@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from ..model.design import RadialSRMParams
 from ..model.errors import InputError, ValidationIssue
 from .primitives import (
-    Arc, Line, Point, Segment, fillet_line_circle, line_circle_intersection, mirror_y, rotate,
+    Arc, Line, Point, Segment, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, rotate,
 )
 
 ORIGIN: Point = (0.0, 0.0)
@@ -131,6 +131,48 @@ def _attribute_pole_fit(prefix: str, face_radius: float, arc: float, taper: floa
         raise _fit_error(parameter, "pole_fit", underlying) from exc
 
 
+def _upper_coil_boundary(p: RadialSRMParams) -> tuple[Segment, ...]:
+    liner = p.slot_liner_thickness
+    r_in = p.bore_radius + p.coil_inner_clearance
+    r_out = p.stator_yoke_inner_radius - 2 * p.stator_fillet_radius - liner
+    if r_out <= r_in:
+        raise _fit_error("coil_inner_clearance", "coil_fit",
+                         ValueError(f"coil radial extent {r_in:.5f}..{r_out:.5f} m is empty"))
+    half = p.stator_pole_arc / 2
+    face_end = (p.bore_radius * math.cos(half), p.bore_radius * math.sin(half))
+    d = (math.cos(p.stator_pole_taper), math.sin(p.stator_pole_taper))
+    n = (-d[1], d[0])
+    # start well inside r_in so the first positive root is the crossing we want
+    flank_start = (face_end[0] + liner * n[0] - p.bore_radius * d[0],
+                   face_end[1] + liner * n[1] - p.bore_radius * d[1])
+    alpha = math.pi / p.n_stator_poles
+    u = (math.cos(alpha), math.sin(alpha))
+    m = (math.sin(alpha), -math.cos(alpha))  # points from the slot centreline towards the pole
+    centre_start = (0.5 * liner * m[0], 0.5 * liner * m[1])
+    a, _ = line_circle_intersection(flank_start, d, r_in)
+    b, _ = line_circle_intersection(flank_start, d, r_out)
+    dd, _ = line_circle_intersection(centre_start, u, r_in)
+    c, _ = line_circle_intersection(centre_start, u, r_out)
+    if not (_angle(a) < _angle(dd) and _angle(b) < _angle(c)):
+        raise _fit_error("slot_liner_thickness", "coil_fit", ValueError("no room for the coil between liners"))
+    return (Line(a, b, "coil"), Arc(b, c, ORIGIN, "coil"), Line(c, dd, "coil"), Arc(dd, a, ORIGIN, "coil"))
+
+
+def _coil_sides(p: RadialSRMParams) -> tuple[CoilSide, ...]:
+    upper = _upper_coil_boundary(p)
+    pitch = 2 * math.pi / p.n_stator_poles
+    sides: list[CoilSide] = []
+    for k in range(p.n_stator_poles):
+        phase, group = k % p.n_phases, k // p.n_phases
+        polarity = 1 if group % 2 == 0 else -1
+        letter = chr(ord("A") + phase)
+        a = k * pitch
+        for sign, fn in ((polarity, lambda q: rotate(q, a)), (-polarity, lambda q: rotate(mirror_y(q), a))):
+            boundary = tuple(map_segment(s, fn) for s in upper)
+            sides.append(CoilSide(f"coil_{letter}{group + 1}{'+' if sign > 0 else '-'}", k, phase, sign, boundary))
+    return tuple(sides)
+
+
 def build_outline(p: RadialSRMParams) -> RadialOutline:
     stator_side = _attribute_pole_fit("stator", p.bore_radius, p.stator_pole_arc, p.stator_pole_taper,
                                       p.stator_yoke_inner_radius, p.stator_fillet_radius, True,
@@ -161,6 +203,6 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
         shaft_radius=p.shaft_radius,
         band_inner_radius=p.band_inner_radius,
         band_outer_radius=p.band_outer_radius,
-        coil_sides=(),
+        coil_sides=_coil_sides(p),
         refinement_features={"pole_tip": tips, "pole_root": roots},
     )
