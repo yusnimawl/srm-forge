@@ -44,6 +44,17 @@ def test_zipper_covers_annulus_exactly(n_in, n_out, offset_frac):
     assert areas.sum() == pytest.approx(_polygon_area(n_out, 1.1) - _polygon_area(n_in, 1.0), rel=1e-12)
 
 
+def test_zipper_band_can_invert_for_a_coarse_outer_ring():
+    # (n_in, n_out) = (64, 8) with r=1, R=1.1: this ring-density mismatch violates zipper_band's
+    # documented precondition -- the raw (un-oriented) output can contain a non-positive-area
+    # triangle. Callers (mesh_at_angle) must check this themselves; orient_ccw only fixes
+    # winding, it cannot fix a genuinely inverted triangle.
+    a_in, a_out, nodes = _rings(64, 8, 0.0)
+    tris = zipper_band(a_in, a_out)
+    areas = _signed(nodes, tris)
+    assert np.any(areas <= 0)
+
+
 def test_every_ring_edge_used_once():
     n = 12
     a_in, a_out, nodes = _rings(n, n, 0.37 * TAU / n)
