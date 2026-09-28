@@ -22,5 +22,6 @@ packages = ["src/srmcore"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = "-ra"
 markers = ["slow: long-running validation tests (nightly or on demand)"]
