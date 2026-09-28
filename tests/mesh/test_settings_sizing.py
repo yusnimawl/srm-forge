@@ -42,6 +42,16 @@ def test_user_overrides(srm_8_6):
     assert r.refinement["pole_root"][1] == pytest.approx(1.3)
 
 
+def test_airgap_region_size_override_propagates_to_gap_and_refinement(srm_8_6):
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(region_sizes={"airgap": 5e-5}))
+    assert r.gap_size == pytest.approx(5e-5)
+    assert r.refinement["pole_tip"][0] == pytest.approx(2.0 * 5e-5)  # full preset tip_factor
+    assert r.band_divisions % 24 == 0
+    r_mid = (srm_8_6.band_inner_radius + srm_8_6.band_outer_radius) / 2
+    pitch_length = r_mid * r.band_pitch
+    assert pitch_length <= 1.5 * r.gap_size + 1e-15
+
+
 def test_size_at_base_feature_and_growth():
     pts = np.array([[0.0, 0.0]])
     features = [(pts, 0.001, 1.5)]

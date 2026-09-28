@@ -111,6 +111,17 @@ def test_mesh_settings_rules(srm_8_6):
     assert ("skin_depth_layers", "not_implemented") in errors
 
 
+def test_airgap_region_size_below_min_layers_rejected(srm_8_6):
+    # air_gap = 0.4 mm, 8 layers => limit 5e-5 m; 4e-4 m gives only ~1 layer.
+    s = MeshSettings(region_sizes={"airgap": 4e-4}, airgap_radial_layers=8)
+    assert ("region_sizes.airgap", "min_layers") in _errors(validate_mesh_settings(s, srm_8_6))
+
+
+def test_airgap_region_size_at_min_layers_accepted(srm_8_6):
+    s = MeshSettings(region_sizes={"airgap": srm_8_6.air_gap / 8}, airgap_radial_layers=8)
+    assert _errors(validate_mesh_settings(s, srm_8_6)) == set()
+
+
 def test_require_valid_raises_with_parameter_names():
     design = Design(machine=make_8_6(air_gap=-1.0))
     with pytest.raises(InputError) as info:

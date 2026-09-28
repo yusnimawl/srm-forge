@@ -146,6 +146,13 @@ def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[Validati
 
     if s.airgap_radial_layers < 4:
         issues.append(_err("airgap_radial_layers", "min_layers", "at least 4 element layers across the air gap"))
+    elif "airgap" in s.region_sizes:
+        airgap_size = s.region_sizes["airgap"]
+        limit = p.air_gap / s.airgap_radial_layers
+        if airgap_size > 0 and airgap_size > limit * (1 + 1e-12):
+            issues.append(_err("region_sizes.airgap", "min_layers",
+                               f"{airgap_size} m gives fewer than {s.airgap_radial_layers} element "
+                               f"layers across the {p.air_gap} m air gap"))
     if s.airgap_circumferential_divisions is not None:
         base = math.lcm(p.n_stator_poles, p.n_rotor_poles)
         n = s.airgap_circumferential_divisions
