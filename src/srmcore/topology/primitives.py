@@ -96,3 +96,19 @@ def fillet_line_circle(p0: Point, d: Point, n: Point, circle_radius: float,
     on_line = (centre[0] - r * n[0], centre[1] - r * n[1])
     k = circle_radius / math.hypot(*centre)
     return Fillet(centre, on_line, (centre[0] * k, centre[1] * k), t)
+
+
+def sample_segment(seg: Segment, max_step: float) -> list[Point]:
+    """Points along the segment, spaced at most max_step apart, both endpoints included."""
+    if isinstance(seg, Line):
+        length = math.dist(seg.start, seg.end)
+        n = max(1, math.ceil(length / max_step))
+        return [(seg.start[0] + (seg.end[0] - seg.start[0]) * i / n,
+                 seg.start[1] + (seg.end[1] - seg.start[1]) * i / n) for i in range(n + 1)]
+    cx, cy = seg.center
+    r = math.dist(seg.start, seg.center)
+    a0 = math.atan2(seg.start[1] - cy, seg.start[0] - cx)
+    a1 = math.atan2(seg.end[1] - cy, seg.end[0] - cx)
+    delta = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi   # minor arc, signed
+    n = max(1, math.ceil(abs(delta) * r / max_step))
+    return [(cx + r * math.cos(a0 + delta * i / n), cy + r * math.sin(a0 + delta * i / n)) for i in range(n + 1)]
