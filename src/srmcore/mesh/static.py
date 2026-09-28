@@ -11,7 +11,6 @@ from ..model.design import Design
 from ..model.errors import ValidationIssue
 from ..model.validator import require_valid
 from .settings import ResolvedMeshSettings, resolve_mesh_settings
-from .sizing import SizeField
 
 TRIANGLE = 2
 LINE = 1
@@ -60,24 +59,51 @@ def _apply_mesh_options(geom: GeometryModel, resolved: ResolvedMeshSettings) -> 
     for curve in (geom.band_inner_curve, geom.band_outer_curve):
         gmsh.model.mesh.setTransfiniteCurve(curve, resolved.band_divisions + 1)
 
+    occ = gmsh.model.occ
+    field = gmsh.model.mesh.field
+    field_ids: list[int] = []
+
+    # Refinement features: size_min + (growth - 1) * distance-to-nearest-sample-point, evaluated
+    # natively by a Distance + MathEval field pair per tag. The sample points are added as free
+    # OCC points (not embedded in any curve/surface) purely to give the Distance field something
+    # to measure to; they must not become mesh-connected, so all points for every tag are added
+    # before a single synchronize(), and the fields are built only after that sync.
+    tag_point_tags: dict[str, list[int]] = {}
+    for tag in resolved.refinement:
+        points = geom.refinement_points.get(tag)
+        if points is None or len(points) == 0:
+            continue
+        tag_point_tags[tag] = [occ.addPoint(float(x), float(y), 0.0) for x, y in points]
+    if tag_point_tags:
+        occ.synchronize()
+    for tag, point_tags in tag_point_tags.items():
+        size_min, growth = resolved.refinement[tag]
+        d = field.add("Distance")
+        field.setNumbers(d, "PointsList", point_tags)
+        m = field.add("MathEval")
+        field.setString(m, "F", f"{size_min!r} + {growth - 1.0!r}*F{d}")
+        field_ids.append(m)
+
+    # Region base sizes: one Constant field per distinct region size, covering its surfaces and
+    # (via IncludeBoundary) their boundary curves/points too, so an interface shared by two
+    # regions gets the min of both regions' sizes once the fields are combined below — the same
+    # rule the old callback's curve_size/point_size dicts implemented by hand.
     surface_size = {t: resolved.region_sizes[geom.region_size_key[name]]
                     for name, tags in geom.region_surfaces.items() for t in tags}
-    curve_size: dict[int, float] = {}
-    for _, c in gmsh.model.getEntities(1):
-        up, _ = gmsh.model.getAdjacencies(1, c)
-        curve_size[c] = min((surface_size[s] for s in up if s in surface_size), default=max_size)
-    point_size: dict[int, float] = {}
-    for _, q in gmsh.model.getEntities(0):
-        up, _ = gmsh.model.getAdjacencies(0, q)
-        point_size[q] = min((curve_size[c] for c in up if c in curve_size), default=max_size)
-    by_dim = {0: point_size, 1: curve_size, 2: surface_size}
-    field = SizeField([(geom.refinement_points[tag], size, growth)
-                       for tag, (size, growth) in resolved.refinement.items() if tag in geom.refinement_points])
+    surfaces_by_size: dict[float, list[int]] = {}
+    for t, v in surface_size.items():
+        surfaces_by_size.setdefault(v, []).append(t)
+    for v, surfaces in surfaces_by_size.items():
+        c = field.add("Constant")
+        field.setNumber(c, "VIn", v)
+        field.setNumber(c, "VOut", max_size)
+        field.setNumbers(c, "SurfacesList", surfaces)
+        field.setNumber(c, "IncludeBoundary", 1)
+        field_ids.append(c)
 
-    def callback(dim: int, tag: int, x: float, y: float, z: float, lc: float) -> float:
-        return field(x, y, by_dim.get(dim, {}).get(tag, max_size))
-
-    gmsh.model.mesh.setSizeCallback(callback)
+    mn = field.add("Min")
+    field.setNumbers(mn, "FieldsList", field_ids)
+    field.setAsBackgroundMesh(mn)
 
 
 def _all_nodes() -> tuple[np.ndarray, np.ndarray]:
@@ -138,10 +164,7 @@ def build_static_mesh(design: Design) -> StaticMesh:
     with gmsh_model():
         geom = build_machine_geometry(p, feature_step=resolved.gap_size)
         _apply_mesh_options(geom, resolved)
-        try:
-            gmsh.model.mesh.generate(2)
-        finally:
-            gmsh.model.mesh.removeSizeCallback()
+        gmsh.model.mesh.generate(2)
         region_names = tuple(sorted(geom.region_surfaces))
         sorted_tags, sorted_xy = _all_nodes()
         stator, stator_used = _extract_part(geom, region_names, "stator", sorted_tags, sorted_xy)

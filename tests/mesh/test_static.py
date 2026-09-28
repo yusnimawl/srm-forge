@@ -6,7 +6,9 @@ import pytest
 from conftest import make_8_6
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.errors import InputError
-from srmcore.mesh.sizing import SizeField, size_at
+from srmcore.mesh.api import build_machine_mesh
+from srmcore.mesh.machine import mesh_at_angle
+from srmcore.mesh.quality import quality_report
 from srmcore.mesh.static import build_static_mesh, orient_ccw
 
 
@@ -19,14 +21,6 @@ def _areas(nodes, tris):
     p = nodes[tris]
     return 0.5 * ((p[:, 1, 0] - p[:, 0, 0]) * (p[:, 2, 1] - p[:, 0, 1])
                   - (p[:, 2, 0] - p[:, 0, 0]) * (p[:, 1, 1] - p[:, 0, 1]))
-
-
-def test_size_field_matches_size_at():
-    rng = np.random.default_rng(0)
-    features = [(rng.random((50, 2)), 0.01, 1.3), (rng.random((5, 2)), 0.002, 1.1)]
-    field = SizeField(features)
-    for x, y in rng.random((20, 2)):
-        assert field(x, y, 0.05) == pytest.approx(size_at(x, y, 0.05, features))
 
 
 def test_orient_ccw_flips_clockwise():
@@ -93,3 +87,27 @@ def test_rotor_mesh_is_not_disproportionately_larger(static_8_6):
     # airgap size class, which previously produced a rotor mesh ~23x the stator's.
     s = static_8_6
     assert len(s.rotor.triangles) < 5 * len(s.stator.triangles)
+
+
+def test_no_stray_refinement_point_nodes(static_8_6):
+    # Task 11b: free (non-embedded) points added for the Distance/MathEval size fields must not
+    # leak into a MeshPart. Every node kept in a part must be referenced by at least one triangle.
+    for part in (static_8_6.stator, static_8_6.rotor):
+        used = np.unique(part.triangles)
+        assert used.tolist() == list(range(len(part.nodes)))
+
+
+def test_mesh_gate_passes_for_8_6_screening():
+    # build_machine_mesh raises MeshRejected if quality drops below the settings' thresholds
+    # (min angle >= 10 deg for the default screening preset); reaching this point is the gate.
+    static = build_machine_mesh(Design(machine=make_8_6(), mesh=MeshSettings(preset="screening")))
+    report = quality_report(mesh_at_angle(static, 0.0, check=False))
+    assert report.min_angle_deg >= static.settings.min_angle_deg
+
+
+def test_triangle_count_regression_within_25pct_of_baseline(static_8_6):
+    # Baseline measured from the pre-Task-11b Python size-callback build (same 8/6 screening
+    # design), recorded in task-11b-report.md: stator 42132, rotor 15146 triangles.
+    s = static_8_6
+    assert len(s.stator.triangles) == pytest.approx(42132, rel=0.25)
+    assert len(s.rotor.triangles) == pytest.approx(15146, rel=0.25)
