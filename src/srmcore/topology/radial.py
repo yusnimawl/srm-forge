@@ -102,6 +102,12 @@ def _salient_boundary(n_poles: int, side: _PoleSide, prefix: str) -> tuple[tuple
     return tuple(segs), corners
 
 
+def _full_circle(radius: float, tag: str) -> tuple[Arc, ...]:
+    """A full circle of the given radius as 4 quarter-circle minor arcs centred on ORIGIN."""
+    pts = [(radius * math.cos(a), radius * math.sin(a)) for a in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2)]
+    return tuple(Arc(pts[i], pts[(i + 1) % 4], ORIGIN, tag) for i in range(4))
+
+
 def _fit_error(parameter: str, rule: str, exc: Exception) -> InputError:
     return InputError([ValidationIssue(parameter, rule, str(exc))])
 
@@ -196,6 +202,15 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
 
     coil_sides = _coil_sides(p)
     refinement_features: dict[str, tuple[Segment | Point, ...]] = {"pole_tip": tips, "pole_root": roots}
+    # The background size jumps from the air gap's fine size to the iron-scale size right across
+    # the slot-mouth arcs, where airgap_stator meets slot_air (at bore_radius) and airgap_rotor
+    # meets rotor_slot_air (at rotor_outer_radius), with no grading in between: a forced-fine curve
+    # (via the airgap regions' IncludeBoundary) butting straight into a coarse interior produces
+    # sliver triangles all along those arcs (Task 12's property-test finding). Grading the size
+    # away from both interfaces fixes it without touching IncludeBoundary, region sizes or the
+    # quality thresholds.
+    refinement_features["airgap_interface"] = (_full_circle(p.rotor_outer_radius, "rotor_airgap_interface")
+                                               + _full_circle(p.bore_radius, "stator_airgap_interface"))
     if p.slot_liner_thickness > 0:
         # The liner strip in slot_air is thin (slot_liner_thickness) compared to the generic
         # "iron"-scale element size, so it needs its own refinement feature to avoid forced

@@ -53,6 +53,11 @@ def test_airgap_region_size_override_propagates_to_gap_and_refinement(srm_8_6):
     assert pitch_length <= 1.5 * r.gap_size + 1e-15
 
 
+def test_airgap_interface_refinement_is_gap_size(srm_8_6):
+    r = resolve_mesh_settings(srm_8_6, MeshSettings())
+    assert r.refinement["airgap_interface"] == (r.gap_size, 1.3)
+
+
 def test_slot_liner_refinement_is_max_of_liner_and_gap(srm_8_6):
     r = resolve_mesh_settings(srm_8_6, MeshSettings())
     assert r.refinement["slot_liner"] == (max(srm_8_6.slot_liner_thickness, r.gap_size), 1.3)

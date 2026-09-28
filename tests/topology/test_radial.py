@@ -78,6 +78,19 @@ def test_refinement_features_with_fillets(srm_8_6):
     assert len(roots) == 2 * (8 + 6) and all(isinstance(r, Arc) for r in roots)
 
 
+def test_airgap_interface_refinement_feature(srm_8_6):
+    p = srm_8_6
+    o = build_outline(p)
+    arcs = o.refinement_features["airgap_interface"]
+    assert len(arcs) == 8
+    assert all(isinstance(a, Arc) for a in arcs)
+    radii = sorted({round(math.hypot(*a.start), 9) for a in arcs} | {round(math.hypot(*a.end), 9) for a in arcs})
+    assert radii == sorted([round(p.rotor_outer_radius, 9), round(p.bore_radius, 9)])
+    for a in arcs:
+        assert math.hypot(*a.start) == pytest.approx(math.hypot(*a.end))
+        assert a.center == (0.0, 0.0)
+
+
 def test_slot_liner_refinement_feature(srm_8_6):
     o = build_outline(srm_8_6)
     liner = o.refinement_features["slot_liner"]

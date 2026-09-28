@@ -106,8 +106,11 @@ def test_mesh_gate_passes_for_8_6_screening():
 
 
 def test_triangle_count_regression_within_25pct_of_baseline(static_8_6):
-    # Baseline measured from the pre-Task-11b Python size-callback build (same 8/6 screening
-    # design), recorded in task-11b-report.md: stator 42132, rotor 15146 triangles.
+    # Baseline measured after Task 12's "airgap_interface" grading fix (same 8/6 screening
+    # design), recorded in task-12-report.md: stator 54674, rotor 29310 triangles. The previous
+    # (pre-Task-12) baseline of stator 42132 / rotor 15146 no longer applies: grading the size away
+    # from the slot-mouth arcs (see topology/radial.py, mesh/settings.py) intentionally adds
+    # triangles there to fix rotor_slot_air/slot_air sliver triangles below the quality gate.
     s = static_8_6
-    assert len(s.stator.triangles) == pytest.approx(42132, rel=0.25)
-    assert len(s.rotor.triangles) == pytest.approx(15146, rel=0.25)
+    assert len(s.stator.triangles) == pytest.approx(54674, rel=0.25)
+    assert len(s.rotor.triangles) == pytest.approx(29310, rel=0.25)

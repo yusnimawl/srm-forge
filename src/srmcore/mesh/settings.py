@@ -47,6 +47,10 @@ def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSe
     refinement = {
         "pole_tip": (preset.tip_factor * gap, DEFAULT_GROWTH),
         "pole_root": (iron / 4, DEFAULT_GROWTH),
+        # Grades the size away from the slot-mouth arcs where the airgap regions' fine size meets
+        # the iron-scale background (Task 12's property-test finding); internal only, not a
+        # user-overridable MeshSettings.refinement tag.
+        "airgap_interface": (gap, DEFAULT_GROWTH),
     }
     if p.slot_liner_thickness > 0:
         # The liner strip is much thinner than the generic "iron"-scale element size, and with
