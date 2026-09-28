@@ -9,7 +9,7 @@ from ..topology.primitives import Line, Point, Segment, sample_segment
 from ..topology.radial import RadialOutline, build_outline
 
 STATOR_REGIONS = ("stator_iron", "slot_air", "airgap_stator")
-ROTOR_REGIONS = ("rotor_iron", "shaft", "airgap_rotor")
+ROTOR_REGIONS = ("rotor_iron", "shaft", "airgap_rotor", "rotor_slot_air")
 
 
 @dataclass(frozen=True)
@@ -64,6 +64,8 @@ def _size_key(region: str) -> str:
         return "coil"
     if region.startswith("airgap_"):
         return "airgap"
+    if region == "rotor_slot_air":
+        return "slot_air"
     return region
 
 
@@ -102,7 +104,12 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
     rotor_area = occ.addPlaneSurface([occ.addCurveLoop(_curves(outline.rotor_outer_boundary, points, centres))])
     shaft = _disk(outline.shaft_radius)
     band_in_disk = _disk(outline.band_inner_radius)
-    gap_rotor, _ = occ.cut([(2, band_in_disk)], [(2, rotor_area)], removeObject=True, removeTool=False)
+    rotor_od_disk = _disk(outline.rotor_outer_radius)
+    # airgap_rotor is just the thin physical gap between the rotor OD and the band; the interpolar
+    # air down to the star-shaped rotor outline is its own region (rotor_slot_air), so it doesn't
+    # inherit the airgap's very fine size class (see Task 9 fix round 1).
+    airgap_rotor, _ = occ.cut([(2, band_in_disk)], [(2, rotor_od_disk)], removeObject=True, removeTool=False)
+    rotor_slot_air, _ = occ.cut([(2, rotor_od_disk)], [(2, rotor_area)], removeObject=True, removeTool=False)
     rotor_iron, _ = occ.cut([(2, rotor_area)], [(2, shaft)], removeObject=True, removeTool=False)
 
     occ.remove([(0, c) for c in centres])
@@ -110,7 +117,8 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
     named: list[tuple[str, list[tuple[int, int]]]] = (
         [("stator_iron", [(2, stator_iron)]), ("slot_air", slot_air), ("airgap_stator", gap_stator)]
         + [(name, [(2, tag)]) for name, tag in coils]
-        + [("rotor_iron", rotor_iron), ("shaft", [(2, shaft)]), ("airgap_rotor", gap_rotor)]
+        + [("rotor_iron", rotor_iron), ("shaft", [(2, shaft)]),
+           ("airgap_rotor", airgap_rotor), ("rotor_slot_air", rotor_slot_air)]
     )
     objects = [dt for _, dts in named for dt in dts]
     _, out_map = occ.fragment(objects, [])

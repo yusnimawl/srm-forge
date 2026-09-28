@@ -86,3 +86,10 @@ def test_gap_elements_are_small(static_8_6):
 def test_invalid_design_fails_before_gmsh():
     with pytest.raises(InputError):
         build_static_mesh(Design(machine=make_8_6(air_gap=-0.001)))
+
+
+def test_rotor_mesh_is_not_disproportionately_larger(static_8_6):
+    # Guards against a region (e.g. the interpolar rotor slot air) falling back into the
+    # airgap size class, which previously produced a rotor mesh ~23x the stator's.
+    s = static_8_6
+    assert len(s.rotor.triangles) < 5 * len(s.stator.triangles)

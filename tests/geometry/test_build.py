@@ -23,12 +23,16 @@ def test_regions_parts_and_areas(srm_8_6):
         assert all(g.region_part[n] == "rotor" for n in ROTOR_REGIONS)
         assert g.region_size_key["coil_A1+"] == "coil"
         assert g.region_size_key["airgap_rotor"] == "airgap"
+        assert g.region_part["rotor_slot_air"] == "rotor"
+        assert g.region_size_key["rotor_slot_air"] == "slot_air"
 
         stator_total = sum(_area(g.region_surfaces[n]) for n in g.region_surfaces if g.region_part[n] == "stator")
         rotor_total = sum(_area(g.region_surfaces[n]) for n in g.region_surfaces if g.region_part[n] == "rotor")
         assert stator_total == pytest.approx(math.pi * (o.stator_outer_radius**2 - o.band_outer_radius**2), rel=1e-6)
         assert rotor_total == pytest.approx(math.pi * o.band_inner_radius**2, rel=1e-6)
         assert _area(g.region_surfaces["shaft"]) == pytest.approx(math.pi * o.shaft_radius**2, rel=1e-6)
+        assert _area(g.region_surfaces["airgap_rotor"]) == pytest.approx(
+            math.pi * (o.band_inner_radius**2 - o.rotor_outer_radius**2), rel=1e-6)
         assert all(_area(g.region_surfaces[n]) > 0 for n in coil_names)
 
 
