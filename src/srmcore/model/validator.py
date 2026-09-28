@@ -15,6 +15,17 @@ _UNIT_RANGES: dict[str, tuple[float, float]] = {
 }
 _TOL = 1e-9
 
+# All float fields of RadialSRMParams that a design supplies directly (not derived properties).
+_PARAM_FLOAT_FIELDS = (
+    "stator_outer_diameter", "rotor_outer_diameter", "air_gap", "stack_length",
+    "shaft_diameter", "stator_pole_arc", "rotor_pole_arc",
+    "stator_pole_taper", "rotor_pole_taper",
+    "stator_yoke_thickness", "rotor_yoke_thickness",
+    "stator_fillet_radius", "rotor_fillet_radius",
+    "fill_factor", "slot_liner_thickness", "coil_inner_clearance",
+)
+_PARAM_OPTIONAL_FLOAT_FIELDS = ("lamination_thickness", "max_speed_rpm")
+
 
 def _err(parameter: str, rule: str, message: str) -> ValidationIssue:
     return ValidationIssue(parameter, rule, message, "error")
@@ -26,6 +37,21 @@ def _warn(parameter: str, rule: str, message: str) -> ValidationIssue:
 
 def validate_params(p: RadialSRMParams) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+
+    non_finite = False
+    for name in _PARAM_FLOAT_FIELDS:
+        if not math.isfinite(getattr(p, name)):
+            issues.append(_err(name, "finite", "must be a finite number"))
+            non_finite = True
+    for name in _PARAM_OPTIONAL_FLOAT_FIELDS:
+        value = getattr(p, name)
+        if value is not None and not math.isfinite(value):
+            issues.append(_err(name, "finite", "must be a finite number"))
+            non_finite = True
+    if non_finite:
+        # A NaN/inf field makes every downstream comparison meaningless (they are
+        # all silently False), so stop here rather than emit misleading secondary errors.
+        return issues
 
     for name in ("n_stator_poles", "n_rotor_poles", "n_phases"):
         if getattr(p, name) < 2:
@@ -96,6 +122,28 @@ def validate_params(p: RadialSRMParams) -> list[ValidationIssue]:
 
 def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+
+    non_finite = False
+    for key, size in s.region_sizes.items():
+        if not math.isfinite(size):
+            issues.append(_err(f"region_sizes.{key}", "finite", "must be a finite number"))
+            non_finite = True
+    for tag, ref in s.refinement.items():
+        if not math.isfinite(ref.size):
+            issues.append(_err(f"refinement.{tag}.size", "finite", "must be a finite number"))
+            non_finite = True
+        if not math.isfinite(ref.growth):
+            issues.append(_err(f"refinement.{tag}.growth", "finite", "must be a finite number"))
+            non_finite = True
+    for name in ("min_angle_deg", "band_min_angle_deg", "max_aspect_ratio"):
+        if not math.isfinite(getattr(s, name)):
+            issues.append(_err(name, "finite", "must be a finite number"))
+            non_finite = True
+    if non_finite:
+        # As in validate_params: a NaN/inf value makes every downstream comparison
+        # meaningless, so stop here rather than emit misleading secondary errors.
+        return issues
+
     if s.airgap_radial_layers < 4:
         issues.append(_err("airgap_radial_layers", "min_layers", "at least 4 element layers across the air gap"))
     if s.airgap_circumferential_divisions is not None:

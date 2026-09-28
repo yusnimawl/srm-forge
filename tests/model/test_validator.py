@@ -82,6 +82,18 @@ def test_thick_lamination_at_high_frequency_warns():
     assert ("lamination_thickness", "lamination_frequency") in _warnings(validate_params(p))
 
 
+@pytest.mark.parametrize("field", ["air_gap", "shaft_diameter", "stator_pole_arc"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_values_rejected(field, bad):
+    p = make_8_6(**{field: bad})
+    assert (field, "finite") in _errors(validate_params(p))
+
+
+def test_mesh_settings_nan_region_size_rejected(srm_8_6):
+    s = MeshSettings(region_sizes={"stator_iron": float("nan")})
+    assert ("region_sizes.stator_iron", "finite") in _errors(validate_mesh_settings(s, srm_8_6))
+
+
 def test_mesh_settings_rules(srm_8_6):
     s = MeshSettings(
         airgap_radial_layers=3,
