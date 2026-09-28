@@ -49,5 +49,22 @@ def test_fillet_is_tangent_to_line_and_circle(inside, p0, d):
 
 
 def test_fillet_too_large_raises():
-    with pytest.raises(ValueError):
+    # fillet_radius=0.5 pushes the offset line clean past the fillet_radius=1.0-0.5
+    # inner circle before it ever reaches it: the second line_circle_intersection
+    # call itself has no real roots.
+    with pytest.raises(ValueError, match="does not reach"):
         fillet_line_circle((0.9, 0.1), (1.0, 0.0), (0.0, 1.0), 1.0, 0.5, inside=True)
+
+
+def test_fillet_does_not_fit_inside_raises():
+    # The offset line does intersect the inner circle, but at t < 0 (behind p0),
+    # so the fit check -- not the intersection -- is what raises here.
+    with pytest.raises(ValueError, match="does not fit"):
+        fillet_line_circle((0.9, 0.0), (1.0, 0.0), (0.0, 1.0), 1.0, 0.2, inside=True)
+
+
+def test_fillet_does_not_fit_outside_raises():
+    # Same shape of failure on the outside branch: the offset line meets the
+    # R + r circle at t < 0, behind p0.
+    with pytest.raises(ValueError, match="does not fit"):
+        fillet_line_circle((1.1, 0.0), (-1.0, 0.0), (0.0, 1.0), 1.0, 0.2, inside=False)
