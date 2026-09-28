@@ -78,6 +78,18 @@ def test_refinement_features_with_fillets(srm_8_6):
     assert len(roots) == 2 * (8 + 6) and all(isinstance(r, Arc) for r in roots)
 
 
+def test_slot_liner_refinement_feature(srm_8_6):
+    o = build_outline(srm_8_6)
+    liner = o.refinement_features["slot_liner"]
+    assert len(liner) == 4 * 2 * srm_8_6.n_stator_poles
+    assert all(isinstance(s, (Line, Arc)) and s.tag == "coil" for s in liner)
+
+
+def test_slot_liner_refinement_feature_absent_when_no_liner():
+    o = build_outline(make_8_6(slot_liner_thickness=0.0))
+    assert "slot_liner" not in o.refinement_features
+
+
 def test_band_radii_and_tags(srm_8_6):
     o = build_outline(srm_8_6)
     assert o.rotor_outer_radius < o.band_inner_radius < o.band_outer_radius < o.bore_radius

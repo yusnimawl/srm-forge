@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pytest
 
+from conftest import make_8_6
 from srmcore.model.design import EdgeRefinement, MeshSettings
 from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.mesh.sizing import size_at
@@ -50,6 +51,22 @@ def test_airgap_region_size_override_propagates_to_gap_and_refinement(srm_8_6):
     r_mid = (srm_8_6.band_inner_radius + srm_8_6.band_outer_radius) / 2
     pitch_length = r_mid * r.band_pitch
     assert pitch_length <= 1.5 * r.gap_size + 1e-15
+
+
+def test_slot_liner_refinement_is_max_of_liner_and_gap(srm_8_6):
+    r = resolve_mesh_settings(srm_8_6, MeshSettings())
+    assert r.refinement["slot_liner"] == (max(srm_8_6.slot_liner_thickness, r.gap_size), 1.3)
+
+
+def test_slot_liner_refinement_uses_gap_floor_when_liner_is_thinner(srm_8_6):
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(region_sizes={"airgap": 0.01}))
+    assert r.gap_size > srm_8_6.slot_liner_thickness
+    assert r.refinement["slot_liner"][0] == pytest.approx(r.gap_size)
+
+
+def test_slot_liner_refinement_absent_when_no_liner():
+    r = resolve_mesh_settings(make_8_6(slot_liner_thickness=0.0), MeshSettings())
+    assert "slot_liner" not in r.refinement
 
 
 def test_size_at_base_feature_and_growth():

@@ -48,6 +48,11 @@ def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSe
         "pole_tip": (preset.tip_factor * gap, DEFAULT_GROWTH),
         "pole_root": (iron / 4, DEFAULT_GROWTH),
     }
+    if p.slot_liner_thickness > 0:
+        # The liner strip is much thinner than the generic "iron"-scale element size, and with
+        # no dedicated refinement it gets forced sliver triangles (Task 11's quality-gate
+        # finding). `gap` is a floor so this never asks for elements finer than the airgap.
+        refinement["slot_liner"] = (max(p.slot_liner_thickness, gap), DEFAULT_GROWTH)
     for tag, ref in s.refinement.items():
         refinement[tag] = (ref.size, ref.growth)
     if s.airgap_circumferential_divisions is not None:

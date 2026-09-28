@@ -194,6 +194,14 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
     else:
         roots = tuple(stator_corners + rotor_corners)
 
+    coil_sides = _coil_sides(p)
+    refinement_features: dict[str, tuple[Segment | Point, ...]] = {"pole_tip": tips, "pole_root": roots}
+    if p.slot_liner_thickness > 0:
+        # The liner strip in slot_air is thin (slot_liner_thickness) compared to the generic
+        # "iron"-scale element size, so it needs its own refinement feature to avoid forced
+        # sliver triangles; see Task 11's quality-gate finding.
+        refinement_features["slot_liner"] = tuple(seg for side in coil_sides for seg in side.boundary)
+
     return RadialOutline(
         stator_outer_radius=p.stator_outer_radius,
         stator_inner_boundary=stator,
@@ -203,6 +211,6 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
         shaft_radius=p.shaft_radius,
         band_inner_radius=p.band_inner_radius,
         band_outer_radius=p.band_outer_radius,
-        coil_sides=_coil_sides(p),
-        refinement_features={"pole_tip": tips, "pole_root": roots},
+        coil_sides=coil_sides,
+        refinement_features=refinement_features,
     )
