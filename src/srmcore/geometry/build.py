@@ -4,8 +4,9 @@ from dataclasses import dataclass
 import gmsh
 import numpy as np
 
+from ..model.design import RadialSRMParams
 from ..topology.primitives import Line, Point, Segment, sample_segment
-from ..topology.radial import RadialOutline
+from ..topology.radial import RadialOutline, build_outline
 
 STATOR_REGIONS = ("stator_iron", "slot_air", "airgap_stator")
 ROTOR_REGIONS = ("rotor_iron", "shaft", "airgap_rotor")
@@ -153,3 +154,7 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
         band_inner_radius=outline.band_inner_radius, band_outer_radius=outline.band_outer_radius,
         refinement_points=refinement_points,
     )
+
+
+def build_machine_geometry(p: RadialSRMParams, feature_step: float) -> GeometryModel:
+    return build_geometry(build_outline(p), feature_step)

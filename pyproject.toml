@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.6",
     "gmsh>=4.12",
     "matplotlib>=3.8",
+    "scipy>=1.12",
 ]
 
 [project.optional-dependencies]
