@@ -70,8 +70,11 @@ def _pole_side(face_radius: float, arc: float, taper: float, root_radius: float,
         side = _PoleSide(face_end, f.on_line, f.on_circle, f.center, corner)
     else:
         side = _PoleSide(face_end, corner, corner, None, corner)
-    if not (0.0 < _angle(side.root_end) < pitch / 2):
-        raise ValueError("pole root leaves no room between neighbouring poles")
+    root_angle = _angle(side.root_end)
+    if root_angle <= 0.0:
+        raise ValueError("flank crosses the pole axis")
+    if root_angle >= pitch / 2:
+        raise ValueError("no room between neighbouring poles")
     return side
 
 
@@ -103,21 +106,38 @@ def _fit_error(parameter: str, rule: str, exc: Exception) -> InputError:
     return InputError([ValidationIssue(parameter, rule, str(exc))])
 
 
+def _attribute_pole_fit(prefix: str, face_radius: float, arc: float, taper: float, root_radius: float,
+                        fillet_radius: float, outward: bool, pitch: float) -> _PoleSide:
+    """Build one pole's side, blaming the parameter that's actually responsible on failure.
+
+    a. Pole face wider than the pole pitch -> *_pole_arc.
+    b. Otherwise, if the same pole fits with no fillet but not with one -> *_fillet_radius.
+    c. Otherwise (fails even without a fillet) -> *_pole_taper when taper != 0, else *_pole_arc.
+    """
+    try:
+        return _pole_side(face_radius, arc, taper, root_radius, fillet_radius, outward, pitch)
+    except ValueError as exc:
+        if "wider than the pole pitch" in str(exc):
+            raise _fit_error(f"{prefix}_pole_arc", "pole_fit", exc) from exc
+        underlying = exc
+        if fillet_radius > 0:
+            try:
+                _pole_side(face_radius, arc, taper, root_radius, 0.0, outward, pitch)
+            except ValueError as sharp_exc:
+                underlying = sharp_exc
+            else:
+                raise _fit_error(f"{prefix}_fillet_radius", "pole_fit", exc) from exc
+        parameter = f"{prefix}_pole_taper" if taper != 0.0 else f"{prefix}_pole_arc"
+        raise _fit_error(parameter, "pole_fit", underlying) from exc
+
+
 def build_outline(p: RadialSRMParams) -> RadialOutline:
-    try:
-        stator_side = _pole_side(p.bore_radius, p.stator_pole_arc, p.stator_pole_taper,
-                                 p.stator_yoke_inner_radius, p.stator_fillet_radius, True,
-                                 2 * math.pi / p.n_stator_poles)
-    except ValueError as exc:
-        raise _fit_error("stator_fillet_radius" if p.stator_fillet_radius > 0 else "stator_pole_arc",
-                         "pole_fit", exc) from exc
-    try:
-        rotor_side = _pole_side(p.rotor_outer_radius, p.rotor_pole_arc, p.rotor_pole_taper,
-                                p.rotor_yoke_outer_radius, p.rotor_fillet_radius, False,
-                                2 * math.pi / p.n_rotor_poles)
-    except ValueError as exc:
-        raise _fit_error("rotor_fillet_radius" if p.rotor_fillet_radius > 0 else "rotor_pole_arc",
-                         "pole_fit", exc) from exc
+    stator_side = _attribute_pole_fit("stator", p.bore_radius, p.stator_pole_arc, p.stator_pole_taper,
+                                      p.stator_yoke_inner_radius, p.stator_fillet_radius, True,
+                                      2 * math.pi / p.n_stator_poles)
+    rotor_side = _attribute_pole_fit("rotor", p.rotor_outer_radius, p.rotor_pole_arc, p.rotor_pole_taper,
+                                     p.rotor_yoke_outer_radius, p.rotor_fillet_radius, False,
+                                     2 * math.pi / p.n_rotor_poles)
 
     stator, stator_corners = _salient_boundary(p.n_stator_poles, stator_side, "stator")
     rotor, rotor_corners = _salient_boundary(p.n_rotor_poles, rotor_side, "rotor")
