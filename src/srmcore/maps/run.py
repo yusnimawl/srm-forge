@@ -91,7 +91,7 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
     # aligned-position check of the failure policy would be wrong for them.
     if excited != "A":
         raise ValueError(f"excited circuit {excited!r} is not supported yet: only phase A is aligned at θ=0")
-    if len(currents) < 2 or np.any(np.diff(currents) <= 0):
+    if len(currents) < 2 or not np.all(np.isfinite(currents)) or np.any(np.diff(currents) <= 0):
         raise ValueError("currents must be strictly increasing with at least two values")
     solver = make_solver(solver_name)
     n_a, n_i = len(angles), len(currents)

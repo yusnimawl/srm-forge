@@ -28,7 +28,8 @@ def _fake(monkeypatch, failing=(), currents=CURRENTS):
         return PointResult(
             angle=angle, circuits=CIRCUITS, currents=np.array([amps, 0.0, 0.0, 0.0]),
             psi=np.full(4, 1e9) if failed else psi, torque_arkkio=1e9 if failed else 0.5 * amps,
-            torque_virtual_work=0.5 * amps, energy=0.2 * amps, coenergy=0.3 * amps,
+            torque_virtual_work=1e9 if failed else 0.5 * amps, energy=0.2 * amps,
+            coenergy=1e9 if failed else 0.3 * amps,
             status=SolveStatus.NONCONVERGED if failed else SolveStatus.OK,
             iterations=3, fallbacks=(), load_fraction=1.0)
 
@@ -91,7 +92,7 @@ def test_only_phase_a_is_supported(monkeypatch, excited):
         _run(excited=excited)
 
 
-@pytest.mark.parametrize("currents", [[0.0, 2.0, 2.0], [3.0, 1.0], [1.0]])
+@pytest.mark.parametrize("currents", [[0.0, 2.0, 2.0], [3.0, 1.0], [1.0], [0.0, np.nan, 4.0], [0.0, 2.0, np.inf]])
 def test_currents_must_increase(monkeypatch, currents):
     _fake(monkeypatch)
     with pytest.raises(ValueError, match="currents"):
