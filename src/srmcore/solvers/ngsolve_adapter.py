@@ -14,7 +14,7 @@ from netgen.meshing import Mesh as NetgenMesh
 from ..fields.solution import FieldSolution, SolveStatus
 from ..materials.laws import LinearLaw
 from ..physics.energy import field_energies
-from ..physics.fem import element_flux_density
+from ..physics.fem import element_flux_density, p1_gradients, secant_residual
 from ..physics.problem import Magnetostatic2D
 from .settings import ELEMENT_ORDER, QUADRATURE_ORDER, NewtonSettings
 
@@ -39,10 +39,12 @@ def _netgen_mesh(nodes: np.ndarray, triangles: np.ndarray) -> ng.Mesh:
 class _Discretisation:
     """NGSolve spaces and forms for one mesh. The triangle rule is pinned to QUADRATURE_ORDER, the same as
     the scikit-fem reference. ν, dν/dB² and J are element-constant (order-0 L2) and P1 gradients are
-    constant, so the integrals are exact at that order anyway."""
+    constant, so the integrals are exact at that order anyway. Only the tangent is assembled in NGSolve;
+    the secant residual is `physics.fem.secant_residual`."""
 
     def __init__(self, nodes: np.ndarray, triangles: np.ndarray):
         self.nodes, self.triangles = nodes, triangles
+        self.grads, self.areas = p1_gradients(nodes, triangles)
         mesh = _netgen_mesh(nodes, triangles)
         space = ng.H1(mesh, order=ELEMENT_ORDER)
         if space.ndof != len(nodes):
@@ -53,8 +55,6 @@ class _Discretisation:
         trial, test = space.TnT()
         grad_a = ng.grad(self.u)
         dx = ng.dx(intrules={ng.TRIG: ng.IntegrationRule(ng.TRIG, QUADRATURE_ORDER)})
-        self.secant = ng.BilinearForm(space)
-        self.secant += self.nu * ng.grad(trial) * ng.grad(test) * dx
         self.tangent = ng.BilinearForm(space)
         self.tangent += (self.nu * ng.grad(trial) * ng.grad(test)
                          + 2 * self.dnu * (ng.grad(trial) * grad_a) * (ng.grad(test) * grad_a)) * dx
@@ -100,11 +100,8 @@ class _System:
 
     def residual(self, a: np.ndarray, f: np.ndarray):
         _, nu, dnu = self.material(a)
-        self._bind(a, nu, dnu)
-        self.disc.secant.Assemble()
-        r = self.disc.secant.mat.CreateColVector()
-        r.data = self.disc.secant.mat * self.disc.u.vec
-        return r.FV().NumPy() - f, nu, dnu
+        r = secant_residual(self.disc.grads, self.disc.areas, self.problem.triangles, nu, a)
+        return r - f, nu, dnu
 
     def solve_tangent(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray, rhs: np.ndarray) -> np.ndarray:
         self._bind(a, nu, dnu)

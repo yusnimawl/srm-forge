@@ -60,3 +60,12 @@ def test_8_6_agrees_at_ten_degrees(static):
 def test_8_6_agrees_across_angles_and_currents(static, theta, amps):
     """Includes angles between band grid positions and angles that wrap past 2π."""
     _agree(machine_problem(mesh_at_angle(static, theta), DESIGN, {"A": amps}))
+
+
+def test_reused_adapter_matches_a_fresh_one_after_the_mesh_changes(static):
+    reused = NgsolveAdapter()
+    for degrees in (10.0, 20.0):
+        p = machine_problem(mesh_at_angle(static, math.radians(degrees)), DESIGN, {"A": 5.0})
+        fresh = NgsolveAdapter().solve(p)
+        again = reused.solve(p)
+        assert np.abs(again.a - fresh.a).max() <= 1e-9 * np.abs(fresh.a).max()

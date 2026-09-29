@@ -34,3 +34,13 @@ Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc 
 1. Brainstorm, then write `docs/superpowers/plans/<date>-m4-maps.md`.
 2. Task 1: `solve_point` and its test (both solvers agree at 1e-4).
 3. Then the speed spike (item 2) before building grids, because it sets the grid sizes.
+
+## Speed measurements
+8/6 screening mesh (42935 nodes), 20 A on phase A, `examples/solve_speed.py`. Before: NGSolve with the secant residual assembled in NGSolve. After: numpy secant residual, NGSolve tangent.
+
+| NGSolve | cold 20 A | Newton it | sweep 5-10-20 A (warm) |
+|---|---|---|---|
+| before | 9 s | 11 | not measured |
+| after | 5.3 s | 11 | 11.9 s, 26 it |
+
+skfem_reference for comparison: cold 6.2 s (11 it), sweep 12.1 s (26 it).
