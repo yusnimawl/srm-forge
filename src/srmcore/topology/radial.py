@@ -49,6 +49,8 @@ class _PoleSide:
 
 
 def periodicity(p: RadialSRMParams) -> int:
+    """gcd(Ns, Nr): the number of geometrically identical sectors. Reserved for sector symmetry
+    (not used in M1, which always solves the full machine)."""
     return math.gcd(p.n_stator_poles, p.n_rotor_poles)
 
 
@@ -206,15 +208,14 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
     # the slot-mouth arcs, where airgap_stator meets slot_air (at bore_radius) and airgap_rotor
     # meets rotor_slot_air (at rotor_outer_radius), with no grading in between: a forced-fine curve
     # (via the airgap regions' IncludeBoundary) butting straight into a coarse interior produces
-    # sliver triangles all along those arcs (Task 12's property-test finding). Grading the size
-    # away from both interfaces fixes it without touching IncludeBoundary, region sizes or the
-    # quality thresholds.
+    # sliver triangles all along those arcs. Grading the size away from both interfaces fixes it
+    # without touching IncludeBoundary, region sizes or the quality thresholds.
     refinement_features["airgap_interface"] = (_full_circle(p.rotor_outer_radius, "rotor_airgap_interface")
                                                + _full_circle(p.bore_radius, "stator_airgap_interface"))
     if p.slot_liner_thickness > 0:
         # The liner strip in slot_air is thin (slot_liner_thickness) compared to the generic
         # "iron"-scale element size, so it needs its own refinement feature to avoid forced
-        # sliver triangles; see Task 11's quality-gate finding.
+        # sliver triangles.
         refinement_features["slot_liner"] = tuple(seg for side in coil_sides for seg in side.boundary)
 
     return RadialOutline(

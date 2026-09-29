@@ -40,12 +40,6 @@ def map_segment(seg: Segment, fn: Callable[[Point], Point]) -> Segment:
     return Arc(fn(seg.start), fn(seg.end), fn(seg.center), seg.tag)
 
 
-def reverse(seg: Segment) -> Segment:
-    if isinstance(seg, Line):
-        return Line(seg.end, seg.start, seg.tag)
-    return Arc(seg.end, seg.start, seg.center, seg.tag)
-
-
 def line_circle_intersection(p0: Point, d: Point, radius: float,
                              t_ref: float | None = None) -> tuple[Point, float]:
     """Intersect p0 + t*d (|d| = 1) with |x| = radius.

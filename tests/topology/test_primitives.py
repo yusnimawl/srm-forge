@@ -3,7 +3,7 @@ import math
 import pytest
 
 from srmcore.topology.primitives import (
-    Arc, Line, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, reverse, rotate,
+    Arc, Line, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, rotate,
 )
 
 
@@ -13,11 +13,10 @@ def test_rotate_quarter_turn():
     assert y == pytest.approx(1.0)
 
 
-def test_mirror_and_map_and_reverse():
+def test_mirror_and_map():
     arc = Arc((1.0, 0.1), (1.0, 0.2), (0.0, 0.0), "t")
     m = map_segment(arc, mirror_y)
     assert m == Arc((1.0, -0.1), (1.0, -0.2), (0.0, 0.0), "t")
-    assert reverse(Line((0, 0), (1, 1), "x")) == Line((1, 1), (0, 0), "x")
 
 
 def test_intersection_from_inside_and_outside():
