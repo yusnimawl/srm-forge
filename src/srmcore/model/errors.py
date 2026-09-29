@@ -36,3 +36,12 @@ class MeshRejected(RuntimeError):
         self.reasons = list(reasons)
         self.report = report
         super().__init__("Mesh rejected: " + "; ".join(self.reasons))
+
+
+class MapFailed(RuntimeError):
+    """A map violates the failed-point policy (spec §8.1)."""
+
+    def __init__(self, reasons: list[str], n_failed: int):
+        self.reasons = list(reasons)
+        self.n_failed = n_failed
+        super().__init__("Map failed: " + "; ".join(self.reasons))
