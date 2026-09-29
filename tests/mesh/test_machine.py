@@ -35,7 +35,8 @@ def test_triangle_quality_reference_shapes():
 
 def test_machine_mesh_exposes_region_metadata_and_band_radii(static_8_6):
     m = mesh_at_angle(static_8_6, 0.0)
-    assert m.region_part == static_8_6.region_part
+    assert m.region_part == {**static_8_6.region_part, "moving_band": "band"}
+    assert set(m.region_part) == set(m.region_names)
     assert m.coils == static_8_6.coils
     assert set(m.region_kind) == set(m.region_names)
     assert m.region_kind["moving_band"] == "air"

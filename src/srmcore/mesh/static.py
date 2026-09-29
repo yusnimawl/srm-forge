@@ -166,7 +166,8 @@ def build_static_mesh(design: Design) -> StaticMesh:
     p = design.machine
     resolved = resolve_mesh_settings(p, design.mesh)
     with gmsh_model():
-        geom = build_machine_geometry(p, feature_step=resolved.gap_size)
+        geom = build_machine_geometry(p, feature_step=resolved.gap_size,
+                                      outer_air_thickness=design.mesh.outer_air_thickness)
         _apply_mesh_options(geom, resolved)
         gmsh.model.mesh.generate(2)
         region_names = tuple(sorted(geom.region_surfaces))
@@ -176,7 +177,7 @@ def build_static_mesh(design: Design) -> StaticMesh:
         n = resolved.band_divisions
         stator_ring = _ring(geom.band_outer_curve, stator_used, stator.nodes, n)
         rotor_ring = _ring(geom.band_inner_curve, rotor_used, rotor.nodes, n)
-        outer_edges = _edges(geom.stator_outer_curve, stator_used)
+        outer_edges = _edges(geom.outer_boundary_curve, stator_used)
     return StaticMesh(
         region_names=region_names,
         region_part={n: geom.region_part[n] for n in region_names},

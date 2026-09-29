@@ -21,6 +21,7 @@ class GeometryModel:
     region_kind: dict[str, str]
     coils: dict[str, CoilInfo]
     stator_outer_curve: int
+    outer_boundary_curve: int
     band_outer_curve: int
     band_inner_curve: int
     refinement_points: dict[str, np.ndarray]
@@ -65,7 +66,7 @@ def _size_key(region: str) -> str:
         return "coil"
     if region.startswith("airgap_"):
         return "airgap"
-    if region == "rotor_slot_air":
+    if region in ("rotor_slot_air", "stator_outer_air"):
         return "slot_air"
     return region
 
@@ -95,7 +96,8 @@ def _disk(radius: float) -> int:
     return occ.addPlaneSurface([loop])
 
 
-def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel:
+def build_geometry(outline: RadialOutline, feature_step: float,
+                   outer_air_radius: float | None = None) -> GeometryModel:
     occ = gmsh.model.occ
     points = _Points()
     centres: list[int] = []
@@ -112,6 +114,9 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
     slot_air, _ = occ.cut([(2, inside_bore)], [(2, bore_disk)] + [(2, t) for _, t in coils],
                           removeObject=True, removeTool=False)
     gap_stator, _ = occ.cut([(2, bore_disk)], [(2, band_out_disk)])
+    outer_air = []
+    if outer_air_radius is not None:
+        outer_air, _ = occ.cut([(2, _disk(outer_air_radius))], [(2, _disk(outline.stator_outer_radius))])
 
     # rotor part
     rotor_area = occ.addPlaneSurface([occ.addCurveLoop(_curves(outline.rotor_outer_boundary, points, centres))])
@@ -129,6 +134,7 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
 
     named: list[tuple[str, list[tuple[int, int]]]] = (
         [("stator_iron", [(2, stator_iron)]), ("slot_air", slot_air), ("airgap_stator", gap_stator)]
+        + ([("stator_outer_air", outer_air)] if outer_air else [])
         + [(name, [(2, tag)]) for name, tag in coils]
         + [("rotor_iron", rotor_iron), ("shaft", [(2, shaft)]),
            ("airgap_rotor", airgap_rotor), ("rotor_slot_air", rotor_slot_air)]
@@ -152,12 +158,15 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
     region_part = {n: ("rotor" if n in ROTOR_REGIONS else "stator") for n in region_surfaces}
     tol = (outline.band_outer_radius - outline.band_inner_radius) / 4
     stator_outer = _full_circle_on_boundary(region_surfaces["stator_iron"], outline.stator_outer_radius, tol)
+    outer_boundary = (stator_outer if outer_air_radius is None
+                      else _full_circle_on_boundary(region_surfaces["stator_outer_air"], outer_air_radius, tol))
     band_outer = _full_circle_on_boundary(region_surfaces["airgap_stator"], outline.band_outer_radius, tol)
     band_inner = _full_circle_on_boundary(region_surfaces["airgap_rotor"], outline.band_inner_radius, tol)
 
     for name, tags in region_surfaces.items():
         gmsh.model.addPhysicalGroup(2, list(tags), name=name)
     gmsh.model.addPhysicalGroup(1, [stator_outer], name="stator_outer")
+    gmsh.model.addPhysicalGroup(1, [outer_boundary], name="outer_boundary")
     gmsh.model.addPhysicalGroup(1, [band_outer], name="band_outer")
     gmsh.model.addPhysicalGroup(1, [band_inner], name="band_inner")
 
@@ -176,10 +185,13 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
         region_size_key={n: _size_key(n) for n in region_surfaces},
         region_kind={n: _region_kind(n) for n in region_surfaces},
         coils=coils,
-        stator_outer_curve=stator_outer, band_outer_curve=band_outer, band_inner_curve=band_inner,
+        stator_outer_curve=stator_outer, outer_boundary_curve=outer_boundary,
+        band_outer_curve=band_outer, band_inner_curve=band_inner,
         refinement_points=refinement_points,
     )
 
 
-def build_machine_geometry(p: RadialSRMParams, feature_step: float) -> GeometryModel:
-    return build_geometry(build_outline(p), feature_step)
+def build_machine_geometry(p: RadialSRMParams, feature_step: float,
+                           outer_air_thickness: float = 0.0) -> GeometryModel:
+    outer_air_radius = p.stator_outer_radius + outer_air_thickness if outer_air_thickness > 0 else None
+    return build_geometry(build_outline(p), feature_step, outer_air_radius)
