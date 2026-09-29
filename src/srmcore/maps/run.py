@@ -67,10 +67,12 @@ def apply_failure_policy(result: MapResult) -> MapResult:
     reasons = []
     if n_failed / failed.size > MAX_FAILED_FRACTION:
         reasons.append(f"{n_failed} of {failed.size} points failed (limit 2 %)")
-    if failed[result.angles == 0.0].any():
+    if failed[np.isclose(result.angles, 0.0)].any():
         reasons.append("a point at the aligned position failed")
     if failed[:, -1].any():
         reasons.append("a point at I_max failed")
+    if failed[:, 0].any():
+        reasons.append("a point at zero current failed")
     if reasons:
         raise MapFailed(reasons, n_failed)
     data = {name: getattr(result, name).copy() for name in _FIELDS}
@@ -84,10 +86,14 @@ def apply_failure_policy(result: MapResult) -> MapResult:
 def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, solver_name: str = "ngsolve",
             excited: str = "A", progress: Callable[[int, int], None] | None = None,
             cancel: Callable[[], bool] | None = None) -> MapResult:
-    solver = make_solver(solver_name)
     circuits = tuple(chr(ord("A") + k) for k in range(design.machine.n_phases))
-    if excited not in circuits:
-        raise ValueError(f"excited circuit {excited!r} is not one of {circuits}")
+    # Only phase A is aligned at θ = 0; the aligned angle of the other phases is not derived, so the
+    # aligned-position check of the failure policy would be wrong for them.
+    if excited != "A":
+        raise ValueError(f"excited circuit {excited!r} is not supported yet: only phase A is aligned at θ=0")
+    if len(currents) < 2 or np.any(np.diff(currents) <= 0):
+        raise ValueError("currents must be strictly increasing with at least two values")
+    solver = make_solver(solver_name)
     n_a, n_i = len(angles), len(currents)
     data = {name: np.full((n_a, n_i, len(circuits)) if name == "psi" else (n_a, n_i), np.nan) for name in _FIELDS}
     iterations = np.zeros((n_a, n_i), dtype=np.int32)

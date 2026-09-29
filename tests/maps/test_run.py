@@ -16,10 +16,10 @@ ANGLES = np.arange(8) * 0.01
 CURRENTS = np.arange(8) * 2.5          # 64 points: one failure is 1.6 %, two are 3.1 %
 
 
-def _fake(monkeypatch, failing=()):
+def _fake(monkeypatch, failing=(), currents=CURRENTS):
     """solve_point stand-in, linear in current so PCHIP reproduces it exactly; `failing` is a set of
     (angle index, current index) that come back NONCONVERGED with garbage values."""
-    bad = {(round(float(ANGLES[a]), 9), round(float(CURRENTS[i]), 9)) for a, i in failing}
+    bad = {(round(float(ANGLES[a]), 9), round(float(currents[i]), 9)) for a, i in failing}
 
     def fake(static, design, angle, currents, solver, **kw):
         amps = currents["A"]
@@ -55,10 +55,19 @@ def test_one_interior_failure_is_interpolated_and_flagged(monkeypatch):
     assert r.filled[2, 3] and r.filled.sum() == 1 and r.status[2, 3] == run.STATUS_NONCONVERGED
     assert r.psi[2, 3, 0] == pytest.approx(0.01 * (1 + ANGLES[2]) * CURRENTS[3], rel=1e-9)
     assert r.torque_arkkio[2, 3] == pytest.approx(0.5 * CURRENTS[3], rel=1e-9)
+    assert r.torque_virtual_work[2, 3] == pytest.approx(0.5 * CURRENTS[3], rel=1e-9)
+    assert r.coenergy[2, 3] == pytest.approx(0.3 * CURRENTS[3], rel=1e-9)
+
+
+def test_exactly_two_percent_failing_passes(monkeypatch):
+    currents = np.arange(10) * 2.0                 # 5 angles x 10 currents = 50 points, one failure = 2 %
+    _fake(monkeypatch, failing={(2, 3)}, currents=currents)
+    r = run.run_map(None, DESIGN, ANGLES[:5], currents)
+    assert r.filled.sum() == 1 and r.filled[2, 3]
 
 
 @pytest.mark.parametrize("failing, reason", [
-    ({(0, 3)}, "aligned"), ({(4, 7)}, "I_max"), ({(2, 2), (3, 3)}, "2 %")])
+    ({(0, 3)}, "aligned"), ({(4, 7)}, "I_max"), ({(2, 0)}, "zero current"), ({(2, 2), (3, 3)}, "2 %")])
 def test_map_fails_on_the_policy_conditions(monkeypatch, failing, reason):
     _fake(monkeypatch, failing=failing)
     with pytest.raises(MapFailed) as e:
@@ -72,13 +81,21 @@ def test_cancel_keeps_partial_results_unfilled(monkeypatch):
     r = _run(cancel=lambda: len(calls) >= 3, progress=lambda done, total: calls.append(done))
     assert not r.complete and calls == [1, 2, 3]
     assert np.all(r.status[3:] == run.STATUS_NOT_RUN) and np.isnan(r.psi[3:]).all()
-    assert np.all(r.status[:3] != run.STATUS_NOT_RUN)
+    assert np.all(r.status[:3] != run.STATUS_NOT_RUN) and not r.filled.any()
 
 
-def test_unknown_excited_circuit_is_rejected(monkeypatch):
+@pytest.mark.parametrize("excited", ["Z", "B"])
+def test_only_phase_a_is_supported(monkeypatch, excited):
     _fake(monkeypatch)
     with pytest.raises(ValueError, match="excited"):
-        _run(excited="Z")
+        _run(excited=excited)
+
+
+@pytest.mark.parametrize("currents", [[0.0, 2.0, 2.0], [3.0, 1.0], [1.0]])
+def test_currents_must_increase(monkeypatch, currents):
+    _fake(monkeypatch)
+    with pytest.raises(ValueError, match="currents"):
+        run.run_map(None, DESIGN, ANGLES, np.array(currents))
 
 
 def test_real_solves_match_solve_point():
