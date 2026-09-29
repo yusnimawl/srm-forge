@@ -157,6 +157,7 @@ def _newton(system: _System, f: np.ndarray, a0: np.ndarray, settings: NewtonSett
 
 class NgsolveAdapter:
     name = "ngsolve"
+    version = ng.__version__
 
     def __init__(self, settings: NewtonSettings = NewtonSettings()):
         self.settings = settings

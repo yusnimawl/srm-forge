@@ -25,6 +25,7 @@ class NewtonSettings:
 
 class SolverAdapter(Protocol):
     name: str
+    version: str
 
     def solve(self, problem: Magnetostatic2D, initial: np.ndarray | None = None) -> FieldSolution:
         """Never raises for non-convergence: returns status NONCONVERGED instead (spec §6)."""

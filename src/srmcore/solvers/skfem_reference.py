@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+import skfem
 from skfem import Basis, BilinearForm, ElementTriP1, LinearForm, MeshTri, asm
 from skfem.helpers import dot, grad
 
@@ -117,6 +118,7 @@ def _newton(system: _System, f: np.ndarray, a0: np.ndarray, settings: NewtonSett
 
 class SkfemReference:
     name = "skfem_reference"
+    version = skfem.__version__
 
     def __init__(self, settings: NewtonSettings = NewtonSettings()):
         self.settings = settings
