@@ -60,8 +60,8 @@ COIL_SIDES = ("coil_top_right", "coil_top_left", "coil_bottom_right", "coil_bott
 COIL_SIGNS = (1.0, -1.0, 1.0, -1.0)
 
 
-def steel_law():
-    return process_bh(BHTable(h=H_TABLE, b=B_TABLE), stacking_factor=1.0, saturation_polarisation=ASSUMED_JS)[0]
+def steel_law(js: float = ASSUMED_JS):
+    return process_bh(BHTable(h=H_TABLE, b=B_TABLE), stacking_factor=1.0, saturation_polarisation=js)[0]
 
 
 @dataclass(frozen=True, eq=False)
@@ -186,10 +186,11 @@ def _triangle_area(nodes, tris):
     return 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1]))
 
 
-def team24_problem(current: float, size_scale: float = 1.0) -> Magnetostatic2D:
-    """TEAM 24 at a given series-circuit current in A (350 turns per coil)."""
+def team24_problem(current: float, size_scale: float = 1.0, js: float = ASSUMED_JS) -> Magnetostatic2D:
+    """TEAM 24 at a given series-circuit current in A (350 turns per coil); `js` is the assumed
+    saturation polarisation in T."""
     m = team24_mesh(size_scale)
-    law = steel_law()
+    law = steel_law(js)
     area = _triangle_area(m.nodes, m.triangles)
     n_side = len(COIL_SIDES)
     first_coil = REGIONS.index(COIL_SIDES[0])

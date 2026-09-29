@@ -9,6 +9,7 @@ pytest.importorskip("ngsolve")
 
 from conftest import make_8_6
 from fem_fixtures import toroid_problem
+from srmcore.fields.solution import SolveStatus
 from srmcore.materials.laws import library_law
 from srmcore.mesh import build_machine_mesh, mesh_at_angle
 from srmcore.model.design import Design, MeshSettings
@@ -27,7 +28,7 @@ def _rel(x, y):
 
 def _agree(problem, check_torque=True):
     ref, ngs = SkfemReference().solve(problem), NgsolveAdapter().solve(problem)
-    assert ref.status == ngs.status
+    assert ref.status == ngs.status != SolveStatus.NONCONVERGED
     assert np.abs(ngs.a - ref.a).max() <= TOL * np.abs(ref.a).max()
     assert _rel(ngs.energy, ref.energy) <= TOL and _rel(ngs.coenergy, ref.coenergy) <= TOL
     psi_ref, psi_ngs = flux_linkage(problem, ref), flux_linkage(problem, ngs)

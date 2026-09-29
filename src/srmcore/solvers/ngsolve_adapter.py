@@ -16,7 +16,7 @@ from ..materials.laws import LinearLaw
 from ..physics.energy import field_energies
 from ..physics.fem import element_flux_density
 from ..physics.problem import Magnetostatic2D
-from .settings import ELEMENT_ORDER, NewtonSettings
+from .settings import ELEMENT_ORDER, QUADRATURE_ORDER, NewtonSettings
 
 # Below this relative residual the damped fallback stops capping the Newton step.
 _FULL_STEP_RESIDUAL = 1e-2
@@ -37,8 +37,9 @@ def _netgen_mesh(nodes: np.ndarray, triangles: np.ndarray) -> ng.Mesh:
 
 
 class _Discretisation:
-    """NGSolve spaces and forms for one mesh. ν, dν/dB² and J are element-constant (order-0 L2), so the
-    integrals are exact at the default quadrature order (P1 gradients and the ν, dν, J constants)."""
+    """NGSolve spaces and forms for one mesh. The triangle rule is pinned to QUADRATURE_ORDER, the same as
+    the scikit-fem reference. ν, dν/dB² and J are element-constant (order-0 L2) and P1 gradients are
+    constant, so the integrals are exact at that order anyway."""
 
     def __init__(self, nodes: np.ndarray, triangles: np.ndarray):
         self.nodes, self.triangles = nodes, triangles
@@ -51,7 +52,7 @@ class _Discretisation:
         self.u = ng.GridFunction(space)
         trial, test = space.TnT()
         grad_a = ng.grad(self.u)
-        dx = ng.dx()
+        dx = ng.dx(intrules={ng.TRIG: ng.IntegrationRule(ng.TRIG, QUADRATURE_ORDER)})
         self.secant = ng.BilinearForm(space)
         self.secant += self.nu * ng.grad(trial) * ng.grad(test) * dx
         self.tangent = ng.BilinearForm(space)
