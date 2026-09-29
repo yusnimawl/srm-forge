@@ -41,7 +41,7 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 | `maps` | all of the above |
 | `project` | model, maps |
 
-- Only `geometry/` and `mesh/` may import `gmsh`. Only `solvers/` may import `ngsolve` or `netgen`. Top-level modules such as `srmcore/__init__.py` must not import either.
+- Only `geometry/` and `mesh/` may import `gmsh`. Only `solvers/` may import `skfem`, `ngsolve` or `netgen`. Top-level modules such as `srmcore/__init__.py` must not import any of `gmsh`, `skfem`, `ngsolve` or `netgen`.
 - Layers exchange plain data: numpy arrays, frozen Pydantic models and frozen dataclasses. Never pass Gmsh or solver objects across a layer boundary.
 - Everything is in SI units internally (metres, radians, amperes). The validator rejects values that look like millimetres, with rule `units`.
 

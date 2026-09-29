@@ -74,7 +74,7 @@ def _size_key(region: str) -> str:
 def _region_kind(region: str) -> str:
     """The material role for a region name (spec §6): stator iron, rotor iron, shaft, coil, or air.
 
-    slot_air, rotor_slot_air and both airgap_* layers are all "air".
+    slot_air, rotor_slot_air, stator_outer_air and both airgap_* layers are all "air".
     """
     if region.startswith("coil_"):
         return "coil"

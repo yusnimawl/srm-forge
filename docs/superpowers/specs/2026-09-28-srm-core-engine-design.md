@@ -163,7 +163,7 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 1. Import (CSV/JSON, or WebPlotDigitizer CSV). Units must be T and A/m; importer rejects/flags unit mix-ups.
 2. Add origin point with initial permeability.
 3. Apply stacking factor: `B_eff(H) = k·B_steel(H) + (1−k)·μ0·H`.
-4. Fit a monotone cubic Hermite interpolant to H(B) through the stacked points (PCHIP knot derivatives; the end derivative equals the last secant); ν = H/B for Newton.
+4. Fit a monotone cubic Hermite interpolant to H(B) through the stacked points (PCHIP knot derivatives; the end derivative equals the last secant; if the fitted end derivative at B=0 is not positive, the first secant is used instead); ν = H/B for Newton.
 5. **Validity check:** ν > 0 and dH/dB > 0 (monotone B-H). Non-monotone data → error, with an optional **repair tool** (smoothing) that reports exactly what changed.
 6. **Saturation tail:** beyond the last data point extrapolate the polarisation `J = B − μ0·H` towards Js with the law `J = Js − d/(1 + s·(H − Hn)/d)`, d = Js − Jn and s the data's end slope of J, which joins the data C¹ and stays well-conditioned as s → 0. A ±2 % Js sensitivity check is part of validation.
 7. **Fit-vs-datasheet error report** (a test).

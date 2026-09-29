@@ -46,7 +46,7 @@ def machine_problem(mesh: MachineMesh, design: Design, currents: Mapping[str, fl
         element_region=mesh.region_ids.astype(np.int64), region_names=mesh.region_names,
         region_kind=dict(mesh.region_kind), element_coil=coil_index[mesh.region_ids],
         winding=winding, currents=i,
-        # outer_edges is the mesh's outermost boundary; a future stator_outer_air ring moves it
-        # outward in the mesh layer and this code does not change.
+        # outer_edges is the mesh's outermost boundary: the stator back-iron edge, or the outer
+        # edge of the stator_outer_air ring when the mesh has one.
         dirichlet_nodes=np.unique(mesh.outer_edges), depth=p.stack_length, band=band,
     )

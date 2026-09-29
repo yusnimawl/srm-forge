@@ -141,6 +141,8 @@ class SkfemReference:
         n = system.basis.N
         if initial is not None and np.shape(initial) != (n,):
             raise ValueError(f"initial guess has shape {np.shape(initial)}, expected ({n},) for this mesh")
+        if initial is not None and not np.all(np.isfinite(initial)):
+            raise ValueError("initial guess contains non-finite values")
         cfg = self.settings
         f = system.load()
         zero = np.zeros(n)

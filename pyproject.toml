@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Core engine of the SRM design tool: geometry, mesh, magnetostatics, maps"
 requires-python = ">=3.12"
 dependencies = [
-    "numpy>=1.26",
+    "numpy>=2.0",
     "pydantic>=2.6",
     "gmsh>=4.12",
     "matplotlib>=3.8",

@@ -40,6 +40,14 @@ def test_initial_guess_from_another_mesh_is_rejected():
         SkfemReference().solve(_small(M19, 100.0), initial=np.zeros(7))
 
 
+def test_non_finite_initial_guess_is_rejected():
+    p = _small(M19, 100.0)
+    guess = np.zeros(len(p.nodes))
+    guess[0] = np.nan
+    with pytest.raises(ValueError, match="non-finite"):
+        SkfemReference().solve(p, initial=guess)
+
+
 def test_continuation_from_a_nearby_solution_converges():
     solver = SkfemReference()
     p = _small(M19, 2000.0)
