@@ -22,15 +22,17 @@ machine = RadialSRMParams(
     turns_per_pole=60, fill_factor=0.5,
     slot_liner_thickness=0.0005, coil_inner_clearance=0.001,
 )
-base = resolve_mesh_settings(machine, MeshSettings(preset="screening")).band_divisions
+default = resolve_mesh_settings(machine, MeshSettings(preset="screening"))
+base = default.band_divisions
+offset = default.band_pitch / 2
 solver = SkfemReference()
 print(f"default band divisions D = {base}")
-print(f"{'divisions':>9} {'offset':>10} {'psi_A [Wb]':>12} {'T_arkkio [Nm]':>14} {'T_nodal [Nm]':>13}")
+print(f"{'divisions':>9} {'theta [deg]':>12} {'psi_A [Wb]':>12} {'T_arkkio [Nm]':>14} {'T_nodal [Nm]':>13}")
 for factor in (1, 2, 4):
     design = Design(machine=machine, mesh=MeshSettings(preset="screening", airgap_circumferential_divisions=base * factor))
     static = build_machine_mesh(design)
-    for label, extra in (("0", 0.0), ("half pitch", static.settings.band_pitch / 2)):
-        problem = machine_problem(mesh_at_angle(static, math.radians(10.0) + extra), design, {"A": 20.0})
+    for theta in (math.radians(10.0), math.radians(10.0) + offset):
+        problem = machine_problem(mesh_at_angle(static, theta), design, {"A": 20.0})
         s = solver.solve(problem)
-        print(f"{base * factor:>9} {label:>10} {flux_linkage(problem, s)[0]:12.6f} "
+        print(f"{base * factor:>9} {math.degrees(theta):12.3f} {flux_linkage(problem, s)[0]:12.6f} "
               f"{arkkio_torque(problem, s):14.5f} {virtual_work_torque(problem, s):13.5f}")
