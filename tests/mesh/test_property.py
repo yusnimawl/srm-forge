@@ -58,7 +58,7 @@ def _check(p: RadialSRMParams, theta_frac: float) -> None:
 _COMMON = dict(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 
 
-@settings(max_examples=5, **_COMMON)
+@settings(max_examples=5, derandomize=True, **_COMMON)
 @given(radial_designs(), st.floats(0.0, 1.0))
 def test_valid_designs_mesh_fast(p, theta_frac):
     _check(p, theta_frac)

@@ -50,12 +50,11 @@ def test_sharp_corners_mesh():
 
 
 def test_airgap_interface_grading_fixes_rotor_slot_air_slivers():
-    """Regression for Task 12's property-test finding: this valid, validate_params-passing 6/4/3
-    design produced sliver triangles all along the slot-mouth arcs (rotor_slot_air's min angle was
-    6.51 deg, below the 10 deg gate) because the background size jumped straight from the air gap's
-    fine size to the iron-scale size across those arcs, with no grading. The "airgap_interface"
-    refinement feature (topology/radial.py, mesh/settings.py) grades the size away from both
-    interfaces instead.
+    """Regression test: this valid, validate_params-passing 6/4/3 design produced sliver triangles
+    all along the slot-mouth arcs (rotor_slot_air's min angle was 6.51 deg, below the 10 deg gate)
+    because the background size jumped straight from the air gap's fine size to the iron-scale size
+    across those arcs, with no grading. The "airgap_interface" refinement feature
+    (topology/radial.py, mesh/settings.py) grades the size away from both interfaces instead.
     """
     p = RadialSRMParams(
         n_stator_poles=6, n_rotor_poles=4, n_phases=3,

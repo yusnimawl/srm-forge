@@ -4,9 +4,8 @@ size(x, y) = min(base_size_of_region_containing(x, y),
                   min over refinement features of size_min + (growth - 1) * dist(x, y, feature_points))
 
 Base size on an interface between two regions is the min of the adjacent regions' sizes.
-Task 11b replaced the Python `gmsh.model.mesh.setSizeCallback` callback that used to evaluate this
-law (via a KD-tree-accelerated `SizeField`) with native Gmsh Distance/MathEval/Constant/Min fields,
-which implement the same law in C++ and are much faster to build the mesh with. `size_at` stays as
+`mesh/static.py` implements this law with native Gmsh Distance/MathEval/Constant/Min fields (in
+C++, for speed) rather than a Python `gmsh.model.mesh.setSizeCallback` callback. `size_at` stays as
 a plain-Python reference for anyone checking the fields' behaviour by hand; it is not called by the
 mesh builder itself.
 """
