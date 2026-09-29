@@ -129,7 +129,7 @@ tools/         FEMM fixture-generation scripts (pyfemm, Windows-only, run once),
 - Errors name the offending parameter and rule (`InputError`).
 
 ### 4.3 Named regions
-Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`, …), slot air, air-gap stator-side layer, **moving band**, air-gap rotor-side layer, optional thin outer air ring. Geometry auto-tags pole tips, fillet roots and yoke corners for refinement.
+Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`, …), slot air, air-gap stator-side layer, **moving band**, air-gap rotor-side layer, optional thin outer air ring. Geometry auto-tags pole tips (`pole_tip`) and pole roots (`pole_root`) for refinement; "yoke corners" is the unfilleted case of a pole root (when a pole has no fillet, its sharp corner is tagged `pole_root` too, as a point rather than an arc).
 
 ### 4.4 Rotor rotation — moving band
 - Stator and rotor meshes are generated **once** and never change → iron elements are fixed points (required for B(t) loss evaluation).
@@ -141,7 +141,7 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 |---|---|
 | Air-gap mesh | explicit radial layer count (≥ 4) and circumferential division count; band pitch derived from it |
 | Per-region size table | element size per region; overrides preset |
-| Edge/corner refinement | size + growth rate per auto-tag (pole tips, fillet roots, yoke corners) |
+| Edge/corner refinement | size + growth rate per auto-tag: `pole_tip`, `pole_root` (pole roots — filleted or, as yoke corners, unfilleted) |
 | Skin-depth layers | boundary-layer hook on conductors/shaft from max frequency & conductivity (used by sub-project #2) |
 | Quality report | element count, min angle, aspect ratio, band skew; below threshold → `MeshRejected` |
 | Adaptive refinement | energy-error-driven; used by the *reference* preset (M5) |
@@ -308,6 +308,12 @@ Every key result (La, Lu, peak torque, ψ at I_max) carries a worst-case uncerta
 ## 10. Open items (do not block #1)
 - DC-bus voltage per vehicle (asked in sub-project #4; affects I_max and drive feasibility).
 - Lamination supplier and grade (JYStator unverified; request datasheets measured after anneal, loss 50 Hz–>1 kHz, anneal spec, post-anneal yield, stacking factor, coating, price/MOQ/lead time, ring samples; obtain a second quote from JFE / Carpenter / VAC).
+- **[M5] Reference-machine data gaps and self-starting-rule conflicts, from the `docs/reference-machines.md` audit (owner decision needed before M5):**
+  (i) no SRM in the literature library at `D:\y\srm` satisfies criteria (a) full geometry + (b) B-H curve + (c) measured ψ(θ,i)/T(θ,i) together; TEAM Problem 24 is the only source that fully qualifies, and only for its own single-pole-pair locked-rotor scope (spec §2.3).
+  (ii) no complete published 12/8 or 24/16 geometry was found in the library; the best traction-class candidate (Jiang's 24/16 PhD thesis) is still missing `rotor_yoke_thickness` and `rotor_pole_taper`, and its 1 mm fillet is a pole-shoe fillet with no M1-topology counterpart.
+  (iii) the validator's `self_starting` (Lawrenson) rule in `src/srmcore/model/validator.py` rejects two of the selected published machines as stated: Krishnan's 6/4 prototype (βs = 24° < 2π/(m·Nr) = 30°) and Jiang's 24/16 thesis machine (βs = 7.0°, βr = 7.2°, both < 2π/(m·Nr) = 7.5°). The validator is unchanged pending this decision. The owner must choose one of: downgrade `self_starting` to a warning, keep it as a hard error (and accept that these machines cannot be built/validated as published), or add a fixture-only bypass for validation-reference machines that does not relax the rule for user-designed machines.
+  (iv) the B-H gap is resolved by library curves at grade C (spec §5.1/§5.3's confidence grade C = "inferred") — i.e. these machines' named lamination grades (M43, M19) are expected to get their B-H curves from `srmcore`'s own materials library, not from the literature that only names the grade; M19 is already the item-1 initial-library entry, M43 would need to be added.
+- **[M1→M5] Final threshold for spec §4.2's minimum web/pole-tip-width validator rule.** `src/srmcore/model/validator.py`'s `min_width` rule uses a provisional module constant `MIN_WEB_WIDTH = 1.0e-3` m (yoke thicknesses and pole-tip chords) pending an owner decision on the final threshold — an absolute floor, a multiple of `lamination_thickness`, or both.
 
 ## 11. Decision log
 | Date | Decision |
