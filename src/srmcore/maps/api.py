@@ -1,4 +1,5 @@
 """Public entry: a map of a design, from cache or by solving (spec §7.2)."""
+import math
 import os
 from collections.abc import Callable
 
@@ -17,6 +18,8 @@ def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited:
               cancel: Callable[[], bool] | None = None) -> MapResult:
     """ψ and torque of `design` over an angle × current grid with `excited` carrying the current. Grid sizes
     default to the design's fidelity preset. A complete map is stored in and served from `cache_dir`."""
+    if not math.isfinite(i_max) or i_max <= 0:
+        raise ValueError(f"i_max must be finite and positive, got {i_max}")
     check_excited(excited)
     adapter = make_solver(solver)
     default_a, default_i = GRID_SIZES[design.mesh.preset]

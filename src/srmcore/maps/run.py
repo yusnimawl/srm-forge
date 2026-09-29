@@ -111,6 +111,7 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
     check_excited(excited)
     if len(currents) < 2 or not np.all(np.isfinite(currents)) or np.any(np.diff(currents) <= 0):
         raise ValueError("currents must be strictly increasing with at least two values")
+    make_solver(solver_name)                     # fail in the parent on an unknown solver or a missing extra
     n_a, n_i = len(angles), len(currents)
     data = {name: np.full((n_a, n_i, len(circuits)) if name == "psi" else (n_a, n_i), np.nan) for name in _FIELDS}
     iterations = np.zeros((n_a, n_i), dtype=np.int32)

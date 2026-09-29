@@ -17,16 +17,20 @@ def _pass(fn, items, results, pending, workers, initializer, initargs, cancel, p
     with ProcessPoolExecutor(workers, mp_context=get_context("spawn"), initializer=initializer,
                              initargs=initargs) as pool:
         futures = {pool.submit(fn, items[k]): k for k in pending}
-        for future in as_completed(futures):
-            k = futures[future]
-            results[k] = future.result()             # raises BrokenProcessPool if a worker died
-            pending.remove(k)
-            if progress is not None:
-                progress(len(items) - len(pending), len(items))
-            if cancel is not None and cancel():
-                pool.shutdown(wait=True, cancel_futures=True)
-                pending.clear()
-                return
+        try:
+            for future in as_completed(futures):
+                k = futures[future]
+                results[k] = future.result()         # raises BrokenProcessPool if a worker died
+                pending.remove(k)
+                if progress is not None:
+                    progress(len(items) - len(pending), len(items))
+                if cancel is not None and cancel():
+                    pool.shutdown(wait=True, cancel_futures=True)
+                    pending.clear()
+                    return
+        except BaseException:
+            pool.shutdown(wait=False, cancel_futures=True)   # do not run the queued items
+            raise
 
 
 def map_ordered(fn: Callable, items: Iterable, *, workers: int = 1, initializer: Callable | None = None,

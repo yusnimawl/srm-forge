@@ -31,7 +31,7 @@ def main() -> None:
 
     start = time.perf_counter()
     build_machine_mesh(design)
-    print(f"mesh build (one process, not part of the map time): {time.perf_counter() - start:.1f} s")
+    print(f"mesh build alone: {time.perf_counter() - start:.1f} s (build_map meshes again, inside the map time)")
 
     def progress(done: int, total: int) -> None:
         print(f"  angle {done}/{total}  t = {time.perf_counter() - start:.1f} s", flush=True)
@@ -45,7 +45,7 @@ def main() -> None:
     print("status counts (ok / fallback / nonconverged / not run):",
           [int((r.status == c).sum()) for c in (0, 1, 2, -1)], " filled:", int(r.filled.sum()))
     print(f"iterations: {r.iterations.min()}..{r.iterations.max()}")
-    print(f"peak torque (Arkkio): {np.nanmax(np.abs(r.torque_arkkio)):.2f} N·m")
+    print(f"peak torque (Arkkio): {np.nanmax(np.abs(r.torque_arkkio)):.2f} N m")
     unaligned = int(np.argmin(np.abs(r.angles - math.pi / machine.n_rotor_poles)))
     ratio = r.psi[0, 1, 0] / r.psi[unaligned, 1, 0]
     print(f"psi_aligned / psi_unaligned at {r.currents[1]:.3f} A: {ratio:.2f}")

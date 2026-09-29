@@ -39,3 +39,14 @@ def test_cancelled_map_is_not_cached(tmp_path):
 def test_only_phase_a_is_supported(excited):
     with pytest.raises(ValueError, match="excited"):
         api.build_map(DESIGN, 5.0, solver="skfem_reference", excited=excited, n_angles=2, n_currents=2)
+
+
+@pytest.mark.parametrize("i_max", [0.0, -1.0, float("nan"), float("inf")])
+def test_i_max_must_be_finite_and_positive(i_max):
+    with pytest.raises(ValueError, match="i_max"):
+        api.build_map(DESIGN, i_max, solver="skfem_reference", n_angles=2, n_currents=2)
+
+
+def test_unknown_solver_fails_in_the_parent_before_the_pool():
+    with pytest.raises(ValueError, match="unknown solver"):
+        run_map(None, DESIGN, np.array([0.0]), np.array([0.0, 5.0]), solver_name="nope", workers=2)

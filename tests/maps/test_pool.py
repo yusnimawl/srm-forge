@@ -21,3 +21,16 @@ def test_a_crashing_worker_is_retried_once_then_reported():
     with pytest.raises(WorkerCrashed) as e:
         map_ordered(os._exit, [1], workers=2)
     assert e.value.items == [0]
+
+
+def _crash_once(item):
+    marker, value = item
+    if not os.path.exists(marker):
+        open(marker, "w").close()
+        os._exit(1)
+    return value
+
+
+def test_a_worker_crash_is_retried_and_the_result_is_complete(tmp_path):
+    items = [(str(tmp_path / "marker"), v) for v in (10, 20, 30, 40)]
+    assert map_ordered(_crash_once, items, workers=2) == [10, 20, 30, 40]
