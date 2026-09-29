@@ -2,10 +2,22 @@ import math
 
 import pytest
 
-from conftest import make_8_6
+from conftest import make_8_6, make_12_8, make_24_16
 from srmcore.model.errors import InputError
 from srmcore.topology.primitives import sample_segment
-from srmcore.topology.radial import build_outline
+from srmcore.topology.radial import _coil_sides, build_outline
+
+
+@pytest.mark.parametrize("make", [make_8_6, make_12_8, make_24_16])
+def test_phases_follow_the_counter_clockwise_motoring_order(make):
+    """At rotor angle 0 pole 0 (phase A) is aligned. The phase whose pole leads the rotor pole by the
+    smallest positive angle pulls counter-clockwise next, so letters must advance B, C, D in that order."""
+    p = make()
+    tau_s, tau_r = 2 * math.pi / p.n_stator_poles, 2 * math.pi / p.n_rotor_poles
+    phase_of_pole = {s.pole: s.phase for s in _coil_sides(p)}
+    lead = {k: (k * tau_s) % tau_r for k in range(p.n_phases)}
+    order = sorted(range(p.n_phases), key=lambda k: lead[k] if k else tau_r)   # pole 0 (A) counts as last
+    assert [phase_of_pole[k] for k in order] == list(range(1, p.n_phases)) + [0]
 
 
 def _pts(coil):

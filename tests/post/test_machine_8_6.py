@@ -74,12 +74,12 @@ def test_torque_sign_symmetry_and_aligned_zero(static, solve):
 
 
 def test_phase_sequence_for_counter_clockwise_motoring(solve):
-    """At θ = 0 (A aligned), D pulls the rotor counter-clockwise and B clockwise, so counter-clockwise
-    motoring excites A → D → C → B. The drive side (sub-project #4) relies on this convention."""
-    t_d = arkkio_torque(*solve(0, 10.0, phase="D"))
+    """At θ = 0 (A aligned), B pulls the rotor counter-clockwise and D clockwise, so counter-clockwise
+    motoring excites A → B → C → D. The drive side (sub-project #4) relies on this convention."""
     t_b = arkkio_torque(*solve(0, 10.0, phase="B"))
-    assert t_d > 0 > t_b
-    assert t_d == pytest.approx(-t_b, rel=0.02)
+    t_d = arkkio_torque(*solve(0, 10.0, phase="D"))
+    assert t_b > 0 > t_d
+    assert t_b == pytest.approx(-t_d, rel=0.02)
 
 
 def test_energy_identity_and_status(solve):

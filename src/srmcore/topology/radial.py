@@ -177,8 +177,11 @@ def _coil_sides(p: RadialSRMParams) -> tuple[CoilSide, ...]:
     upper = _upper_coil_boundary(p)
     pitch = 2 * math.pi / p.n_stator_poles
     sides: list[CoilSide] = []
+    # More stator than rotor poles: the pole that pulls the rotor counter-clockwise next is the one
+    # before it in pole order, so lettering runs against the pole order and reads A → B → C → D in motoring.
+    direction = -1 if p.n_stator_poles > p.n_rotor_poles else 1
     for k in range(p.n_stator_poles):
-        phase, group = k % p.n_phases, k // p.n_phases
+        phase, group = (direction * k) % p.n_phases, k // p.n_phases
         polarity = 1 if group % 2 == 0 else -1
         letter = chr(ord("A") + phase)
         a = k * pitch
