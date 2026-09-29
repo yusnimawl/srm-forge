@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md`. It covers the architecture, physics, tolerances, milestones M1–M5, open items and the decision log. Read the relevant section before starting milestone work. Implementation plans are in `docs/superpowers/plans/`, and `docs/reference-machines.md` audits which published machines can be used for validation.
 
-**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go) and M4a (`maps/point.py` `solve_point`, phase order A→B→C→D, incremental inductance, solve-speed work) are complete. M4a speed result: a cold `screening` solve at 20 A takes about 4.5–5 s (11 Newton iterations), so the 4 s gate is not met; see `docs/m4-handoff.md`. An Euler current predictor was tried and dropped (spec §10). The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check. `maps` and `project` are still empty placeholders for later milestones (M4: maps; M5: validation).
+**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go) and M4a (`maps/point.py` `solve_point`, phase order A→B→C→D, incremental inductance, solve-speed work) are complete. M4a speed result: a cold `screening` solve at 20 A takes about 4.5–5 s (11 Newton iterations), so the 4 s gate is not met; see `docs/m4-handoff.md`. An Euler current predictor was tried and dropped (spec §10). The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check. `maps` holds `point.py` so far (grids, datasets and workers come in M4b); `project` is still an empty placeholder (M5: validation).
 
 ## Commands
 
@@ -23,7 +23,7 @@ python -m pytest tests/mesh/test_band.py::test_name  # single test
 python examples\mesh_8_6.py [screening|full]         # mesh an 8/6 and save PNG plots
 python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print psi, torque, energies, saturation
 python examples\band_pitch_convergence.py           # band-pitch convergence table on the 8/6 screening mesh
-python examples\solve_speed.py [screening|full]        # time cold and warm solves with both solvers
+python examples\solve_speed.py [screening|full]     # time cold and warm solves with both solvers
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 
@@ -60,14 +60,14 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 6. **`mesh/quality.py`**: quality report and gate. A failure raises `MeshRejected`, which carries either a `MeshQualityReport` or a `BandRejection`.
 7. **`mesh/api.py` `build_machine_mesh`**: the public entry point. It validates, builds the static mesh and quality-gates it at angle 0 and at half a band pitch.
 
-## Solve pipeline (M2)
+## Solve pipeline (M2–M4a)
 
 1. **`materials/`**: `load_material(name)` reads `materials/data/<name>.json`. `process_bh` checks units, adds the origin, applies the stacking factor, requires J = B − μ0·H to be non-decreasing, and builds a monotone Hermite H(B) with a C¹ tail towards Js. `library_law(name)` returns the cached `ReluctivityLaw`; conductors and air use `LinearLaw`/`VACUUM`.
 2. **`physics/build.py` `machine_problem(mesh, design, currents)`**: assigns laws by `region_kind` through `RegionMaterials`, builds the connection matrix from `CoilInfo` (`physics/winding.py`), takes Dirichlet nodes from `outer_edges` and band info from the mesh. It never parses region names.
 3. **`solvers/skfem_reference.py` `SkfemReference().solve(problem, initial=None)`**: P1, quadrature order 2, Newton with the consistent Jacobian, and both residual and ΔA < 1e-8. On failure it falls back to damped Newton, then a current ramp, then `NONCONVERGED`; it never raises. It returns a `FieldSolution` (`fields/solution.py`) with A, element B, ν and energies.
-3b. **`solvers/ngsolve_adapter.py` `NgsolveAdapter().solve(problem, initial=None)`**: the same contract and Newton scheme as `SkfemReference`, with NGSolve assembling the tangent and the load and doing the umfpack solves. The secant residual is `physics.fem.secant_residual` (numpy). ν, dν/dB² and J are element-constant order-0 L2 grid functions; the quadrature rule is pinned to `QUADRATURE_ORDER`. The Newton driver is a deliberate separate copy, so the cross-solver tests compare that numpy stiffness and the NGSolve load and tangent against skfem's assembly, plus the linear solve. NGSolve is the `[ngsolve]` optional extra; its tests use `importorskip`.
+3b. **`solvers/ngsolve_adapter.py` `NgsolveAdapter().solve(problem, initial=None)`**: the same contract and Newton scheme as `SkfemReference`, with NGSolve assembling the tangent and the load and doing the umfpack solves. The secant residual is `physics.fem.secant_residual` (numpy). ν, dν/dB² and J are element-constant order-0 L2 grid functions; the quadrature rule is pinned to `QUADRATURE_ORDER`. The Newton driver is a deliberate separate copy, so the cross-solver tests compare the converged solutions (A, energies, ψ, torque), which checks assembly and the linear solve indirectly; the numpy stiffness is checked in `tests/physics/test_p1_kernels.py`. NGSolve is the `[ngsolve]` optional extra; its tests use `importorskip`.
 4. **`post/quantities.py`**: `flux_linkage`, `arkkio_torque` (band radii from the mesh; positive counter-clockwise), `virtual_work_torque` (nodal-force torque from a virtual rotation of the band nodes at fixed A; agrees with Arkkio to 0.02 % on the 8/6) and `saturation_report`. Phase A is aligned at θ = 0, and counter-clockwise motoring excites A → B → C → D. `incremental_inductance(problem, sensitivity)` returns L_inc = ∂ψ/∂i (H) from the converged tangent.
-4b. **`solvers/*` `sensitivity(problem, a)`**: dA/di per circuit (nodes × circuits) from the tangent at A; both adapters implement it and the tests compare it with central differences.
+4b. **`solvers/*` `sensitivity(problem, a)`**: dA/di per circuit (nodes × circuits) from the tangent at A; both adapters implement it, the adapters are compared with each other, and L_inc is checked against central differences.
 5. **`maps/point.py` `solve_point(static, design, angle, currents, solver, initial=None, keep_field=False, with_l_inc=False)`**: mesh_at_angle → machine_problem → solve → post, returning a frozen `PointResult` (ψ, Arkkio and virtual-work torque, W, W′, status, iterations, optional L_inc). L_inc is withheld unless the solve converged at full load.
 
 Analytic test problems (the current-sheet toroid and MMS on the unit square) live in `tests/fem_fixtures.py`. `tests/team24_fixture.py` builds the TEAM Problem 24 rig as a `Magnetostatic2D`; the finding is in `docs/team24-feasibility.md`. `tests/solvers/test_cross_solver.py` compares the two solvers at 1e-4. Test file basenames must be unique, because `tests/` has no `__init__.py`.
