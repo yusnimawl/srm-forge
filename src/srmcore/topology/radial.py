@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from ..model.design import RadialSRMParams
 from ..model.errors import InputError, ValidationIssue
+from ..model.validator import MIN_WEB_WIDTH
 from .primitives import (
     Arc, Line, Point, Segment, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, rotate,
 )
@@ -75,7 +76,13 @@ def _pole_side(face_radius: float, arc: float, taper: float, root_radius: float,
     root_angle = _angle(side.root_end)
     if root_angle <= 0.0:
         raise ValueError("flank crosses the pole axis")
-    if root_angle >= pitch / 2:
+    # The remaining web between this pole's root and the mirror-image root of the next pole, at the
+    # root radius, is root_radius * (pitch - 2*root_angle); require it to clear MIN_WEB_WIDTH rather
+    # than merely be positive. A flank whose root radius is comparable to face_radius*sin(half) is
+    # near-tangent to the root circle, so a small fillet can push root_angle to within a hair of
+    # pitch/2 and leave a web too thin to mesh sensibly (a knife-edge sliver, not a real feature).
+    margin_angle = MIN_WEB_WIDTH / (2 * root_radius)
+    if root_angle >= pitch / 2 - margin_angle:
         raise ValueError("no room between neighbouring poles")
     return side
 

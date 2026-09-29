@@ -58,6 +58,36 @@ def _check(p: RadialSRMParams, theta_frac: float) -> None:
 _COMMON = dict(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 
 
+def test_rotor_fillet_that_collapses_the_root_web_is_rejected():
+    """Regression for a test_valid_designs_mesh_many falsifying example (Hypothesis's example
+    database replayed it deterministically): a 12/8 design with stator_pole_arc == rotor_pole_arc ==
+    20.1377 deg (sum 40.28 deg, just under the 45 deg rotor pitch) leaves only a ~1.34 mm
+    sharp-corner web between two adjacent rotor pole roots at the rotor yoke-outer radius. This
+    design's rotor_fillet_radius = 1 mm then collapses that web to ~0.012 mm (root_angle 22.4876 deg
+    against the 22.5 deg pitch/2 limit that _pole_side used to allow right up to, with no minimum web
+    requirement) -- previously a hairline sliver that produced a 2.67 deg min-angle triangle in
+    rotor_iron/rotor_slot_air and a MeshRejected at the screening preset, at theta_frac=0.0.
+
+    topology/radial.py's _pole_side now requires the same MIN_WEB_WIDTH used by model/validator.py's
+    min_width rule as a minimum root-to-root web, not just a positive one, so this design is now
+    rejected before any meshing, naming rotor_fillet_radius with rule pole_fit.
+    """
+    p = RadialSRMParams(
+        n_stator_poles=12, n_rotor_poles=8, n_phases=3,
+        stator_outer_diameter=0.22287996013788341, rotor_outer_diameter=0.11143998006894171,
+        air_gap=0.00025, stack_length=0.08, shaft_diameter=0.027422069628080966,
+        stator_pole_arc=0.3514692451161861, rotor_pole_arc=0.3514692451161861,
+        stator_pole_taper=0.0, rotor_pole_taper=0.0,
+        stator_yoke_thickness=0.02144282366804983, rotor_yoke_thickness=0.013372797608273004,
+        stator_fillet_radius=0.0, rotor_fillet_radius=0.001,
+        turns_per_pole=40, fill_factor=0.5,
+        slot_liner_thickness=0.0004, coil_inner_clearance=0.001,
+    )
+    with pytest.raises(InputError) as info:
+        build_machine_mesh(Design(machine=p, mesh=MeshSettings(preset="screening")))
+    assert any(i.parameter == "rotor_fillet_radius" and i.rule == "pole_fit" for i in info.value.issues)
+
+
 @settings(max_examples=5, derandomize=True, **_COMMON)
 @given(radial_designs(), st.floats(0.0, 1.0))
 def test_valid_designs_mesh_fast(p, theta_frac):
