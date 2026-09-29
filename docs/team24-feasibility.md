@@ -2,7 +2,7 @@
 
 Answer: **yes, TEAM 24 can be set up and solved by the 2D engine.** Both solvers agree to machine precision,
 static torque is +6.4 % above measurement, and the current rise follows the measured shape but is
-faster early (eddy currents are not modelled). Reproduce with `python examples\team24_check.py [size_scale]`;
+faster than measured from 5 ms on (eddy currents are not modelled). The verdict is provisional, see the last section. Reproduce with `python examples\team24_check.py [size_scale]`;
 the model is `tests/team24_fixture.py::team24_problem`.
 
 ## Inputs used
@@ -49,7 +49,7 @@ the owner may want to confirm against the printed table.
 
 - Saturation polarisation for the tail beyond 2.472 T: 2.6 T (assumed). Corner elements exceed the table:
   peak |B| in iron is 2.79 T (default mesh) to 3.09 T (finer mesh), i.e. the sharp overlapping pole
-  corner (no fillet) is a field singularity. Torque does not move with it (below).
+  corner (no fillet) is a field singularity. Static torque changes by 0.001 % when the assumed value goes from 2.5 T to 2.8 T (below).
 - Steel is solid (stacking factor 1); eddy currents neglected (spec section 2.3).
 - 3D end effects (axial length 25.4 mm, coil overhang, leakage outside the stator) are not in a 2D model.
 
@@ -75,7 +75,10 @@ psi(7.41 A) = 0.4066 Wb-turns.
 | default mesh | 3.426 N.m | 3.426 | 3.22 | +6.4 % |
 | size_scale 0.5 | 3.425 | 3.425 | 3.22 | +6.4 % |
 
-Arkkio and virtual work agree within 0.01 %; mesh refinement moves torque by 0.03 %. Torque is positive
+Arkkio and virtual work agree within 0.01 %; mesh refinement moves torque by 0.03 %.
+
+Assumed saturation polarisation (default mesh, 7.41 A, Arkkio): 2.5 T gives 3.42596 N.m, 2.6 T gives
+3.42594, 2.8 T gives 3.42592, a change of 0.001 % over the range. Torque is positive
 (counter-clockwise, toward alignment); both poles carry flux in the same direction (checked).
 
 ## Current rise
@@ -96,10 +99,14 @@ V = 23.1 V, R = 3.09 ohm, then compared with Table III at the table times.
 | 0.300 | 7.41 | 7.47 | +0.8 % |
 
 The model is up to 12 % ahead of the measurement between 10 and 40 ms and settles at V/R = 7.476 A
-(the table is truncated at 7.47 A in the script; measured 7.41 A). The early lag in the measurement is what
-eddy currents in solid steel would produce, so the sign of the deviation is the expected one.
-Torque at the measured time points is off by up to +65 % mid-rise, because torque follows the current
-lag (torque vs current at the same current is within about 6 %): compare torque against current, not time.
+(the table is truncated at 7.47 A in the script; measured 7.41 A). At 2 ms the model is 12.5 % behind
+the measurement, the opposite sign to what eddy currents in solid steel would give (they slow the rise),
+so the deviation is not explained by eddy currents and its cause is not established. The late-time +0.8 %
+offset comes from using R = 3.09 ohm while the measured steady-state 7.41 A implies R = 23.1 / 7.41 = 3.12 ohm;
+it is not physics.
+Torque at the measured time points is off by up to +65 % mid-rise because the model current runs ahead of
+the measurement. Torque against time is therefore not a useful comparison; torque against current at the
+same current was not computed here.
 
 ## Comparison with the NGSolve reference page
 
@@ -113,16 +120,18 @@ match Fig. 1 and were not used.
 
 - Nothing blocked. The one-pass geometry (Gmsh OCC booleans, fragment for conformity) meshed first time.
 - The report's B-H column units are garbled in text (see above).
-- The Task 3 checks (Newton, cross-solver, virtual work) work unchanged on a non-SRM topology.
+- The Newton, cross-solver and virtual-work checks (Newton, cross-solver, virtual work) work unchanged on a non-SRM topology.
 - Not compared: rotor pole flux (Table V, 5-turn search coil) and Hall probe B_y (Table VI), which need
   probe positions and are 3D quantities.
 
 ## Is TEAM 24 behaviour reached?
 
-Yes for the magnetostatic scope: the engine reproduces the saturated end state (torque within 6.4 %)
-and the qualitative current rise. The rise deviates by about 12 % at worst because eddy currents are outside
-the scope.
+Provisionally yes for the magnetostatic scope: the engine reproduces the saturated end state (static
+torque +6.4 % from measured) and a current rise of the measured shape, up to 12 % off in current. Two
+things are open for the owner before this counts:
 
-Proposed criterion for the owner to accept or change in Task 6 (provisional): static torque within 10 % of
-measured at 7.41 A, and a current-rise curve that follows the measured shape. Current numbers meet both;
-a stricter "current within 10 % at all times" would fail between 10 and 40 ms.
+- Confirm the Table I H-column units against the printed report. The x10 reading was rejected because
+  J = B - mu0 H would decrease, which is an inference, not a check.
+- Accept or change the criterion, which is a proposal: static torque within 10 % of measured at 7.41 A,
+  and a current-rise curve that follows the measured shape. Current numbers meet both; a stricter
+  "current within 10 % at all times" would fail between 10 and 40 ms.

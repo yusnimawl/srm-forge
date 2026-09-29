@@ -1,5 +1,6 @@
 """Band-pitch convergence on the 8/6 `screening` mesh: ψ_A, Arkkio torque and nodal-force torque at 20 A
-for band divisions D, 2D and 4D, at 10° and half a band pitch later.
+for band divisions D, 2D and 4D, at 10° and 10° + p_D/2, where p_D is the band pitch of the default D, for
+every division count.
 
 Run from the repo root:  .venv\\Scripts\\python examples\\band_pitch_convergence.py
 """
