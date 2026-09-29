@@ -1,0 +1,22 @@
+{
+  "kind": "soft_magnetic",
+  "name": "steel_1010",
+  "grade": "1010",
+  "variant": "FEMM library curve",
+  "provenance": {
+    "source": "FEMM 4.2 material library matlib.dat (github.com/cenit/FEMM, bin/matlib.dat), block \"1010 Steel\" (38 BH points)",
+    "typical": true
+  },
+  "confidence": "C",
+  "bh": {
+    "h": [0.0, 79.577472, 100.182101, 126.121793, 158.77793, 199.889571, 251.646061, 316.80362, 398.832128, 502.099901, 632.106325, 795.774715, 1001.821011, 1261.217929, 1587.779301, 1998.89571, 2516.460605, 3168.036204, 3988.321282, 5020.999013, 6321.06325, 7957.747155, 10018.210114, 12612.179293, 15877.79301, 19988.957103, 25164.606052, 31680.362037, 39883.212823, 50209.990127, 63210.632497, 79577.471546, 100182.101136, 126121.792926, 158777.930096, 199889.57103, 251646.060522, 316803.62037],
+    "b": [0.0, 0.211862, 0.265665, 0.332377, 0.414377, 0.513811, 0.631899, 0.767784, 0.917018, 1.070353, 1.214255, 1.334637, 1.422981, 1.480634, 1.517214, 1.544515, 1.571296, 1.602049, 1.638404, 1.68049, 1.727311, 1.776659, 1.825401, 1.870557, 1.910809, 1.947222, 1.982328, 2.018252, 2.055398, 2.092545, 2.128095, 2.161612, 2.194644, 2.230339, 2.272386, 2.324282, 2.389356, 2.471238]
+  },
+  "stacking_factor": 1.0,
+  "stacking_factor_source": "solid (not laminated) shaft steel",
+  "saturation_polarisation": 2.1,
+  "saturation_polarisation_source": "PROVISIONAL: low-carbon steel, somewhat below pure iron's 2.15 T (Bozorth, Ferromagnetism, 1951); the FEMM tail is flat at J = 2.073 T so the value barely matters (spec §10)",
+  "density": 7870.0,
+  "density_source": "PROVISIONAL: typical carbon-steel value (ASM Handbook), not yet checked (spec §10)",
+  "provisional_fields": ["saturation_polarisation", "density"]
+}

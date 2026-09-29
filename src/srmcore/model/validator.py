@@ -157,7 +157,7 @@ def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[Validati
         if not math.isfinite(ref.growth):
             issues.append(_err(f"refinement.{tag}.growth", "finite", "must be a finite number"))
             non_finite = True
-    for name in ("min_angle_deg", "band_min_angle_deg", "max_aspect_ratio"):
+    for name in ("min_angle_deg", "band_min_angle_deg", "max_aspect_ratio", "outer_air_thickness"):
         if not math.isfinite(getattr(s, name)):
             issues.append(_err(name, "finite", "must be a finite number"))
             non_finite = True
@@ -202,6 +202,11 @@ def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[Validati
         issues.append(_err("band_min_angle_deg", "range", "must be in (0, 60)"))
     if s.max_aspect_ratio <= 1:
         issues.append(_err("max_aspect_ratio", "range", "must be > 1"))
+    if s.outer_air_thickness < 0:
+        issues.append(_err("outer_air_thickness", "non_negative", "must be >= 0 (0 = no outer air ring)"))
+    elif s.outer_air_thickness > p.stator_outer_radius:
+        issues.append(_err("outer_air_thickness", "units",
+                           f"{s.outer_air_thickness} m is larger than the stator outer radius; lengths are in metres"))
     return issues
 
 

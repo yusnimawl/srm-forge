@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md`. It covers the architecture, physics, tolerances, milestones M1–M5, open items and the decision log. Read the relevant section before starting milestone work. Implementation plans are in `docs/superpowers/plans/`, and `docs/reference-machines.md` audits which published machines can be used for validation.
 
-**Current state:** M1 (geometry and mesh) is complete. Of the subpackages `model`, `topology`, `geometry` and `mesh` contain code. `materials`, `fields`, `physics`, `solvers`, `post`, `maps` and `project` are empty placeholders that later milestones will fill (M2: materials, B-H processing and the skfem solver; M3: NGSolve adapter go/no-go; M4: maps; M5: validation).
+**Current state:** M1 (geometry and mesh) and M2 (materials and nonlinear magnetostatics) are complete. `maps` and `project` are still empty placeholders for later milestones (M3: NGSolve adapter go/no-go; M4: maps; M5: validation).
 
 ## Commands
 
@@ -21,6 +21,7 @@ python -m pytest -m "not slow"                       # fast suite (what CI runs)
 python -m pytest                                     # include slow property/quality tests
 python -m pytest tests/mesh/test_band.py::test_name  # single test
 python examples\mesh_8_6.py [screening|full]         # mesh an 8/6 and save PNG plots
+python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print psi, torque, energies, saturation
 ```
 
 On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 libxft2 libxinerama1`). There is no linter or formatter configured.
@@ -40,7 +41,7 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 | `maps` | all of the above |
 | `project` | model, maps |
 
-- Only `geometry/` and `mesh/` may import `gmsh`. Only `solvers/` may import `ngsolve` or `netgen`. Top-level modules such as `srmcore/__init__.py` must not import either.
+- Only `geometry/` and `mesh/` may import `gmsh`. Only `solvers/` may import `skfem`, `ngsolve` or `netgen`. Top-level modules such as `srmcore/__init__.py` must not import any of `gmsh`, `skfem`, `ngsolve` or `netgen`.
 - Layers exchange plain data: numpy arrays, frozen Pydantic models and frozen dataclasses. Never pass Gmsh or solver objects across a layer boundary.
 - Everything is in SI units internally (metres, radians, amperes). The validator rejects values that look like millimetres, with rule `units`.
 
@@ -55,6 +56,15 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 5. **`mesh/machine.py` `mesh_at_angle`**: rotates the rotor nodes and re-triangulates only the thin moving-band annulus. `band.py` zips two node rings that have the same uniform pitch. Angles are wrapped into [0, 2π). `snap_angle` snaps an angle to the band pitch.
 6. **`mesh/quality.py`**: quality report and gate. A failure raises `MeshRejected`, which carries either a `MeshQualityReport` or a `BandRejection`.
 7. **`mesh/api.py` `build_machine_mesh`**: the public entry point. It validates, builds the static mesh and quality-gates it at angle 0 and at half a band pitch.
+
+## Solve pipeline (M2)
+
+1. **`materials/`**: `load_material(name)` reads `materials/data/<name>.json`. `process_bh` checks units, adds the origin, applies the stacking factor, requires J = B − μ0·H to be non-decreasing, and builds a monotone Hermite H(B) with a C¹ tail towards Js. `library_law(name)` returns the cached `ReluctivityLaw`; conductors and air use `LinearLaw`/`VACUUM`.
+2. **`physics/build.py` `machine_problem(mesh, design, currents)`**: assigns laws by `region_kind` through `RegionMaterials`, builds the connection matrix from `CoilInfo` (`physics/winding.py`), takes Dirichlet nodes from `outer_edges` and band info from the mesh. It never parses region names.
+3. **`solvers/skfem_reference.py` `SkfemReference().solve(problem, initial=None)`**: P1, quadrature order 2, Newton with the consistent Jacobian, and both residual and ΔA < 1e-8. On failure it falls back to damped Newton, then a current ramp, then `NONCONVERGED`; it never raises. It returns a `FieldSolution` (`fields/solution.py`) with A, element B, ν and energies.
+4. **`post/quantities.py`**: `flux_linkage`, `arkkio_torque` (band radii from the mesh; positive counter-clockwise) and `saturation_report`. Phase A is aligned at θ = 0, and counter-clockwise motoring excites A → D → C → B.
+
+Analytic test problems (the current-sheet toroid and MMS on the unit square) live in `tests/fem_fixtures.py`. Test file basenames must be unique, because `tests/` has no `__init__.py`.
 
 ## Tests
 

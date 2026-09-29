@@ -1,0 +1,13 @@
+{
+  "kind": "conductor",
+  "name": "copper",
+  "provenance": {
+    "source": "IEC 60028 International Annealed Copper Standard",
+    "typical": true
+  },
+  "resistivity": 1.7241e-08,
+  "reference_temperature_c": 20.0,
+  "temperature_coefficient": 0.00393,
+  "density": 8890.0,
+  "density_source": "IEC 60028 International Annealed Copper Standard (8890 kg/m3)"
+}

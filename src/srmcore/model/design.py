@@ -91,6 +91,9 @@ class MeshSettings(_Frozen):
     min_angle_deg: float = 10.0
     band_min_angle_deg: float = 5.0
     max_aspect_ratio: float = 12.0
+    # Radial thickness of an air ring outside the stator OD (spec §4.3); 0 = none. A = 0 then sits on the
+    # ring's outer circle instead of the stator OD, which admits yoke-saturation leakage flux.
+    outer_air_thickness: float = 0.0
 
 
 class Design(_Frozen):

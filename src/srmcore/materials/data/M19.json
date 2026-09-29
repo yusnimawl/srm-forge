@@ -1,0 +1,23 @@
+{
+  "kind": "soft_magnetic",
+  "name": "M19",
+  "grade": "M19",
+  "variant": "FEMM library curve",
+  "thickness": 0.000635,
+  "provenance": {
+    "source": "FEMM 4.2 material library matlib.dat (github.com/cenit/FEMM, bin/matlib.dat), block \"M-19 Steel\" (47 BH points; d_lam 0.635 mm). Typical catalogue curve; points above about 2.0 T are FEMM's own extrapolation, not measurements. Validation curve, not representative of EV traction steel.",
+    "typical": true
+  },
+  "confidence": "C",
+  "bh": {
+    "h": [0.0, 15.120714, 22.718292, 27.842733, 31.871434, 35.365044, 38.600588, 41.736202, 44.873979, 48.087807, 51.437236, 54.975221, 58.752993, 62.823644, 67.245285, 72.084406, 77.4201, 83.350021, 89.999612, 97.537353, 106.201406, 116.348464, 128.547329, 143.765431, 163.754169, 191.868158, 234.833507, 306.509769, 435.255202, 674.911968, 1108.325569, 1813.085468, 2801.217421, 4053.653117, 5591.10689, 7448.318413, 9708.81567, 12486.931615, 16041.483644, 21249.420624, 31313.495878, 53589.446877, 88477.484601, 124329.41054, 159968.5693, 197751.604272, 234024.751347],
+    "b": [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2.0, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3]
+  },
+  "stacking_factor": 0.98,
+  "stacking_factor_source": "FEMM matlib \"M-19 Steel\" LamFill",
+  "saturation_polarisation": 2.03,
+  "saturation_polarisation_source": "PROVISIONAL: typical room-temperature value for Fe-3%Si non-oriented steel (Bozorth, Ferromagnetism, 1951); replace with the supplier value (spec §10)",
+  "density": 7650.0,
+  "density_source": "PROVISIONAL: typical M19 value from AK Steel (Cleveland-Cliffs) M-19 product data, not yet checked against the datasheet (spec §10)",
+  "provisional_fields": ["saturation_polarisation", "density"]
+}

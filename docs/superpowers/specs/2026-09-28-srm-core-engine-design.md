@@ -163,9 +163,9 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 1. Import (CSV/JSON, or WebPlotDigitizer CSV). Units must be T and A/m; importer rejects/flags unit mix-ups.
 2. Add origin point with initial permeability.
 3. Apply stacking factor: `B_eff(H) = k·B_steel(H) + (1−k)·μ0·H`.
-4. Fit a monotone PCHIP to B(H); derive reluctivity ν for Newton.
+4. Fit a monotone cubic Hermite interpolant to H(B) through the stacked points (PCHIP knot derivatives; the end derivative equals the last secant; if the fitted end derivative at B=0 is not positive, the first secant is used instead); ν = H/B for Newton.
 5. **Validity check:** ν > 0 and dH/dB > 0 (monotone B-H). Non-monotone data → error, with an optional **repair tool** (smoothing) that reports exactly what changed.
-6. **Saturation tail:** beyond the last data point extrapolate the polarisation `J = B − μ0·H` towards Js with a fitted law (e.g. `J = Js − a/H`) joined smoothly (C¹) to the data. A ±2 % Js sensitivity check is part of validation.
+6. **Saturation tail:** beyond the last data point extrapolate the polarisation `J = B − μ0·H` towards Js with the law `J = Js − d/(1 + s·(H − Hn)/d)`, d = Js − Jn and s the data's end slope of J, which joins the data C¹ and stays well-conditioned as s → 0. A ±2 % Js sensitivity check is part of validation.
 7. **Fit-vs-datasheet error report** (a test).
 
 ### 5.3 Initial library
@@ -314,6 +314,11 @@ Every key result (La, Lu, peak torque, ψ at I_max) carries a worst-case uncerta
   (iii) the validator's `self_starting` (Lawrenson) rule in `src/srmcore/model/validator.py` rejects two of the selected published machines as stated: Krishnan's 6/4 prototype (βs = 24° < 2π/(m·Nr) = 30°) and Jiang's 24/16 thesis machine (βs = 7.0°, βr = 7.2°, both < 2π/(m·Nr) = 7.5°). The validator is unchanged pending this decision. The owner must choose one of: downgrade `self_starting` to a warning, keep it as a hard error (and accept that these machines cannot be built/validated as published), or add a fixture-only bypass for validation-reference machines that does not relax the rule for user-designed machines.
   (iv) the B-H gap is resolved by library curves at grade C (spec §5.1/§5.3's confidence grade C = "inferred") — i.e. these machines' named lamination grades (M43, M19) are expected to get their B-H curves from `srmcore`'s own materials library, not from the literature that only names the grade; M19 is already the item-1 initial-library entry, M43 would need to be added.
 - **[M1→M5] Final threshold for spec §4.2's minimum web/pole-tip-width validator rule.** `src/srmcore/model/validator.py`'s `min_width` rule uses a provisional module constant `MIN_WEB_WIDTH = 1.0e-3` m (yoke thicknesses and pole-tip chords) pending an owner decision on the final threshold — an absolute floor, a multiple of `lamination_thickness`, or both.
+- **[M2→M5] Provisional material data in `src/srmcore/materials/data/`.** The M19 and steel_1010 B-H tables are FEMM 4.2 library curves (confidence C; FEMM's M-19 points above about 2.0 T are its own extrapolation). Their Js (M19 2.03 T, steel_1010 2.10 T) and densities (7650 and 7870 kg/m³) are typical handbook or datasheet values that have not been checked; each record lists them in `provisional_fields`. No `cost_per_kg` is set. Replace these with supplier values before M5. The §5.2 ±2 % Js sensitivity check runs in M5; steel_1010's tail is flat, so Js barely affects it.
+- **[M2→M4] Phase labelling.** Counter-clockwise motoring excites A → D → C → B (pinned by a test). The owner decides whether to relabel phases so the sequence reads alphabetically before the drive work.
+- **[M2→M4] Solve speed.** About 0.65–1.0 s per Newton iteration at 43k DOF and 5–13 iterations cold, against §7.2's ≤ 4 s per solve. M4 options: vectorised P1 assembly with a fixed sparsity pattern, parallel map points, a tangent (Euler) predictor for current continuation (a warm start or a scaled start does not help), and an energy (Armijo) line search. Keep `skfem_reference` as it is; its independence makes it the M3 cross-check.
+- **[M2→M4] Per-region stacking factor.** Motor-CAD sets the stacking factor per stator and rotor component; srmcore sets it per material. Revisit when rotor and stator use different stacks.
+- **[M2→M5] FEMM fixtures.** Give FEMM the raw curve plus its LamFill, not the stacked curve, so the stacking factor is not applied twice.
 
 ## 11. Decision log
 | Date | Decision |
@@ -326,3 +331,8 @@ Every key result (La, Lu, peak torque, ψ at I_max) carries a worst-case uncerta
 | 2026-09-28 | #1 awards "EM-validated" only; "fabrication-ready" belongs to #7 |
 | 2026-09-28 | First validation measured benchmark: TEAM Problem 24 |
 | 2026-09-28 | Repository at `D:\y\srm-designer`; spec approved |
+| 2026-09-29 | B-H fit is a monotone Hermite interpolant of H(B), not a PCHIP of B(H) (§5.2 step 4); decided by the owner's expert panel |
+| 2026-09-29 | Saturation tail J = Js − d/(1 + s·(H−Hn)/d), C¹ at the last point (§5.2 step 6) |
+| 2026-09-29 | μ0 = 4π×10⁻⁷ exactly (FEMM parity) |
+| 2026-09-29 | Outer air ring is `MeshSettings.outer_air_thickness`, default 0 (A = 0 on the stator OD); M5 decides whether to default to a ring |
+| 2026-09-29 | Material costs stay unset until supplier quotes exist; placeholder values are listed in `provisional_fields` |

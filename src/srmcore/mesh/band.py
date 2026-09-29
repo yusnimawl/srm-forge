@@ -48,6 +48,16 @@ def zipper_band(inner_angles: np.ndarray, outer_angles: np.ndarray) -> np.ndarra
     rel_out = _snap(a_out - start)
     events = sorted([(float(rel_out[j]), 1, int(j)) for j in out_order[1:]]
                     + [(float(rel_in[i]), 0, i) for i in range(n_in)])
+    # Where an inner and an outer node coincide in angle, the band cell between this tie and the
+    # previous one is a quad, and the event order picks its diagonal. Alternating the diagonal from
+    # tie to tie (outer-first on even ties, like the closing quad) makes the band mirror-symmetric
+    # about every tie; one fixed diagonal biases the torque by ~1 % of peak with a sign set by it.
+    ties = 0
+    for k in range(len(events) - 1):
+        if events[k][0] == events[k + 1][0] and events[k][1] != events[k + 1][1]:
+            ties += 1
+            if ties % 2 == 0 and events[k][1] == 0:
+                events[k], events[k + 1] = events[k + 1], events[k]
     last_out = first_out
     last_in = int(np.argmax(rel_in))
     tris: list[tuple[int, int, int]] = []

@@ -89,10 +89,12 @@ def mesh_at_angle(static: StaticMesh, theta: float, check: bool = True) -> Machi
                                report=BandRejection(rotor_angle=wrapped, band_min_angle_deg=worst))
     region_kind = dict(static.region_kind)
     region_kind["moving_band"] = "air"
+    region_part = dict(static.region_part)
+    region_part["moving_band"] = "band"
     return MachineMesh(
         nodes=nodes, triangles=triangles, region_ids=region_ids,
         region_names=static.region_names + ("moving_band",),
-        region_part=dict(static.region_part), region_kind=region_kind, coils=dict(static.coils),
+        region_part=region_part, region_kind=region_kind, coils=dict(static.coils),
         n_stator_nodes=ns, outer_edges=static.outer_edges, rotor_angle=wrapped,
         band_rows=slice(start, len(triangles)),
         band_inner_radius=static.band_inner_radius, band_outer_radius=static.band_outer_radius,

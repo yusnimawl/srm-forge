@@ -22,6 +22,7 @@ THIRD_PARTY_OWNERS: dict[str, set[str]] = {
     "ngsolve": {"solvers"},
     "netgen": {"solvers"},
     "gmsh": {"geometry", "mesh"},
+    "skfem": {"solvers"},
 }
 
 
