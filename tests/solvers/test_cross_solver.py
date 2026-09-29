@@ -33,11 +33,12 @@ def _agree(problem, check_torque=True):
     psi_ref, psi_ngs = flux_linkage(problem, ref), flux_linkage(problem, ngs)
     assert np.allclose(psi_ngs, psi_ref, rtol=TOL, atol=TOL * np.abs(psi_ref).max())
     if check_torque:
-        t_ref = arkkio_torque(problem, ref)
-        assert abs(arkkio_torque(problem, ngs) - t_ref) <= TOL * abs(t_ref)
-        v_ref = virtual_work_torque(problem, ref)
-        assert abs(virtual_work_torque(problem, ngs) - v_ref) <= TOL * abs(v_ref)
-
+        # Torque vanishes by symmetry at aligned and unaligned positions, so the floor is the
+        # co-energy per radian, a physical torque scale, rather than the (noise-level) value itself.
+        t_ref, v_ref = arkkio_torque(problem, ref), virtual_work_torque(problem, ref)
+        scale = max(abs(t_ref), abs(v_ref), abs(ref.coenergy))
+        assert abs(arkkio_torque(problem, ngs) - t_ref) <= TOL * scale
+        assert abs(virtual_work_torque(problem, ngs) - v_ref) <= TOL * scale
 
 def test_nonlinear_toroid_agrees():
     _agree(toroid_problem(library_law("M19"), 3000.0, n_theta=48, layers_per_mm=1), check_torque=False)
