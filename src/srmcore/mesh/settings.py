@@ -3,6 +3,7 @@ import math
 from dataclasses import dataclass
 
 from ..model.design import MeshSettings, RadialSRMParams
+from ..model.regions import REGION_SIZE_KEYS
 
 
 @dataclass(frozen=True)
@@ -38,31 +39,34 @@ class ResolvedMeshSettings:
 def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSettings:
     preset = PRESETS[s.preset]
     iron = p.bore_radius * preset.iron_factor
-    sizes = {
-        "stator_iron": iron, "rotor_iron": iron, "shaft": 2 * iron,
-        "coil": iron, "slot_air": iron, "airgap": p.air_gap / s.airgap_radial_layers,
-    }
+    # Every REGION_SIZE_KEYS entry gets an iron-scale default; shaft and airgap override it below.
+    sizes = {key: iron for key in REGION_SIZE_KEYS}
+    sizes["shaft"] = 2 * iron
+    sizes["airgap"] = p.air_gap / s.airgap_radial_layers
     sizes.update(s.region_sizes)
     gap = sizes["airgap"]
     refinement = {
         "pole_tip": (preset.tip_factor * gap, DEFAULT_GROWTH),
         "pole_root": (iron / 4, DEFAULT_GROWTH),
         # Grades the size away from the slot-mouth arcs where the airgap regions' fine size meets
-        # the iron-scale background (Task 12's property-test finding); internal only, not a
-        # user-overridable MeshSettings.refinement tag.
+        # the iron-scale background; internal only, not a user-overridable MeshSettings.refinement
+        # tag. Without it, a forced-fine curve butting straight into a coarse interior produces
+        # sliver triangles all along those arcs.
         "airgap_interface": (gap, DEFAULT_GROWTH),
     }
     if p.slot_liner_thickness > 0:
         # The liner strip is much thinner than the generic "iron"-scale element size, and with
-        # no dedicated refinement it gets forced sliver triangles (Task 11's quality-gate
-        # finding). `gap` is a floor so this never asks for elements finer than the airgap.
+        # no dedicated refinement it gets forced sliver triangles. `gap` is a floor so this never
+        # asks for elements finer than the airgap.
         refinement["slot_liner"] = (max(p.slot_liner_thickness, gap), DEFAULT_GROWTH)
     for tag, ref in s.refinement.items():
         refinement[tag] = (ref.size, ref.growth)
     if s.airgap_circumferential_divisions is not None:
         divisions = s.airgap_circumferential_divisions
     else:
-        base = math.lcm(p.n_stator_poles, p.n_rotor_poles)
+        # lcm(Ns, 2*Nr), not lcm(Ns, Nr): puts the unaligned rotor position (half a rotor pitch
+        # off the aligned position) on the band grid too, not just the aligned positions.
+        base = math.lcm(p.n_stator_poles, 2 * p.n_rotor_poles)
         r_mid = (p.band_inner_radius + p.band_outer_radius) / 2
         target = 2 * math.pi * r_mid / (preset.band_aspect * gap)
         divisions = base * math.ceil(target / base)

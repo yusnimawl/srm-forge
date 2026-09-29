@@ -3,8 +3,9 @@ import math
 import numpy as np
 import pytest
 
-from conftest import make_8_6
+from conftest import make_8_6, make_12_8, make_24_16
 from srmcore.model.design import EdgeRefinement, MeshSettings
+from srmcore.model.regions import REGION_SIZE_KEYS
 from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.mesh.sizing import size_at
 
@@ -18,7 +19,7 @@ def test_full_preset_defaults(srm_8_6):
     assert pitch_length <= 1.5 * r.gap_size + 1e-15   # divisions rounded up => pitch not above target
     assert pitch_length > 1.5 * r.gap_size * r.band_divisions / (r.band_divisions + 24)
     assert r.band_pitch == pytest.approx(2 * math.pi / r.band_divisions)
-    assert set(r.region_sizes) == {"stator_iron", "rotor_iron", "shaft", "coil", "slot_air", "airgap"}
+    assert set(r.region_sizes) == set(REGION_SIZE_KEYS)
     assert r.region_sizes["airgap"] == r.gap_size
 
 
@@ -81,3 +82,14 @@ def test_size_at_base_feature_and_growth():
     assert size_at(0.004, 0.0, 0.01, features) == pytest.approx(0.001 + 0.5 * 0.004)
     assert size_at(1.0, 0.0, 0.01, features) == pytest.approx(0.01)
     assert size_at(1.0, 0.0, 0.01, []) == pytest.approx(0.01)
+
+
+@pytest.mark.parametrize("factory", [make_8_6, make_12_8, make_24_16])
+@pytest.mark.parametrize("preset", ["screening", "full"])
+def test_unaligned_position_lands_on_the_band_grid(factory, preset):
+    # (pi/Nr)/pitch must be an integer: the unaligned rotor position (half a rotor pitch off the
+    # aligned position) must land on the band grid, not just the aligned positions.
+    p = factory()
+    r = resolve_mesh_settings(p, MeshSettings(preset=preset))
+    k = (math.pi / p.n_rotor_poles) / r.band_pitch
+    assert k == pytest.approx(round(k), abs=1e-9)

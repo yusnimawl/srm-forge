@@ -3,8 +3,11 @@ import math
 
 from .design import Design, MeshSettings, RadialSRMParams
 from .errors import InputError, ValidationIssue
+from .regions import REGION_SIZE_KEYS
 
-REGION_SIZE_KEYS = frozenset({"stator_iron", "rotor_iron", "shaft", "coil", "slot_air", "airgap"})
+# Provisional floor for spec §4.2's minimum web/pole-tip-width rule; see spec §10 open items for
+# the final threshold (owner decision: absolute value and/or a multiple of lamination thickness).
+MIN_WEB_WIDTH = 1.0e-3
 
 # Plausible ranges in metres; values outside almost always mean wrong units (mm instead of m).
 _UNIT_RANGES: dict[str, tuple[float, float]] = {
@@ -12,6 +15,13 @@ _UNIT_RANGES: dict[str, tuple[float, float]] = {
     "rotor_outer_diameter": (0.005, 2.0),
     "air_gap": (1e-5, 0.01),
     "stack_length": (1e-3, 2.0),
+    "shaft_diameter": (1e-3, 0.5),
+    "stator_yoke_thickness": (1e-4, 0.1),
+    "rotor_yoke_thickness": (1e-4, 0.1),
+    "stator_fillet_radius": (1e-5, 0.02),
+    "rotor_fillet_radius": (1e-5, 0.02),
+    "slot_liner_thickness": (1e-5, 0.01),
+    "coil_inner_clearance": (1e-5, 0.02),
 }
 _TOL = 1e-9
 
@@ -93,6 +103,18 @@ def validate_params(p: RadialSRMParams) -> list[ValidationIssue]:
     if p.stator_yoke_inner_radius <= p.bore_radius:
         issues.append(_err("stator_yoke_thickness", "radial_stack", "no room left for stator poles"))
 
+    for name in ("stator_yoke_thickness", "rotor_yoke_thickness"):
+        if 0 < getattr(p, name) < MIN_WEB_WIDTH:
+            issues.append(_err(name, "min_width", f"{getattr(p, name)} m < {MIN_WEB_WIDTH} m minimum web width"))
+    stator_tip_chord = 2 * p.bore_radius * math.sin(p.stator_pole_arc / 2)
+    if stator_tip_chord < MIN_WEB_WIDTH:
+        issues.append(_err("stator_pole_arc", "min_width",
+                           f"pole-tip chord {stator_tip_chord} m < {MIN_WEB_WIDTH} m minimum width"))
+    rotor_tip_chord = 2 * p.rotor_outer_radius * math.sin(p.rotor_pole_arc / 2)
+    if rotor_tip_chord < MIN_WEB_WIDTH:
+        issues.append(_err("rotor_pole_arc", "min_width",
+                           f"pole-tip chord {rotor_tip_chord} m < {MIN_WEB_WIDTH} m minimum width"))
+
     if p.n_phases >= 2 and p.n_rotor_poles >= 2:
         bs, br = p.stator_pole_arc, p.rotor_pole_arc
         limit = 2 * math.pi / (p.n_phases * p.n_rotor_poles)
@@ -154,11 +176,14 @@ def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[Validati
                                f"{airgap_size} m gives fewer than {s.airgap_radial_layers} element "
                                f"layers across the {p.air_gap} m air gap"))
     if s.airgap_circumferential_divisions is not None:
-        base = math.lcm(p.n_stator_poles, p.n_rotor_poles)
+        # lcm(Ns, 2*Nr), not lcm(Ns, Nr): the extra factor of 2 puts the unaligned rotor position
+        # (pi/Nr, half a rotor pitch off the aligned position) on the band grid too, not just the
+        # aligned positions (multiples of a full rotor pitch).
+        base = math.lcm(p.n_stator_poles, 2 * p.n_rotor_poles)
         n = s.airgap_circumferential_divisions
         if n < base or n % base != 0:
             issues.append(_err("airgap_circumferential_divisions", "band_divisions",
-                               f"must be a positive multiple of lcm(Ns, Nr) = {base}"))
+                               f"must be a positive multiple of lcm(Ns, 2*Nr) = {base}"))
     for key, size in s.region_sizes.items():
         if key not in REGION_SIZE_KEYS:
             issues.append(_err(f"region_sizes.{key}", "unknown_region", f"allowed: {sorted(REGION_SIZE_KEYS)}"))

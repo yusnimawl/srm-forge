@@ -2,10 +2,10 @@ import math
 
 import pytest
 
-from conftest import make_8_6, make_12_8
+from conftest import make_8_6, make_12_8, make_24_16
 from srmcore.model.design import Design, EdgeRefinement, MeshSettings
 from srmcore.model.errors import InputError
-from srmcore.model.validator import require_valid, validate_mesh_settings, validate_params
+from srmcore.model.validator import MIN_WEB_WIDTH, require_valid, validate_mesh_settings, validate_params
 
 
 def _errors(issues):
@@ -66,6 +66,32 @@ def test_stator_arc_larger_than_rotor_is_only_a_warning():
     assert ("stator_pole_arc", "arc_order") in _warnings(issues)
 
 
+def test_min_web_width_rejects_thin_yokes():
+    errors = _errors(validate_params(make_8_6(stator_yoke_thickness=MIN_WEB_WIDTH / 2)))
+    assert ("stator_yoke_thickness", "min_width") in errors
+    errors = _errors(validate_params(make_8_6(rotor_yoke_thickness=MIN_WEB_WIDTH / 2)))
+    assert ("rotor_yoke_thickness", "min_width") in errors
+
+
+def test_min_web_width_rejects_thin_pole_tip_chords():
+    p = make_8_6(stator_pole_arc=math.radians(0.5))  # tiny arc -> tiny pole-tip chord
+    assert ("stator_pole_arc", "min_width") in _errors(validate_params(p))
+    p = make_8_6(rotor_pole_arc=math.radians(0.5))
+    assert ("rotor_pole_arc", "min_width") in _errors(validate_params(p))
+
+
+def test_min_web_width_accepts_reference_designs(reference_design):
+    assert ("stator_yoke_thickness", "min_width") not in _errors(validate_params(reference_design))
+    assert ("rotor_yoke_thickness", "min_width") not in _errors(validate_params(reference_design))
+    assert ("stator_pole_arc", "min_width") not in _errors(validate_params(reference_design))
+    assert ("rotor_pole_arc", "min_width") not in _errors(validate_params(reference_design))
+
+
+def test_unit_sanity_covers_shaft_and_yoke_and_fillet_and_liner_fields():
+    p = make_8_6(shaft_diameter=20.0)  # metres, obviously a millimetre value
+    assert ("shaft_diameter", "units") in _errors(validate_params(p))
+
+
 def test_radial_stack_rules():
     errors = _errors(validate_params(make_8_6(rotor_yoke_thickness=0.031)))  # 0.010 + 0.031 > 0.040
     assert ("rotor_yoke_thickness", "radial_stack") in errors
@@ -97,7 +123,7 @@ def test_mesh_settings_nan_region_size_rejected(srm_8_6):
 def test_mesh_settings_rules(srm_8_6):
     s = MeshSettings(
         airgap_radial_layers=3,
-        airgap_circumferential_divisions=100,  # lcm(8, 6) = 24 does not divide 100
+        airgap_circumferential_divisions=100,  # lcm(8, 2*6) = 24 does not divide 100
         region_sizes={"stator_iron": 0.002, "rotor": 0.002},
         refinement={"pole_tip": EdgeRefinement(size=0.0, growth=0.9)},
         skin_depth_layers=3,
