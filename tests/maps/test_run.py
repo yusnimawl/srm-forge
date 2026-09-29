@@ -1,4 +1,4 @@
-"""Serial map runner: layout, failed-point policy, cancellation. Solves are faked except in the last test."""
+"""Map runner: layout, failed-point policy, cancellation. Solves are faked except in the last test."""
 import numpy as np
 import pytest
 

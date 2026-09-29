@@ -2,12 +2,15 @@
 from .settings import SolverAdapter
 
 
-def make_solver(name: str) -> SolverAdapter:
+def make_solver(name: str, threads: int | None = None) -> SolverAdapter:
     if name == "ngsolve":
         try:
             from .ngsolve_adapter import NgsolveAdapter
         except ImportError as e:
             raise ImportError("the 'ngsolve' solver needs the optional extra: pip install srmcore[ngsolve]") from e
+        if threads is not None:
+            import ngsolve
+            ngsolve.SetNumThreads(threads)
         return NgsolveAdapter()
     if name == "skfem_reference":
         from .skfem_reference import SkfemReference

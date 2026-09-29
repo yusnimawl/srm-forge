@@ -1,0 +1,35 @@
+"""Public entry: a map of a design, from cache or by solving (spec §7.2)."""
+import os
+from collections.abc import Callable
+
+from ..mesh import build_machine_mesh
+from ..mesh.settings import resolve_mesh_settings
+from ..model.design import Design
+from ..solvers.factory import make_solver
+from .dataset import cached_map, provenance, store_map
+from .grids import GRID_SIZES, angle_grid, current_grid
+from .run import MapResult, check_excited, run_map
+
+
+def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited: str = "A",
+              workers: int | None = None, n_angles: int | None = None, n_currents: int | None = None,
+              cache_dir=None, progress: Callable[[int, int], None] | None = None,
+              cancel: Callable[[], bool] | None = None) -> MapResult:
+    """ψ and torque of `design` over an angle × current grid with `excited` carrying the current. Grid sizes
+    default to the design's fidelity preset. A complete map is stored in and served from `cache_dir`."""
+    check_excited(excited)
+    adapter = make_solver(solver)
+    default_a, default_i = GRID_SIZES[design.mesh.preset]
+    divisions = resolve_mesh_settings(design.machine, design.mesh).band_divisions
+    angles = angle_grid(design.machine, divisions, n_angles or default_a)
+    currents = current_grid(i_max, n_currents or default_i)
+    prov = provenance(design, angles, currents, excited, adapter)
+    if cache_dir is not None and (hit := cached_map(cache_dir, prov)) is not None:
+        return hit
+    # ponytail: half the logical CPUs stands in for the physical core count; psutil is not a dependency.
+    workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
+    result = run_map(build_machine_mesh(design), design, angles, currents, solver_name=solver, excited=excited,
+                     workers=workers, progress=progress, cancel=cancel)
+    if cache_dir is not None:
+        store_map(cache_dir, result, prov)
+    return result

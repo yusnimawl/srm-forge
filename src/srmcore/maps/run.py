@@ -1,7 +1,8 @@
-"""Serial map runner: one excited circuit swept over an angle × current grid (spec §7.2, §8.1).
+"""Map runner: one excited circuit swept over an angle × current grid (spec §7.2, §8.1).
 
 Every point is an independent solve from A = 0. Warm starts from the neighbouring current saved under
-20 % of the Newton iterations on the 8/6, so points stay independent and parallelise per angle."""
+20 % of the Newton iterations on the 8/6, so points stay independent; each angle is one job of the
+process pool."""
 import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from ..model.errors import MapFailed
 from ..solvers.factory import make_solver
 from ..solvers.settings import SolverAdapter
 from .point import solve_point
+from .pool import map_ordered
 
 STATUS_OK, STATUS_FALLBACK, STATUS_NONCONVERGED, STATUS_NOT_RUN = 0, 1, 2, -1
 _CODE = {SolveStatus.OK: STATUS_OK, SolveStatus.OK_WITH_FALLBACK: STATUS_FALLBACK,
@@ -83,32 +85,48 @@ def apply_failure_policy(result: MapResult) -> MapResult:
     return dataclasses.replace(result, **data, filled=failed.copy())
 
 
-def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, solver_name: str = "ngsolve",
-            excited: str = "A", progress: Callable[[int, int], None] | None = None,
-            cancel: Callable[[], bool] | None = None) -> MapResult:
-    circuits = tuple(chr(ord("A") + k) for k in range(design.machine.n_phases))
+_WORKER: dict = {}
+
+
+def _init_worker(static, design, solver_name, threads) -> None:
+    _WORKER.update(static=static, design=design, solver=make_solver(solver_name, threads))
+
+
+def _solve_job(job):
+    angle, currents, excited = job
+    return solve_angle(_WORKER["static"], _WORKER["design"], _WORKER["solver"], angle, currents, excited)
+
+
+def check_excited(excited: str) -> None:
     # Only phase A is aligned at θ = 0; the aligned angle of the other phases is not derived, so the
     # aligned-position check of the failure policy would be wrong for them.
     if excited != "A":
         raise ValueError(f"excited circuit {excited!r} is not supported yet: only phase A is aligned at θ=0")
+
+
+def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, solver_name: str = "ngsolve",
+            excited: str = "A", workers: int = 1, progress: Callable[[int, int], None] | None = None,
+            cancel: Callable[[], bool] | None = None) -> MapResult:
+    circuits = tuple(chr(ord("A") + k) for k in range(design.machine.n_phases))
+    check_excited(excited)
     if len(currents) < 2 or not np.all(np.isfinite(currents)) or np.any(np.diff(currents) <= 0):
         raise ValueError("currents must be strictly increasing with at least two values")
-    solver = make_solver(solver_name)
     n_a, n_i = len(angles), len(currents)
     data = {name: np.full((n_a, n_i, len(circuits)) if name == "psi" else (n_a, n_i), np.nan) for name in _FIELDS}
     iterations = np.zeros((n_a, n_i), dtype=np.int32)
     status = np.full((n_a, n_i), STATUS_NOT_RUN, dtype=np.int8)
-    complete = True
-    for a, angle in enumerate(angles):
-        if cancel is not None and cancel():
-            complete = False
-            break
-        row = solve_angle(static, design, solver, float(angle), currents, excited)
+    jobs = [(float(a), currents, excited) for a in angles]
+    # Pool workers run single-threaded solvers; the pool supplies the parallelism.
+    rows = map_ordered(_solve_job, jobs, workers=workers, initializer=_init_worker,
+                       initargs=(static, design, solver_name, 1 if workers > 1 else None),
+                       cancel=cancel, progress=progress)
+    for a, row in enumerate(rows):
+        if row is None:
+            continue
         for name in _FIELDS:
             data[name][a] = row[name]
         iterations[a], status[a] = row["iterations"], row["status"]
-        if progress is not None:
-            progress(a + 1, n_a)
+    complete = all(row is not None for row in rows)
     result = MapResult(np.asarray(angles, float), np.asarray(currents, float), circuits, excited,
                        **data, iterations=iterations, status=status,
                        filled=np.zeros((n_a, n_i), dtype=bool), complete=complete)

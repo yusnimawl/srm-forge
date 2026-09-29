@@ -38,6 +38,14 @@ class MeshRejected(RuntimeError):
         super().__init__("Mesh rejected: " + "; ".join(self.reasons))
 
 
+class WorkerCrashed(RuntimeError):
+    """A pool worker died twice on the same items (spec §8.1)."""
+
+    def __init__(self, items: list[int]):
+        self.items = list(items)
+        super().__init__(f"worker process crashed twice on items {self.items}")
+
+
 class MapFailed(RuntimeError):
     """A map violates the failed-point policy (spec §8.1)."""
 
