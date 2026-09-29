@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md`. It covers the architecture, physics, tolerances, milestones M1–M5, open items and the decision log. Read the relevant section before starting milestone work. Implementation plans are in `docs/superpowers/plans/`, and `docs/reference-machines.md` audits which published machines can be used for validation.
 
-**Current state:** M1 (geometry and mesh) and M2 (materials and nonlinear magnetostatics) are complete. `maps` and `project` are still empty placeholders for later milestones (M3: NGSolve adapter go/no-go; M4: maps; M5: validation).
+**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics) and M3 (NGSolve adapter go/no-go) are complete. The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check. `maps` and `project` are still empty placeholders for later milestones (M4: maps; M5: validation).
 
 ## Commands
 
@@ -16,12 +16,14 @@ The project needs Python 3.12 or newer. CI tests on 3.12 and 3.14, on both Windo
 
 ```powershell
 .venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ngsolve]"
 python -m pytest -m "not slow"                       # fast suite (what CI runs)
 python -m pytest                                     # include slow property/quality tests
 python -m pytest tests/mesh/test_band.py::test_name  # single test
 python examples\mesh_8_6.py [screening|full]         # mesh an 8/6 and save PNG plots
 python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print psi, torque, energies, saturation
+python examples\band_pitch_convergence.py           # band-pitch convergence table on the 8/6 screening mesh
+python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 
 On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 libxft2 libxinerama1`). There is no linter or formatter configured.
@@ -62,9 +64,10 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 1. **`materials/`**: `load_material(name)` reads `materials/data/<name>.json`. `process_bh` checks units, adds the origin, applies the stacking factor, requires J = B − μ0·H to be non-decreasing, and builds a monotone Hermite H(B) with a C¹ tail towards Js. `library_law(name)` returns the cached `ReluctivityLaw`; conductors and air use `LinearLaw`/`VACUUM`.
 2. **`physics/build.py` `machine_problem(mesh, design, currents)`**: assigns laws by `region_kind` through `RegionMaterials`, builds the connection matrix from `CoilInfo` (`physics/winding.py`), takes Dirichlet nodes from `outer_edges` and band info from the mesh. It never parses region names.
 3. **`solvers/skfem_reference.py` `SkfemReference().solve(problem, initial=None)`**: P1, quadrature order 2, Newton with the consistent Jacobian, and both residual and ΔA < 1e-8. On failure it falls back to damped Newton, then a current ramp, then `NONCONVERGED`; it never raises. It returns a `FieldSolution` (`fields/solution.py`) with A, element B, ν and energies.
-4. **`post/quantities.py`**: `flux_linkage`, `arkkio_torque` (band radii from the mesh; positive counter-clockwise) and `saturation_report`. Phase A is aligned at θ = 0, and counter-clockwise motoring excites A → D → C → B.
+3b. **`solvers/ngsolve_adapter.py` `NgsolveAdapter().solve(problem, initial=None)`**: the same contract and Newton scheme as `SkfemReference`, with NGSolve doing the P1 assembly and umfpack solves. ν, dν/dB² and J are element-constant order-0 L2 grid functions; the quadrature rule is pinned to `QUADRATURE_ORDER`. The Newton driver is a deliberate separate copy, so the cross-solver tests check assembly and the linear solve. NGSolve is the `[ngsolve]` optional extra; its tests use `importorskip`.
+4. **`post/quantities.py`**: `flux_linkage`, `arkkio_torque` (band radii from the mesh; positive counter-clockwise), `virtual_work_torque` (nodal-force torque from a virtual rotation of the band nodes at fixed A; agrees with Arkkio to 0.02 % on the 8/6) and `saturation_report`. Phase A is aligned at θ = 0, and counter-clockwise motoring excites A → D → C → B.
 
-Analytic test problems (the current-sheet toroid and MMS on the unit square) live in `tests/fem_fixtures.py`. Test file basenames must be unique, because `tests/` has no `__init__.py`.
+Analytic test problems (the current-sheet toroid and MMS on the unit square) live in `tests/fem_fixtures.py`. `tests/team24_fixture.py` builds the TEAM Problem 24 rig as a `Magnetostatic2D`; the finding is in `docs/team24-feasibility.md`. `tests/solvers/test_cross_solver.py` compares the two solvers at 1e-4. Test file basenames must be unique, because `tests/` has no `__init__.py`.
 
 ## Tests
 
