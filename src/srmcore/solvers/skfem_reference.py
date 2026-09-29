@@ -122,6 +122,19 @@ class SkfemReference:
         self.settings = settings
         self._cache: tuple[np.ndarray, np.ndarray, Basis] | None = None
 
+    def sensitivity(self, problem: Magnetostatic2D, a: np.ndarray) -> np.ndarray:
+        system = self._bind(problem)
+        a = np.asarray(a, float)
+        _, nu, dnu = system.material(a)
+        lu = spla.splu(system.tangent(a, nu, dnu)[system.free][:, system.free].tocsc())
+        m = len(problem.winding.circuits)
+        out = np.zeros((system.basis.N, m))
+        for k in range(m):
+            unit = problem.with_currents(np.eye(m)[k])
+            rhs = asm(_load, system.basis, j=system._q(unit.current_density()))
+            out[system.free, k] = lu.solve(rhs[system.free])
+        return out
+
     def _bind(self, problem: Magnetostatic2D) -> _System:
         """Reuse the basis while the mesh arrays are the same objects (a current sweep on one mesh)."""
         c = self._cache

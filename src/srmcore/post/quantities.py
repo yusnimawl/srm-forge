@@ -13,14 +13,23 @@ from ..physics.problem import Magnetostatic2D
 _MIDPOINTS = np.array([[0.5, 0.5, 0.0], [0.0, 0.5, 0.5], [0.5, 0.0, 0.5]])
 
 
-def flux_linkage(problem: Magnetostatic2D, solution: FieldSolution) -> np.ndarray:
-    """ψ_k = L·Σ_s C_sk·∫_s A dA per circuit, Wb-turns. ∫A dA on a P1 triangle = area × mean nodal A."""
+def _linkage(problem: Magnetostatic2D, a: np.ndarray) -> np.ndarray:
     in_coil = np.flatnonzero(problem.element_coil >= 0)
     tri = problem.triangles[in_coil]
-    integral = triangle_areas(problem.nodes, tri) * solution.a[tri].mean(axis=1)
+    integral = triangle_areas(problem.nodes, tri) * a[tri].mean(axis=1)
     per_side = np.bincount(problem.element_coil[in_coil], weights=integral,
                            minlength=len(problem.winding.coil_sides))
     return problem.depth * problem.winding.matrix.T @ per_side
+
+
+def flux_linkage(problem: Magnetostatic2D, solution: FieldSolution) -> np.ndarray:
+    """ψ_k = L·Σ_s C_sk·∫_s A dA per circuit, Wb-turns. ∫A dA on a P1 triangle = area × mean nodal A."""
+    return _linkage(problem, solution.a)
+
+
+def incremental_inductance(problem: Magnetostatic2D, sensitivity: np.ndarray) -> np.ndarray:
+    """L_inc[k, j] = ∂ψ_k/∂i_j, H. ψ is linear in A, so column j is the flux linkage of the response dA/di_j."""
+    return np.column_stack([_linkage(problem, sensitivity[:, j]) for j in range(sensitivity.shape[1])])
 
 
 def arkkio_torque(problem: Magnetostatic2D, solution: FieldSolution) -> float:

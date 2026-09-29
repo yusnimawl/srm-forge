@@ -29,3 +29,8 @@ class SolverAdapter(Protocol):
     def solve(self, problem: Magnetostatic2D, initial: np.ndarray | None = None) -> FieldSolution:
         """Never raises for non-convergence: returns status NONCONVERGED instead (spec §6)."""
         ...
+
+    def sensitivity(self, problem: Magnetostatic2D, a: np.ndarray) -> np.ndarray:
+        """dA/di_k = K_T(A)⁻¹·∂f/∂i_k for every circuit k at the converged field `a`: shape
+        (n_nodes, n_circuits), zero on the Dirichlet nodes."""
+        ...

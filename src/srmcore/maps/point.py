@@ -9,7 +9,7 @@ from ..mesh.machine import mesh_at_angle
 from ..mesh.static import StaticMesh
 from ..model.design import Design
 from ..physics.build import machine_problem
-from ..post.quantities import arkkio_torque, flux_linkage, virtual_work_torque
+from ..post.quantities import arkkio_torque, flux_linkage, incremental_inductance, virtual_work_torque
 from ..solvers.settings import SolverAdapter
 
 
@@ -30,16 +30,20 @@ class PointResult:
     fallbacks: tuple[str, ...]
     load_fraction: float
     field: FieldSolution | None = None
+    l_inc: np.ndarray | None = None    # H; only when requested and the solve converged at full load
 
 
 def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapping[str, float],
                 solver: SolverAdapter, initial: np.ndarray | None = None,
-                keep_field: bool = False) -> PointResult:
+                keep_field: bool = False, with_l_inc: bool = False) -> PointResult:
     """Solve `design` with the rotor at `angle` and the given circuit currents. `initial` is a node
     vector A from a neighbouring point on the same static mesh. The field is kept only on request."""
     mesh = mesh_at_angle(static, angle)
     problem = machine_problem(mesh, design, currents)
     solution = solver.solve(problem, initial=initial)
+    l_inc = None
+    if with_l_inc and solution.status is not SolveStatus.NONCONVERGED and solution.load_fraction == 1.0:
+        l_inc = incremental_inductance(problem, solver.sensitivity(problem, solution.a))
     return PointResult(
         angle=mesh.rotor_angle, circuits=problem.winding.circuits, currents=problem.currents,
         psi=flux_linkage(problem, solution),
@@ -47,5 +51,5 @@ def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapp
         torque_virtual_work=virtual_work_torque(problem, solution),
         energy=solution.energy, coenergy=solution.coenergy, status=solution.status,
         iterations=solution.iterations, fallbacks=solution.fallbacks, load_fraction=solution.load_fraction,
-        field=solution if keep_field else None,
+        field=solution if keep_field else None, l_inc=l_inc,
     )

@@ -1,4 +1,5 @@
-"""NGSolve adapter: P1 assembly and direct solves in NGSolve, Newton with the consistent Jacobian
+"""NGSolve adapter: the tangent and load are assembled in NGSolve, the secant residual is
+`physics.fem.secant_residual` (numpy), and the solves use umfpack. Newton with the consistent Jacobian
 ν·I + 2·dν/d(B²)·B⊗B, backtracking line search, and the fallback chain damped → current ramp →
 NONCONVERGED (spec §6).
 
@@ -100,7 +101,7 @@ class _System:
 
     def residual(self, a: np.ndarray, f: np.ndarray):
         _, nu, dnu = self.material(a)
-        r = secant_residual(self.disc.grads, self.disc.areas, self.problem.triangles, nu, a)
+        r = secant_residual(self.disc.grads, self.disc.areas, self.disc.triangles, nu, a)
         return r - f, nu, dnu
 
     def solve_tangent(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray, rhs: np.ndarray) -> np.ndarray:
@@ -160,6 +161,26 @@ class NgsolveAdapter:
     def __init__(self, settings: NewtonSettings = NewtonSettings()):
         self.settings = settings
         self._disc: _Discretisation | None = None
+
+    def sensitivity(self, problem: Magnetostatic2D, a: np.ndarray) -> np.ndarray:
+        system = self._bind(problem)
+        a = np.asarray(a, float)
+        _, nu, dnu = system.material(a)
+        system._bind(a, nu, dnu)
+        system.disc.tangent.Assemble()
+        inverse = system.disc.tangent.mat.Inverse(system.freedofs, inverse="umfpack")
+        m = len(problem.winding.circuits)
+        out = np.zeros((system.n, m))
+        for k in range(m):
+            system.disc.j.vec.FV().NumPy()[:] = problem.with_currents(np.eye(m)[k]).current_density()
+            system.disc.load.Assemble()
+            rhs = ng.BaseVector(system.n)
+            rhs.FV().NumPy()[:] = system.disc.load.vec.FV().NumPy()
+            x = rhs.CreateVector()
+            x.data = inverse * rhs
+            out[:, k] = x.FV().NumPy()
+        out[problem.dirichlet_nodes] = 0.0
+        return out
 
     def _bind(self, problem: Magnetostatic2D) -> _System:
         """Reuse the discretisation while the mesh is unchanged (a current sweep on one mesh)."""
