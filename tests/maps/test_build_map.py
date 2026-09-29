@@ -50,3 +50,10 @@ def test_i_max_must_be_finite_and_positive(i_max):
 def test_unknown_solver_fails_in_the_parent_before_the_pool():
     with pytest.raises(ValueError, match="unknown solver"):
         run_map(None, DESIGN, np.array([0.0]), np.array([0.0, 5.0]), solver_name="nope", workers=2)
+
+
+@pytest.mark.parametrize("kw", [{"n_angles": 0, "n_currents": 2}, {"n_angles": 2, "n_currents": 1},
+                                {"n_angles": 2, "n_currents": 0}])
+def test_grid_sizes_must_be_usable(kw):
+    with pytest.raises(ValueError, match="n_"):
+        api.build_map(DESIGN, 5.0, solver="skfem_reference", **kw)

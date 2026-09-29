@@ -26,6 +26,10 @@ def _pass(fn, items, results, pending, workers, initializer, initargs, cancel, p
                     progress(len(items) - len(pending), len(items))
                 if cancel is not None and cancel():
                     pool.shutdown(wait=True, cancel_futures=True)
+                    for f, j in futures.items():         # keep jobs that finished while shutting down
+                        if j in pending and f.done() and not f.cancelled() and f.exception() is None:
+                            results[j] = f.result()
+                            pending.remove(j)
                     pending.clear()
                     return
         except BaseException:

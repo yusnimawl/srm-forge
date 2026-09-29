@@ -56,7 +56,7 @@ Remaining options, owner decides for M4b:
 | 4 | 68.5 s | 1.07 s | 0..14 | 0 |
 | 8 | 50.4 s | 0.79 s | 0..14 | 0 |
 
-Per-solve time, (wall - mesh) x workers / 64: about 4.3 s at 4 workers and about 5.7 s at 8, against 4.5 s for a single-process cold solve, so each worker slows down under contention (memory bandwidth, shared cores).
+Per-solve time, (wall - mesh) x workers / 64: about 4.0 s at 4 workers and about 5.7 s at 8, against 4.5 s for a single-process cold solve, so the per-worker slowdown from contention (memory bandwidth, shared cores) shows only at 8 workers.
 
 Both maps came back with 64 OK points, peak Arkkio torque 12.04 N·m and a flux-linkage ratio (aligned to unaligned at 0.408 A) of 8.85. The 30 s `screening` budget (spec §7.2) is **not met**. With one job per angle there are only 8 jobs, so the wall time is set by the slowest angles (first job back after 34 s, last after 50 s on 8 workers) and more workers cannot help beyond 8. Options, owner decides for M4c:
 - split jobs finer than one angle (per angle and current block) so more workers stay busy;

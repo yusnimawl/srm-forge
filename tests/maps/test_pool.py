@@ -34,3 +34,9 @@ def _crash_once(item):
 def test_a_worker_crash_is_retried_and_the_result_is_complete(tmp_path):
     items = [(str(tmp_path / "marker"), v) for v in (10, 20, 30, 40)]
     assert map_ordered(_crash_once, items, workers=2) == [10, 20, 30, 40]
+
+
+def test_pool_cancel_keeps_finished_results():
+    out = map_ordered(abs, [-1, -2, -3, -4, -5, -6], workers=2, cancel=lambda: True)
+    assert any(v is not None for v in out)
+    assert all(v is None or v == abs(-(k + 1)) for k, v in enumerate(out))

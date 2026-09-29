@@ -20,17 +20,22 @@ def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited:
     default to the design's fidelity preset. A complete map is stored in and served from `cache_dir`."""
     if not math.isfinite(i_max) or i_max <= 0:
         raise ValueError(f"i_max must be finite and positive, got {i_max}")
+    if n_angles is not None and n_angles < 1:
+        raise ValueError(f"n_angles must be at least 1, got {n_angles}")
+    if n_currents is not None and n_currents < 2:
+        raise ValueError(f"n_currents must be at least 2, got {n_currents}")
     check_excited(excited)
     adapter = make_solver(solver)
     default_a, default_i = GRID_SIZES[design.mesh.preset]
     divisions = resolve_mesh_settings(design.machine, design.mesh).band_divisions
-    angles = angle_grid(design.machine, divisions, n_angles or default_a)
-    currents = current_grid(i_max, n_currents or default_i)
+    angles = angle_grid(design.machine, divisions, default_a if n_angles is None else n_angles)
+    currents = current_grid(i_max, default_i if n_currents is None else n_currents)
     prov = provenance(design, angles, currents, excited, adapter)
     if cache_dir is not None and (hit := cached_map(cache_dir, prov)) is not None:
         return hit
     # ponytail: half the logical CPUs stands in for the physical core count; psutil is not a dependency.
     workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
+    workers = max(1, min(workers, len(angles), 61))          # 61: the Windows pool limit
     result = run_map(build_machine_mesh(design), design, angles, currents, solver_name=solver, excited=excited,
                      workers=workers, progress=progress, cancel=cancel)
     if cache_dir is not None:
