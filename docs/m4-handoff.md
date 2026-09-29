@@ -1,6 +1,6 @@
 # M4 handoff ("engine usable")
 
-State: M1–M3 done, on `main`, tree clean. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` and `project/` are empty.
+State: M1–M3 on `main`; M4a (solve_point, phase order, L_inc, speed work) done on branch `m4a-point-speed-linc`; M4b (grids, datasets, workers) next. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` and `project/` are empty.
 
 ## Read first
 - Spec §7 (maps, speed, checks), §10 (open items), §11 (decisions), M4 row of the milestone table (~line 301).
@@ -44,3 +44,14 @@ Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc 
 | after | 5.3 s | 11 | 11.9 s, 26 it |
 
 skfem_reference for comparison: cold 6.2 s (11 it), sweep 12.1 s (26 it).
+
+Final M4a run (`examples\solve_speed.py`, NGSolve, same mesh):
+
+| stage | cold 20 A | Newton it | sweep 5-10-20 A (warm) |
+|---|---|---|---|
+| baseline | 9 s | 11 | not measured |
+| after numpy residual (Task 3) | 5.3 s | 11 | 26 it |
+| final (Task 5) | 4.5-5.0 s | 11 | 26 it, 10.3 s |
+
+Gate (cold 20 A at theta = 0 in 4 s or less): **not met**. Euler predictor result (dropped): warm sweep 24 it / 10.4 s; cold with 1, 3, 6 sub-steps 14 it 6.0 s, 8 it 4.8 s, 6 it 5.8 s (plain cold: 11 it, 4.5 s).
+Remaining options, owner to decide for M4b: structured air-gap meshing to cut DOF; scipy/umfpack tangent assembly (about 0.3 s per iteration); parallel map points.

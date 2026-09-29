@@ -7,6 +7,7 @@ import pytest
 
 from conftest import make_8_6
 from srmcore.maps.point import solve_point
+from srmcore.fields.solution import SolveStatus
 from srmcore.materials.laws import VACUUM, LinearLaw
 from srmcore.mesh import build_machine_mesh, mesh_at_angle
 from srmcore.model.design import Design, MeshSettings
@@ -40,7 +41,8 @@ def test_matches_central_differences_in_the_saturating_range(static):
     solver, base = SkfemReference(), 15.0
     mesh = mesh_at_angle(static, THETA)
     p = machine_problem(mesh, DESIGN, {"A": base})
-    l_inc, _ = _l_inc(solver, p)
+    l_inc, base_solution = _l_inc(solver, p)
+    assert l_inc[0, 0] < flux_linkage(p, base_solution)[0] / base * (1 - 0.01)   # differential below secant
     h = 0.25
     hi = flux_linkage(p.with_currents([base + h, 0, 0, 0]), solver.solve(p.with_currents([base + h, 0, 0, 0])))
     lo = flux_linkage(p.with_currents([base - h, 0, 0, 0]), solver.solve(p.with_currents([base - h, 0, 0, 0])))
@@ -80,4 +82,5 @@ def test_solve_point_l_inc_flag(static):
 def test_solve_point_withholds_l_inc_when_not_converged(static):
     stingy = SkfemReference(NewtonSettings(max_iterations=1, ramp_steps=1))
     result = solve_point(static, DESIGN, 0.0, {"A": 20.0}, stingy, with_l_inc=True)
+    assert result.status is SolveStatus.NONCONVERGED
     assert result.l_inc is None
