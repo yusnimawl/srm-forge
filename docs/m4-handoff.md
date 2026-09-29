@@ -1,6 +1,6 @@
 # M4 handoff ("engine usable")
 
-State: M1–M4a done (M4a on branch `m4a-point-speed-linc`, merge pending); M4b next. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` holds `point.py` (`solve_point`, `PointResult`); `project/` is empty.
+State: M1–M4b done (M4b on branch `m4b-map-runner`, merge pending); M4c next. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` holds `point.py`, `grids.py`, `run.py`, `dataset.py`, `pool.py` and `api.py` (`build_map`); `project/` is empty.
 
 ## Read first
 - Spec §7 (maps, speed, checks), §10 (open items), §11 (decisions), M4 row of the milestone table (~line 301).
@@ -46,3 +46,20 @@ Remaining options, owner decides for M4b:
 - scipy/umfpack tangent assembly (about 0.3 s per iteration);
 - parallel map points;
 - Euler current predictor (dropped in M4a): NGSolve cold with 1, 3, 6 sub-steps took 14 it 6.0 s, 8 it 4.8 s, 6 it 5.8 s against 11 it 4.5 s plain; warm sweep 24 it. skfem + Euler predictor (3 sub-steps) reached 3.5 s cold in one run; the predictor pays off only where the sensitivity solves are cheap.
+
+## M4b: map times and M4c carry-in
+
+8/6 `screening` map, I_max = 20 A, 8 angles x 8 currents = 64 points, NGSolve, one thread per worker, 16 logical CPUs, `examples/build_map_8_6.py`. The map time includes the parent's mesh build (about 4.6 s) and worker start-up.
+
+| workers | wall | wall per point | Newton iterations | failed points |
+|---|---|---|---|---|
+| 4 | 68.5 s | 1.07 s | 0..14 | 0 |
+| 8 | 50.4 s | 0.79 s | 0..14 | 0 |
+
+Both maps came back with 64 OK points, peak Arkkio torque 12.04 N·m and a flux-linkage ratio (aligned to unaligned at 0.408 A) of 8.85. The 30 s `screening` budget (spec §7.2) is **not met**. With one job per angle there are only 8 jobs, so the wall time is set by the slowest angles (first job back after 34 s, last after 50 s on 8 workers) and more workers cannot help beyond 8. Options, owner decides for M4c:
+- split jobs finer than one angle (per angle and current block) so more workers stay busy;
+- structured air-gap meshing to cut DOF;
+- scipy/umfpack tangent assembly;
+- reuse of the Newton factorisation for L_inc when L_inc is added to the map.
+
+Carried into M4c: L_inc and ∂ψ/∂θ in the dataset; per-pole force arrays; inverse tables; overlap map and coupling check; standard results and key numbers; LUT exports (CSV, .mat); the §7.3 checks; the screening-vs-full fidelity check (within 3 %, Spearman ρ >= 0.95); non-A excitation (needs the aligned angle per phase); the map open items in spec §10.

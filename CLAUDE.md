@@ -8,11 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md`. It covers the architecture, physics, tolerances, milestones M1–M5, open items and the decision log. Read the relevant section before starting milestone work. Implementation plans are in `docs/superpowers/plans/`, and `docs/reference-machines.md` audits which published machines can be used for validation.
 
-**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go) and M4a (`maps/point.py` `solve_point`, phase order A→B→C→D, incremental inductance, solve-speed work) are complete. M4a speed result: a cold `screening` solve at 20 A takes about 4.5–5 s (11 Newton iterations), so the 4 s gate is not met; see `docs/m4-handoff.md`. An Euler current predictor was tried and dropped (spec §10). The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check. `maps` holds `point.py` so far (grids, datasets and workers come in M4b); `project` is still an empty placeholder (M5: validation).
+**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go), M4a (`maps/point.py` `solve_point`, phase order A→B→C→D, incremental inductance, solve-speed work) and M4b (map grids, runner, HDF5 dataset and cache, process pool, `build_map`) are complete; M4c is next (L_inc and ∂ψ/∂θ in the dataset, inverse tables, overlap map, exports, §7.3 checks). Speed: a cold `screening` solve at 20 A takes about 4.5–5 s (11 Newton iterations), so the 4 s gate is not met, and the 8/6 `screening` map (64 points) takes 50–68 s on 4–8 workers against the 30 s budget; see `docs/m4-handoff.md`. The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check. `project` is still an empty placeholder (M5: validation).
 
 ## Commands
 
-The project needs Python 3.12 or newer. CI tests on 3.12 and 3.14, on both Windows and Linux. A `.venv` exists at the repo root.
+The project needs Python 3.12 or newer. CI tests on 3.12 and 3.14, on both Windows and Linux. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -24,6 +24,7 @@ python examples\mesh_8_6.py [screening|full]         # mesh an 8/6 and save PNG 
 python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print psi, torque, energies, saturation
 python examples\band_pitch_convergence.py           # band-pitch convergence table on the 8/6 screening mesh
 python examples\solve_speed.py [screening|full]     # time cold and warm solves with both solvers
+python examples\build_map_8_6.py [workers] [solver] # build and time the 8/6 screening map (I_max 20 A)
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 
@@ -69,6 +70,14 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 4. **`post/quantities.py`**: `flux_linkage`, `arkkio_torque` (band radii from the mesh; positive counter-clockwise), `virtual_work_torque` (nodal-force torque from a virtual rotation of the band nodes at fixed A; agrees with Arkkio to 0.02 % on the 8/6) and `saturation_report`. Phase A is aligned at θ = 0, and counter-clockwise motoring excites A → B → C → D. `incremental_inductance(problem, sensitivity)` returns L_inc = ∂ψ/∂i (H) from the converged tangent.
 4b. **`solvers/*` `sensitivity(problem, a)`**: dA/di per circuit (nodes × circuits) from the tangent at A; both adapters implement it, the adapters are compared with each other, and L_inc is checked against central differences.
 5. **`maps/point.py` `solve_point(static, design, angle, currents, solver, initial=None, keep_field=False, with_l_inc=False)`**: mesh_at_angle → machine_problem → solve → post, returning a frozen `PointResult` (ψ, Arkkio and virtual-work torque, W, W′, status, iterations, optional L_inc). L_inc is withheld unless the solve converged at full load.
+
+## Map pipeline (M4b)
+
+1. **`maps/grids.py`**: `angle_grid` (warped, dense at alignment, snapped to the band pitch, one rotor pole pitch) and `current_grid` (power law, dense at low current); `GRID_SIZES` gives the default sizes per fidelity preset.
+2. **`maps/run.py` `run_map(static, design, angles, currents, solver_name, excited="A", workers=1, ...)`**: one job per angle (all currents, each point solved from A = 0), then `apply_failure_policy` (isolated non-converged points are PCHIP-filled along current and flagged; the map fails with `MapFailed` above 2 % failed points or on a failure at the aligned angle, at zero current or at I_max). It validates `excited` (phase A only) and the currents before making a solver. Cancellation returns a partial, unfilled result with `complete=False`.
+3. **`maps/dataset.py`**: `provenance` hashes the design, grids, excitation, solver and srmcore version plus the material JSON bytes; `write_map`/`read_map` use HDF5; `cached_map`/`store_map` serve and store complete maps only, and treat foreign-schema files as misses.
+4. **`maps/pool.py` `map_ordered`**: spawn `ProcessPoolExecutor`, results in item order, one retry of the unfinished items after a worker crash, then `WorkerCrashed`. `workers <= 1` runs in-process, through the same `_init_worker`. Workers run single-threaded numerics (`OMP/OPENBLAS/MKL_NUM_THREADS=1`, `make_solver(name, threads=1)`).
+5. **`maps/api.py` `build_map(design, i_max, solver="ngsolve", excited="A", workers=None, n_angles, n_currents, cache_dir, progress, cancel)`**: grids, provenance, cache lookup, mesh built once in the parent, `run_map`, cache store. `workers=None` means half the logical CPUs.
 
 Analytic test problems (the current-sheet toroid and MMS on the unit square) live in `tests/fem_fixtures.py`. `tests/team24_fixture.py` builds the TEAM Problem 24 rig as a `Magnetostatic2D`; the finding is in `docs/team24-feasibility.md`. `tests/solvers/test_cross_solver.py` compares the two solvers at 1e-4. Test file basenames must be unique, because `tests/` has no `__init__.py`.
 
