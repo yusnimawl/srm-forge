@@ -68,6 +68,10 @@ class BHCurve:
         # End derivative = last secant, so the tail's join slope dB/dH is exactly the last secant's,
         # which the polarisation check guarantees is >= μ0.
         d[-1] = slopes[-1]
+        # PCHIP's edge rule can return 0 (or less) at B = 0 when the second secant is much steeper;
+        # a zero initial reluctivity would make the stiffness singular, so fall back to the first secant.
+        if d[0] <= 0:
+            d[0] = slopes[0]
         self._spline = CubicHermiteSpline(b, h, d)
         self._dspline = self._spline.derivative()
         self._w = self._spline.antiderivative()

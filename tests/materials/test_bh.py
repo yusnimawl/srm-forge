@@ -119,3 +119,11 @@ def test_laws_for_materials():
     nu, dnu = lin.nu_dnu(np.array([1.0, 4.0]))
     assert np.allclose(nu, 1 / (1000 * MU0)) and np.all(dnu == 0)
     assert lin.energy_density(np.array([2.0]))[0] == pytest.approx(2.0 / (1000 * MU0))
+
+
+def test_steep_second_secant_keeps_initial_reluctivity_positive():
+    table = _table([100.0, 1000.0, 1e4, 5e4], [1.0, 1.5, 1.8, 1.95])
+    curve, report = process_bh(table, 1.0, 2.05)
+    assert curve.nu0 > 0 and np.isfinite(report.initial_relative_permeability)
+    nu, _ = curve.nu_dnu(np.array([0.0, 1e-8]))
+    assert np.all(np.isfinite(nu)) and np.all(nu > 0)
