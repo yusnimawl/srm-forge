@@ -23,7 +23,14 @@ class InputError(ValueError):
 
 
 class MeshRejected(RuntimeError):
-    """Mesh quality is below the configured thresholds."""
+    """Mesh quality is below the configured thresholds.
+
+    `report` carries one of two variants, depending on where the rejection happened:
+    - `mesh.quality.MeshQualityReport`, from `check_quality`'s full-mesh sweep (min angle, aspect
+      ratio and band min angle over the whole mesh).
+    - `mesh.machine.BandRejection`, from `mesh_at_angle`'s own band checks (an inverted raw
+      triangle, or a band min angle below threshold, at one specific rotor angle).
+    """
 
     def __init__(self, reasons: list[str], report: object):
         self.reasons = list(reasons)

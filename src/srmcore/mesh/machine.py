@@ -5,9 +5,21 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..model.errors import MeshRejected
+from ..model.regions import CoilInfo
 from .band import TAU, zipper_band
 from .quality import triangle_quality
 from .static import StaticMesh, orient_ccw
+
+
+@dataclass(frozen=True)
+class BandRejection:
+    """Report carried by a MeshRejected raised from mesh_at_angle (band-specific, not a full quality
+    sweep); see MeshRejected's docstring for the other report variant, MeshQualityReport.
+    """
+    rotor_angle: float
+    triangle_index: int | None = None
+    signed_area: float | None = None
+    band_min_angle_deg: float | None = None
 
 
 @dataclass(frozen=True)
@@ -16,10 +28,15 @@ class MachineMesh:
     triangles: np.ndarray
     region_ids: np.ndarray
     region_names: tuple[str, ...]
+    region_part: dict[str, str]
+    region_kind: dict[str, str]
+    coils: dict[str, CoilInfo]
     n_stator_nodes: int
     outer_edges: np.ndarray
     rotor_angle: float
     band_rows: slice
+    band_inner_radius: float
+    band_outer_radius: float
 
 
 def _signed_areas(nodes: np.ndarray, triangles: np.ndarray) -> np.ndarray:
@@ -56,7 +73,7 @@ def mesh_at_angle(static: StaticMesh, theta: float, check: bool = True) -> Machi
         bad = int(np.argmin(raw_areas))
         raise MeshRejected(
             ["inverted band triangle"],
-            report={"rotor_angle": wrapped, "triangle_index": bad, "signed_area": float(raw_areas[bad])},
+            report=BandRejection(rotor_angle=wrapped, triangle_index=bad, signed_area=float(raw_areas[bad])),
         )
     band = orient_ccw(nodes, raw_global)
 
@@ -69,9 +86,14 @@ def mesh_at_angle(static: StaticMesh, theta: float, check: bool = True) -> Machi
         worst = float(triangle_quality(nodes, band)[0].min())
         if worst < static.settings.band_min_angle_deg:
             raise MeshRejected([f"band min angle {worst:.2f}° < {static.settings.band_min_angle_deg}°"],
-                               report={"rotor_angle": wrapped, "band_min_angle_deg": worst})
+                               report=BandRejection(rotor_angle=wrapped, band_min_angle_deg=worst))
+    region_kind = dict(static.region_kind)
+    region_kind["moving_band"] = "air"
     return MachineMesh(
         nodes=nodes, triangles=triangles, region_ids=region_ids,
-        region_names=static.region_names + ("moving_band",), n_stator_nodes=ns,
-        outer_edges=static.outer_edges, rotor_angle=wrapped, band_rows=slice(start, len(triangles)),
+        region_names=static.region_names + ("moving_band",),
+        region_part=dict(static.region_part), region_kind=region_kind, coils=dict(static.coils),
+        n_stator_nodes=ns, outer_edges=static.outer_edges, rotor_angle=wrapped,
+        band_rows=slice(start, len(triangles)),
+        band_inner_radius=static.band_inner_radius, band_outer_radius=static.band_outer_radius,
     )

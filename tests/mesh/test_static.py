@@ -6,10 +6,21 @@ import pytest
 from conftest import make_8_6
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.errors import InputError
+from srmcore.model.regions import CoilInfo
 from srmcore.mesh.api import build_machine_mesh
 from srmcore.mesh.machine import mesh_at_angle
 from srmcore.mesh.quality import quality_report
 from srmcore.mesh.static import build_static_mesh, orient_ccw
+from srmcore.topology.radial import build_outline
+
+EXPECTED_8_6_KINDS = {
+    "stator_iron": "stator_iron", "slot_air": "air", "airgap_stator": "air",
+    "rotor_iron": "rotor_iron", "shaft": "shaft", "airgap_rotor": "air", "rotor_slot_air": "air",
+    "coil_A1+": "coil", "coil_A1-": "coil", "coil_A2+": "coil", "coil_A2-": "coil",
+    "coil_B1+": "coil", "coil_B1-": "coil", "coil_B2+": "coil", "coil_B2-": "coil",
+    "coil_C1+": "coil", "coil_C1-": "coil", "coil_C2+": "coil", "coil_C2-": "coil",
+    "coil_D1+": "coil", "coil_D1-": "coil", "coil_D2+": "coil", "coil_D2-": "coil",
+}
 
 
 @pytest.fixture(scope="module")
@@ -89,9 +100,24 @@ def test_rotor_mesh_is_not_disproportionately_larger(static_8_6):
     assert len(s.rotor.triangles) < 5 * len(s.stator.triangles)
 
 
+def test_every_region_has_a_part_and_a_kind(static_8_6):
+    s = static_8_6
+    assert set(s.region_part) == set(s.region_names)
+    assert set(s.region_kind) == set(s.region_names)
+    assert s.region_kind == EXPECTED_8_6_KINDS
+
+
+def test_every_coil_region_has_a_matching_coil_info(static_8_6):
+    o = build_outline(make_8_6())
+    assert set(static_8_6.coils) == {c.name for c in o.coil_sides}
+    for c in o.coil_sides:
+        info = static_8_6.coils[c.name]
+        assert info == CoilInfo(pole=c.pole, phase=chr(ord("A") + c.phase), sign=c.sign)
+
+
 def test_no_stray_refinement_point_nodes(static_8_6):
-    # Task 11b: free (non-embedded) points added for the Distance/MathEval size fields must not
-    # leak into a MeshPart. Every node kept in a part must be referenced by at least one triangle.
+    # Free (non-embedded) points added for the Distance/MathEval size fields must not leak into a
+    # MeshPart. Every node kept in a part must be referenced by at least one triangle.
     for part in (static_8_6.stator, static_8_6.rotor):
         used = np.unique(part.triangles)
         assert used.tolist() == list(range(len(part.nodes)))
@@ -106,11 +132,10 @@ def test_mesh_gate_passes_for_8_6_screening():
 
 
 def test_triangle_count_regression_within_25pct_of_baseline(static_8_6):
-    # Baseline measured after Task 12's "airgap_interface" grading fix (same 8/6 screening
-    # design), recorded in task-12-report.md: stator 54674, rotor 29310 triangles. The previous
-    # (pre-Task-12) baseline of stator 42132 / rotor 15146 no longer applies: grading the size away
-    # from the slot-mouth arcs (see topology/radial.py, mesh/settings.py) intentionally adds
-    # triangles there to fix rotor_slot_air/slot_air sliver triangles below the quality gate.
+    # Baseline measured for this 8/6 screening design with the "airgap_interface" grading in
+    # place (topology/radial.py, mesh/settings.py): stator 54674, rotor 29310 triangles. That
+    # grading intentionally adds triangles near the slot-mouth arcs to fix rotor_slot_air/slot_air
+    # sliver triangles that would otherwise fall below the quality gate.
     s = static_8_6
     assert len(s.stator.triangles) == pytest.approx(54674, rel=0.25)
     assert len(s.rotor.triangles) == pytest.approx(29310, rel=0.25)

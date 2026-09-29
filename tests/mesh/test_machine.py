@@ -33,6 +33,18 @@ def test_triangle_quality_reference_shapes():
     assert min_angle[1] == pytest.approx(45.0) and aspect[1] == pytest.approx(math.sqrt(2) / (2 * math.sqrt(3) * (1 - math.sqrt(2) / 2)))
 
 
+def test_machine_mesh_exposes_region_metadata_and_band_radii(static_8_6):
+    m = mesh_at_angle(static_8_6, 0.0)
+    assert m.region_part == static_8_6.region_part
+    assert m.coils == static_8_6.coils
+    assert set(m.region_kind) == set(m.region_names)
+    assert m.region_kind["moving_band"] == "air"
+    for name in static_8_6.region_names:
+        assert m.region_kind[name] == static_8_6.region_kind[name]
+    assert m.band_inner_radius == static_8_6.band_inner_radius
+    assert m.band_outer_radius == static_8_6.band_outer_radius
+
+
 def test_mesh_at_zero_is_complete_and_ccw(static_8_6):
     m = mesh_at_angle(static_8_6, 0.0)
     assert np.all(_areas(m.nodes, m.triangles) > 0)
@@ -120,6 +132,9 @@ def _synthetic_static(n_in: int, n_out: int, r: float, R: float, band_min_angle_
     )
     return StaticMesh(
         region_names=("dummy",),
+        region_part={"dummy": "stator"},
+        region_kind={"dummy": "air"},
+        coils={},
         stator=MeshPart(stator_nodes, empty_tris, empty_ids),
         rotor=MeshPart(rotor_nodes, empty_tris, empty_ids),
         stator_ring=np.arange(n_out, dtype=np.int64),

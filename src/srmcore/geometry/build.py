@@ -5,6 +5,7 @@ import gmsh
 import numpy as np
 
 from ..model.design import RadialSRMParams
+from ..model.regions import CoilInfo
 from ..topology.primitives import Line, Point, Segment, sample_segment
 from ..topology.radial import RadialOutline, build_outline
 
@@ -17,11 +18,11 @@ class GeometryModel:
     region_surfaces: dict[str, tuple[int, ...]]
     region_part: dict[str, str]
     region_size_key: dict[str, str]
+    region_kind: dict[str, str]
+    coils: dict[str, CoilInfo]
     stator_outer_curve: int
     band_outer_curve: int
     band_inner_curve: int
-    band_inner_radius: float
-    band_outer_radius: float
     refinement_points: dict[str, np.ndarray]
 
 
@@ -69,6 +70,18 @@ def _size_key(region: str) -> str:
     return region
 
 
+def _region_kind(region: str) -> str:
+    """The material role for a region name (spec §6): stator iron, rotor iron, shaft, coil, or air.
+
+    slot_air, rotor_slot_air and both airgap_* layers are all "air".
+    """
+    if region.startswith("coil_"):
+        return "coil"
+    if region in ("stator_iron", "rotor_iron", "shaft"):
+        return region
+    return "air"
+
+
 def _disk(radius: float) -> int:
     """A plane disk of the given radius, bounded by a true Circle curve.
 
@@ -107,7 +120,7 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
     rotor_od_disk = _disk(outline.rotor_outer_radius)
     # airgap_rotor is just the thin physical gap between the rotor OD and the band; the interpolar
     # air down to the star-shaped rotor outline is its own region (rotor_slot_air), so it doesn't
-    # inherit the airgap's very fine size class (see Task 9 fix round 1).
+    # inherit the airgap's very fine size class.
     airgap_rotor, _ = occ.cut([(2, band_in_disk)], [(2, rotor_od_disk)], removeObject=True, removeTool=False)
     rotor_slot_air, _ = occ.cut([(2, rotor_od_disk)], [(2, rotor_area)], removeObject=True, removeTool=False)
     rotor_iron, _ = occ.cut([(2, rotor_area)], [(2, shaft)], removeObject=True, removeTool=False)
@@ -155,11 +168,15 @@ def build_geometry(outline: RadialOutline, feature_step: float) -> GeometryModel
             pts.extend(sample_segment(f, feature_step) if not isinstance(f, tuple) else [f])
         refinement_points[tag] = np.asarray(pts, dtype=float).reshape(-1, 2)
 
+    coils = {c.name: CoilInfo(pole=c.pole, phase=chr(ord("A") + c.phase), sign=c.sign)
+             for c in outline.coil_sides}
+
     return GeometryModel(
         region_surfaces=region_surfaces, region_part=region_part,
         region_size_key={n: _size_key(n) for n in region_surfaces},
+        region_kind={n: _region_kind(n) for n in region_surfaces},
+        coils=coils,
         stator_outer_curve=stator_outer, band_outer_curve=band_outer, band_inner_curve=band_inner,
-        band_inner_radius=outline.band_inner_radius, band_outer_radius=outline.band_outer_radius,
         refinement_points=refinement_points,
     )
 

@@ -9,6 +9,7 @@ from ..geometry.build import GeometryModel, build_machine_geometry
 from ..geometry.session import gmsh_model
 from ..model.design import Design
 from ..model.errors import ValidationIssue
+from ..model.regions import CoilInfo
 from ..model.validator import require_valid
 from .settings import ResolvedMeshSettings, resolve_mesh_settings
 
@@ -26,6 +27,9 @@ class MeshPart:
 @dataclass(frozen=True)
 class StaticMesh:
     region_names: tuple[str, ...]
+    region_part: dict[str, str]
+    region_kind: dict[str, str]
+    coils: dict[str, CoilInfo]
     stator: MeshPart
     rotor: MeshPart
     stator_ring: np.ndarray
@@ -174,7 +178,11 @@ def build_static_mesh(design: Design) -> StaticMesh:
         rotor_ring = _ring(geom.band_inner_curve, rotor_used, rotor.nodes, n)
         outer_edges = _edges(geom.stator_outer_curve, stator_used)
     return StaticMesh(
-        region_names=region_names, stator=stator, rotor=rotor,
+        region_names=region_names,
+        region_part={n: geom.region_part[n] for n in region_names},
+        region_kind={n: geom.region_kind[n] for n in region_names},
+        coils=dict(geom.coils),
+        stator=stator, rotor=rotor,
         stator_ring=stator_ring, rotor_ring=rotor_ring, outer_edges=outer_edges,
         band_inner_radius=p.band_inner_radius, band_outer_radius=p.band_outer_radius,
         settings=resolved, warnings=tuple(warnings),

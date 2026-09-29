@@ -5,6 +5,7 @@ import pytest
 
 from srmcore.geometry.build import ROTOR_REGIONS, STATOR_REGIONS, build_geometry
 from srmcore.geometry.session import gmsh_model
+from srmcore.model.regions import REGION_KINDS, REGION_SIZE_KEYS
 from srmcore.topology.radial import build_outline
 
 
@@ -34,6 +35,43 @@ def test_regions_parts_and_areas(srm_8_6):
         assert _area(g.region_surfaces["airgap_rotor"]) == pytest.approx(
             math.pi * (o.band_inner_radius**2 - o.rotor_outer_radius**2), rel=1e-6)
         assert all(_area(g.region_surfaces[n]) > 0 for n in coil_names)
+
+
+def test_region_kind_and_size_key_are_in_the_shared_vocabulary(srm_8_6):
+    o = build_outline(srm_8_6)
+    with gmsh_model():
+        g = build_geometry(o, feature_step=1e-4)
+        assert set(g.region_kind) == set(g.region_surfaces)
+        assert set(g.region_kind.values()) <= REGION_KINDS
+        assert set(g.region_size_key.values()) <= REGION_SIZE_KEYS
+        for name in g.region_surfaces:
+            if name.startswith("coil_"):
+                assert g.region_kind[name] == "coil"
+        assert g.region_kind["stator_iron"] == "stator_iron"
+        assert g.region_kind["rotor_iron"] == "rotor_iron"
+        assert g.region_kind["shaft"] == "shaft"
+        for name in ("slot_air", "airgap_stator", "airgap_rotor", "rotor_slot_air"):
+            assert g.region_kind[name] == "air"
+
+
+def test_coils_expose_pole_phase_sign_matching_topology(srm_8_6):
+    o = build_outline(srm_8_6)
+    with gmsh_model():
+        g = build_geometry(o, feature_step=1e-4)
+        assert set(g.coils) == {c.name for c in o.coil_sides}
+        for c in o.coil_sides:
+            info = g.coils[c.name]
+            assert info.pole == c.pole
+            assert info.phase == chr(ord("A") + c.phase)
+            assert info.sign == c.sign
+
+
+def test_geometry_model_has_no_dead_band_radius_fields(srm_8_6):
+    o = build_outline(srm_8_6)
+    with gmsh_model():
+        g = build_geometry(o, feature_step=1e-4)
+    assert not hasattr(g, "band_inner_radius")
+    assert not hasattr(g, "band_outer_radius")
 
 
 def test_band_and_outer_curves_are_full_circles(srm_8_6):
