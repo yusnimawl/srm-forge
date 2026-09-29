@@ -23,7 +23,7 @@ python -m pytest tests/mesh/test_band.py::test_name  # single test
 python examples\mesh_8_6.py [screening|full]         # mesh an 8/6 and save PNG plots
 python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print psi, torque, energies, saturation
 python examples\band_pitch_convergence.py           # band-pitch convergence table on the 8/6 screening mesh
-python examplessolve_speed.py [screening|full]        # time cold and warm solves with both solvers
+python examples\solve_speed.py [screening|full]        # time cold and warm solves with both solvers
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 
