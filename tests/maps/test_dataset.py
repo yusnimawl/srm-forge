@@ -1,11 +1,12 @@
 import dataclasses
 import json
 
+import h5py
 import numpy as np
-import pytest
 
 from conftest import make_8_6
 from srmcore.maps import dataset
+from srmcore.materials import library
 from srmcore.maps.run import STATUS_OK, MapResult
 from srmcore.model.design import Design, MeshSettings
 from srmcore.solvers.skfem_reference import SkfemReference
@@ -74,3 +75,27 @@ def test_corrupt_or_mismatched_cache_file_is_a_miss(tmp_path):
 
 def test_provenance_is_json_serialisable():
     json.dumps(_prov(), sort_keys=True)
+
+
+def test_material_file_change_changes_hash(tmp_path, monkeypatch):
+    base = dataset.provenance_hash(_prov())
+    for src in library._data_dir().iterdir():
+        (tmp_path / src.name).write_bytes(src.read_bytes())
+    monkeypatch.setattr(library, "_data_dir", lambda: tmp_path)
+    assert dataset.provenance_hash(_prov()) == base
+    m19 = tmp_path / "M19.json"
+    m19.write_bytes(m19.read_bytes() + b" ")
+    assert dataset.provenance_hash(_prov()) != base
+
+
+def test_valid_h5_with_other_schema_is_a_miss(tmp_path):
+    prov = _prov()
+    with h5py.File(tmp_path / f"map_{dataset.provenance_hash(prov)}.h5", "w") as f:
+        f.create_dataset("angles", data=ANGLES)
+    assert dataset.cached_map(tmp_path, prov) is None
+
+
+def test_map_copied_to_other_provenance_path_is_a_miss(tmp_path):
+    p1, p2 = _prov(), _prov(excited="B")
+    dataset.write_map(tmp_path / f"map_{dataset.provenance_hash(p2)}.h5", _result(), p1)
+    assert dataset.cached_map(tmp_path, p2) is None

@@ -8,6 +8,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
+from ..materials import library
 from ..model.design import Design
 from ..solvers.settings import SolverAdapter
 from .run import MapResult
@@ -20,8 +21,11 @@ _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "curre
 
 def provenance(design: Design, angles: np.ndarray, currents: np.ndarray, excited: str,
                solver: SolverAdapter) -> dict:
-    """Everything that decides the numbers in a map. The design JSON covers geometry, mesh and materials."""
-    return {"srmcore": version("srmcore"), "design": json.loads(design.to_json()),
+    """Everything that decides the numbers in a map. The design JSON covers geometry, mesh and material names;
+    the material files' hashes cover their data."""
+    names = sorted(set(design.machine.materials.model_dump().values()))
+    materials = {n: hashlib.sha256((library._data_dir() / f"{n}.json").read_bytes()).hexdigest() for n in names}
+    return {"srmcore": version("srmcore"), "design": json.loads(design.to_json()), "materials": materials,
             "angles": np.asarray(angles, float).tolist(), "currents": np.asarray(currents, float).tolist(),
             "excited": excited, "solver": solver.name, "solver_version": solver.version}
 
@@ -63,7 +67,7 @@ def cached_map(cache_dir, prov: dict) -> MapResult | None:
         return None
     try:
         result, stored = read_map(path)
-    except OSError:
+    except (OSError, KeyError):
         return None
     return result if result.complete and stored == prov else None
 
