@@ -54,11 +54,14 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0,
     so the result may hold fewer than `n` designs."""
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
     d_lo = min(MIN_OD, d_hi / 2)
-    per_set = math.ceil(n / len(pole_sets))
+    base, extra = divmod(n, len(pole_sets))
+    children = np.random.SeedSequence(seed).spawn(len(pole_sets))
     dropped = {"validator": 0, "fit": 0}
     kept: list[Candidate] = []
     for index, (ns, nr, m) in enumerate(pole_sets):
-        samples = qmc.LatinHypercube(d=_DIMS, seed=seed + index).random(per_set * _TRIES_PER_DESIGN)
+        per_set = base + (index < extra)
+        samples = qmc.LatinHypercube(d=_DIMS, seed=np.random.default_rng(children[index])).random(
+            max(per_set, 1) * _TRIES_PER_DESIGN)
         taken = 0
         for u in samples:
             if taken == per_set:
@@ -77,4 +80,4 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0,
                 continue
             kept.append(Candidate(hashlib.sha256(design.to_json().encode()).hexdigest()[:12], design))
             taken += 1
-    return kept[:n] if len(kept) > n else kept, dropped
+    return kept, dropped

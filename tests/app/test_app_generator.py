@@ -1,5 +1,3 @@
-import pytest
-
 from srmapp.requirements import Requirements
 from srmapp.sizing.generator import POLE_SETS, sample_candidates
 from srmcore.model.validator import require_valid
@@ -51,7 +49,18 @@ def test_ids_are_unique():
     assert len({c.id for c in cands}) == len(cands)
 
 
-def test_very_restrictive_limit_returns_fewer_without_raising():
-    cands, dropped = sample_candidates(_req(max_outer_diameter_m=0.02), 8, seed=0)
-    assert len(cands) <= 8
-    assert sum(dropped.values()) >= 0
+def test_very_restrictive_limit_returns_nothing_and_counts_drops():
+    cands, dropped = sample_candidates(_req(max_outer_diameter_m=0.011), 8, seed=0)
+    assert cands == []
+    assert sum(dropped.values()) > 0
+
+
+def test_split_is_even_over_pole_sets():
+    cands, _ = sample_candidates(_req(), 8, seed=0)
+    counts = [sum(c.design.machine.n_stator_poles == s for c in cands) for s, _, _ in POLE_SETS]
+    assert counts == [2, 2, 2, 2]
+
+
+def test_small_n_uses_first_pole_sets():
+    cands, _ = sample_candidates(_req(), 3, seed=0)
+    assert [c.design.machine.n_stator_poles for c in cands] == [s for s, _, _ in POLE_SETS[:3]]
