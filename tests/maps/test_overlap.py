@@ -1,3 +1,4 @@
+import dataclasses
 import math
 
 import numpy as np
@@ -25,7 +26,7 @@ def _synthetic(coupling=0.0, asym=0.0):
     ia = ib = np.array([0.0, 5.0, 10.0])
     shape = (2, 3, 3)
     psi = np.zeros((*shape, 2))
-    psi[..., 0] = 0.1 * ia[None, :, None] * (1 + coupling * (ib[None, None, :] > 0)) + 0 * ib
+    psi[..., 0] = 0.1 * ia[None, :, None] * (1 + coupling * (ib[None, None, :] > 0))
     psi[..., 1] = 0.1 * ib[None, None, :]
     torque = np.broadcast_to(ia[None, :, None] + ib[None, None, :], shape) * (1 + coupling * (ia[:, None] * ib > 0))
     l_inc = np.zeros((*shape, 2, 2))
@@ -43,6 +44,7 @@ def test_checks_pass_without_coupling():
 def test_coupling_warns_and_asymmetry_fails():
     checks = {c.name: c for c in coupling_checks(_synthetic(coupling=0.5))}
     assert checks["coupling_psi"].status == "warn" and checks["coupling_torque"].status == "warn"
+    assert checks["coupling_psi"].value == pytest.approx(0.5 / 1.5) and checks["coupling_torque"].value == pytest.approx(1 / 3)
     assert coupling_checks(_synthetic(asym=0.5))[2].status == "fail"
 
 
@@ -63,20 +65,46 @@ def test_empty_window_returns_none():
 
 
 @pytest.mark.slow
-def test_fem_overlap_reciprocity_and_coupling(capsys):
+def test_fem_overlap_reciprocity_and_coupling():
+    pytest.importorskip("ngsolve")
     r = build_overlap_map(DESIGN, 20.0, workers=4, n_angles=2, n_currents=3)
     assert r.complete and r.psi.shape == (2, 3, 3, 4) and r.l_inc.shape == (2, 3, 3, 2, 2)
     checks = {c.name: c for c in coupling_checks(r)}
-    with capsys.disabled():
-        print({n: (c.status, c.value) for n, c in checks.items()})
     assert checks["reciprocity"].status == "pass"
+    # ib = 0 column equals a single-phase solve
+    from srmcore.maps.point import solve_point
+    from srmcore.mesh import build_machine_mesh
+    from srmcore.solvers.factory import make_solver
+    p = solve_point(build_machine_mesh(DESIGN), DESIGN, float(r.angles[0]), {"A": float(r.currents_a[2])},
+                    make_solver("ngsolve"))
+    assert r.psi[0, 2, 0, 0] == pytest.approx(p.psi[0], rel=1e-9)
 
 
 def test_nonconverged_point_fails_the_map(monkeypatch):
     from srmcore.maps import overlap
     from srmcore.model.errors import MapFailed
-    row = {"psi": np.zeros(4), "torque_arkkio": 0.0, "status": 2, "l_inc": np.zeros((4, 4))}
+    row = {"psi": np.zeros(4), "torque_arkkio": 0.0, "status": 2, "l_inc": np.zeros((4, 4)),
+           "circuits": ("A", "B", "C", "D")}
     monkeypatch.setattr(overlap, "map_ordered", lambda *a, **k: [row] * 4)
     with pytest.raises(MapFailed):
         overlap.run_overlap_map(None, DESIGN, np.array([0.9, 1.0]), np.array([0.0, 1.0]), np.array([0.0]),
                                 solver_name="skfem_reference")
+
+
+def test_incomplete_and_nonzero_start_and_nonfinite():
+    r = _synthetic()
+    with pytest.raises(ValueError, match="incomplete"):
+        coupling_checks(dataclasses.replace(r, complete=False))
+    with pytest.raises(ValueError, match="start at 0"):
+        coupling_checks(dataclasses.replace(r, currents_a=r.currents_a + 1))
+    bad = r.l_inc.copy()
+    bad[0, 1, 1, 0, 1] = np.nan
+    c = {c.name: c for c in coupling_checks(dataclasses.replace(r, l_inc=bad))}
+    assert c["reciprocity"].status == "fail" and "non-finite" in c["reciprocity"].detail
+
+
+def test_cancelled_overlap_is_incomplete_and_not_cached(tmp_path):
+    r = build_overlap_map(DESIGN, 10.0, solver="skfem_reference", n_angles=2, n_currents=2, workers=1,
+                          cache_dir=tmp_path, cancel=lambda: True)
+    assert not r.complete and np.all(r.status == -1) and np.isnan(r.psi).all()
+    assert not list(tmp_path.glob("overlap_*.h5"))
