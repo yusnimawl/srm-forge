@@ -10,16 +10,6 @@ from srmcore.model.design import Design, MeshSettings
 DESIGN = Design(machine=make_8_6(), mesh=MeshSettings(preset="screening"))
 
 
-def test_pool_result_equals_serial_result():
-    static = build_machine_mesh(DESIGN)
-    angles, currents = np.array([0.0, 2 * static.settings.band_pitch]), np.array([0.0, 5.0])
-    serial = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=1)
-    pooled = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=2)
-    assert np.allclose(pooled.psi, serial.psi, rtol=1e-9, atol=1e-15)
-    assert np.allclose(pooled.torque_arkkio, serial.torque_arkkio, rtol=1e-9, atol=1e-15)
-    assert np.array_equal(pooled.status, serial.status)
-
-
 def test_pool_matches_serial_to_1e12_and_progress_counts_points():
     static = build_machine_mesh(DESIGN)
     angles, currents = np.array([0.0, 2 * static.settings.band_pitch]), np.array([0.0, 2.5, 5.0])

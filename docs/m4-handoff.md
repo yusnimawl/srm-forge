@@ -60,11 +60,13 @@ Remaining options, owner decides for M4b:
 
 The last two rows use one pool job per (angle, current) point, highest current first, and the numpy tangent. The 30 s budget is **still not met**: per-solve time, (wall - mesh) x workers / 64, is about 5.2 s at 8 workers and 6.4 s at 4 against 2.0-2.5 s for a single-process cold solve, so the pool run is dominated by per-worker slowdown under contention (and worker start-up), not by load balance.
 
-Per-solve time, (wall - mesh) x workers / 64: about 4.0 s at 4 workers and about 5.7 s at 8, against 4.5 s for a single-process cold solve, so the per-worker slowdown from contention (memory bandwidth, shared cores) shows only at 8 workers.
+Per-angle baseline (first two rows): per-solve time, (wall - mesh) x workers / 64, was about 4.0 s at 4 workers and about 5.7 s at 8, against 4.5 s for a single-process cold solve. Both maps came back with 64 OK points, peak Arkkio torque 12.04 N·m and a flux-linkage ratio (aligned to unaligned at 0.408 A) of 8.85. With one job per angle there were only 8 jobs, so the wall time was set by the slowest angles (baseline).
 
-Both maps came back with 64 OK points, peak Arkkio torque 12.04 N·m and a flux-linkage ratio (aligned to unaligned at 0.408 A) of 8.85. The 30 s `screening` budget (spec §7.2) is **not met**. With one job per angle there are only 8 jobs, so the wall time is set by the slowest angles (first job back after 34 s, last after 50 s on 8 workers) and more workers cannot help beyond 8. Options, owner decides for M4c:
-- split jobs finer than one angle (per angle and current block) so more workers stay busy;
-- structured air-gap meshing to cut DOF;
-- reuse of the Newton factorisation for L_inc when L_inc is added to the map.
+Pool contention (measured by the controller, pooltime script, 64 jobs, i7-13620H laptop: 6 performance and 4 efficiency cores, 16 threads): mean per-job time 1.63 s at 1 worker, 1.85 s at 2, 2.63 s at 4, 4.44 s at 8; the serial map takes 109 s. The per-solve slowdown in the pool, including the rise from 4.0 s to 6.4 s at 4 workers, comes from CPU contention (hybrid cores, shared power limit, memory bandwidth). It is not load balance and not code.
+
+Remaining options to reach 30 s, owner decides:
+- reuse umfpack's symbolic factorisation (`inverse.Update()`): 0.078 s vs 0.100 s per factorisation, about 8 % per solve;
+- fewer air-gap layers, which needs the validator's `min_layers` rule (at least 4) relaxed;
+- coarser slot-air grading in the screening preset: slot_air plus rotor_slot_air hold 31.6k of the 85.7k triangles (M5 preset study).
 
 Carried into M4c: L_inc and ∂ψ/∂θ in the dataset; per-pole force arrays; inverse tables; overlap map and coupling check; standard results and key numbers; LUT exports (CSV, .mat); the §7.3 checks; the screening-vs-full fidelity check (within 3 %, Spearman ρ >= 0.95); non-A excitation (needs the aligned angle per phase); the map open items in spec §10.
