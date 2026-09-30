@@ -36,7 +36,14 @@ def arkkio_torque(problem: Magnetostatic2D, solution: FieldSolution) -> float:
     """T = L / (μ0·(r_out - r_in)) · ∫_band r·B_r·B_θ dS, N·m, positive counter-clockwise on the rotor."""
     if problem.band is None:
         raise ValueError("Arkkio torque needs a moving band (problem.band is None)")
-    el = problem.band.elements
+    return arkkio_torque_annulus(problem, solution, problem.band.elements, problem.band.inner_radius,
+                                 problem.band.outer_radius)
+
+
+def arkkio_torque_annulus(problem: Magnetostatic2D, solution: FieldSolution, elements: np.ndarray,
+                          r_in: float, r_out: float) -> float:
+    """Arkkio torque from the air elements `elements` filling the annulus r_in..r_out, N·m."""
+    el = elements
     tri = problem.triangles[el]
     bx, by = solution.b[el, 0], solution.b[el, 1]
     corners = problem.nodes[tri]                                  # (n, 3, 2)
@@ -47,7 +54,7 @@ def arkkio_torque(problem: Magnetostatic2D, solution: FieldSolution) -> float:
         r = np.hypot(x, y)
         total += (bx * x + by * y) * (-bx * y + by * x) / r / 3   # r·B_r·B_θ
     integral = float(total @ triangle_areas(problem.nodes, tri))
-    return problem.depth * integral / (MU0 * (problem.band.outer_radius - problem.band.inner_radius))
+    return problem.depth * integral / (MU0 * (r_out - r_in))
 
 
 def virtual_work_torque(problem: Magnetostatic2D, solution: FieldSolution, delta: float = 1e-6) -> float:
