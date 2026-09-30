@@ -1,8 +1,8 @@
 # M4 handoff ("engine usable")
 
-State: M1–M4b done (M4b on branch `m4b-map-runner`, merge pending); M4c next. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` holds `point.py`, `grids.py`, `run.py`, `dataset.py`, `pool.py` and `api.py` (`build_map`); `project/` is empty.
+State: M1–M4 done (2026-09-30); M5 next. NGSolve is the primary solver; `skfem_reference` is the independent cross-check. `maps/` holds the map runner, dataset, pool, tables, checks, exports, overlap, fem_checks and fidelity modules; `project/` is empty. Sections below record the M4 history and measurements; the M5 carry-in is at the end.
 
-## Read first
+## Read first (historical: written for M4)
 - Spec §7 (maps, speed, checks), §10 (open items), §11 (decisions), M4 row of the milestone table (~line 301).
 - `docs/team24-feasibility.md` (M3 finding), `docs/reference-machines.md`.
 
@@ -10,7 +10,7 @@ State: M1–M4b done (M4b on branch `m4b-map-runner`, merge pending); M4c next. 
 Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc and ∂ψ/∂θ; inverse tables; overlap map and coupling check; standard results and key numbers; LUT exports (CSV, .mat); per-pole force arrays; all §7.3 checks; screening-vs-full fidelity check (within 3 %, Spearman ρ ≥ 0.95); error policy, cancellation, crash retry.
 
 ## Carried-in items (spec §10)
-1. **Solve speed.** The cold 20 A `screening` solve takes 4.5–5.3 s against the 4 s gate (see table below). Decide first whether M4b attacks the gate; options are listed below the table.
+1. **Solve speed.** Resolved: the numpy tangent brought the cold 20 A `screening` solve to 2.0–2.5 s (gate 4 s met; see the table below).
 2. **Air-gap element count.** 4 layers across the gap give 20–50k triangles even on `screening`. Measure DOF per preset. Add structured gap meshing if the speed budget needs it.
 3. **L_inc factorisation.** Built on `sensitivity`, which refactorises the tangent. Reuse the Newton factorisation (about one Newton iteration saved per point with `with_l_inc=True`).
 4. **Per-region stacking factor.** Currently per material. Revisit if rotor and stator differ.

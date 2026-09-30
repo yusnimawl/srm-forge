@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md`. It covers the architecture, physics, tolerances, milestones M1–M5, open items and the decision log. Read the relevant section before starting milestone work. Implementation plans are in `docs/superpowers/plans/`, and `docs/reference-machines.md` audits which published machines can be used for validation.
 
-**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go), M4a (`solve_point`), M4b (map grids, runner, HDF5 dataset and cache, process pool, `build_map`) and M4c (map products: tables, key numbers, §7.3 checks, exports, overlap map, held-out checks, fidelity check) are complete, so M4 is done; M5 (validation) is next and `project` is still an empty placeholder. Speed: a cold `screening` solve at 20 A takes 2.0–2.5 s (gate 4 s met, numpy tangent). The owner decided the M4 open items (spec §11, 2026-09-30): the `screening` grid is 12 angles × 8 currents (peak torque within 0.24 % of `full`), the screening La tolerance is 5 %, the speed budgets are re-baselined to the laptop (`screening` < ~90 s, `full` < 13 min), and the held-out torque limit is 3 % (provisional until M5). See `docs/m4-handoff.md`. The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check.
+**Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go), M4a (`solve_point`), M4b (map grids, runner, HDF5 dataset and cache, process pool, `build_map`) and M4c (map products: tables, key numbers, §7.3 checks, exports, overlap map, held-out checks, fidelity check) are complete, so M4 is done; M5 (validation) is next and `project` is still an empty placeholder. A v0 end-to-end web path (requirements, candidates, Pareto plot) is designed in `docs/superpowers/specs/2026-09-30-v0-walking-skeleton-design.md` and is planned before M5. Speed: a cold `screening` solve at 20 A takes 2.0–2.5 s (gate 4 s met, numpy tangent). The owner decided the M4 open items (spec §11, 2026-09-30): the `screening` grid is 12 angles × 8 currents (peak torque within 0.24 % of `full`), the screening La tolerance is 5 %, the speed budgets are re-baselined to the laptop (`screening` < ~90 s, `full` < 13 min), and the held-out torque limit is 3 % (provisional until M5). See `docs/m4-handoff.md`. The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check.
 
 ## Commands
 
@@ -25,6 +25,7 @@ python examples\solve_8_6.py [screening|full]        # solve an 8/6 and print ps
 python examples\band_pitch_convergence.py           # band-pitch convergence table on the 8/6 screening mesh
 python examples\solve_speed.py [screening|full]     # time cold and warm solves with both solvers
 python examples\build_map_8_6.py [workers] [solver] # build and time the 8/6 screening map (I_max 20 A)
+python examples\fidelity_8_6.py                     # screening-vs-full fidelity on 4 variants of the 8/6 (about 45 min)
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 
@@ -71,7 +72,7 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 4b. **`solvers/*` `sensitivity(problem, a)`**: dA/di per circuit (nodes × circuits) from the tangent at A; both adapters implement it, the adapters are compared with each other, and L_inc is checked against central differences.
 5. **`maps/point.py` `solve_point(static, design, angle, currents, solver, initial=None, keep_field=False, with_l_inc=False)`**: mesh_at_angle → machine_problem → solve → post, returning a frozen `PointResult` (ψ, Arkkio and virtual-work torque, W, W′, status, iterations, optional L_inc). L_inc is withheld unless the solve converged at full load.
 
-## Map pipeline (M4b)
+## Map pipeline
 
 1. **`maps/grids.py`**: `angle_grid` (warped, dense at alignment, snapped to the band pitch, one rotor pole pitch) and `current_grid` (power law, dense at low current); `GRID_SIZES` gives the default sizes per fidelity preset.
 2. **`maps/run.py` `run_map(static, design, angles, currents, solver_name, excited="A", workers=1, ...)`**: one job per point (each solved from A = 0, highest current first), then `apply_failure_policy` (isolated non-converged points are PCHIP-filled along current and flagged; the map fails with `MapFailed` above 2 % failed points or on a failure at the aligned angle, at zero current or at I_max). It validates `excited` (any phase of the machine; `aligned_angle` validates the letter) and the currents before making a solver. Cancellation returns a partial, unfilled result with `complete=False`.
@@ -79,11 +80,11 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 4. **`maps/pool.py` `map_ordered`**: spawn `ProcessPoolExecutor`, results in item order, one retry of the unfinished items after a worker crash, then `WorkerCrashed`. `workers <= 1` runs in-process, through the same `_init_worker`. Workers run single-threaded numerics (`OMP/OPENBLAS/MKL_NUM_THREADS=1`, `make_solver(name, threads=1)`).
 5. **`maps/api.py` `build_map(design, i_max, solver="ngsolve", excited="A", workers=None, n_angles, n_currents, cache_dir, progress, cancel)`**: grids, provenance, cache lookup, mesh built once in the parent, `run_map`, cache store. `workers=None` means half the logical CPUs.
 
-## Map products (M4c)
+## Map products
 
 1. **`maps/tables.py`**: `angle_spline`, `dpsi_dtheta`, and `drive_tables` (`DriveTables`: inverse i(θ,ψ) and T(θ,ψ) on a saturation-graded ψ grid, flat, monotone, round-trip checked).
 2. **`maps/results.py`**: `key_numbers` (`KeyNumbers`: La and Lu as secant values at the lowest non-zero current, peak torque, ψ_max), `inductance_curves`. `grids.aligned_angle` gives each phase's aligned angle.
-3. **`maps/checks.py`**: 14 cheap §7.3 checks (`Check`), `analyse_map` returning a `MapReport`. Energy checks warn instead of fail below 16 angles. Limits are provisional (spec §11).
+3. **`maps/checks.py`**: the cheap §7.3 checks (`Check`), `analyse_map` returning a `MapReport`. Energy checks warn instead of fail below 16 angles. Limits are provisional (spec §11).
 4. **`maps/export.py`**: `export_csv`, `export_mat`.
 5. **`maps/overlap.py`** with `api.build_overlap_map`: overlap map, coupling and reciprocity checks; any non-converged point in a complete overlap map raises `MapFailed`.
 6. **`maps/fem_checks.py`**: held-out interpolation and band-radius independence (`full`/`reference` only). **`maps/fidelity.py`**: `fidelity_check` (screening vs full).
