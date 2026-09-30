@@ -19,7 +19,7 @@
 - Fast suite stays under 10 minutes. Tests that build a map are marked `@pytest.mark.slow` and use `pytest.importorskip("ngsolve")`.
 - Test file basenames must be unique across `tests/` (no `__init__.py`); all new tests are named `test_app_*.py`.
 - Every result carries the label "unvalidated, peak-only" in its docstring or field; nothing in this plan awards "EM-validated".
-- `J_PEAK = 15e6` A/m² is a provisional peak current density (sub-project #3 replaces it with a thermal limit).
+- `J_PEAK = 20e6` A/m² (20 A/mm²) is the provisional default peak current density; it is a `SearchSettings.j_peak` setting (direct liquid cooling allows 20–30 A/mm² for 30 s peaks). Sub-project #3 replaces it with a thermal limit.
 - DC-bus voltage default is 400 V (assumed; parent spec §10 open item).
 
 ## Review Focus
@@ -229,7 +229,7 @@ git commit -m "feat(app): srmapp package and Requirements"
 **Interfaces:**
 - Consumes: `srmcore.model.design.RadialSRMParams`, `srmcore.materials.load_material` (soft magnetic: `.density`, `.stacking_factor`; conductor: `.density`, `.resistivity`, `.reference_temperature_c`, `.temperature_coefficient`).
 - Produces:
-  - `J_PEAK: float = 15e6`
+  - `J_PEAK: float = 20e6`
   - `@dataclass(frozen=True) Mass(stator_iron: float, rotor_iron: float, copper: float)` with property `total`
   - `pole_chord(radius: float, arc: float) -> float`
   - `coil_side_area(p) -> float` (m², one coil side)
@@ -347,8 +347,8 @@ from dataclasses import dataclass
 from srmcore.materials import load_material
 from srmcore.model.design import RadialSRMParams
 
-# Peak current density in the conductor, A/m². Provisional: a thermal model replaces it.
-J_PEAK = 15e6
+# Default peak current density in the conductor, A/m². Provisional: a thermal model replaces it.
+J_PEAK = 20e6
 
 
 @dataclass(frozen=True)
@@ -629,7 +629,7 @@ git commit -m "feat(app): Latin-hypercube candidate generator"
 - Produces:
   - `torque_upper_bound(p, i_peak) -> float`: N·m; a deliberately optimistic bound (energy-conversion rectangle ψ_sat·I per stroke, m·Nr strokes per revolution).
   - `@dataclass(frozen=True) Stage1(mass: Mass, i_peak: float, torque_upper: float, passes: bool, reason: str)`
-  - `stage1(req, p, margin=1.0) -> Stage1`: fails when the mass exceeds `req.max_mass_kg` or `torque_upper < margin * req.peak_torque_nm`.
+  - `stage1(req, p, margin=1.0, j_peak=J_PEAK) -> Stage1`: fails when the mass exceeds `req.max_mass_kg` or `torque_upper < margin * req.peak_torque_nm`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -685,6 +685,12 @@ def test_mass_limit():
     assert not s.passes and "mass" in s.reason
 
 
+def test_current_density_raises_the_bound_and_the_current():
+    lo, hi = stage1(_req(), make_8_6(), j_peak=10e6), stage1(_req(), make_8_6(), j_peak=30e6)
+    assert hi.i_peak == pytest.approx(3 * lo.i_peak)
+    assert hi.torque_upper == pytest.approx(3 * lo.torque_upper)
+
+
 def test_margin_tightens_the_filter():
     req = _req(peak_power_w=1000.0, peak_torque_nm=3.2)
     assert stage1(req, make_8_6(), margin=1.0).passes
@@ -711,7 +717,7 @@ from srmcore.materials import load_material
 from srmcore.model.design import RadialSRMParams
 
 from ..requirements import Requirements
-from .estimates import Mass, active_mass, peak_current, pole_chord
+from .estimates import J_PEAK, Mass, active_mass, peak_current, pole_chord
 
 
 def torque_upper_bound(p: RadialSRMParams, i_peak: float) -> float:
@@ -736,9 +742,9 @@ class Stage1:
     reason: str            # empty when the design passes
 
 
-def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0) -> Stage1:
+def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: float = J_PEAK) -> Stage1:
     mass = active_mass(p)
-    i_peak = peak_current(p)
+    i_peak = peak_current(p, j_peak)
     upper = torque_upper_bound(p, i_peak)
     reason = ""
     if req.max_mass_kg is not None and mass.total > req.max_mass_kg:
@@ -1265,7 +1271,7 @@ git commit -m "feat(app): stage-2 evaluation and Pareto mask"
 **Interfaces:**
 - Consumes: everything above.
 - Produces:
-  - `@dataclass(frozen=True) SearchSettings(n_candidates: int = 200, seed: int = 0, shortlist: int = 40, grid: StageTwoGrid = StageTwoGrid(), margin: float = 1.0)`
+  - `@dataclass(frozen=True) SearchSettings(n_candidates: int = 200, seed: int = 0, shortlist: int = 40, grid: StageTwoGrid = StageTwoGrid(), margin: float = 1.0, j_peak: float = J_PEAK)`
   - `@dataclass(frozen=True) SearchResult(requirements, sampled: int, dropped: dict[str, int], stage1_rejected: int, evaluations: tuple[Evaluation, ...], cancelled: bool)` with method `pareto(self, maximize=(False, True, True)) -> tuple[Evaluation, ...]` over `(mass_kg, power_density_kw_per_kg, efficiency_base)` for feasible evaluations only.
   - `run_search(req, settings=SearchSettings(), *, solver="ngsolve", workers=None, cache_dir=None, progress=None, cancel=None) -> SearchResult`; `progress(done, total)` counts stage-2 designs; `cancel()` is polled before each design and passed into `evaluate_stage2`.
 
@@ -1332,6 +1338,19 @@ def test_cancel_returns_partial_results():
     assert all(e.status == "ok" for e in res.evaluations)
 
 
+def test_j_peak_reaches_stage_one():
+    seen = []
+    real = __import__("srmapp.pipeline", fromlist=["stage1"]).stage1
+
+    def spy(req, p, margin, j_peak):
+        seen.append(j_peak)
+        return real(req, p, margin, j_peak)
+    with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6))
+    assert seen and set(seen) == {25e6}
+
+
 def test_progress_counts_designs():
     seen = []
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
@@ -1372,6 +1391,7 @@ import numpy as np
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
+from .sizing.estimates import J_PEAK
 from .sizing.generator import sample_candidates
 from .sizing.stage1 import stage1
 
@@ -1383,6 +1403,7 @@ class SearchSettings:
     shortlist: int = 40
     grid: StageTwoGrid = field(default_factory=StageTwoGrid)
     margin: float = 1.0
+    j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max
 
 
 @dataclass(frozen=True)
@@ -1408,7 +1429,7 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                progress: Callable[[int, int], None] | None = None,
                cancel: Callable[[], bool] | None = None) -> SearchResult:
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed)
-    scored = [(c, stage1(req, c.design.machine, settings.margin)) for c in candidates]
+    scored = [(c, stage1(req, c.design.machine, settings.margin, settings.j_peak)) for c in candidates]
     passing = [(c, s) for c, s in scored if s.passes]
     passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.total, reverse=True)
     shortlist = passing[:settings.shortlist]
@@ -1540,7 +1561,7 @@ In `2026-09-30-v0-walking-skeleton-design.md`:
 - §4.3 Stage 1: replace "magnetic-circuit estimate of peak torque and the voltage limit" with "closed-form upper bound on peak torque (saturated pole flux times the peak current, one energy rectangle per stroke) and the mass limit; the voltage limit is left to stage 2".
 - §5 Layering: state the package is `srmapp` (`requirements`, `sizing`, `drive`, `evaluate`, `pareto`, `pipeline`) with the web layer to follow in plan v0b.
 - §4.6: replace the score list with "peak torque, peak power, mass, power density (kW/kg), copper-only efficiency at base speed"; and §9 open item "Third Pareto axis" with "Pareto axes are mass, power density and copper-only efficiency at base speed; torque ripple is not computed in v0".
-- §4: add "Peak current is J_PEAK = 15 A/mm² times the conductor area (provisional until the thermal model)."
+- §4: add "Peak current is the peak current density (default 20 A/mm², `SearchSettings.j_peak`) times the conductor area; provisional until the thermal model."
 
 - [ ] **Step 3: Run the fast suite**
 
