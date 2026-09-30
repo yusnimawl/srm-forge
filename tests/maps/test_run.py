@@ -34,7 +34,7 @@ def _fake(monkeypatch, failing=(), currents=CURRENTS):
             coenergy=1e9 if failed else 0.3 * amps, pole_force=np.full((8, 2), 1e9 if failed else 2.0 * amps),
             l_inc=None if failed else np.outer([1, 2, 3, 4], [0.1 * amps + 1, 0, 0, 0]),
             status=SolveStatus.NONCONVERGED if failed else SolveStatus.OK,
-            iterations=3, fallbacks=(), load_fraction=1.0)
+            iterations=3, fallbacks=(), load_fraction=1.0, b_peak=1e9 if failed else 1.5)
 
     monkeypatch.setattr(run, "solve_point", fake)
     monkeypatch.setattr(run, "make_solver", lambda *a, **k: object())

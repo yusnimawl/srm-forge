@@ -18,7 +18,7 @@ _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "curre
          "torque_arkkio": ("angle", "current"), "torque_virtual_work": ("angle", "current"),
          "energy": ("angle", "current"), "coenergy": ("angle", "current"),
          "l_inc": ("angle", "current", "circuit"), "pole_force": ("angle", "current", "pole", "component"),
-         "iterations": ("angle", "current"),
+         "b_peak": ("angle", "current"), "iterations": ("angle", "current"),
          "status": ("angle", "current"), "filled": ("angle", "current")}
 
 

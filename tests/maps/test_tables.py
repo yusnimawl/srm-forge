@@ -26,7 +26,7 @@ def test_linear_roundtrip_and_inverse():
     assert np.allclose(psi[ok], np.broadcast_to(t.psi_grid, psi.shape)[ok], rtol=1e-6, atol=1e-12)
     assert np.isnan(t.current).any()      # ψ above ψ(θ, I_max) of the unaligned angles
     assert np.array_equal(np.isnan(t.current), t.psi_grid[None] > r.psi[:, -1, :1])
-    want = -0.5 * dinductance(r.angles)[:, None] * t.current ** 2
+    want = 0.5 * dinductance(r.angles)[:, None] * t.current ** 2
     assert np.allclose(t.torque[ok], want[ok], atol=5e-2 * np.nanmax(np.abs(want)))
 
 

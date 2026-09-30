@@ -23,7 +23,7 @@ _CODE = {SolveStatus.OK: STATUS_OK, SolveStatus.OK_WITH_FALLBACK: STATUS_FALLBAC
          SolveStatus.NONCONVERGED: STATUS_NONCONVERGED}
 # Spec §8.1: the map fails when more than this fraction of its points fail.
 MAX_FAILED_FRACTION = 0.02
-_FIELDS = ("psi", "torque_arkkio", "torque_virtual_work", "energy", "coenergy", "l_inc", "pole_force")
+_FIELDS = ("psi", "torque_arkkio", "torque_virtual_work", "energy", "coenergy", "l_inc", "pole_force", "b_peak")
 
 
 @dataclass(frozen=True, eq=False)
@@ -42,6 +42,7 @@ class MapResult:
     coenergy: np.ndarray               # J
     l_inc: np.ndarray                  # (n_angles, n_currents, n_circuits), H: ∂ψ_k/∂i_excited, NaN where withheld
     pole_force: np.ndarray             # (n_angles, n_currents, n_poles, 2), N: [radial outward, tangential ccw]
+    b_peak: np.ndarray                 # (n_angles, n_currents), T: peak |B| over the stator and rotor iron elements
     iterations: np.ndarray
     status: np.ndarray
     filled: np.ndarray
@@ -60,7 +61,7 @@ def solve_job(job) -> dict:
                     with_l_inc=True)
     l_inc = np.full(len(p.circuits), np.nan) if p.l_inc is None else p.l_inc[:, p.circuits.index(excited)]
     return {"psi": p.psi, "torque_arkkio": p.torque_arkkio, "torque_virtual_work": p.torque_virtual_work,
-            "energy": p.energy, "coenergy": p.coenergy, "l_inc": l_inc, "pole_force": p.pole_force,
+            "energy": p.energy, "coenergy": p.coenergy, "l_inc": l_inc, "pole_force": p.pole_force, "b_peak": p.b_peak,
             "iterations": p.iterations, "status": _CODE[p.status]}
 
 

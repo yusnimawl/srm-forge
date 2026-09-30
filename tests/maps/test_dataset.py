@@ -21,7 +21,7 @@ def _result(complete=True):
     return MapResult(
         ANGLES, CURRENTS, ("A", "B", "C", "D"), "A", rng.random((3, 2, 4)), rng.random((3, 2)),
         rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2, 4)),
-        rng.random((3, 2, 8, 2)), np.full((3, 2), 7, dtype=np.int32),
+        rng.random((3, 2, 8, 2)), rng.random((3, 2)), np.full((3, 2), 7, dtype=np.int32),
         np.full((3, 2), STATUS_OK, dtype=np.int8), np.zeros((3, 2), dtype=bool), complete)
 
 
