@@ -56,6 +56,7 @@ class _Discretisation:
         trial, test = space.TnT()
         grad_a = ng.grad(self.u)
         dx = ng.dx(intrules={ng.TRIG: ng.IntegrationRule(ng.TRIG, QUADRATURE_ORDER)})
+        # The symbolic tangent form only supplies the sparsity pattern; `set_tangent` fills the values.
         self.tangent = ng.BilinearForm(space)
         self.tangent += (self.nu * ng.grad(trial) * ng.grad(test)
                          + 2 * self.dnu * (ng.grad(trial) * grad_a) * (ng.grad(test) * grad_a)) * dx

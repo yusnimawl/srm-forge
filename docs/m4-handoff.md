@@ -25,7 +25,7 @@ Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc 
 
 ## Suggested start (M4b)
 1. Brainstorm, then write `docs/superpowers/plans/<date>-m4b-maps.md`.
-2. Decide first whether to attack the 4 s gate, because it sets the grid sizes: structured air-gap mesh, scipy/umfpack tangent assembly, parallel points.
+2. Decide first whether to attack the 4 s gate, because it sets the grid sizes: structured air-gap mesh, parallel points.
 3. Then grids, datasets, workers.
 
 ## Speed measurements
@@ -44,7 +44,6 @@ Gate (cold 20 A at θ = 0 in 4 s or less): **met** on NGSolve after the numpy ta
 
 Remaining options, owner decides for M4b:
 - structured air-gap meshing to cut DOF;
-- scipy/umfpack tangent assembly (about 0.3 s per iteration);
 - parallel map points;
 - Euler current predictor (dropped in M4a): NGSolve cold with 1, 3, 6 sub-steps took 14 it 6.0 s, 8 it 4.8 s, 6 it 5.8 s against 11 it 4.5 s plain; warm sweep 24 it. skfem + Euler predictor (3 sub-steps) reached 3.5 s cold in one run; the predictor pays off only where the sensitivity solves are cheap.
 
@@ -62,7 +61,6 @@ Per-solve time, (wall - mesh) x workers / 64: about 4.0 s at 4 workers and about
 Both maps came back with 64 OK points, peak Arkkio torque 12.04 N·m and a flux-linkage ratio (aligned to unaligned at 0.408 A) of 8.85. The 30 s `screening` budget (spec §7.2) is **not met**. With one job per angle there are only 8 jobs, so the wall time is set by the slowest angles (first job back after 34 s, last after 50 s on 8 workers) and more workers cannot help beyond 8. Options, owner decides for M4c:
 - split jobs finer than one angle (per angle and current block) so more workers stay busy;
 - structured air-gap meshing to cut DOF;
-- scipy/umfpack tangent assembly;
 - reuse of the Newton factorisation for L_inc when L_inc is added to the map.
 
 Carried into M4c: L_inc and ∂ψ/∂θ in the dataset; per-pole force arrays; inverse tables; overlap map and coupling check; standard results and key numbers; LUT exports (CSV, .mat); the §7.3 checks; the screening-vs-full fidelity check (within 3 %, Spearman ρ >= 0.95); non-A excitation (needs the aligned angle per phase); the map open items in spec §10.

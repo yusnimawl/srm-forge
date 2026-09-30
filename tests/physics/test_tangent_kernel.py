@@ -52,6 +52,7 @@ def test_kernel_matches_ngsolve_assembly(setup):
 def test_scatter_solve_matches_ngsolve_assembly(setup):
     problem, system, a, nu, dnu = setup
     rhs = np.random.default_rng(2).normal(size=system.n)
+    system.disc.tangent.mat.AsVector().FV().NumPy()[:] = 0  # the numpy fill alone must restore the matrix
     ours = system.solve_tangent(a, nu, dnu, rhs)
     _bind_form(system.disc, a, nu, dnu)
     system.disc.tangent.Assemble()
