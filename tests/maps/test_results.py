@@ -28,7 +28,7 @@ def test_key_numbers_linear_map():
     assert k.i_max == 20
     assert k.aligned_angle == 0
     assert k.unaligned_angle == pytest.approx(PERIOD / 2)
-    assert k.la == pytest.approx(L0 + L1, rel=1e-12)
+    assert k.la == pytest.approx(L0 + L1, rel=1e-12)  # linear map: any current gives the same secant
     assert k.lu == pytest.approx(L0 - L1, rel=1e-2)
     assert k.la_lu == pytest.approx(k.la / k.lu)
     assert k.psi_max == pytest.approx((L0 + L1) * 20)
@@ -50,3 +50,14 @@ def test_inductance_curves():
     assert sel.shape == (len(r.angles), 2)
     with pytest.raises(ValueError):
         inductance_curves(r, [1.2345])
+
+
+def test_key_numbers_use_lowest_current_when_saturating():
+    r = synthetic_map(psi_sat=0.05)
+    k = key_numbers(r, make_8_6())
+    i1 = r.currents[1]
+    la_lo = 0.05 * np.tanh((L0 + L1) * i1 / 0.05) / i1
+    assert k.la == pytest.approx(la_lo, rel=1e-12)
+    assert k.psi_max == pytest.approx(0.05 * np.tanh((L0 + L1) * 20 / 0.05), rel=1e-12)
+    assert abs(k.psi_max / 20 - k.la) > 0.05 * k.la  # I_max secant would differ
+    assert k.la_lu == pytest.approx(k.la / k.lu)

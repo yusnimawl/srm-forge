@@ -14,7 +14,7 @@ from .tables import angle_spline
 @dataclass(frozen=True)
 class KeyNumbers:
     la: float               # aligned secant inductance ψ/i at I_max, H
-    lu: float               # unaligned secant inductance at I_max, H
+    lu: float               # unaligned secant inductance at the same current, H
     la_lu: float
     peak_torque: float      # max |Arkkio torque| over the grid, N·m
     psi_max: float          # excited ψ at the aligned angle and I_max, Wb-turns
@@ -30,10 +30,12 @@ def key_numbers(result: MapResult, machine: RadialSRMParams) -> KeyNumbers:
     th_a = aligned_angle(machine, result.excited)
     th_u = th_a + tau / 2
     i_max = float(result.currents[-1])
-    psi = angle_spline(result.angles, result.psi[:, -1, result.circuits.index(result.excited)], tau)
-    psi_a, psi_u = float(psi(th_a)), float(psi(th_u))
-    return KeyNumbers(psi_a / i_max, psi_u / i_max, psi_a / psi_u, float(np.max(np.abs(result.torque_arkkio))),
-                      psi_a, i_max, th_a, th_u)
+    e = result.circuits.index(result.excited)
+    i_lo = float(result.currents[1])
+    at = lambda k: angle_spline(result.angles, result.psi[:, k, e], tau)([th_a, th_u])
+    (lo_a, lo_u), (hi_a, _) = at(1), at(-1)
+    return KeyNumbers(lo_a / i_lo, lo_u / i_lo, lo_a / lo_u, float(np.max(np.abs(result.torque_arkkio))),
+                      float(hi_a), i_max, th_a, th_u)
 
 
 def inductance_curves(result: MapResult, currents: Sequence[float] | None = None) -> np.ndarray:
