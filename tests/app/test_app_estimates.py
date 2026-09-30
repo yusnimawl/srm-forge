@@ -4,6 +4,7 @@ import pytest
 from conftest import make_8_6, make_24_16
 
 from srmapp.sizing import estimates as est
+from srmcore.materials.library import load_material
 
 
 def test_pole_chord():
@@ -27,7 +28,7 @@ def test_8_6_mass_is_plausible():
     # 160 mm OD, 100 mm stack: a few kg of iron, a few kg of copper
     m = est.active_mass(make_8_6())
     assert 3.0 < m.stator_iron + m.rotor_iron < 12.0
-    assert 0.2 < m.copper < 5.0
+    assert 0.2 < m.copper < 4.5
 
 
 def test_current_and_resistance_relations():
@@ -51,7 +52,7 @@ def test_copper_mass_equals_volume_from_resistance_geometry():
     p = make_24_16()
     turns_phase = p.turns_per_pole * p.n_stator_poles / p.n_phases
     volume = p.n_phases * turns_phase * est.mean_turn_length(p) * est.conductor_area(p)
-    assert est.active_mass(p).copper == pytest.approx(8890.0 * volume, rel=1e-6)
+    assert est.active_mass(p).copper == pytest.approx(load_material("copper").density * volume, rel=1e-6)
 
 
 @pytest.mark.slow
@@ -75,9 +76,8 @@ def test_areas_agree_with_the_mesh():
     rotor_area = area(mesh.rotor, "rotor_iron")
     coil_area = area(mesh.stator, "coil")
     m = est.active_mass(p)
-    rho = 7650.0   # M19 provisional density
-    from srmcore.materials.library import load_material
-    k = load_material("M19").stacking_factor
+    iron = load_material("M19")
+    rho, k = iron.density, iron.stacking_factor
     assert m.stator_iron == pytest.approx(rho * k * stator_area * p.stack_length, rel=0.08)
     assert m.rotor_iron == pytest.approx(rho * k * rotor_area * p.stack_length, rel=0.08)
-    assert 2 * p.n_stator_poles * est.coil_side_area(p) == pytest.approx(coil_area, rel=0.15)
+    assert 2 * p.n_stator_poles * est.coil_side_area(p) == pytest.approx(coil_area, rel=0.05)

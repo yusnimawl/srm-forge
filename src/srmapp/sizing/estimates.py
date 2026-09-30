@@ -34,10 +34,12 @@ def _slot_width(p: RadialSRMParams) -> float:
 
 
 def coil_side_area(p: RadialSRMParams) -> float:
-    """Copper-bearing area of one coil side: half of the slot, less liner and inner clearance."""
+    """Copper-bearing area of one coil side, following the outline srmcore builds: half of the slot,
+    less a liner at the pole flank and half a liner at the slot centreline, the inner clearance, and a
+    liner plus two yoke fillet radii at the slot bottom."""
     height = p.stator_yoke_inner_radius - p.bore_radius
-    width = _slot_width(p) - 2 * p.slot_liner_thickness
-    depth = height - p.slot_liner_thickness - p.coil_inner_clearance
+    width = _slot_width(p) - 3 * p.slot_liner_thickness
+    depth = height - p.slot_liner_thickness - p.coil_inner_clearance - 2 * p.stator_fillet_radius
     return max(width, 0.0) * max(depth, 0.0) / 2
 
 
