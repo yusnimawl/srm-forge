@@ -24,7 +24,7 @@ def _fake(monkeypatch, failing=(), currents=CURRENTS):
     bad = {(round(float(ANGLES[a]), 9), round(float(currents[i]), 9)) for a, i in failing}
 
     def fake(static, design, angle, currents, solver, **kw):
-        amps = currents["A"]
+        (amps,) = currents.values()
         failed = (round(angle, 9), round(amps, 9)) in bad
         psi = np.array([0.01 * (1 + angle) * amps, 0.0, 0.0, 0.0])
         return PointResult(
@@ -45,6 +45,14 @@ def _withheld_row(monkeypatch):
     monkeypatch.setattr(run, "solve_point", lambda *a, **k: dataclasses.replace(fake(*a, **k), l_inc=None))
     run._WORKER.update(static=None, design=DESIGN, solver=None)
     return run.solve_job((0.0, 5.0, "A"))
+
+
+def _fake_result():
+    n = (8, 8)
+    z = np.zeros(n)
+    return run.MapResult(ANGLES, CURRENTS, CIRCUITS, "A", np.zeros((*n, 4)), z, z.copy(), z.copy(), z.copy(),
+                         np.zeros((*n, 4)), np.zeros((*n, 8, 2)), z.copy(), np.zeros(n, np.int32),
+                         np.zeros(n, np.int8), np.zeros(n, bool), True)
 
 
 def _run(**kw):
@@ -108,11 +116,30 @@ def test_cancel_keeps_partial_results_unfilled(monkeypatch):
     assert np.isnan(r.psi[~done]).all() and not np.isnan(r.psi[done]).any() and not r.filled.any()
 
 
-@pytest.mark.parametrize("excited", ["Z", "B"])
-def test_only_phase_a_is_supported(monkeypatch, excited):
+def test_unknown_phase_is_rejected(monkeypatch):
     _fake(monkeypatch)
-    with pytest.raises(ValueError, match="excited"):
-        _run(excited=excited)
+    with pytest.raises(ValueError, match="phase"):
+        _run(excited="Z")
+
+
+def test_failure_policy_checks_the_aligned_angle_of_the_excited_phase(monkeypatch):
+    _fake(monkeypatch, failing={(0, 3)})
+    monkeypatch.setattr(run, "aligned_angle", lambda machine, excited: 0.0 if excited == "A" else ANGLES[0])
+    # phase A: angle 0 is aligned, so the failure there is fatal; a phase aligned at ANGLES[5] fills it instead
+    with pytest.raises(MapFailed, match="aligned"):
+        _run(excited="A")
+    monkeypatch.setattr(run, "aligned_angle", lambda machine, excited: ANGLES[5])
+    r = _run(excited="B")
+    assert r.excited == "B" and r.filled[0, 3] and r.filled.sum() == 1
+
+
+def test_aligned_check_is_circular(monkeypatch):
+    tau = 2 * np.pi / DESIGN.machine.n_rotor_poles
+    r = dataclasses.replace(_fake_result(), angles=np.append(ANGLES[:-1], tau - 1e-12))
+    r.status[-1, 4] = run.STATUS_NONCONVERGED
+    with pytest.raises(MapFailed, match="aligned"):
+        run.apply_failure_policy(r, 0.0, tau)
+    assert run.apply_failure_policy(r, tau / 2, tau).filled[-1, 4]
 
 
 @pytest.mark.parametrize("currents", [[0.0, 2.0, 2.0], [3.0, 1.0], [1.0], [0.0, np.nan, 4.0], [0.0, 2.0, np.inf]])

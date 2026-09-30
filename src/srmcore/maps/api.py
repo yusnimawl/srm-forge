@@ -8,8 +8,8 @@ from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..solvers.factory import make_solver
 from .dataset import cached_map, provenance, store_map
-from .grids import GRID_SIZES, angle_grid, current_grid
-from .run import MapResult, check_excited, run_map
+from .grids import GRID_SIZES, aligned_angle, angle_grid, current_grid
+from .run import MapResult, run_map
 
 
 def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited: str = "A",
@@ -24,11 +24,12 @@ def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited:
         raise ValueError(f"n_angles must be at least 1, got {n_angles}")
     if n_currents is not None and n_currents < 2:
         raise ValueError(f"n_currents must be at least 2, got {n_currents}")
-    check_excited(excited)
+    aligned = aligned_angle(design.machine, excited)          # rejects a letter that is not a phase
     adapter = make_solver(solver)
     default_a, default_i = GRID_SIZES[design.mesh.preset]
     divisions = resolve_mesh_settings(design.machine, design.mesh).band_divisions
-    angles = angle_grid(design.machine, divisions, default_a if n_angles is None else n_angles)
+    angles = angle_grid(design.machine, divisions, default_a if n_angles is None else n_angles,
+                        aligned=aligned)
     currents = current_grid(i_max, default_i if n_currents is None else n_currents)
     prov = provenance(design, angles, currents, excited, adapter)
     if cache_dir is not None and (hit := cached_map(cache_dir, prov)) is not None:

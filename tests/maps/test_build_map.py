@@ -38,9 +38,9 @@ def test_cancelled_map_is_not_cached(tmp_path):
     assert not r.complete and not list(tmp_path.glob("map_*.h5"))
 
 
-@pytest.mark.parametrize("excited", ["Z", "B"])
-def test_only_phase_a_is_supported(excited):
-    with pytest.raises(ValueError, match="excited"):
+@pytest.mark.parametrize("excited", ["Z", "E"])
+def test_unknown_phase_is_rejected(excited):
+    with pytest.raises(ValueError, match="phase"):
         api.build_map(DESIGN, 5.0, solver="skfem_reference", excited=excited, n_angles=2, n_currents=2)
 
 
@@ -60,3 +60,10 @@ def test_unknown_solver_fails_in_the_parent_before_the_pool():
 def test_grid_sizes_must_be_usable(kw):
     with pytest.raises(ValueError, match="n_"):
         api.build_map(DESIGN, 5.0, solver="skfem_reference", **kw)
+
+
+def test_map_of_phase_b_is_shifted_to_its_aligned_angle():
+    r = api.build_map(DESIGN, 5.0, solver="skfem_reference", excited="B", n_angles=2, n_currents=2, workers=1)
+    assert r.excited == "B" and r.complete
+    assert np.isclose(r.angles, np.radians(15.0), atol=1e-9).any()
+    assert np.all(r.psi[:, -1, 1] > 0) and np.all(r.psi[:, 0] == 0)

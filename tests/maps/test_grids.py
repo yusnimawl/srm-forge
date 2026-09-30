@@ -3,8 +3,8 @@ import math
 import numpy as np
 import pytest
 
-from conftest import make_8_6
-from srmcore.maps.grids import GRID_SIZES, angle_grid, current_grid
+from conftest import make_8_6, make_12_8
+from srmcore.maps.grids import GRID_SIZES, aligned_angle, angle_grid, current_grid
 from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.model.design import MeshSettings
 
@@ -42,3 +42,22 @@ def test_current_grid_starts_at_zero_ends_at_i_max_and_is_denser_at_low_current(
     c = current_grid(20.0, 8)
     assert c[0] == 0.0 and c[-1] == 20.0 and np.all(np.diff(c) > 0)
     assert np.diff(c)[0] < np.diff(c)[-1]
+
+
+@pytest.mark.parametrize("excited, k", [("B", 1), ("C", 2), ("D", 3)])
+def test_shifted_angle_grid_contains_the_aligned_angle(excited, k):
+    divisions = _divisions("screening")
+    aligned = aligned_angle(MACHINE, excited)
+    a = angle_grid(MACHINE, divisions, 8, aligned=aligned)
+    pitch = 2 * math.pi / divisions
+    assert a[0] >= 0 and a[-1] < TAU_R - 1e-9 and np.all(np.diff(a) > 0)
+    assert np.isclose(a, aligned, atol=1e-9).any()
+    assert np.allclose(a / pitch, np.round(a / pitch), atol=1e-9)
+    assert len(a) == len(angle_grid(MACHINE, divisions, 8))
+
+
+def test_aligned_angles_of_every_phase():
+    deg = lambda m, phases: [math.degrees(aligned_angle(m, p)) for p in phases]
+    assert deg(MACHINE, "ABCD") == pytest.approx([0, 15, 30, 45])
+    assert deg(make_12_8(), "ABC") == pytest.approx([0, 15, 30])
+    assert deg(make_8_6(n_stator_poles=6, n_rotor_poles=4, n_phases=3), "ABC") == pytest.approx([0, 30, 60])

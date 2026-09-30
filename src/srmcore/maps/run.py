@@ -4,6 +4,7 @@ Every point is an independent solve from A = 0. Warm starts from the neighbourin
 20 % of the Newton iterations on the 8/6, so points stay independent; each point is one job of the
 process pool, highest current first because those solves take the most Newton iterations."""
 import dataclasses
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -11,10 +12,12 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 from ..fields.solution import SolveStatus
+from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..model.errors import MapFailed
 from ..solvers.factory import make_solver
 from ..solvers.settings import SolverAdapter
+from .grids import aligned_angle
 from .point import solve_point
 from .pool import map_ordered
 
@@ -65,8 +68,9 @@ def solve_job(job) -> dict:
             "iterations": p.iterations, "status": _CODE[p.status]}
 
 
-def apply_failure_policy(result: MapResult) -> MapResult:
-    """Interpolate isolated NONCONVERGED points along current (PCHIP) and flag them, or raise MapFailed
+def apply_failure_policy(result: MapResult, aligned: float, tau: float, atol: float = 1e-9) -> MapResult:
+    """`aligned` is the aligned angle of the excited phase; angles are compared with it modulo the rotor pole
+    pitch `tau`, within `atol`. Interpolate isolated NONCONVERGED points along current (PCHIP) and flag them, or raise MapFailed
     when more than 2 % of the points fail or the aligned angle or I_max has a failure."""
     failed = result.status == STATUS_NONCONVERGED
     n_failed = int(failed.sum())
@@ -75,7 +79,8 @@ def apply_failure_policy(result: MapResult) -> MapResult:
     reasons = []
     if n_failed / failed.size > MAX_FAILED_FRACTION:
         reasons.append(f"{n_failed} of {failed.size} points failed (limit 2 %)")
-    if failed[np.isclose(result.angles, 0.0)].any():
+    offset = (result.angles - aligned + tau / 2) % tau - tau / 2
+    if failed[np.abs(offset) <= atol].any():
         reasons.append("a point at the aligned position failed")
     if failed[:, -1].any():
         reasons.append("a point at I_max failed")
@@ -109,7 +114,7 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
             excited: str = "A", workers: int = 1, progress: Callable[[int, int], None] | None = None,
             cancel: Callable[[], bool] | None = None) -> MapResult:
     circuits = tuple(chr(ord("A") + k) for k in range(design.machine.n_phases))
-    check_excited(excited)
+    aligned = aligned_angle(design.machine, excited)       # rejects a letter that is not a phase
     if len(currents) < 2 or not np.all(np.isfinite(currents)) or np.any(np.diff(currents) <= 0):
         raise ValueError("currents must be strictly increasing with at least two values")
     make_solver(solver_name)                     # fail in the parent on an unknown solver or a missing extra
@@ -136,4 +141,8 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
     result = MapResult(np.asarray(angles, float), np.asarray(currents, float), circuits, excited,
                        **data, iterations=iterations, status=status,
                        filled=np.zeros((n_a, n_i), dtype=bool), complete=complete)
-    return apply_failure_policy(result) if complete else result
+    if not complete:
+        return result
+    # A map angle is on the band grid, so the aligned angle counts within half a band pitch.
+    divisions = resolve_mesh_settings(design.machine, design.mesh).band_divisions
+    return apply_failure_policy(result, aligned, 2 * math.pi / design.machine.n_rotor_poles, math.pi / divisions)
