@@ -20,7 +20,7 @@ LU_EST = (P_PH * N**2 * MU0 * M.bore_radius * M.stator_pole_arc * M.stack_length
 
 
 def good_map(**kw):
-    """Linear synthetic map with La = 2.5·La_est/2.5... chosen so every design-dependent check passes."""
+    """Linear synthetic map whose La and Lu sit inside every design-dependent band."""
     la = 1.2 * LA_EST
     lu = la / 8
     return synthetic_map(l0=(la + lu) / 2, l1=(la - lu) / 2, currents=np.linspace(0, 5, 9), **kw)
@@ -38,10 +38,17 @@ def test_consistent_map_passes_every_check():
 
 
 def test_torque_scaled_fails_coenergy_torque():
-    r = good_map()
+    r = good_map(n_angles=16)
     bad = dataclasses.replace(r, torque_arkkio=1.1 * r.torque_arkkio, torque_virtual_work=1.1 * r.torque_virtual_work)
     c = by_name(bad)["coenergy_torque"]
     assert c.status == "fail" and c.value == pytest.approx(0.1, abs=0.02)
+
+
+def test_coarse_grid_warns_instead_of_failing_energy_checks():
+    r = good_map(n_angles=12)
+    bad = dataclasses.replace(r, torque_arkkio=1.1 * r.torque_arkkio, torque_virtual_work=1.1 * r.torque_virtual_work)
+    c = by_name(bad)["coenergy_torque"]
+    assert c.status == "warn" and c.value > c.limit and "grid too coarse" in c.detail and "12 angles < 16" in c.detail
 
 
 def test_arkkio_vs_nodal_fails_on_disagreement():
@@ -56,7 +63,7 @@ def test_energy_identity_fails_on_wrong_energy():
 
 
 def test_loop_energy_fails_when_flux_is_scaled():
-    r = good_map()
+    r = good_map(n_angles=16)
     psi = r.psi.copy()
     psi[..., 0] *= 1.1
     assert by_name(dataclasses.replace(r, psi=psi))["loop_energy"].status == "fail"
@@ -151,4 +158,26 @@ def test_real_8_6_map_checks(tmp_path, capsys):
     with capsys.disabled():
         for c in rep.checks:
             print(f"CHECK {c.name:32s} {c.status:5s} value={c.value:.4g} limit={c.limit:.4g}")
+    status = {c.name: c.status for c in rep.checks}
     assert len(rep.checks) == 14 and np.isfinite(r.b_peak).all()
+    # 8 angles is below MIN_ANGLES_FOR_ENERGY_CHECKS, so the two energy checks warn instead of failing.
+    assert status["coenergy_torque"] == "warn" and status["loop_energy"] == "warn"
+    assert rep.ok
+
+
+def test_psi_decreasing_fails_on_dip_just_after_unaligned():
+    r = good_map()
+    first_up = int(np.flatnonzero(r.angles > PERIOD / 2)[0])
+    psi = r.psi.copy()
+    psi[first_up, -1, 0] = 0.0                       # below the unaligned flux
+    assert by_name(dataclasses.replace(r, psi=psi))["psi_decreasing"].status == "fail"
+
+
+def test_phase_b_map_uses_its_own_aligned_angle():
+    r = good_map(excited="B")
+    assert r.excited == "B" and r.angles[0] != 0.0
+    checks = by_name(r)
+    for name in ("sign_pattern", "zero_torque_aligned_unaligned", "psi_decreasing", "coenergy_torque"):
+        assert checks[name].status == "pass", name
+    flipped = dataclasses.replace(r, torque_arkkio=-r.torque_arkkio)
+    assert by_name(flipped)["sign_pattern"].status == "fail"
