@@ -8,7 +8,6 @@ import numpy as np
 from srmcore.maps import build_map
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
-from srmcore.model.errors import InputError, MapFailed, MeshRejected, WorkerCrashed
 
 from .drive.envelope import Envelope, envelope
 from .requirements import Requirements
@@ -71,7 +70,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     try:
         result = build_map(design, stage.i_peak, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
-    except (MapFailed, MeshRejected, InputError, WorkerCrashed) as exc:
+    except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
         return _failed(candidate, stage, type(exc).__name__, str(exc))
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")

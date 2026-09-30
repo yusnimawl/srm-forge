@@ -39,8 +39,8 @@ SI internally; conversion at the UI edge only.
 
 1. **Generator** samples designs in a bounded box: pole set (6/4, 8/6, 12/8, 24/16), stator outer diameter, stack length, pole arcs, turns per pole, yoke thicknesses. Latin-hypercube sampling with a fixed seed. Designs the validator rejects (`InputError`) are dropped and counted. Peak current is the peak current density (default 20 A/mm², `SearchSettings.j_peak`) times the conductor area; provisional until the thermal model.
 2. **Mass** from geometry and material densities (active parts: stator and rotor iron, copper).
-3. **Stage 1, analytic filter** (milliseconds): closed-form upper bound on peak torque (saturated pole flux times the peak current, one energy rectangle per stroke) and the mass limit; the voltage limit is left to stage 2. Drops designs that miss the requirements by a wide margin. The margin is a parameter; the filter must not drop a design that stage 2 would keep (checked on a sample in tests).
-4. **Stage 2, reduced FEM map** on the shortlist: `build_map` with a reduced grid, fewer angles and currents than `screening`. The default grid is 12 angles x 5 currents, chosen from the grid study against the `screening` map key numbers. Measured cost: one design took about 200 s in a 6-design search (about 93 s for one map alone in the grid study); 24 candidates narrowed to 6 evaluated took about 20 min. The engine speed work (parent spec §10 speed options, pool start-up per design, mesh build per design) is the lever and is not yet done.
+3. **Stage 1, analytic filter** (milliseconds): closed-form upper bound on peak torque (saturated pole flux times the peak current, one energy rectangle per stroke) and the mass limit; the voltage limit is left to stage 2. Drops designs whose optimistic bound misses the requirements. The margin parameter defaults to 1.0. The bound is meant not to drop a design that stage 2 would keep, but its false-drop rate against stage 2 is not yet measured; a sample check is open.
+4. **Stage 2, reduced FEM map** on the shortlist: `build_map` with a reduced grid, fewer angles and currents than `screening`. The default grid is 12 angles x 5 currents, chosen from the grid study against the `screening` map key numbers. Measured cost: one design took about 200 s in a 6-design search (about 93 s for one map alone in the grid study); 24 candidates narrowed to 6 evaluated took about 20 min. The grid study gives wall time of about 2.5 s + 1.6 s per map point (32 points 53 s, 60 points 93 s, 96 points 154 s), so per-point solves dominate and fixed per-design overhead is a few seconds. Levers, in order: choose turns after the FEM (one map per geometry serves every turn count); use the half-pitch symmetry of phase A (psi(-t)=psi(t), T(-t)=-T(t)); skip the zero-current column (12 of 60 jobs); make L_inc optional (run.py hard-codes with_l_inc=True and the envelope does not use it); fewer workers (contention); and the unexplained gap between 93 s (grid study) and about 200 s (search), probably mesh size on large-OD designs (unmeasured; log element count and Newton iterations per design). None is done.
 5. **Drive model** (minimal): from ψ(θ, i) and the bus voltage, the energy-conversion-loop method with ideal commutation and a current limit gives average torque and power against speed, hence the torque-speed envelope. Base speed is where the voltage limit starts to bind.
 6. **Score**: peak torque, peak power, mass, power density (kW/kg), copper-only efficiency at base speed. Designs that miss a requirement are flagged infeasible, not silently dropped from the plot.
 7. **Pareto set** over the chosen objectives, non-dominated sorting.
@@ -48,8 +48,8 @@ SI internally; conversion at the UI edge only.
 ## 5. Web layer
 
 - **Backend:** FastAPI on localhost. Job runner behind an interface (local process pool now; a hosted runner can replace it). Endpoints: submit requirements, job status/progress (WebSocket), cancel, results, design detail. Results stored as HDF5 maps (reusing the map cache) plus JSON summaries.
-- **Frontend:** one plain page with Plotly. A 3D scatter of candidates (default axes: mass, peak power, power density; selectable), colour by pole set, infeasible points greyed. Clicking a point opens the detail view: geometry plot, ψ-i curves, torque map, torque-speed curve, key numbers, warnings and the "unvalidated, peak-only" banner.
-- **Layering:** the package is `srmapp` (`requirements`, `sizing`, `drive`, `evaluate`, `pareto`, `pipeline`), with the web layer to follow in plan v0b. It sits above `srmcore`. `srmcore` does not import them. The `project` placeholder in `srmcore` stays empty unless a later plan needs it.
+- **Frontend:** one plain page with Plotly. A 3D scatter of candidates (default axes: mass, peak power, power density; selectable, and they may differ from the Pareto objectives in §9), colour by pole set, infeasible points greyed. Clicking a point opens the detail view: geometry plot, ψ-i curves, torque map, torque-speed curve, key numbers, warnings and the "unvalidated, peak-only" banner.
+- **Layering:** the package is `srmapp` (`requirements`, `sizing`, `drive`, `evaluate`, `pareto`, `pipeline`), with the web layer to follow in plan v0b. It sits above `srmcore` and imports `srmcore` submodules that are not layer-private (no gmsh, ngsolve or skfem objects cross the boundary). `srmcore` does not import it. The `project` placeholder in `srmcore` stays empty unless a later plan needs it.
 
 ## 6. Optimisation (second plan)
 
@@ -58,7 +58,7 @@ NSGA-III (a library such as pymoo, an installed-or-approved dependency to be dec
 ## 7. Testing
 
 - Generator: determinism for a seed; every kept design passes the validator.
-- Stage 1: no false drops on a sample checked against stage 2.
+- Stage 1: sanity bound against one static FEM peak. A false-drop sample check against stage 2 is open.
 - Drive model: on a linear synthetic map, the torque-speed envelope matches a closed-form result; power = torque × speed.
 - Pareto: non-dominated sorting on synthetic points.
 - API: job lifecycle, cancel, and a small end-to-end run on one pole set with a tiny grid (marked slow).
@@ -68,15 +68,15 @@ NSGA-III (a library such as pymoo, an installed-or-approved dependency to be dec
 
 | Risk | Handling |
 |---|---|
-| About 200 s per design makes a search or an optimisation take hours (24 candidates -> 6 evaluated took about 20 min) | engine speed work is the lever (parent spec §10 speed options, pool start-up per design, mesh build per design), not yet done; also tighten the stage-1 filter and reduce the map grid |
+| About 200 s per design makes a search or an optimisation take hours (24 candidates -> 6 evaluated took about 20 min) | per-point solves dominate (about 2.5 s + 1.6 s per point); levers are listed in §4.4 (turns after the FEM first), none done; also tighten the stage-1 filter and reduce the map grid |
 | The minimal drive model misstates power | label peak-only and unvalidated; compare with a closed-form case in tests; full model is sub-project #4 |
 | Unvalidated engine numbers mislead | banner on every result; M5 follows v0 |
-| Analytic filter drops good designs | keep the margin generous; test against stage 2 |
+| Analytic filter drops good designs | margin defaults to 1.0; false-drop rate against stage 2 not yet measured |
 
 ## 9. Open items
 
 - DC-bus voltage per vehicle (default 400 V assumed).
 - Pareto axes are mass, power density and copper-only efficiency at base speed; torque ripple is not computed in v0.
-- No feasible design was found for 10 kW / 32 N.m / 3000-9000 rpm / 400 V at 20 A/mm2 in the first 6 evaluated designs (torque ratios 0.02-1.82, power ratios 0.01-0.56). Cause not yet diagnosed; candidates: turns choice vs the 400 V constant-power range, stage-1 bound optimistic, drive model single-pulse only.
+- No feasible design was found for 10 kW / 32 N.m / 3000-9000 rpm / 400 V at 20 A/mm2 in the first 6 evaluated designs (torque ratios 0.02-1.82, power ratios 0.01-0.56). Analysis, not measurement: turns per pole are sampled independently of bus voltage and max speed (generator.py), and stage 1 and the shortlist cannot see turns. At fixed current density the ampere-turns, copper mass and FEM field do not depend on the turn count; only flux linkage scales with N, current with 1/N and resistance with N^2. Changing turns by a factor k is therefore a speed rescale of the same envelope (synthetic-map probe: turns divided by 3 gives torque at 3000/9000/27000 rpm of 1.498/1.314/0.797, against 1.498/1.311/0.786 for the original at 1000/3000/9000 rpm). A design with torque ratio >= 1 at base speed (the 1.82 one) is probably feasible geometry with the wrong turn count. Follow-up, not done in v0a: choose turns per design from bus voltage and max speed after the map; one map per geometry serves every turn count. Also: the drive model forbids flux past alignment (envelope.py), which is conservative at high speed and unmeasured; and v0 has no inverter current limit, so a turns rescale hides a current cost that is not reported.
 - Optimisation library and evaluation budget (second plan).
 - Reduced-grid sizes are set (12 x 5) from the grid study; revisit after M5.

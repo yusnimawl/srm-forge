@@ -28,7 +28,7 @@ python examples\band_pitch_convergence.py           # band-pitch convergence tab
 python examples\solve_speed.py [screening|full]     # time cold and warm solves with both solvers
 python examples\build_map_8_6.py [workers] [solver] # build and time the 8/6 screening map (I_max 20 A)
 python examples\fidelity_8_6.py                     # screening-vs-full fidelity on 4 variants of the 8/6 (about 45 min)
-python examples\v0_search.py [n_candidates] [shortlist]   # requirements-driven search on a small budget (set PYTHONPATH=tests)
+python examples\v0_search.py [n_candidates] [shortlist]   # requirements-driven search on a small budget
 python examples\v0_grid_study.py                            # reduced map grids against the 12 x 8 screening map (set PYTHONPATH=tests)
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```

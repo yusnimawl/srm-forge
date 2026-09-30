@@ -151,4 +151,4 @@ Caveats:
 Open questions:
 - Stage-2 time per design is about 10x the 20 s budget in the v0 spec.
 - The stage-1 torque bound is optimistic against FEM.
-- Power ratios are low, possibly because the 3:1 constant-power range at 400 V limits the turns choice (unmeasured).
+- Power ratios are low. Analysis, not measurement: turns are sampled independently of bus voltage and max speed, and at fixed current density a turns change only rescales the same envelope in speed (flux linkage ~N, current ~1/N, resistance ~N^2), so a geometry may be fine with the wrong turn count. Choosing turns after the map is the follow-up (spec §9).

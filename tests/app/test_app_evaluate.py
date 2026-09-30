@@ -12,7 +12,7 @@ from srmapp.requirements import Requirements
 from srmapp.sizing.generator import Candidate
 from srmapp.sizing.stage1 import stage1
 from srmcore.model.design import Design, MeshSettings
-from srmcore.model.errors import MapFailed
+from srmcore.model.errors import InputError, MapFailed, MeshRejected, WorkerCrashed
 
 
 def _req(**kw):
@@ -76,3 +76,17 @@ def test_real_8_6_evaluation():
     assert e.status == "ok", e.error
     assert 1.0 < e.envelope.torque[0] < stage1(req, make_8_6()).torque_upper
     assert e.key is not None and e.key.peak_torque > 0
+
+
+@pytest.mark.parametrize("exc", [MeshRejected(["min angle"], None), InputError([]), WorkerCrashed([3]),
+                                 RuntimeError("boom"), ValueError("bad current")])
+def test_any_exception_from_build_map_becomes_a_failed_evaluation(exc):
+    with mock.patch("srmapp.evaluate.build_map", side_effect=exc):
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+    assert e.status == type(exc).__name__ and not e.feasible
+    assert math.isnan(e.torque_ratio) and e.envelope is None
+
+
+def test_keyboard_interrupt_is_not_swallowed():
+    with mock.patch("srmapp.evaluate.build_map", side_effect=KeyboardInterrupt), pytest.raises(KeyboardInterrupt):
+        evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
