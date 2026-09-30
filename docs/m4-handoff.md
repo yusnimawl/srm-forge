@@ -71,3 +71,24 @@ Remaining options to reach 30 s, owner decides:
 - coarser slot-air grading in the screening preset: slot_air plus rotor_slot_air hold 31.6k of the 85.7k triangles (M5 preset study).
 
 Carried into M4c: L_inc and ∂ψ/∂θ in the dataset; per-pole force arrays; inverse tables; overlap map and coupling check; standard results and key numbers; LUT exports (CSV, .mat); the §7.3 checks; the screening-vs-full fidelity check (within 3 %, Spearman ρ >= 0.95); non-A excitation (needs the aligned angle per phase); the map open items in spec §10.
+
+## M4c: fidelity and full-map checks
+
+Run: `examples/fidelity_8_6.py` (4 variants of the example 8/6, I_max 20 A, ngsolve, default workers), 2752 s wall for 8 maps. Tolerances unchanged (rel. error <= 3 %, Spearman >= 0.95).
+
+| stator/rotor arc | la | lu | peak_torque | psi_max |
+|---|---|---|---|---|
+| 18/22 | 2.59 % | 0.07 % | 6.67 % | 0.02 % |
+| 20/22 | 2.83 % | 0.07 % | 3.23 % | 0.04 % |
+| 22/24 | 3.00 % | 0.09 % | 1.22 % | 0.03 % |
+| 20/24 | 2.79 % | 0.08 % | 1.70 % | 0.04 % |
+| Spearman | 1.000 | 1.000 | -0.400 | 1.000 |
+
+**Fidelity: FAIL.** Peak torque is off by up to 6.67 % (3.23 % on the base design) and ranks the designs wrongly (rho -0.4); `la` sits at the 3 % limit (3.00 % is the worst, the check is `<= 0.03` on the unrounded value). `lu` and `psi_max` are well inside. Screening is not a reliable torque guide on this mesh; the cause is not investigated.
+
+Wall times per map (default workers): screening 53-69 s (64 points, budget 30 s: missed); `full` 520, 719, 717, 552 s (600 points, budget 5 min = 300 s: missed on all four).
+
+Checks on the base design's (20/22) cached `full` 30x20 map:
+- `analyse_map`: passes; `iron_b_peak` warns (1.481 x Js against 1.15).
+- `fem_checks` wall 33 s against the 7 min "full extras" budget: met.
+- `held_out_psi` 5.7e-4 (limit 5e-3): pass. `held_out_torque` 0.0211 (limit 0.01): **FAIL**. `band_radius` 8.2e-4 (limit 0.01): pass.
