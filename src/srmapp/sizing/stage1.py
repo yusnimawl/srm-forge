@@ -1,6 +1,6 @@
 """Stage 1: closed-form filter that drops designs that cannot meet the requirements even under optimistic
-assumptions (v0 spec §4.3). The torque bound is an upper bound on purpose, so the filter never drops a design
-the FEM stage would keep."""
+assumptions (v0 spec §4.3). The torque bound is deliberately optimistic; its false-drop rate is checked against
+stage 2 later."""
 import math
 from dataclasses import dataclass
 
@@ -10,17 +10,20 @@ from srmcore.model.design import RadialSRMParams
 from ..requirements import Requirements
 from .estimates import J_PEAK, Mass, active_mass, peak_current, pole_chord
 
+# Allowance on the saturation flux for mu0*H beyond Js and fringing.
+FLUX_ALLOWANCE = 1.1
+
 
 def torque_upper_bound(p: RadialSRMParams, i_peak: float) -> float:
-    """Average torque (N·m) if every stroke converted the full rectangle ψ_sat·i_peak: the pole flux saturates at
-    the material's saturation polarisation in the narrower of the stator and rotor poles, and the phase carries
-    turns_per_pole × poles-per-phase series turns. Each of the m·Nr strokes per revolution converts one rectangle."""
-    stator, rotor = load_material(p.materials.stator), load_material(p.materials.rotor)
-    b_sat = min(stator.saturation_polarisation, rotor.saturation_polarisation)
-    pole_width = min(pole_chord(p.bore_radius, p.stator_pole_arc), pole_chord(p.rotor_outer_radius, p.rotor_pole_arc))
-    pole_area = pole_width * p.stack_length * min(stator.stacking_factor, rotor.stacking_factor)
+    """Upper bound on the revolution-average torque (N·m) if every stroke converted the full rectangle
+    ψ_sat·i_peak. The flux linking the coil is bounded by the stator pole body saturating at the stator material's
+    saturation polarisation, taken at the bore chord (pole taper is ignored; the generator uses zero taper), and the
+    phase carries turns_per_pole × poles-per-phase series turns. Each of the m·Nr strokes per revolution converts
+    one rectangle."""
+    stator = load_material(p.materials.stator)
+    pole_area = pole_chord(p.bore_radius, p.stator_pole_arc) * p.stack_length * stator.stacking_factor
     series_turns = p.turns_per_pole * p.n_stator_poles / p.n_phases
-    psi_sat = series_turns * b_sat * pole_area
+    psi_sat = FLUX_ALLOWANCE * series_turns * stator.saturation_polarisation * pole_area
     return p.n_phases * p.n_rotor_poles * psi_sat * i_peak / (2 * math.pi)
 
 
