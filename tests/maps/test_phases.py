@@ -23,8 +23,6 @@ def test_every_phase_is_symmetric_to_phase_a():
         theta = aligned_angle(DESIGN.machine, letter)
         aligned = solve_point(static, DESIGN, theta, {letter: 10.0}, solver)
         off = solve_point(static, DESIGN, theta + TAU / 4, {letter: 10.0}, solver)
-        print(letter, aligned.torque_arkkio / off.torque_arkkio, aligned.psi[k] / ref.psi[0] - 1,
-              off.torque_arkkio / quarter.torque_arkkio - 1)
         assert abs(aligned.torque_arkkio) < 0.01 * abs(off.torque_arkkio)
         assert aligned.psi[k] == pytest.approx(ref.psi[0], rel=1e-3)
         assert off.torque_arkkio == pytest.approx(quarter.torque_arkkio, rel=1e-3)

@@ -69,9 +69,9 @@ def solve_job(job) -> dict:
 
 
 def apply_failure_policy(result: MapResult, aligned: float, tau: float, atol: float = 1e-9) -> MapResult:
-    """`aligned` is the aligned angle of the excited phase; angles are compared with it modulo the rotor pole
-    pitch `tau`, within `atol`. Interpolate isolated NONCONVERGED points along current (PCHIP) and flag them, or raise MapFailed
-    when more than 2 % of the points fail or the aligned angle or I_max has a failure."""
+    """`aligned` is the aligned angle of the excited phase; angles are compared with it modulo the rotor
+    pole pitch `tau`, within `atol`. Interpolate isolated NONCONVERGED points along current (PCHIP) and
+    flag them, or raise MapFailed when more than 2 % of the points fail or the aligned angle or I_max has a failure."""
     failed = result.status == STATUS_NONCONVERGED
     n_failed = int(failed.sum())
     if n_failed == 0:
@@ -101,13 +101,6 @@ _WORKER: dict = {}
 
 def _init_worker(static, design, solver_name, threads) -> None:
     _WORKER.update(static=static, design=design, solver=make_solver(solver_name, threads))
-
-
-def check_excited(excited: str) -> None:
-    # Only phase A is aligned at θ = 0; the aligned angle of the other phases is not derived, so the
-    # aligned-position check of the failure policy would be wrong for them.
-    if excited != "A":
-        raise ValueError(f"excited circuit {excited!r} is not supported yet: only phase A is aligned at θ=0")
 
 
 def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, solver_name: str = "ngsolve",

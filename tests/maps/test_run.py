@@ -124,11 +124,11 @@ def test_unknown_phase_is_rejected(monkeypatch):
 
 def test_failure_policy_checks_the_aligned_angle_of_the_excited_phase(monkeypatch):
     _fake(monkeypatch, failing={(0, 3)})
-    monkeypatch.setattr(run, "aligned_angle", lambda machine, excited: 0.0 if excited == "A" else ANGLES[0])
+    monkeypatch.setattr(run, "aligned_angle", lambda *a: 0.0)
     # phase A: angle 0 is aligned, so the failure there is fatal; a phase aligned at ANGLES[5] fills it instead
     with pytest.raises(MapFailed, match="aligned"):
         _run(excited="A")
-    monkeypatch.setattr(run, "aligned_angle", lambda machine, excited: ANGLES[5])
+    monkeypatch.setattr(run, "aligned_angle", lambda *a: ANGLES[5])
     r = _run(excited="B")
     assert r.excited == "B" and r.filled[0, 3] and r.filled.sum() == 1
 
