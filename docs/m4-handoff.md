@@ -36,10 +36,11 @@ Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc 
 | baseline (residual assembled in NGSolve) | 9 s | 11 | not measured |
 | numpy secant residual | 5.3 s | 11 | 26 it, 11.9 s |
 | final run | 4.5–5.0 s (range over runs 4.5–5.3 s) | 11 | 26 it, 10.3 s |
+| numpy tangent into NGSolve CSR, bulk netgen mesh | 2.0–2.5 s (three runs, first call includes the discretisation build) | 11 | 26 it, 4.7–5.0 s |
 
 skfem_reference for comparison: cold 4.5–6.2 s (11 it), sweep 26 it, 9–12 s.
 
-Gate (cold 20 A at θ = 0 in 4 s or less): **not met** on NGSolve.
+Gate (cold 20 A at θ = 0 in 4 s or less): **met** on NGSolve after the numpy tangent (2.0–2.5 s); before it, not met (4.5–5.3 s).
 
 Remaining options, owner decides for M4b:
 - structured air-gap meshing to cut DOF;

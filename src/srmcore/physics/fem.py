@@ -32,3 +32,13 @@ def secant_residual(grads: np.ndarray, areas: np.ndarray, triangles: np.ndarray,
     ga = np.einsum("eik,ei->ek", grads, a[triangles])
     contribution = (nu * areas)[:, None] * np.einsum("eik,ek->ei", grads, ga)
     return np.bincount(triangles.ravel(), weights=contribution.ravel(), minlength=len(a))
+
+
+def tangent_element_matrices(grads: np.ndarray, areas: np.ndarray, triangles: np.ndarray, nu: np.ndarray,
+                             dnu: np.ndarray, a: np.ndarray) -> np.ndarray:
+    """Element tangent matrices (n_elements, 3, 3) per unit depth for element-constant ν and dν/dB²:
+    K_e[i, j] = area·(ν·∇φ_i·∇φ_j + 2·dν/dB²·(∇φ_i·∇A)(∇φ_j·∇A)), with |B| = |∇A| as in `secant_residual`."""
+    ga = np.einsum("eik,ei->ek", grads, a[triangles])
+    gg = np.einsum("eik,ejk->eij", grads, grads)
+    gd = np.einsum("eik,ek->ei", grads, ga)
+    return areas[:, None, None] * (nu[:, None, None] * gg + 2 * dnu[:, None, None] * gd[:, :, None] * gd[:, None, :])

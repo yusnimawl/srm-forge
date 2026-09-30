@@ -1,5 +1,6 @@
-"""NGSolve adapter: the tangent and load are assembled in NGSolve, the secant residual is
-`physics.fem.secant_residual` (numpy), and the solves use umfpack. Newton with the consistent Jacobian
+"""NGSolve adapter: the secant residual and the tangent element matrices are numpy
+(`physics.fem.secant_residual`, `physics.fem.tangent_element_matrices`). NGSolve supplies the sparsity
+pattern (the tangent values are scattered into its matrix), the load, and the umfpack solves. Newton with the consistent Jacobian
 ν·I + 2·dν/d(B²)·B⊗B, backtracking line search, and the fallback chain damped → current ramp →
 NONCONVERGED (spec §6).
 
@@ -9,13 +10,13 @@ from dataclasses import dataclass
 
 import ngsolve as ng
 import numpy as np
-from netgen.meshing import Element2D, FaceDescriptor, MeshPoint, Pnt
+from netgen.meshing import FaceDescriptor
 from netgen.meshing import Mesh as NetgenMesh
 
 from ..fields.solution import FieldSolution, SolveStatus
 from ..materials.laws import LinearLaw
 from ..physics.energy import field_energies
-from ..physics.fem import element_flux_density, p1_gradients, secant_residual
+from ..physics.fem import element_flux_density, p1_gradients, secant_residual, tangent_element_matrices
 from ..physics.problem import Magnetostatic2D
 from .settings import ELEMENT_ORDER, QUADRATURE_ORDER, NewtonSettings
 
@@ -30,18 +31,17 @@ def _netgen_mesh(nodes: np.ndarray, triangles: np.ndarray) -> ng.Mesh:
     det = (x[:, 1] - x[:, 0]) * (y[:, 2] - y[:, 0]) - (x[:, 2] - x[:, 0]) * (y[:, 1] - y[:, 0])
     oriented = np.where((det < 0)[:, None], triangles[:, [0, 2, 1]], triangles)
     mesh = NetgenMesh(dim=2)
-    points = [mesh.Add(MeshPoint(Pnt(float(px), float(py), 0.0))) for px, py in nodes]
-    face = mesh.Add(FaceDescriptor(surfnr=1, domin=1, bc=1))
-    for tri in oriented:
-        mesh.Add(Element2D(face, [points[i] for i in tri]))
+    mesh.AddPoints(np.column_stack([nodes, np.zeros(len(nodes))]))
+    mesh.Add(FaceDescriptor(surfnr=1, domin=1, bc=1))
+    mesh.AddElements(dim=2, index=1, data=np.ascontiguousarray(oriented, dtype=np.int32), base=0)
     return ng.Mesh(mesh)
 
 
 class _Discretisation:
     """NGSolve spaces and forms for one mesh. The triangle rule is pinned to QUADRATURE_ORDER, the same as
     the scikit-fem reference. ν, dν/dB² and J are element-constant (order-0 L2) and P1 gradients are
-    constant, so the integrals are exact at that order anyway. Only the tangent is assembled in NGSolve;
-    the secant residual is `physics.fem.secant_residual`."""
+    constant, so the integrals are exact at that order anyway. The tangent form is assembled once to fix
+    the sparsity pattern; afterwards `set_tangent` writes numpy element matrices into its value array."""
 
     def __init__(self, nodes: np.ndarray, triangles: np.ndarray):
         self.nodes, self.triangles = nodes, triangles
@@ -61,6 +61,27 @@ class _Discretisation:
                          + 2 * self.dnu * (ng.grad(trial) * grad_a) * (ng.grad(test) * grad_a)) * dx
         self.load = ng.LinearForm(space)
         self.load += self.j * test * dx
+        self._scatter = self._scatter_index()
+
+    def _scatter_index(self) -> np.ndarray:
+        """Position in the tangent's value array of every element entry (e, i, j), in C order."""
+        self.tangent.Assemble()
+        _, cols, rowptr = self.tangent.mat.CSR()
+        cols, rowptr = np.asarray(cols, dtype=np.int64), np.asarray(rowptr, dtype=np.int64)
+        n = len(self.nodes)
+        keys = np.repeat(np.arange(n, dtype=np.int64), np.diff(rowptr)) * n + cols
+        tri = self.triangles.astype(np.int64)
+        wanted = (tri[:, :, None] * n + tri[:, None, :]).ravel()
+        pos = np.searchsorted(keys, wanted)
+        if np.any(pos >= len(keys)) or np.any(keys[np.minimum(pos, len(keys) - 1)] != wanted):
+            raise RuntimeError("tangent sparsity pattern misses element entries")
+        return pos
+
+    def set_tangent(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray) -> None:
+        """Fill the tangent matrix with the numpy element matrices at A (no NGSolve assembly)."""
+        k = tangent_element_matrices(self.grads, self.areas, self.triangles, nu, dnu, a)
+        values = self.tangent.mat.AsVector().FV().NumPy()
+        values[:] = np.bincount(self._scatter, weights=k.ravel(), minlength=len(values))
 
     def matches(self, problem: Magnetostatic2D) -> bool:
         return (problem.nodes is self.nodes or np.array_equal(problem.nodes, self.nodes)) and (
@@ -74,10 +95,9 @@ class _System:
         self.problem, self.disc = problem, disc
         self.n = len(problem.nodes)
         self.free = np.setdiff1d(np.arange(self.n), problem.dirichlet_nodes)
-        self.freedofs = ng.BitArray(self.n)
-        self.freedofs.Clear()
-        for i in self.free:
-            self.freedofs.Set(int(i))
+        mask = np.ones(self.n, dtype=bool)
+        mask[problem.dirichlet_nodes] = False
+        self.freedofs = ng.BitArray(mask.tolist())
         self.groups = [(law, np.flatnonzero(problem.element_law == k)) for k, law in enumerate(problem.laws)]
         self.linear = all(isinstance(law, LinearLaw) for law in problem.laws)
 
@@ -94,19 +114,13 @@ class _System:
             nu[idx], dnu[idx] = law.nu_dnu(b2[idx])
         return b, nu, dnu
 
-    def _bind(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray) -> None:
-        self.disc.nu.vec.FV().NumPy()[:] = nu
-        self.disc.dnu.vec.FV().NumPy()[:] = dnu
-        self.disc.u.vec.FV().NumPy()[:] = a
-
     def residual(self, a: np.ndarray, f: np.ndarray):
         _, nu, dnu = self.material(a)
         r = secant_residual(self.disc.grads, self.disc.areas, self.disc.triangles, nu, a)
         return r - f, nu, dnu
 
     def solve_tangent(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray, rhs: np.ndarray) -> np.ndarray:
-        self._bind(a, nu, dnu)
-        self.disc.tangent.Assemble()
+        self.disc.set_tangent(a, nu, dnu)
         inverse = self.disc.tangent.mat.Inverse(self.freedofs, inverse="umfpack")
         b = ng.BaseVector(self.n)
         b.FV().NumPy()[:] = rhs
@@ -167,8 +181,7 @@ class NgsolveAdapter:
         system = self._bind(problem)
         a = np.asarray(a, float)
         _, nu, dnu = system.material(a)
-        system._bind(a, nu, dnu)
-        system.disc.tangent.Assemble()
+        system.disc.set_tangent(a, nu, dnu)
         inverse = system.disc.tangent.mat.Inverse(system.freedofs, inverse="umfpack")
         m = len(problem.winding.circuits)
         out = np.zeros((system.n, m))
