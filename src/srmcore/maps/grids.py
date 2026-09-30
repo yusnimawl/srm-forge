@@ -33,4 +33,8 @@ def aligned_angle(machine: RadialSRMParams, excited: str) -> float:
     stroke angle ε = 2π/(m·Nr) and rotor pole pitch τ = 2π/Nr."""
     tau = 2 * math.pi / machine.n_rotor_poles
     eps = tau / machine.n_phases
-    return (("ABCDEFGH".index(excited)) * eps) % tau
+    k = ord(excited) - ord("A") if len(excited) == 1 else -1
+    if not 0 <= k < machine.n_phases:
+        last = chr(ord("A") + machine.n_phases - 1)
+        raise ValueError(f"phase {excited!r} is not a phase of this machine (A..{last})")
+    return (k * eps) % tau

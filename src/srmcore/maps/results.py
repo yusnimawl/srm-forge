@@ -13,8 +13,8 @@ from .tables import angle_spline
 
 @dataclass(frozen=True)
 class KeyNumbers:
-    la: float               # aligned secant inductance ψ/i at I_max, H
-    lu: float               # unaligned secant inductance at the same current, H
+    la: float               # aligned secant inductance ψ/i at the lowest non-zero grid current, H
+    lu: float               # unaligned secant inductance at the lowest non-zero grid current, H
     la_lu: float
     peak_torque: float      # max |Arkkio torque| over the grid, N·m
     psi_max: float          # excited ψ at the aligned angle and I_max, Wb-turns
@@ -32,7 +32,10 @@ def key_numbers(result: MapResult, machine: RadialSRMParams) -> KeyNumbers:
     i_max = float(result.currents[-1])
     e = result.circuits.index(result.excited)
     i_lo = float(result.currents[1])
-    at = lambda k: angle_spline(result.angles, result.psi[:, k, e], tau)([th_a, th_u])
+
+    def at(k):
+        return angle_spline(result.angles, result.psi[:, k, e], tau)([th_a, th_u])
+
     (lo_a, lo_u), (hi_a, _) = at(1), at(-1)
     return KeyNumbers(lo_a / i_lo, lo_u / i_lo, lo_a / lo_u, float(np.max(np.abs(result.torque_arkkio))),
                       float(hi_a), i_max, th_a, th_u)

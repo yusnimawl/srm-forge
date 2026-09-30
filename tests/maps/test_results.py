@@ -22,6 +22,12 @@ def test_aligned_angle(machine, expected):
     assert got == pytest.approx([D(x) for x in expected])
 
 
+def test_aligned_angle_rejects_unknown_phase():
+    for bad in ("E", "AB", "", "a"):
+        with pytest.raises(ValueError, match="not a phase"):
+            aligned_angle(make_8_6(), bad)
+
+
 def test_key_numbers_linear_map():
     r = synthetic_map()
     k = key_numbers(r, make_8_6())
@@ -61,3 +67,8 @@ def test_key_numbers_use_lowest_current_when_saturating():
     assert k.psi_max == pytest.approx(0.05 * np.tanh((L0 + L1) * 20 / 0.05), rel=1e-12)
     assert abs(k.psi_max / 20 - k.la) > 0.05 * k.la  # I_max secant would differ
     assert k.la_lu == pytest.approx(k.la / k.lu)
+
+
+def test_inductance_curves_rejects_zero_current():
+    with pytest.raises(ValueError):
+        inductance_curves(synthetic_map(), [0.0])
