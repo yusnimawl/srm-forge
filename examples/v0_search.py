@@ -2,7 +2,7 @@
 
     PYTHONPATH=tests python examples/v0_search.py [n_candidates] [shortlist]
 
-Peak-only and unvalidated. Stage 2 takes tens of seconds per design."""
+Peak-only and unvalidated. Stage 2 takes about 200 s per design."""
 import sys
 import time
 

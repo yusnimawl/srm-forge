@@ -137,3 +137,18 @@ Example 8/6, `screening` mesh, I_max 20 A, relative error against the 12 x 8 map
 ```
 
 Chosen stage-2 grid: 12 x 5 (`StageTwoGrid` default).
+
+Caveats:
+- The 12 x 8 reference shares its angle set with 12 x 5 and 12 x 6 (`angle_grid` depends only on the angle count), so their errors are current-interpolation error only; 0.00 % at T_peak and T@300 is by construction.
+- Going from 12 to 10 angles at equal current count moves the envelope torque by 10 to 35 %, so the drive-model result is strongly sensitive to the angle count.
+- 11 x N and 12 x 4 were not tried.
+- A check of the 12-angle map against a 24 or 30 angle reference is open.
+
+### v0a search run
+
+`v0_search.py 24 6` (10 kW, 32 N.m, 3000 to 9000 rpm, 400 V, 20 A/mm2): sampled 24, dropped validator 2 / fit 3, stage 1 rejected 6, evaluated 6 in 1178 s (about 200 s per design). All six status ok; 0 of 6 feasible. Torque ratios 0.02 to 1.82, power ratios 0.01 to 0.56.
+
+Open questions:
+- Stage-2 time per design is about 10x the 20 s budget in the v0 spec.
+- The stage-1 torque bound is optimistic against FEM.
+- Power ratios are low because the 3:1 constant-power range at 400 V limits the turns choice.

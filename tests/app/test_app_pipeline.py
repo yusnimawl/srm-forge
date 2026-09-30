@@ -1,8 +1,6 @@
 from unittest import mock
 
 import numpy as np
-import pytest
-from conftest import make_8_6
 
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
@@ -47,12 +45,12 @@ def test_cancel_returns_partial_results():
 
     def cancel():
         calls["n"] += 1
-        return calls["n"] > 2
+        return calls["n"] > 3   # pre-check, then the fake's own poll for design 1; design 2 is cancelled mid-evaluation
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         res = run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                          SearchSettings(n_candidates=12, shortlist=6, seed=1), cancel=cancel)
     assert res.cancelled
-    assert 0 < len(res.evaluations) < 6
+    assert len(res.evaluations) == 1
     assert all(e.status == "ok" for e in res.evaluations)
 
 

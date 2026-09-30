@@ -2,7 +2,7 @@
 
     PYTHONPATH=tests python examples/v0_grid_study.py
 
-Prints the relative error of peak torque, La and the low-speed envelope torque, and the wall time per grid."""
+Prints the relative error of peak torque, La and the envelope torque at 300, 3000 and 9000 rpm, and the wall time per grid."""
 import time
 
 from conftest import make_8_6
@@ -11,6 +11,10 @@ from srmapp.drive.envelope import envelope
 from srmcore.maps import build_map
 from srmcore.maps.results import key_numbers
 from srmcore.model.design import Design, MeshSettings
+
+# Test-drive parameters for the envelope comparison (not a design point).
+V_DC = 400.0   # V
+R_PHASE = 0.1  # ohm
 
 GRIDS = [(12, 8), (8, 4), (10, 5), (10, 6), (12, 5), (12, 6)]
 
@@ -23,7 +27,7 @@ if __name__ == "__main__":
         r = build_map(design, 20.0, n_angles=n_a, n_currents=n_i)
         wall = time.perf_counter() - t0
         k = key_numbers(r, machine)
-        env = envelope(r, machine, 400.0, 0.1, [300.0, 3000.0, 9000.0])
+        env = envelope(r, machine, V_DC, R_PHASE, [300.0, 3000.0, 9000.0])
         rows[(n_a, n_i)] = (k.peak_torque, k.la, *env.torque, wall)
     ref = rows[GRIDS[0]]
     print(f"{'grid':>8}{'T_peak':>9}{'La':>9}{'T@300':>9}{'T@3000':>9}{'T@9000':>9}{'wall s':>8}   (rel. error vs 12x8)")

@@ -21,7 +21,7 @@ _NAN = float("nan")
 
 @dataclass(frozen=True)
 class StageTwoGrid:
-    """Reduced map grid. Provisional until measured against the `screening` map (examples/v0_grid_study.py)."""
+    """Reduced map grid. The default 12 x 5 was chosen from the v0a grid study in docs/m4-handoff.md."""
     n_angles: int = 12
     n_currents: int = 5
 
