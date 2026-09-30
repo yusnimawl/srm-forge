@@ -8,6 +8,12 @@ from ..physics.problem import Magnetostatic2D
 from .quantities import _MIDPOINTS
 
 
+def _pole_index(angle: np.ndarray, n_poles: int) -> np.ndarray:
+    """Pole whose sector [k·2π/Ns - π/Ns, k·2π/Ns + π/Ns) contains `angle`."""
+    pitch = 2 * np.pi / n_poles
+    return np.floor((angle + pitch / 2) / pitch).astype(int) % n_poles
+
+
 def pole_forces(problem: Magnetostatic2D, solution: FieldSolution, n_stator_poles: int) -> np.ndarray:
     """Net force vector on stator pole k, N, stack length included, in the pole's radial/tangential frame
     at φ_k = k·2π/Ns: [radial outward, tangential counter-clockwise].
@@ -22,7 +28,7 @@ def pole_forces(problem: Magnetostatic2D, solution: FieldSolution, n_stator_pole
     corners = problem.nodes[tri]                                       # (n, 3, 2)
     pitch = 2 * np.pi / n_stator_poles
     centroid = corners.mean(axis=1)
-    pole = np.floor((np.arctan2(centroid[:, 1], centroid[:, 0]) + pitch / 2) / pitch).astype(int) % n_stator_poles
+    pole = _pole_index(np.arctan2(centroid[:, 1], centroid[:, 0]), n_stator_poles)
     bx, by = solution.b[el, 0], solution.b[el, 1]
     fx, fy = np.zeros(len(el)), np.zeros(len(el))
     for weights in _MIDPOINTS:

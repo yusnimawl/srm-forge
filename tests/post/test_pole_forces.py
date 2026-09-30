@@ -6,11 +6,11 @@ import pytest
 
 from conftest import make_8_6
 from srmcore.mesh import build_machine_mesh, mesh_at_angle
+from srmcore.model.constants import MU0
 from srmcore.model.design import Design, MeshSettings
 from srmcore.physics.build import machine_problem
-from srmcore.model.constants import MU0
 from srmcore.physics.fem import triangle_areas
-from srmcore.post.forces import pole_forces
+from srmcore.post.forces import _pole_index, pole_forces
 from srmcore.post.quantities import _MIDPOINTS, arkkio_torque
 from srmcore.solvers.skfem_reference import SkfemReference
 
@@ -29,6 +29,19 @@ def _solve(static, degrees, amps):
     return p, SkfemReference().solve(p)
 
 
+def _net(f):
+    """Sum of the pole force vectors in x-y, from the pole-frame [radial, tangential] rows."""
+    phi = np.arange(len(f)) * 2 * np.pi / len(f)
+    return np.array([np.sum(f[:, 0] * np.cos(phi) - f[:, 1] * np.sin(phi)),
+                     np.sum(f[:, 0] * np.sin(phi) + f[:, 1] * np.cos(phi))])
+
+
+def test_sector_binning():
+    d = 1e-6
+    angles = np.array([-np.pi / 8 + d, -np.pi / 8 - d, np.pi, 0.0, np.pi / 8 + d])
+    assert _pole_index(angles, 8).tolist() == [0, 7, 4, 0, 1]
+
+
 def test_zero_current_gives_zero_force(static):
     p, s = _solve(static, 0.0, 0.0)
     assert pole_forces(p, s, NS).shape == (NS, 2) and not np.any(pole_forces(p, s, NS))
@@ -37,17 +50,16 @@ def test_zero_current_gives_zero_force(static):
 def test_partially_aligned_pole_is_pulled_towards_the_rotor_pole(static):
     p, s = _solve(static, 10.0, 20.0)
     f = pole_forces(p, s, NS)
-    print("pole 0 force at 10 deg, 20 A (N):", f[0].tolist(), "torque", arkkio_torque(p, s))
     assert arkkio_torque(p, s) < 0                    # the rotor is pulled back towards alignment
     assert f[0, 1] > 0.01 * abs(f[0, 0])              # the reaction pulls the stator pole counter-clockwise
 
 
 def test_pole_vectors_sum_to_minus_the_rotor_force(static):
+    """Bookkeeping check, not independent physics: every band element is binned once and the pole-frame
+    rotation round-trips, so the pole vectors add up to the whole-band force."""
     p, s = _solve(static, 10.0, 20.0)
     f = pole_forces(p, s, NS)
-    phi = np.arange(NS) * 2 * np.pi / NS
-    net = np.array([np.sum(f[:, 0] * np.cos(phi) - f[:, 1] * np.sin(phi)),
-                    np.sum(f[:, 0] * np.sin(phi) + f[:, 1] * np.cos(phi))])
+    net = _net(f)
     el = p.band.elements
     tri = p.triangles[el]
     corners = p.nodes[tri]
@@ -68,10 +80,7 @@ def test_pole_vectors_sum_to_minus_the_rotor_force(static):
 def test_aligned_pole_pulls_radially_and_the_net_force_cancels(static):
     p, s = _solve(static, 0.0, 20.0)
     f = pole_forces(p, s, NS)
-    print("pole forces at 0 deg, 20 A (N):", f.tolist())
     assert f[0, 0] < 0
-    phi = np.arange(NS) * 2 * np.pi / NS
-    net = np.array([np.sum(f[:, 0] * np.cos(phi) - f[:, 1] * np.sin(phi)),
-                    np.sum(f[:, 0] * np.sin(phi) + f[:, 1] * np.cos(phi))])
+    net = _net(f)
     assert np.hypot(*net) < 1e-3 * abs(f[0, 0])
     assert abs(f[0, 1]) < 0.01 * abs(f[0, 0])

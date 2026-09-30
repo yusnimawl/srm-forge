@@ -57,6 +57,7 @@ Remaining options, owner decides for M4b:
 | 8 | 50.4 s | 0.79 s | 0..14 | 0 |
 | 4, per-point jobs + numpy tangent | 51.3 s | 0.80 s | 0..14 | 0 |
 | 8, per-point jobs + numpy tangent | 45.9 s | 0.72 s | 0..14 | 0 |
+| 8, + L_inc and pole forces per point | 51.6 s | 0.81 s | 0..14 | 0 |
 
 The last two rows use one pool job per (angle, current) point, highest current first, and the numpy tangent. The 30 s budget is **still not met**: per-solve time, (wall - mesh) x workers / 64, is about 5.2 s at 8 workers and 6.4 s at 4 against 2.0-2.5 s for a single-process cold solve, so the pool run is dominated by per-worker slowdown under contention (and worker start-up), not by load balance.
 
