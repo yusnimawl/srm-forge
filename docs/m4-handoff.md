@@ -84,7 +84,7 @@ Run: `examples/fidelity_8_6.py` (4 variants of the example 8/6, I_max 20 A, ngso
 | 20/24 | 2.79 % | 0.08 % | 1.70 % | 0.04 % |
 | Spearman | 1.000 | 1.000 | -0.400 | 1.000 |
 
-**Fidelity: FAIL.** Peak torque is off by up to 6.67 % (3.23 % on the base design) and ranks the designs wrongly (rho -0.4); `la` sits at the 3 % limit (3.00 % is the worst, the check is `<= 0.03` on the unrounded value). `lu` and `psi_max` are well inside. Screening with 8 angles is not a reliable torque guide.
+**Fidelity: FAIL.** Peak torque is off by up to 6.67 % (3.23 % on the base design) and ranks the designs wrongly (rho -0.4); `la` sits at the 3 % limit (3.00 % is the worst, the check is `<= 0.03` on the unrounded value). `lu` and `psi_max` are well inside. Screening with 8 angles is not a reliable torque guide. The 53-69 s screening wall times in this run ran alongside other work; the reference screening timings are in the speed table (46-52 s on 8 workers).
 
 Cause, measured by rebuilding the screening maps with more angles (same screening mesh, 8 currents), rel. error against the `full` map:
 
