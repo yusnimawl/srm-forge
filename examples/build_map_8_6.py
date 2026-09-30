@@ -9,7 +9,7 @@ import time
 
 import numpy as np
 
-from srmcore.maps import build_map
+from srmcore.maps import analyse_map, build_map
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams
 
@@ -49,6 +49,14 @@ def main() -> None:
     unaligned = int(np.argmin(np.abs(r.angles - math.pi / machine.n_rotor_poles)))
     ratio = r.psi[0, 1, 0] / r.psi[unaligned, 1, 0]
     print(f"psi_aligned / psi_unaligned at {r.currents[1]:.3f} A: {ratio:.2f}")
+
+    report = analyse_map(r, design)
+    k = report.key_numbers
+    print(f"key numbers: La {k.la * 1e3:.3f} mH, Lu {k.lu * 1e3:.3f} mH, La/Lu {k.la_lu:.2f}, "
+          f"peak torque {k.peak_torque:.2f} N m, psi_max {k.psi_max:.4f} Wb-turns")
+    for c in report.checks:
+        print(f"  [{c.status:4s}] {c.name}: {c.value:.4g} (limit {c.limit:.4g})")
+    print("map ok" if report.ok else "map has failing checks")
 
 
 if __name__ == "__main__":       # spawn workers re-import this module

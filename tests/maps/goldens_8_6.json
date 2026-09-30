@@ -1,0 +1,28 @@
+{
+  "key_numbers": {
+    "la": 0.03168369735759341,
+    "lu": 0.003581094264752069,
+    "la_lu": 8.847490463864396,
+    "peak_torque": 12.03566766484486,
+    "psi_max": 0.32016946762935256,
+    "i_max": 20.0,
+    "aligned_angle": 0.0,
+    "unaligned_angle": 0.5235987755982988
+  },
+  "statuses": {
+    "coenergy_torque": "warn",
+    "arkkio_vs_nodal": "pass",
+    "energy_identity": "pass",
+    "loop_energy": "warn",
+    "zero_mean_torque": "pass",
+    "zero_torque_aligned_unaligned": "pass",
+    "sign_pattern": "pass",
+    "la_lu": "pass",
+    "dpsi_di_positive": "pass",
+    "psi_bound": "pass",
+    "psi_decreasing": "pass",
+    "la_analytic": "pass",
+    "lu_air_slot": "pass",
+    "iron_b_peak": "warn"
+  }
+}

@@ -92,3 +92,12 @@ Checks on the base design's (20/22) cached `full` 30x20 map:
 - `analyse_map`: passes; `iron_b_peak` warns (1.481 x Js against 1.15).
 - `fem_checks` wall 33 s against the 7 min "full extras" budget: met.
 - `held_out_psi` 5.7e-4 (limit 5e-3): pass. `held_out_torque` 0.0211 (limit 0.01): **FAIL**. `band_radius` 8.2e-4 (limit 0.01): pass.
+
+## M5 carry-in
+
+What M5 inherits from M4:
+- A working engine: `build_map`, `build_overlap_map`, `analyse_map`, exports, `fem_checks`, `fidelity_check`; goldens for the 8/6 screening map in `tests/maps/goldens_8_6.json`.
+- Open owner decisions (spec §10, "Open items after M4"): map speed against the 30 s and 300 s budgets, the failing screening fidelity check (preset refinement or a different rule), held-out torque on the default `full` grid, the provisional check limits.
+- Deferred: the saturation-knee-vs-Bsat check; reuse of the Newton factorisation for L_inc (about 0.15 s per point); temperature in the cache key; engine changes enter the cache key only through the srmcore version.
+- Iron B peaks above 1.15 Js on the example 8/6 (`iron_b_peak` warns); the material data behind that is provisional (spec §10).
+- M5 work: FEMM fixtures, TEAM 24 comparison, measured-data comparison, mesh-preset defaults from a convergence study (which also addresses the fidelity result), uncertainty budgets.
