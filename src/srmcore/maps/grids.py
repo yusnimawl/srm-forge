@@ -26,3 +26,11 @@ def angle_grid(machine: RadialSRMParams, band_divisions: int, n: int, cluster: f
 def current_grid(i_max: float, n: int, exponent: float = 2.0) -> np.ndarray:
     """n currents from 0 to i_max, denser at low current: i_max·(k/(n−1))^exponent."""
     return i_max * (np.arange(n) / (n - 1)) ** exponent
+
+
+def aligned_angle(machine: RadialSRMParams, excited: str) -> float:
+    """Rotor angle at which the excited phase is aligned: (k·ε) mod τ for phase letter index k (A = 0),
+    stroke angle ε = 2π/(m·Nr) and rotor pole pitch τ = 2π/Nr."""
+    tau = 2 * math.pi / machine.n_rotor_poles
+    eps = tau / machine.n_phases
+    return (("ABCDEFGH".index(excited)) * eps) % tau
