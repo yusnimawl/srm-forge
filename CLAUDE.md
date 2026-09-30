@@ -10,6 +10,8 @@ The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-d
 
 **Current state:** M1 (geometry and mesh), M2 (materials and nonlinear magnetostatics), M3 (NGSolve adapter go/no-go), M4a (`solve_point`), M4b (map grids, runner, HDF5 dataset and cache, process pool, `build_map`) and M4c (map products: tables, key numbers, §7.3 checks, exports, overlap map, held-out checks, fidelity check) are complete, so M4 is done; M5 (validation) is next and `project` is still an empty placeholder. A v0 end-to-end web path (requirements, candidates, Pareto plot) is designed in `docs/superpowers/specs/2026-09-30-v0-walking-skeleton-design.md` and is planned before M5. Speed: a cold `screening` solve at 20 A takes 2.0–2.5 s (gate 4 s met, numpy tangent). The owner decided the M4 open items (spec §11, 2026-09-30): the `screening` grid is 12 angles × 8 currents (peak torque within 0.24 % of `full`), the screening La tolerance is 5 %, the speed budgets are re-baselined to the laptop (`screening` < ~90 s, `full` < 13 min), and the held-out torque limit is 3 % (provisional until M5). See `docs/m4-handoff.md`. The owner accepted NGSolve as the primary solver (spec §11); `skfem_reference` stays as the independent cross-check.
 
+`src/srmapp/` holds the requirements-driven search (requirements, candidate generator, stage-1 filter, drive envelope, stage-2 evaluation, Pareto set); it imports `srmcore` public modules and `srmcore` never imports it (`tests/app/test_app_layering.py`).
+
 ## Commands
 
 The project needs Python 3.12 or newer. CI tests on 3.12 and 3.14, on both Windows and Linux. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
@@ -26,6 +28,8 @@ python examples\band_pitch_convergence.py           # band-pitch convergence tab
 python examples\solve_speed.py [screening|full]     # time cold and warm solves with both solvers
 python examples\build_map_8_6.py [workers] [solver] # build and time the 8/6 screening map (I_max 20 A)
 python examples\fidelity_8_6.py                     # screening-vs-full fidelity on 4 variants of the 8/6 (about 45 min)
+python examples\v0_search.py [n_candidates] [shortlist]   # requirements-driven search on a small budget (set PYTHONPATH=tests)
+python examples\v0_grid_study.py                            # reduced map grids against the 12 x 8 screening map (set PYTHONPATH=tests)
 python examples\team24_check.py                     # TEAM 24 static torque and current rise (needs the ngsolve extra)
 ```
 

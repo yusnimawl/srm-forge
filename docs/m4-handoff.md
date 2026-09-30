@@ -151,4 +151,4 @@ Caveats:
 Open questions:
 - Stage-2 time per design is about 10x the 20 s budget in the v0 spec.
 - The stage-1 torque bound is optimistic against FEM.
-- Power ratios are low because the 3:1 constant-power range at 400 V limits the turns choice.
+- Power ratios are low, possibly because the 3:1 constant-power range at 400 V limits the turns choice (unmeasured).
