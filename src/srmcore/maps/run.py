@@ -57,15 +57,24 @@ def require_complete(result: MapResult) -> None:
         raise ValueError("map is incomplete")
 
 
+def solve_currents_job(job) -> dict:
+    """One point solved in a worker: `job` is (angle, {circuit: current}). `l_inc` is the full
+    (n_circuits, n_circuits) ∂ψ/∂i, NaN where withheld."""
+    angle, currents = job
+    p = solve_point(_WORKER["static"], _WORKER["design"], angle, currents, _WORKER["solver"], with_l_inc=True)
+    n = len(p.circuits)
+    l_inc = np.full((n, n), np.nan) if p.l_inc is None else p.l_inc
+    return {"psi": p.psi, "torque_arkkio": p.torque_arkkio, "torque_virtual_work": p.torque_virtual_work,
+            "energy": p.energy, "coenergy": p.coenergy, "l_inc": l_inc, "pole_force": p.pole_force, "b_peak": p.b_peak,
+            "iterations": p.iterations, "status": _CODE[p.status], "circuits": p.circuits}
+
+
 def solve_job(job) -> dict:
     """One point of the map, solved in a worker: `job` is (angle, current, excited)."""
     angle, current, excited = job
-    p = solve_point(_WORKER["static"], _WORKER["design"], angle, {excited: current}, _WORKER["solver"],
-                    with_l_inc=True)
-    l_inc = np.full(len(p.circuits), np.nan) if p.l_inc is None else p.l_inc[:, p.circuits.index(excited)]
-    return {"psi": p.psi, "torque_arkkio": p.torque_arkkio, "torque_virtual_work": p.torque_virtual_work,
-            "energy": p.energy, "coenergy": p.coenergy, "l_inc": l_inc, "pole_force": p.pole_force, "b_peak": p.b_peak,
-            "iterations": p.iterations, "status": _CODE[p.status]}
+    row = solve_currents_job((angle, {excited: current}))
+    row["l_inc"] = row["l_inc"][:, row.pop("circuits").index(excited)]
+    return row
 
 
 def apply_failure_policy(result: MapResult, aligned: float, tau: float, atol: float = 1e-9) -> MapResult:

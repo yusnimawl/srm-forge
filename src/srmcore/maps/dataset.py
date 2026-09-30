@@ -11,6 +11,7 @@ import numpy as np
 from ..materials import library
 from ..model.design import Design
 from ..solvers.settings import SolverAdapter
+from .overlap import OverlapResult
 from .run import MapResult
 from .tables import dpsi_dtheta
 
@@ -87,4 +88,62 @@ def store_map(cache_dir, result: MapResult, prov: dict) -> Path | None:
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     path = _path(cache_dir, prov)
     write_map(path, result, prov)
+    return path
+
+
+_OVERLAP_DIMS = {"angles": ("angle",), "currents_a": ("current_a",), "currents_b": ("current_b",),
+                 "psi": ("angle", "current_a", "current_b", "circuit"),
+                 "torque_arkkio": ("angle", "current_a", "current_b"),
+                 "l_inc": ("angle", "current_a", "current_b", "row", "column"),
+                 "status": ("angle", "current_a", "current_b")}
+
+
+def overlap_provenance(design: Design, angles: np.ndarray, currents_a: np.ndarray, currents_b: np.ndarray,
+                       solver: SolverAdapter) -> dict:
+    prov = provenance(design, angles, currents_a, "AB", solver)
+    return {**prov, "overlap": True, "currents_b": np.asarray(currents_b, float).tolist()}
+
+
+def write_overlap(path, result: OverlapResult, prov: dict) -> None:
+    path = Path(path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    with h5py.File(tmp, "w") as f:
+        for name, dims in _OVERLAP_DIMS.items():
+            f.create_dataset(name, data=getattr(result, name)).attrs["dims"] = list(dims)
+        f.create_dataset("circuits", data=np.array(result.circuits, dtype="S"))
+        f.attrs.update(complete=result.complete, provenance=json.dumps(prov, sort_keys=True),
+                       hash=provenance_hash(prov))
+    os.replace(tmp, path)
+
+
+def read_overlap(path) -> tuple[OverlapResult, dict]:
+    with h5py.File(path, "r") as f:
+        arrays = {name: f[name][()] for name in _OVERLAP_DIMS}
+        circuits = tuple(c.decode() for c in f["circuits"][()])
+        result = OverlapResult(**arrays, circuits=circuits, complete=bool(f.attrs["complete"]))
+        return result, json.loads(f.attrs["provenance"])
+
+
+def _overlap_path(cache_dir, prov: dict) -> Path:
+    return Path(cache_dir) / f"overlap_{provenance_hash(prov)}.h5"
+
+
+def cached_overlap(cache_dir, prov: dict) -> OverlapResult | None:
+    path = _overlap_path(cache_dir, prov)
+    if not path.exists():
+        return None
+    try:
+        result, stored = read_overlap(path)
+    except (OSError, KeyError, ValueError):
+        return None
+    return result if result.complete and stored == prov else None
+
+
+def store_overlap(cache_dir, result: OverlapResult, prov: dict) -> Path | None:
+    """Only complete overlap maps are cached."""
+    if not result.complete:
+        return None
+    Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    path = _overlap_path(cache_dir, prov)
+    write_overlap(path, result, prov)
     return path
