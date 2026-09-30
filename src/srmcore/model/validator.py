@@ -1,13 +1,39 @@
 """Closed-form validation of designs and mesh settings (runs in milliseconds, before meshing)."""
 import math
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from .design import Design, MeshSettings, RadialSRMParams
 from .errors import InputError, ValidationIssue
 from .regions import REGION_SIZE_KEYS
 
-# Provisional floor for spec §4.2's minimum web/pole-tip-width rule; see spec §10 open items for
-# the final threshold (owner decision: absolute value and/or a multiple of lamination thickness).
+# Spec §4.2 minimum web/pole-tip width (owner decision, spec §11): max(MIN_WEB_WIDTH, 2 × lamination thickness).
 MIN_WEB_WIDTH = 1.0e-3
+WEB_LAMINATIONS = 2
+
+# Rules that validation reference machines may waive (spec §11): published machines that break them are still
+# built for comparison with their measurements. User designs never run inside `waive_rules`.
+WAIVABLE_RULES = frozenset({"self_starting"})
+_WAIVED: ContextVar[frozenset[str]] = ContextVar("waived_rules", default=frozenset())
+
+
+@contextmanager
+def waive_rules(*rules: str) -> Iterator[None]:
+    """Turn the named rule errors into warnings inside this context; only WAIVABLE_RULES may be waived."""
+    unknown = set(rules) - WAIVABLE_RULES
+    if unknown:
+        raise ValueError(f"rules {sorted(unknown)} cannot be waived (waivable: {sorted(WAIVABLE_RULES)})")
+    token = _WAIVED.set(_WAIVED.get() | frozenset(rules))
+    try:
+        yield
+    finally:
+        _WAIVED.reset(token)
+
+
+def min_web_width(p: RadialSRMParams) -> float:
+    lam = p.lamination_thickness
+    return MIN_WEB_WIDTH if lam is None else max(MIN_WEB_WIDTH, WEB_LAMINATIONS * lam)
 
 # Plausible ranges in metres; values outside almost always mean wrong units (mm instead of m).
 _UNIT_RANGES: dict[str, tuple[float, float]] = {
@@ -103,17 +129,18 @@ def validate_params(p: RadialSRMParams) -> list[ValidationIssue]:
     if p.stator_yoke_inner_radius <= p.bore_radius:
         issues.append(_err("stator_yoke_thickness", "radial_stack", "no room left for stator poles"))
 
+    web = min_web_width(p)
     for name in ("stator_yoke_thickness", "rotor_yoke_thickness"):
-        if 0 < getattr(p, name) < MIN_WEB_WIDTH:
-            issues.append(_err(name, "min_width", f"{getattr(p, name)} m < {MIN_WEB_WIDTH} m minimum web width"))
+        if 0 < getattr(p, name) < web:
+            issues.append(_err(name, "min_width", f"{getattr(p, name)} m < {web} m minimum web width"))
     stator_tip_chord = 2 * p.bore_radius * math.sin(p.stator_pole_arc / 2)
-    if stator_tip_chord < MIN_WEB_WIDTH:
+    if stator_tip_chord < web:
         issues.append(_err("stator_pole_arc", "min_width",
-                           f"pole-tip chord {stator_tip_chord} m < {MIN_WEB_WIDTH} m minimum width"))
+                           f"pole-tip chord {stator_tip_chord} m < {web} m minimum width"))
     rotor_tip_chord = 2 * p.rotor_outer_radius * math.sin(p.rotor_pole_arc / 2)
-    if rotor_tip_chord < MIN_WEB_WIDTH:
+    if rotor_tip_chord < web:
         issues.append(_err("rotor_pole_arc", "min_width",
-                           f"pole-tip chord {rotor_tip_chord} m < {MIN_WEB_WIDTH} m minimum width"))
+                           f"pole-tip chord {rotor_tip_chord} m < {web} m minimum width"))
 
     if p.n_phases >= 2 and p.n_rotor_poles >= 2:
         bs, br = p.stator_pole_arc, p.rotor_pole_arc
@@ -212,6 +239,9 @@ def validate_mesh_settings(s: MeshSettings, p: RadialSRMParams) -> list[Validati
 
 def require_valid(design: Design) -> list[ValidationIssue]:
     issues = validate_params(design.machine) + validate_mesh_settings(design.mesh, design.machine)
+    waived = _WAIVED.get()
+    issues = [ValidationIssue(i.parameter, i.rule, f"waived: {i.message}", "warning")
+              if i.severity == "error" and i.rule in waived else i for i in issues]
     if any(i.severity == "error" for i in issues):
         raise InputError(issues)
     return [i for i in issues if i.severity == "warning"]

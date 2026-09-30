@@ -144,7 +144,7 @@ def _map_checks(result: MapResult, design: Design, key: KeyNumbers | None) -> tu
     checks.append(Check("lu_air_slot", "pass" if np.isfinite(ratio) and ratio >= 1 else "fail", ratio, 1.0,
                         "Lu / Lu_est, Lu_est = p·N²·µ0·r·βs·L/(g + h_r); the air path is a lower bound"))
     b = float(np.max(result.b_peak)) / js
-    checks.append(_upper("iron_b_peak", b, 1.15, "peak iron |B| / Js", bad="warn"))
+    checks.append(_upper("iron_b_peak", b, 1.5, "peak iron |B| / Js", bad="warn"))
     return tuple(checks)
 
 

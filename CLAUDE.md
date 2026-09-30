@@ -101,4 +101,4 @@ Analytic test problems (the current-sheet toroid and MMS on the unit square) liv
 ## Conventions
 
 - Keep comments free of task or plan history. Comments should explain the code as it is now.
-- Open owner decisions are tracked in spec §10, for example whether the `self_starting` rule should be an error or a warning, and the provisional `MIN_WEB_WIDTH = 1e-3` m. Leave these behaviours unchanged unless the owner decides. Record decisions in spec §11.
+- Open owner decisions are tracked in spec §10; decisions go in spec §11. `self_starting` is a hard error for user designs; only validation reference machines may build inside `model.validator.waive_rules("self_starting")`. The minimum web width is max(1 mm, 2 × lamination thickness).

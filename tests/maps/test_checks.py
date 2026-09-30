@@ -131,7 +131,7 @@ def test_lu_air_slot_fails_below_estimate():
     assert c.status == "fail" and c.value == pytest.approx(0.5, rel=1e-2)
 
 
-def test_iron_b_peak_warns_above_1p15_js():
+def test_iron_b_peak_warns_above_1p5_js():
     assert by_name(good_map(b_peak=1.0))["iron_b_peak"].status == "pass"
     assert by_name(good_map(b_peak=5.0))["iron_b_peak"].status == "warn"
 
@@ -151,13 +151,10 @@ def test_analyse_map_requires_complete():
 
 
 @pytest.mark.slow
-def test_real_8_6_map_checks(tmp_path, capsys):
+def test_real_8_6_map_checks(tmp_path):
     from srmcore.maps import build_map
     r = build_map(DESIGN, 20.0, n_angles=8, n_currents=3, workers=4, cache_dir=tmp_path)
     rep = analyse_map(r, DESIGN)
-    with capsys.disabled():
-        for c in rep.checks:
-            print(f"CHECK {c.name:32s} {c.status:5s} value={c.value:.4g} limit={c.limit:.4g}")
     status = {c.name: c.status for c in rep.checks}
     assert len(rep.checks) == 14 and np.isfinite(r.b_peak).all()
     # 8 angles is below MIN_ANGLES_FOR_ENERGY_CHECKS, so the two energy checks warn instead of failing.

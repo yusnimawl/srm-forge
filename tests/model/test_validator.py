@@ -5,7 +5,8 @@ import pytest
 from conftest import make_8_6, make_12_8, make_24_16
 from srmcore.model.design import Design, EdgeRefinement, MeshSettings
 from srmcore.model.errors import InputError
-from srmcore.model.validator import MIN_WEB_WIDTH, require_valid, validate_mesh_settings, validate_params
+from srmcore.model.validator import (MIN_WEB_WIDTH, require_valid, validate_mesh_settings, validate_params,
+                                    waive_rules)
 
 
 def _errors(issues):
@@ -159,3 +160,27 @@ def test_require_valid_returns_warnings(srm_8_6):
     design = Design(machine=make_8_6(stator_pole_arc=math.radians(23.0), rotor_pole_arc=math.radians(21.0)))
     warnings = require_valid(design)
     assert [w.rule for w in warnings] == ["arc_order"]
+
+
+def test_min_web_width_grows_with_thick_laminations():
+    # 1.5 mm yoke: fine with a 0.5 mm lamination (floor 1 mm), too thin with 1 mm (2 × 1 mm = 2 mm).
+    assert _errors(validate_params(make_8_6(stator_yoke_thickness=1.5e-3, lamination_thickness=0.5e-3))) == set()
+    errors = _errors(validate_params(make_8_6(stator_yoke_thickness=1.5e-3, lamination_thickness=1e-3)))
+    assert ("stator_yoke_thickness", "min_width") in errors
+
+
+def test_waive_self_starting_for_reference_machines():
+    design = Design(machine=make_8_6(stator_pole_arc=math.radians(12.0)))
+    with pytest.raises(InputError):
+        require_valid(design)
+    with waive_rules("self_starting"):
+        warnings = require_valid(design)
+    assert "self_starting" in [w.rule for w in warnings]
+    with pytest.raises(InputError):                       # the waiver ends with the context
+        require_valid(design)
+
+
+def test_only_waivable_rules_can_be_waived():
+    with pytest.raises(ValueError, match="cannot be waived"):
+        with waive_rules("min_width"):
+            pass

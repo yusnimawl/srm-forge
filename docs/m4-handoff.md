@@ -20,7 +20,7 @@ Grids and fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc 
 - Import rules in `tests/test_import_rules.py`. `maps` may import all lower layers; only `solvers/` touches ngsolve/skfem.
 - SI units. Frozen Pydantic models and dataclasses across layers.
 - Fast suite under 10 min. Mark long tests `slow`. Unique test basenames.
-- Do not change open-owner-decision behaviours (`self_starting`, `MIN_WEB_WIDTH`). Record decisions in spec §11.
+- `self_starting` stays a hard error for user designs (reference machines use `waive_rules`); record decisions in spec §11.
 - Comments describe the code as it is now, with no plan history.
 
 ## Suggested start (M4b)
@@ -109,7 +109,7 @@ Owner decision (2026-09-30): `screening` is 12 angles × 8 currents, the screeni
 Wall times per map (default workers): screening 53-69 s (64 points, budget 30 s: missed); `full` 520, 719, 717, 552 s (600 points, budget 5 min = 300 s: missed on all four).
 
 Checks on the base design's (20/22) cached `full` 30x20 map:
-- `analyse_map`: passes; `iron_b_peak` warns (1.481 x Js against 1.15).
+- `analyse_map`: passes; `iron_b_peak` 1.481 × Js (warned against the old 1.15 limit; passes the 1.5 limit decided on 2026-09-30).
 - `fem_checks` wall 33 s against the 7 min "full extras" budget: met.
 - `held_out_psi` 5.7e-4 (limit 5e-3): pass. `held_out_torque` 0.0211 (limit 0.01): **FAIL**. `band_radius` 8.2e-4 (limit 0.01): pass.
 
@@ -119,5 +119,5 @@ What M5 inherits from M4:
 - A working engine: `build_map`, `build_overlap_map`, `analyse_map`, exports, `fem_checks`, `fidelity_check`; goldens for the 8/6 screening map in `tests/maps/goldens_8_6.json`.
 - Open owner decisions (spec §10, "Open items after M4"): map speed against the 30 s and 300 s budgets, the failing screening fidelity check (preset refinement or a different rule), held-out torque on the default `full` grid, the provisional check limits.
 - Deferred: the saturation-knee-vs-Bsat check; reuse of the Newton factorisation for L_inc (about 0.15 s per point); temperature in the cache key; engine changes enter the cache key only through the srmcore version.
-- Iron B peaks above 1.15 Js on the example 8/6 (`iron_b_peak` warns); the material data behind that is provisional (spec §10).
+- Iron B peaks reach 1.43–1.48 Js at the pole-tip corners on the example 8/6 (limit 1.5 Js); the material data behind that is provisional (spec §10).
 - M5 work: FEMM fixtures, TEAM 24 comparison, measured-data comparison, mesh-preset defaults from a convergence study (which also addresses the fidelity result), uncertainty budgets.

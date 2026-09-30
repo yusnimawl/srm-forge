@@ -23,6 +23,6 @@
     "psi_decreasing": "pass",
     "la_analytic": "pass",
     "lu_air_slot": "pass",
-    "iron_b_peak": "warn"
+    "iron_b_peak": "pass"
   }
 }
