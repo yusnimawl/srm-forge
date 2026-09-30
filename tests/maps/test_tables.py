@@ -25,6 +25,9 @@ def test_linear_roundtrip_and_inverse():
     psi = inductance(r.angles)[:, None] * t.current
     assert np.allclose(psi[ok], np.broadcast_to(t.psi_grid, psi.shape)[ok], rtol=1e-6, atol=1e-12)
     assert np.isnan(t.current).any()      # ψ above ψ(θ, I_max) of the unaligned angles
+    assert np.array_equal(np.isnan(t.current), t.psi_grid[None] > r.psi[:, -1, :1])
+    want = -0.5 * dinductance(r.angles)[:, None] * t.current ** 2
+    assert np.allclose(t.torque[ok], want[ok], atol=5e-2 * np.nanmax(np.abs(want)))
 
 
 def test_flat_only_when_deeply_saturated():
@@ -56,3 +59,21 @@ def test_dataset_stores_dpsi_dtheta(tmp_path):
     with h5py.File(tmp_path / "m.h5") as f:
         assert f["dpsi_dtheta"].shape == r.psi.shape
         assert list(f["dpsi_dtheta"].attrs["dims"]) == ["angle", "current", "circuit"]
+
+
+def test_aligned_angle_not_row_zero():
+    r = synthetic_map()
+    ang = (r.angles + 0.4 * PERIOD) % PERIOD
+    order = np.argsort(ang)
+    rolled = dataclasses.replace(
+        r, angles=ang[order], psi=r.psi[order], torque_arkkio=r.torque_arkkio[order],
+        torque_virtual_work=r.torque_virtual_work[order])
+    assert np.argmax(rolled.psi[:, -1, 0]) != 0
+    t = drive_tables(rolled)
+    assert t.psi_grid.max() == pytest.approx(r.psi[:, -1, 0].max(), rel=1e-12)
+
+
+def test_first_current_must_be_zero():
+    with pytest.raises(ValueError, match="first current"):
+        drive_tables(synthetic_map(currents=np.linspace(1, 20, 9)))
+

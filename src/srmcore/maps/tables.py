@@ -31,23 +31,29 @@ class DriveTables:
     torque: np.ndarray                 # (n_angles, n_psi), N·m (Arkkio)
     flat: np.ndarray                   # (n_angles, n_psi) bool
     monotone: np.ndarray               # (n_angles,) bool: ψ strictly increasing in current
-    roundtrip_error: float             # max |ψ(θ, i(θ, ψ)) − ψ| / ψ_max over defined points
+    roundtrip_error: float             # NaN if no point is defined; else max |ψ(θ, i(θ, ψ)) − ψ| / ψ_max over defined points
 
 
 def drive_tables(result: MapResult, n_psi: int | None = None, eps: float | None = None) -> DriveTables:
     require_complete(result)
     e = result.circuits.index(result.excited)
     cur, psi = result.currents, result.psi[..., e]
+    if cur[0] != 0:
+        raise ValueError("the first current must be 0")
     n_psi = n_psi or 2 * len(cur)
-    # ψ values of the aligned curve at uniform currents: dense in ψ where the curve flattens.
-    grid = PchipInterpolator(cur, psi[0])(np.linspace(cur[0], cur[-1], n_psi))
+    # The aligned angle has the largest ψ at I_max. Its ψ values at uniform currents make the grid dense in ψ
+    # where the curve flattens.
+    a0 = int(np.argmax(psi[:, -1]))
+    if not np.all(np.diff(psi[a0]) > 0):
+        raise ValueError("ψ(i) at the aligned angle is not strictly increasing")
+    grid = PchipInterpolator(cur, psi[a0])(np.linspace(cur[0], cur[-1], n_psi))
     if eps is None:
-        eps = 1e-3 * psi[0, 1] / cur[1]
+        eps = 1e-3 * psi[a0, 1] / cur[1]
     n_a = len(result.angles)
     i_tab, t_tab = np.full((n_a, n_psi), np.nan), np.full((n_a, n_psi), np.nan)
     flat = np.zeros((n_a, n_psi), dtype=bool)
     monotone = np.all(np.diff(psi, axis=1) > 0, axis=1)
-    err = 0.0
+    err = None
     for a in np.flatnonzero(monotone):
         ok = grid <= psi[a, -1]
         i = PchipInterpolator(psi[a], cur)(grid[ok])
@@ -55,5 +61,7 @@ def drive_tables(result: MapResult, n_psi: int | None = None, eps: float | None 
         i_tab[a, ok] = i
         t_tab[a, ok] = PchipInterpolator(cur, result.torque_arkkio[a])(i)
         flat[a, ok] = psi_i(i, 1) < eps
-        err = max(err, float(np.max(np.abs(psi_i(i) - grid[ok]))))
-    return DriveTables(result.angles, grid, i_tab, t_tab, flat, monotone, err / float(np.max(np.abs(grid))))
+        e_a = float(np.max(np.abs(psi_i(i) - grid[ok])))
+        err = e_a if err is None else max(err, e_a)
+    return DriveTables(result.angles, grid, i_tab, t_tab, flat, monotone,
+                       np.nan if err is None else err / float(np.max(np.abs(grid))))
