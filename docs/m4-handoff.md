@@ -84,7 +84,27 @@ Run: `examples/fidelity_8_6.py` (4 variants of the example 8/6, I_max 20 A, ngso
 | 20/24 | 2.79 % | 0.08 % | 1.70 % | 0.04 % |
 | Spearman | 1.000 | 1.000 | -0.400 | 1.000 |
 
-**Fidelity: FAIL.** Peak torque is off by up to 6.67 % (3.23 % on the base design) and ranks the designs wrongly (rho -0.4); `la` sits at the 3 % limit (3.00 % is the worst, the check is `<= 0.03` on the unrounded value). `lu` and `psi_max` are well inside. Screening is not a reliable torque guide on this mesh; the cause is not investigated.
+**Fidelity: FAIL.** Peak torque is off by up to 6.67 % (3.23 % on the base design) and ranks the designs wrongly (rho -0.4); `la` sits at the 3 % limit (3.00 % is the worst, the check is `<= 0.03` on the unrounded value). `lu` and `psi_max` are well inside. Screening with 8 angles is not a reliable torque guide.
+
+Cause, measured by rebuilding the screening maps with more angles (same screening mesh, 8 currents), rel. error against the `full` map:
+
+| stator/rotor arc | angles | la | lu | peak_torque | psi_max | wall |
+|---|---|---|---|---|---|---|
+| 18/22 | 12 | 2.59 % | 0.07 % | 0.07 % | 0.02 % | 99 s |
+| 20/22 | 12 | 2.83 % | 0.07 % | 0.10 % | 0.04 % | 100 s |
+| 22/24 | 12 | 3.00 % | 0.09 % | 0.24 % | 0.03 % | 88 s |
+| 20/24 | 12 | 2.79 % | 0.08 % | 0.21 % | 0.04 % | 70 s |
+| 18/22 | 16 | 2.59 % | 0.07 % | 0.04 % | 0.02 % | 105 s |
+| 20/22 | 16 | 2.83 % | 0.07 % | 0.21 % | 0.04 % | 115 s |
+| 22/24 | 16 | 3.00 % | 0.09 % | 0.65 % | 0.03 % | 112 s |
+| 20/24 | 16 | 2.79 % | 0.08 % | 0.75 % | 0.04 % | 87 s |
+
+- The peak-torque error comes from the 8-angle grid missing the torque peak: 12 angles bring it under 0.25 %. The peak value is the grid maximum; a dense evaluation of the periodic angle spline on the 8-angle grid overshoots instead (1.7-5.3 %), so it is no fix.
+- The `la` error (2.6-3.0 %) does not change with the angle count: it comes from the screening mesh (aligned-position saturation at the pole tips) and needs a finer screening mesh or a looser La tolerance.
+- The four variants' `full` peak torques span only 12.40-12.44 N·m (0.3 %), far less than the 8-angle error, so the Spearman -0.4 on peak torque says the variants are too alike to rank, not only that screening is wrong.
+- The wall times above ran partly alongside the test suite; treat them as upper bounds. A 12-angle screening map costs about 1.5 × the 8-angle map.
+
+Owner decision: raise the `screening` angle count to 12 (fixes peak torque, costs about 1.5 × map time), refine the screening mesh near the pole tips for `la`, or relax the La tolerance for screening.
 
 Wall times per map (default workers): screening 53-69 s (64 points, budget 30 s: missed); `full` 520, 719, 717, 552 s (600 points, budget 5 min = 300 s: missed on all four).
 
