@@ -30,7 +30,8 @@ def fidelity_check(designs: Sequence[Design], i_max: float, *, solver: str = "ng
                    workers: int | None = None, cache_dir=None,
                    progress: Callable[[int, int], None] | None = None) -> FidelityReport:
     """Builds each design's screening and full map and compares `la`, `lu`, `peak_torque` and `psi_max`.
-    `ok`: every relative error <= 3 % and, with 3 or more designs, every Spearman rho >= 0.95."""
+    `ok`: every relative error <= 3 % and, with 3 or more designs, every Spearman rho >= 0.95
+    (a NaN rho from constant values fails)."""
     values = {p: {k: [] for k in KEYS} for p in ("screening", "full")}
     for d in designs:
         for preset, vals in values.items():
@@ -43,6 +44,6 @@ def fidelity_check(designs: Sequence[Design], i_max: float, *, solver: str = "ng
     full = {k: np.array(v) for k, v in values["full"].items()}
     rel = {k: np.abs(scr[k] - full[k]) / np.abs(full[k]) for k in KEYS}
     rho = {k: float(spearmanr(scr[k], full[k]).statistic) if len(designs) >= 3 else float("nan") for k in KEYS}
-    ok = all(np.all(e <= MAX_REL_ERROR) for e in rel.values()) and all(
-        np.isnan(r) or r >= MIN_SPEARMAN for r in rho.values())
+    ok = all(np.all(e <= MAX_REL_ERROR) for e in rel.values()) and (
+        len(designs) < 3 or all(r >= MIN_SPEARMAN for r in rho.values()))     # NaN rho (constant input) fails
     return FidelityReport(len(designs), rel, rho, bool(ok))
