@@ -48,6 +48,11 @@ class MapResult:
     complete: bool
 
 
+def require_complete(result: MapResult) -> None:
+    if not result.complete:
+        raise ValueError("map is incomplete")
+
+
 def solve_job(job) -> dict:
     """One point of the map, solved in a worker: `job` is (angle, current, excited)."""
     angle, current, excited = job

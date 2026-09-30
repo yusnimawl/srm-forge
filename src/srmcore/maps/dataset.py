@@ -12,6 +12,7 @@ from ..materials import library
 from ..model.design import Design
 from ..solvers.settings import SolverAdapter
 from .run import MapResult
+from .tables import dpsi_dtheta
 
 _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "current", "circuit"),
          "torque_arkkio": ("angle", "current"), "torque_virtual_work": ("angle", "current"),
@@ -45,6 +46,9 @@ def write_map(path, result: MapResult, prov: dict) -> None:
     with h5py.File(tmp, "w") as f:
         for name, dims in _DIMS.items():
             f.create_dataset(name, data=getattr(result, name)).attrs["dims"] = list(dims)
+        if result.complete:
+            period = 2 * np.pi / prov["design"]["machine"]["n_rotor_poles"]
+            f.create_dataset("dpsi_dtheta", data=dpsi_dtheta(result, period)).attrs["dims"] = list(_DIMS["psi"])
         f.create_dataset("circuits", data=np.array(result.circuits, dtype="S"))
         f.attrs.update(excited=result.excited, complete=result.complete,
                        provenance=json.dumps(prov, sort_keys=True), hash=provenance_hash(prov))
