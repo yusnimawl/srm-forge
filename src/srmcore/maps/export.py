@@ -14,6 +14,8 @@ _KEY_UNITS = {"la": "H", "lu": "H", "la_lu": "1", "peak_torque": "N*m", "psi_max
 
 
 def _cell(x):
+    if isinstance(x, str):
+        return x
     return repr(float(x)) if isinstance(x, (float, np.floating)) else int(x)
 
 
@@ -43,11 +45,8 @@ def export_csv(report: MapReport, directory) -> list[Path]:
         d / "inverse_current.csv", ["angle_rad", "psi_Wb", "current_A", "torque_Nm", "flat"],
         ([t.angles[a], t.psi_grid[p], t.current[a, p], t.torque[a, p], t.flat[a, p]]
          for a in range(na) for p in range(len(t.psi_grid))))
-    key = d / "key_numbers.csv"
-    with open(key, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["name", "value", "unit"])
-        w.writerows((k, repr(float(v)), _KEY_UNITS[k]) for k, v in asdict(report.key_numbers).items())
+    key = _write(d / "key_numbers.csv", ["name", "value", "unit"],
+                 ((k, float(v), _KEY_UNITS[k]) for k, v in asdict(report.key_numbers).items()))
     return [psi_map, inverse, key]
 
 
@@ -59,11 +58,12 @@ def export_mat(report: MapReport, path, provenance_hash: str | None = None) -> P
         "angles": r.angles, "currents": r.currents, "psi": r.psi, "torque": r.torque_arkkio,
         "coenergy": r.coenergy, "l_inc": r.l_inc, "dpsi_dtheta": report.dpsi_dtheta,
         "psi_grid": t.psi_grid, "current_of_psi": t.current, "torque_of_psi": t.torque,
-        "status": r.status, "circuits": np.array(r.circuits, dtype=object),
+        "status": r.status, "filled": r.filled, "flat": t.flat, "circuits": np.array(r.circuits, dtype=object),
         "key_numbers": asdict(report.key_numbers),
     }
     if provenance_hash is not None:
         data["provenance_hash"] = provenance_hash
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     savemat(path, data)
     return path

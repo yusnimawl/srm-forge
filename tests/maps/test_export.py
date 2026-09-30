@@ -81,6 +81,8 @@ def test_mat_round_trip(tmp_path):
     _same(m["current_of_psi"], t.current)
     _same(m["torque_of_psi"], t.torque)
     _same(m["status"], r.status)
+    _same(m["filled"], r.filled)
+    _same(m["flat"], t.flat)
     assert list(np.atleast_1d(m["circuits"])) == list(r.circuits)
     for f in dataclasses.fields(rep.key_numbers):
         assert getattr(m["key_numbers"], f.name) == getattr(rep.key_numbers, f.name)
@@ -95,5 +97,7 @@ def test_mat_omits_hash_by_default(tmp_path):
 def test_exports_refuse_incomplete_map(tmp_path):
     rep = _report()
     rep = dataclasses.replace(rep, result=dataclasses.replace(rep.result, complete=False))
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="incomplete"):
         export_csv(rep, tmp_path)
+    with pytest.raises(ValueError, match="incomplete"):
+        export_mat(rep, tmp_path / "m.mat")
