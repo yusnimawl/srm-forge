@@ -1,6 +1,6 @@
 """Run a small requirements-driven search and print the scored candidates.
 
-    python examples\v0_search.py [n_candidates] [shortlist]
+    PYTHONPATH=tests python examples/v0_search.py [n_candidates] [shortlist]
 
 Peak-only and unvalidated. Stage 2 takes tens of seconds per design."""
 import sys
