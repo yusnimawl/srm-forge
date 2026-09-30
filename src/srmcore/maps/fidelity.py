@@ -10,7 +10,8 @@ from .api import build_map
 from .results import key_numbers
 
 KEYS = ("la", "lu", "peak_torque", "psi_max")
-MAX_REL_ERROR = 0.03
+# Owner decision 2026-09-30: La may differ by 5 % (the screening mesh under-resolves the pole tips); others 3 %.
+MAX_REL_ERROR = {"la": 0.05, "lu": 0.03, "peak_torque": 0.03, "psi_max": 0.03}
 MIN_SPEARMAN = 0.95
 
 
@@ -48,6 +49,6 @@ def fidelity_check(designs: Sequence[Design], i_max: float, *, solver: str = "ng
             return float("nan")
         return float(spearmanr(a, b).statistic)
     rho = {k: _rho(scr[k], full[k]) for k in KEYS}
-    ok = all(np.all(e <= MAX_REL_ERROR) for e in rel.values()) and (
+    ok = all(np.all(rel[k] <= MAX_REL_ERROR[k]) for k in KEYS) and (
         len(designs) < 3 or all(r >= MIN_SPEARMAN for r in rho.values()))     # NaN rho (constant input) fails
     return FidelityReport(len(designs), rel, rho, bool(ok))

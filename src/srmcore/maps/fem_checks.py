@@ -20,7 +20,7 @@ from .run import STATUS_NONCONVERGED, MapResult, _init_worker, require_complete,
 from .tables import angle_spline
 
 PSI_TOLERANCE = 0.005            # of ψ_max
-TORQUE_TOLERANCE = 0.01          # of peak torque
+TORQUE_TOLERANCE = 0.03          # of peak torque; provisional (owner, 2026-09-30) until the M5 convergence study
 BAND_RADIUS_TOLERANCE = 0.01     # of peak torque
 
 

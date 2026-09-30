@@ -104,7 +104,7 @@ Cause, measured by rebuilding the screening maps with more angles (same screenin
 - The four variants' `full` peak torques span only 12.40-12.44 N·m (0.3 %), far less than the 8-angle error, so the Spearman -0.4 on peak torque says the variants are too alike to rank, not only that screening is wrong.
 - The wall times above ran partly alongside the test suite; treat them as upper bounds. A 12-angle screening map costs about 1.5 × the 8-angle map.
 
-Owner decision: raise the `screening` angle count to 12 (fixes peak torque, costs about 1.5 × map time), refine the screening mesh near the pole tips for `la`, or relax the La tolerance for screening.
+Owner decision (2026-09-30): `screening` is 12 angles × 8 currents, the screening La tolerance is 5 %, the speed budgets are re-baselined to these laptop numbers, and the held-out torque limit is 3 % until the M5 convergence study (spec §11). With 12 angles the 8/6 golden peak torque is 12.42 N·m against 12.44 N·m on the `full` map.
 
 Wall times per map (default workers): screening 53-69 s (64 points, budget 30 s: missed); `full` 520, 719, 717, 552 s (600 points, budget 5 min = 300 s: missed on all four).
 

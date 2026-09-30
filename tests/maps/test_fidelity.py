@@ -50,6 +50,28 @@ def test_not_ok_when_one_key_number_four_percent_off(monkeypatch):
     assert not rep.ok
 
 
+@pytest.mark.parametrize("la_error, ok", [(0.04, True), (0.06, False)])
+def test_la_tolerance_is_five_percent(monkeypatch, la_error, ok):
+    last = {}
+    fake = _fake()
+
+    def build_map(design, i_max, **kw):
+        last["preset"] = design.mesh.preset
+        return fake(design, i_max, **kw)
+
+    real = fidelity.key_numbers
+
+    def key_numbers(result, machine):
+        key = real(result, machine)
+        return dataclasses.replace(key, la=key.la * (1 + la_error)) if last["preset"] == "screening" else key
+
+    monkeypatch.setattr(fidelity, "build_map", build_map)
+    monkeypatch.setattr(fidelity, "key_numbers", key_numbers)
+    rep = fidelity_check(_designs(4), 20.0)
+    assert rep.rel_error["la"] == pytest.approx(np.full(4, la_error))
+    assert rep.ok is ok
+
+
 def test_not_ok_when_ranking_flips_within_tolerance(monkeypatch):
     # full scales 1, 1.01, 1.02, 1.03; screening off by +-2 % in alternation reverses the pairs' order
     flip = lambda k: 1.02 if k % 2 == 0 else 0.98

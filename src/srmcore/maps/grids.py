@@ -7,7 +7,7 @@ from ..mesh.band import snap_angle
 from ..model.design import RadialSRMParams
 
 # (angles, currents) per fidelity preset, following the mesh preset. Provisional until the M5 study.
-GRID_SIZES = {"screening": (8, 8), "full": (30, 20), "reference": (60, 40)}
+GRID_SIZES = {"screening": (12, 8), "full": (30, 20), "reference": (60, 40)}
 
 
 def angle_grid(machine: RadialSRMParams, band_divisions: int, n: int, cluster: float = 0.5,
