@@ -13,6 +13,13 @@ for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_var, "1")
 
 
+def default_workers(workers: int | None, n_jobs: int) -> int:
+    """`workers`, or half the logical CPUs when None, clamped to [1, n_jobs] and the Windows pool limit of 61."""
+    # ponytail: half the logical CPUs stands in for the physical core count; psutil is not a dependency.
+    workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
+    return max(1, min(workers, n_jobs, 61))
+
+
 def _pass(fn, items, results, pending, workers, initializer, initargs, cancel, progress) -> None:
     with ProcessPoolExecutor(workers, mp_context=get_context("spawn"), initializer=initializer,
                              initargs=initargs) as pool:

@@ -1,6 +1,5 @@
 """Public entry: a map of a design, from cache or by solving (spec §7.2)."""
 import math
-import os
 from collections.abc import Callable
 
 import numpy as np
@@ -12,6 +11,7 @@ from ..model.design import Design
 from ..solvers.factory import make_solver
 from .dataset import cached_map, cached_overlap, overlap_provenance, provenance, store_map, store_overlap
 from .grids import GRID_SIZES, aligned_angle, angle_grid, current_grid
+from .pool import default_workers
 from .overlap import OverlapResult, overlap_window, run_overlap_map
 from .run import MapResult, run_map
 
@@ -38,9 +38,7 @@ def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited:
     prov = provenance(design, angles, currents, excited, adapter)
     if cache_dir is not None and (hit := cached_map(cache_dir, prov)) is not None:
         return hit
-    # ponytail: half the logical CPUs stands in for the physical core count; psutil is not a dependency.
-    workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
-    workers = max(1, min(workers, len(angles) * len(currents), 61))          # 61: the Windows pool limit
+    workers = default_workers(workers, len(angles) * len(currents))
     result = run_map(build_machine_mesh(design), design, angles, currents, solver_name=solver, excited=excited,
                      workers=workers, progress=progress, cancel=cancel)
     if cache_dir is not None:
@@ -71,8 +69,7 @@ def build_overlap_map(design: Design, i_max: float, *, solver: str = "ngsolve", 
     prov = overlap_provenance(design, angles, currents, currents, adapter)
     if cache_dir is not None and (hit := cached_overlap(cache_dir, prov)) is not None:
         return hit
-    workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
-    workers = max(1, min(workers, len(angles) * n_currents**2, 61))
+    workers = default_workers(workers, len(angles) * n_currents**2)
     result = run_overlap_map(build_machine_mesh(design), design, angles, currents, currents, solver_name=solver,
                              workers=workers, progress=progress, cancel=cancel)
     if cache_dir is not None:

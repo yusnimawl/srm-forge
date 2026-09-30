@@ -41,6 +41,22 @@ def test_fem_checks_skips_screening():
     assert fem_checks(design, synthetic_map()) == ()
 
 
+@pytest.mark.parametrize("n_a, n_i, n", [(8, 4, 8), (30, 20, 16), (16, 8, 16), (30, 20, 1000)])
+def test_held_out_samples_spread(n_a, n_i, n):
+    from map_fixtures import PERIOD, synthetic_map
+    from srmcore.maps.fem_checks import _held_out_samples
+    r = synthetic_map(n_angles=n_a, currents=np.linspace(0, 20, n_i))
+    s = _held_out_samples(r, PERIOD, n)
+    ang = np.append(r.angles, r.angles[0] + PERIOD)
+    cur = r.currents[1:]
+    mid_i = (cur[:-1] + cur[1:]) / 2
+    assert len(s) == min(n, n_a * (n_i - 2))
+    assert any(np.isclose(a, (ang[-2] + ang[-1]) / 2) for a, _ in s)
+    assert all(i > r.currents[1] for _, i in s)
+    cols = {int(np.argmin(np.abs(mid_i - i))) for _, i in s}
+    assert len(cols) >= min(n, len(mid_i))
+
+
 @pytest.mark.slow
 def test_fem_checks_full_preset(capsys):
     import time
@@ -54,4 +70,6 @@ def test_fem_checks_full_preset(capsys):
         for c in checks:
             print(f"CHECK {c.name:16s} {c.status:5s} value={c.value:.4g} limit={c.limit:.4g}")
     assert [c.name for c in checks] == ["held_out_psi", "held_out_torque", "band_radius"]
-    assert next(c for c in checks if c.name == "band_radius").status == "pass"
+    by = {c.name: c for c in checks}
+    assert by["band_radius"].status == "pass"
+    assert by["held_out_psi"].value < 0.1 and by["held_out_torque"].value < 1.0
