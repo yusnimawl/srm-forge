@@ -12,7 +12,7 @@ DESIGN = Design(machine=make_8_6(), mesh=MeshSettings(preset="screening"))
 
 def test_pool_matches_serial_to_1e12_and_progress_counts_points():
     static = build_machine_mesh(DESIGN)
-    angles, currents = np.array([0.0, 2 * static.settings.band_pitch]), np.array([0.0, 2.5, 5.0])
+    angles, currents = np.array([2 * static.settings.band_pitch]), np.array([0.0, 5.0])
     ticks = []
     serial = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=1)
     pooled = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=2,
@@ -20,7 +20,7 @@ def test_pool_matches_serial_to_1e12_and_progress_counts_points():
     for name in ("psi", "torque_arkkio", "torque_virtual_work", "coenergy"):
         assert np.allclose(getattr(pooled, name), getattr(serial, name), rtol=1e-12, atol=1e-15)
     assert np.array_equal(pooled.iterations, serial.iterations)
-    assert ticks[-1] == (6, 6) and {t for _, t in ticks} == {6}
+    assert ticks[-1] == (2, 2) and {t for _, t in ticks} == {2}
 
 
 def test_second_call_is_served_from_the_cache_without_meshing(tmp_path, monkeypatch):

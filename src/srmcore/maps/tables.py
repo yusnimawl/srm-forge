@@ -41,7 +41,8 @@ def drive_tables(result: MapResult, n_psi: int | None = None, eps: float | None 
     if cur[0] != 0:
         raise ValueError("the first current must be 0")
     n_psi = n_psi or 2 * len(cur)
-    # The aligned angle has the largest ψ at I_max. Its ψ values at uniform currents make the grid dense in ψ
+    # The aligned row is found by the largest ψ at I_max, so it does not depend on the angle-grid layout; this
+    # agrees with `aligned_angle` for a valid map. Its ψ values at uniform currents make the grid dense in ψ
     # where the curve flattens.
     a0 = int(np.argmax(psi[:, -1]))
     if not np.all(np.diff(psi[a0]) > 0):

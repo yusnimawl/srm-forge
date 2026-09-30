@@ -43,6 +43,8 @@ class MapReport:
 
 
 def _upper(name, value, limit, detail, bad: Status = "fail") -> Check:
+    if not np.isfinite(value):
+        return Check(name, bad, float(value), limit, f"non-finite value; {detail}")
     return Check(name, bad if value > limit else "pass", float(value), limit, detail)
 
 
@@ -55,6 +57,11 @@ def _energy_check(name, value, n_angles, detail) -> Check:
 
 
 def map_checks(result: MapResult, design: Design, key: KeyNumbers | None = None) -> tuple[Check, ...]:
+    with np.errstate(all="ignore"):                              # zero scales give inf/NaN ratios, which the checks fail
+        return _map_checks(result, design, key)
+
+
+def _map_checks(result: MapResult, design: Design, key: KeyNumbers | None) -> tuple[Check, ...]:
     require_complete(result)
     m = design.machine
     e = result.circuits.index(result.excited)
@@ -65,7 +72,8 @@ def map_checks(result: MapResult, design: Design, key: KeyNumbers | None = None)
     nz = cur > 0
     psi = result.psi[..., e]
     key = key or key_numbers(result, m)
-    peak = key.peak_torque
+    peak = np.float64(key.peak_torque)
+    psi_max = np.float64(key.psi_max)
     t_ark, t_vw = result.torque_arkkio, result.torque_virtual_work
     t_spl = angle_spline(ang, t_ark, tau)
     stroke = (th_a - tau / 2, th_a)
@@ -102,17 +110,18 @@ def map_checks(result: MapResult, design: Design, key: KeyNumbers | None = None)
     checks.append(_upper("sign_pattern", worst / peak, 0.0,
                          "torque negative while leaving alignment, positive while approaching it (1 % of peak tolerated)"))
 
-    checks.append(Check("la_lu", "fail" if key.la_lu < 2 else "warn" if key.la_lu < 3 or key.la_lu > 15 else "pass",
-                        key.la_lu, 2.0 if key.la_lu < 3 else 15.0, "La/Lu; pass in 3–15, warn in 2–3 and above 15"))
+    lalu = key.la_lu
+    status = "fail" if not np.isfinite(lalu) or lalu < 2 else "warn" if lalu < 3 or lalu > 15 else "pass"
+    checks.append(Check("la_lu", status, lalu, 2.0 if lalu < 3 else 15.0, "La/Lu; pass in 3–15, warn in 2–3 and above 15"))
 
-    d_min = np.min(np.diff(psi, axis=1)) / key.psi_max
+    d_min = np.min(np.diff(psi, axis=1)) / psi_max
     checks.append(Check("dpsi_di_positive", "pass" if d_min > 0 else "fail", float(d_min), 0.0,
                         "smallest ψ step along current, relative to ψ_max"))
 
     js = load_material(m.materials.stator).saturation_polarisation
     n_series = m.turns_per_pole * m.n_stator_poles / m.n_phases
     w_pole = 2 * m.bore_radius * math.sin(m.stator_pole_arc / 2)
-    checks.append(_upper("psi_bound", key.psi_max / (n_series * js * w_pole * m.stack_length * 1.1), 1.0,
+    checks.append(_upper("psi_bound", psi_max / (n_series * js * w_pole * m.stack_length * 1.1), 1.0,
                          "ψ_max against N_series·Js·pole width·L with 10 % margin"))
 
     order = np.argsort(x)
@@ -121,18 +130,18 @@ def map_checks(result: MapResult, design: Design, key: KeyNumbers | None = None)
     trough = psi_spl(th_u)[-1]                       # ψ(θ_u, I_max) joins the falling and the rising branch
     rise = np.max(np.diff(np.append(top[down], trough)), initial=0.0)
     fall = np.max(-np.diff(np.concatenate([[trough], top[~down], top[:1]])), initial=0.0)
-    checks.append(_upper("psi_decreasing", max(rise, fall) / key.psi_max, 0.005,
+    checks.append(_upper("psi_decreasing", max(rise, fall) / psi_max, 0.005,
                          "ψ(θ, I_max) falls from aligned to unaligned and rises back (worst reversal / ψ_max)"))
 
     p_ph, n = m.n_stator_poles / m.n_phases, m.turns_per_pole
     la_est = p_ph * n**2 * MU0 * m.bore_radius * min(m.stator_pole_arc, m.rotor_pole_arc) * m.stack_length / m.air_gap
-    ratio = key.la / la_est
+    ratio = np.float64(key.la) / la_est
     checks.append(Check("la_analytic", "warn" if not 0.5 <= ratio <= 1.5 else "pass", ratio,
                         0.5 if ratio < 0.5 else 1.5, "La / La_est, La_est = p·N²·µ0·r·min(βs, βr)·L/g"))
     h_r = m.rotor_outer_radius - m.rotor_yoke_outer_radius
     lu_est = p_ph * n**2 * MU0 * m.bore_radius * m.stator_pole_arc * m.stack_length / (m.air_gap + h_r)
-    ratio = key.lu / lu_est
-    checks.append(Check("lu_air_slot", "fail" if ratio < 1 else "pass", ratio, 1.0,
+    ratio = np.float64(key.lu) / lu_est
+    checks.append(Check("lu_air_slot", "pass" if np.isfinite(ratio) and ratio >= 1 else "fail", ratio, 1.0,
                         "Lu / Lu_est, Lu_est = p·N²·µ0·r·βs·L/(g + h_r); the air path is a lower bound"))
     b = float(np.max(result.b_peak)) / js
     checks.append(_upper("iron_b_peak", b, 1.15, "peak iron |B| / Js", bad="warn"))

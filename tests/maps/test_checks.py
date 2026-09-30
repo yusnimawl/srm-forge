@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from conftest import make_8_6
-from map_fixtures import NR, PERIOD, synthetic_map
+from map_fixtures import PERIOD, synthetic_map
 from srmcore.maps import DriveTables, KeyNumbers, MapReport, analyse_map
 from srmcore.maps.checks import Check, map_checks
 from srmcore.model.design import Design, MeshSettings
@@ -181,3 +181,23 @@ def test_phase_b_map_uses_its_own_aligned_angle():
         assert checks[name].status == "pass", name
     flipped = dataclasses.replace(r, torque_arkkio=-r.torque_arkkio)
     assert by_name(flipped)["sign_pattern"].status == "fail"
+
+
+def _nan_at(r, name):
+    a = np.array(getattr(r, name), dtype=float)
+    a[(0,) * a.ndim] = np.nan
+    return dataclasses.replace(r, **{name: a})
+
+
+@pytest.mark.parametrize("field, check", [("b_peak", "iron_b_peak"), ("torque_virtual_work", "arkkio_vs_nodal")])
+def test_nan_in_a_field_is_not_a_pass(field, check):
+    c = by_name(_nan_at(good_map(), field))[check]
+    assert c.status != "pass" and "non-finite" in c.detail
+
+
+def test_nan_inductances_are_not_a_pass():
+    r = good_map()
+    key = dataclasses.replace(analyse_map(r, DESIGN).key_numbers, la=float("nan"), lu=float("nan"),
+                              la_lu=float("nan"))
+    checks = {c.name: c for c in map_checks(r, DESIGN, key)}
+    assert checks["la_lu"].status != "pass" and checks["lu_air_slot"].status != "pass"

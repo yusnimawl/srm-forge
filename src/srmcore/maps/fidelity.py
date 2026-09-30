@@ -43,7 +43,11 @@ def fidelity_check(designs: Sequence[Design], i_max: float, *, solver: str = "ng
     scr = {k: np.array(v) for k, v in values["screening"].items()}
     full = {k: np.array(v) for k, v in values["full"].items()}
     rel = {k: np.abs(scr[k] - full[k]) / np.abs(full[k]) for k in KEYS}
-    rho = {k: float(spearmanr(scr[k], full[k]).statistic) if len(designs) >= 3 else float("nan") for k in KEYS}
+    def _rho(a, b):
+        if len(a) < 3 or np.ptp(a) == 0 or np.ptp(b) == 0:
+            return float("nan")
+        return float(spearmanr(a, b).statistic)
+    rho = {k: _rho(scr[k], full[k]) for k in KEYS}
     ok = all(np.all(e <= MAX_REL_ERROR) for e in rel.values()) and (
         len(designs) < 3 or all(r >= MIN_SPEARMAN for r in rho.values()))     # NaN rho (constant input) fails
     return FidelityReport(len(designs), rel, rho, bool(ok))

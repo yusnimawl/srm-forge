@@ -16,7 +16,6 @@ from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..model.errors import MapFailed
 from ..solvers.factory import make_solver
-from ..solvers.settings import SolverAdapter
 from .grids import aligned_angle
 from .point import solve_point
 from .pool import map_ordered
