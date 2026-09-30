@@ -9,6 +9,7 @@ from ..mesh.machine import mesh_at_angle
 from ..mesh.static import StaticMesh
 from ..model.design import Design
 from ..physics.build import machine_problem
+from ..post.forces import pole_forces
 from ..post.quantities import arkkio_torque, flux_linkage, incremental_inductance, virtual_work_torque
 from ..solvers.settings import SolverAdapter
 
@@ -25,6 +26,7 @@ class PointResult:
     torque_virtual_work: float         # N·m
     energy: float                      # W, J
     coenergy: float                    # W', J
+    pole_force: np.ndarray             # (n_stator_poles, 2) N: [radial outward, tangential counter-clockwise]
     status: SolveStatus
     iterations: int
     fallbacks: tuple[str, ...]
@@ -49,7 +51,8 @@ def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapp
         psi=flux_linkage(problem, solution),
         torque_arkkio=arkkio_torque(problem, solution),
         torque_virtual_work=virtual_work_torque(problem, solution),
-        energy=solution.energy, coenergy=solution.coenergy, status=solution.status,
+        energy=solution.energy, coenergy=solution.coenergy,
+        pole_force=pole_forces(problem, solution, design.machine.n_stator_poles), status=solution.status,
         iterations=solution.iterations, fallbacks=solution.fallbacks, load_fraction=solution.load_fraction,
         field=solution if keep_field else None, l_inc=l_inc,
     )

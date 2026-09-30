@@ -20,7 +20,8 @@ def _result(complete=True):
     rng = np.random.default_rng(0)
     return MapResult(
         ANGLES, CURRENTS, ("A", "B", "C", "D"), "A", rng.random((3, 2, 4)), rng.random((3, 2)),
-        rng.random((3, 2)), rng.random((3, 2)), np.full((3, 2), 7, dtype=np.int32),
+        rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2, 4)),
+        rng.random((3, 2, 8, 2)), np.full((3, 2), 7, dtype=np.int32),
         np.full((3, 2), STATUS_OK, dtype=np.int8), np.zeros((3, 2), dtype=bool), complete)
 
 
@@ -99,3 +100,11 @@ def test_map_copied_to_other_provenance_path_is_a_miss(tmp_path):
     p1, p2 = _prov(), _prov(excited="B")
     dataset.write_map(tmp_path / f"map_{dataset.provenance_hash(p2)}.h5", _result(), p1)
     assert dataset.cached_map(tmp_path, p2) is None
+
+
+def test_file_without_the_force_products_is_a_miss(tmp_path):
+    prov = _prov()
+    path = dataset.store_map(tmp_path, _result(), prov)
+    with h5py.File(path, "r+") as f:
+        del f["l_inc"]
+    assert dataset.cached_map(tmp_path, prov) is None

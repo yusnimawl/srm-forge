@@ -15,7 +15,9 @@ from .run import MapResult
 
 _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "current", "circuit"),
          "torque_arkkio": ("angle", "current"), "torque_virtual_work": ("angle", "current"),
-         "coenergy": ("angle", "current"), "iterations": ("angle", "current"),
+         "energy": ("angle", "current"), "coenergy": ("angle", "current"),
+         "l_inc": ("angle", "current", "circuit"), "pole_force": ("angle", "current", "pole", "component"),
+         "iterations": ("angle", "current"),
          "status": ("angle", "current"), "filled": ("angle", "current")}
 
 

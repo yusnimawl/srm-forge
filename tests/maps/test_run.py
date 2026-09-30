@@ -1,4 +1,6 @@
 """Map runner: layout, failed-point policy, cancellation. Solves are faked except in the last test."""
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -29,12 +31,20 @@ def _fake(monkeypatch, failing=(), currents=CURRENTS):
             angle=angle, circuits=CIRCUITS, currents=np.array([amps, 0.0, 0.0, 0.0]),
             psi=np.full(4, 1e9) if failed else psi, torque_arkkio=1e9 if failed else 0.5 * amps,
             torque_virtual_work=1e9 if failed else 0.5 * amps, energy=0.2 * amps,
-            coenergy=1e9 if failed else 0.3 * amps,
+            coenergy=1e9 if failed else 0.3 * amps, pole_force=np.full((8, 2), 1e9 if failed else 2.0 * amps),
+            l_inc=None if failed else np.outer([1, 2, 3, 4], [0.1 * amps + 1, 0, 0, 0]),
             status=SolveStatus.NONCONVERGED if failed else SolveStatus.OK,
             iterations=3, fallbacks=(), load_fraction=1.0)
 
     monkeypatch.setattr(run, "solve_point", fake)
     monkeypatch.setattr(run, "make_solver", lambda *a, **k: object())
+
+
+def _withheld_row(monkeypatch):
+    fake = run.solve_point
+    monkeypatch.setattr(run, "solve_point", lambda *a, **k: dataclasses.replace(fake(*a, **k), l_inc=None))
+    run._WORKER.update(static=None, design=DESIGN, solver=None)
+    return run.solve_job((0.0, 5.0, "A"))
 
 
 def _run(**kw):
@@ -58,6 +68,18 @@ def test_one_interior_failure_is_interpolated_and_flagged(monkeypatch):
     assert r.torque_arkkio[2, 3] == pytest.approx(0.5 * CURRENTS[3], rel=1e-9)
     assert r.torque_virtual_work[2, 3] == pytest.approx(0.5 * CURRENTS[3], rel=1e-9)
     assert r.coenergy[2, 3] == pytest.approx(0.3 * CURRENTS[3], rel=1e-9)
+    assert r.energy[2, 3] == pytest.approx(0.2 * CURRENTS[3], rel=1e-9)
+    assert np.allclose(r.pole_force[2, 3], 2.0 * CURRENTS[3])
+    assert np.allclose(r.l_inc[2, 3], np.array([1, 2, 3, 4]) * (0.1 * CURRENTS[3] + 1))
+
+
+def test_products_layout_and_withheld_l_inc(monkeypatch):
+    _fake(monkeypatch)
+    r = _run()
+    assert r.energy.shape == (8, 8) and r.l_inc.shape == (8, 8, 4) and r.pole_force.shape == (8, 8, 8, 2)
+    assert r.l_inc[3, 5, 1] == pytest.approx(2 * (0.1 * CURRENTS[5] + 1))
+    row = _withheld_row(monkeypatch)
+    assert np.isnan(row["l_inc"]).all() and row["l_inc"].shape == (4,)
 
 
 def test_exactly_two_percent_failing_passes(monkeypatch):

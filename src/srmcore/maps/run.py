@@ -23,7 +23,7 @@ _CODE = {SolveStatus.OK: STATUS_OK, SolveStatus.OK_WITH_FALLBACK: STATUS_FALLBAC
          SolveStatus.NONCONVERGED: STATUS_NONCONVERGED}
 # Spec §8.1: the map fails when more than this fraction of its points fail.
 MAX_FAILED_FRACTION = 0.02
-_FIELDS = ("psi", "torque_arkkio", "torque_virtual_work", "coenergy")
+_FIELDS = ("psi", "torque_arkkio", "torque_virtual_work", "energy", "coenergy", "l_inc", "pole_force")
 
 
 @dataclass(frozen=True, eq=False)
@@ -38,7 +38,10 @@ class MapResult:
     psi: np.ndarray                    # (n_angles, n_currents, n_circuits), Wb-turns
     torque_arkkio: np.ndarray          # (n_angles, n_currents), N·m
     torque_virtual_work: np.ndarray
+    energy: np.ndarray                 # J
     coenergy: np.ndarray               # J
+    l_inc: np.ndarray                  # (n_angles, n_currents, n_circuits), H: ∂ψ_k/∂i_excited, NaN where withheld
+    pole_force: np.ndarray             # (n_angles, n_currents, n_poles, 2), N: [radial outward, tangential ccw]
     iterations: np.ndarray
     status: np.ndarray
     filled: np.ndarray
@@ -48,9 +51,12 @@ class MapResult:
 def solve_job(job) -> dict:
     """One point of the map, solved in a worker: `job` is (angle, current, excited)."""
     angle, current, excited = job
-    p = solve_point(_WORKER["static"], _WORKER["design"], angle, {excited: current}, _WORKER["solver"])
+    p = solve_point(_WORKER["static"], _WORKER["design"], angle, {excited: current}, _WORKER["solver"],
+                    with_l_inc=True)
+    l_inc = np.full(len(p.circuits), np.nan) if p.l_inc is None else p.l_inc[:, p.circuits.index(excited)]
     return {"psi": p.psi, "torque_arkkio": p.torque_arkkio, "torque_virtual_work": p.torque_virtual_work,
-            "coenergy": p.coenergy, "iterations": p.iterations, "status": _CODE[p.status]}
+            "energy": p.energy, "coenergy": p.coenergy, "l_inc": l_inc, "pole_force": p.pole_force,
+            "iterations": p.iterations, "status": _CODE[p.status]}
 
 
 def apply_failure_policy(result: MapResult) -> MapResult:
@@ -102,7 +108,9 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
         raise ValueError("currents must be strictly increasing with at least two values")
     make_solver(solver_name)                     # fail in the parent on an unknown solver or a missing extra
     n_a, n_i = len(angles), len(currents)
-    data = {name: np.full((n_a, n_i, len(circuits)) if name == "psi" else (n_a, n_i), np.nan) for name in _FIELDS}
+    inner = {"psi": (len(circuits),), "l_inc": (len(circuits),),
+             "pole_force": (design.machine.n_stator_poles, 2)}
+    data = {name: np.full((n_a, n_i, *inner.get(name, ())), np.nan) for name in _FIELDS}
     iterations = np.zeros((n_a, n_i), dtype=np.int32)
     status = np.full((n_a, n_i), STATUS_NOT_RUN, dtype=np.int8)
     # Longest solves first keeps the pool busy to the end; results are scattered back by grid index.
