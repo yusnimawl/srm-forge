@@ -121,3 +121,19 @@ What M5 inherits from M4:
 - Deferred: the saturation-knee-vs-Bsat check; reuse of the Newton factorisation for L_inc (about 0.15 s per point); temperature in the cache key; engine changes enter the cache key only through the srmcore version.
 - Iron B peaks reach 1.43–1.48 Js at the pole-tip corners on the example 8/6 (limit 1.5 Js); the material data behind that is provisional (spec §10).
 - M5 work: FEMM fixtures, TEAM 24 comparison, measured-data comparison, mesh-preset defaults from a convergence study (which also addresses the fidelity result), uncertainty budgets.
+
+## v0a grid study
+
+Example 8/6, `screening` mesh, I_max 20 A, relative error against the 12 x 8 map.
+
+```
+    grid   T_peak       La    T@300   T@3000   T@9000  wall s   (rel. error vs 12x8)
+  12x8      0.00%    0.00%    0.00%    0.00%    0.00%     154
+   8x4      3.13%    6.33%   16.29%   22.26%   44.98%      53
+  10x5      0.45%    4.47%   10.31%   13.63%   34.78%      85
+  10x6      0.45%    2.71%   10.31%   13.71%   35.92%      95
+  12x5      0.00%    4.47%    0.00%    0.27%    1.22%      93
+  12x6      0.00%    2.71%    0.00%    0.15%    0.31%     101
+```
+
+Chosen stage-2 grid: 12 x 5 (`StageTwoGrid` default).

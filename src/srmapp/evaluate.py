@@ -22,7 +22,7 @@ _NAN = float("nan")
 @dataclass(frozen=True)
 class StageTwoGrid:
     """Reduced map grid. Provisional until measured against the `screening` map (examples/v0_grid_study.py)."""
-    n_angles: int = 10
+    n_angles: int = 12
     n_currents: int = 5
 
 
