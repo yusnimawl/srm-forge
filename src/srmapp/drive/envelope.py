@@ -16,8 +16,8 @@ from srmcore.model.design import RadialSRMParams
 N_THETA = 181                 # angle points over one rotor pole pitch
 N_CURRENT = 121               # current points over 0..I_max
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
-OFF_RANGE = (0.45, 0.95)      # turn-off search range
-N_ON, N_OFF = 12, 10
+OFF_RANGE = (0.45, 0.995)      # turn-off search range
+N_ON, N_OFF = 40, 40
 
 
 @dataclass(frozen=True)
@@ -71,14 +71,16 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
         new = np.where(started, psi + (v - r * i) / omega * dth, 0.0)
         new = np.where(pulse, np.minimum(new, t.psi[k + 1, -1]), new)     # current limit while the pulse is on
         new = np.maximum(new, 0.0)
-        i_new = np.interp(new, t.psi[k + 1], t.current)
+        # zero flux is zero current even when the map row has tied leading zeros
+        i_new = np.where(new > 0, np.interp(new, t.psi[k + 1], t.current), 0.0)
         tq_old = np.interp(i, t.current, t.torque[k])
         tq_new = np.interp(i_new, t.current, t.torque[k + 1])
         w_t += 0.5 * (tq_old + tq_new) * dth * started
         w_l += 0.5 * (i + i_new) * (new - psi)
-        i2 += 0.5 * (i**2 + i_new**2) * dth
+        i2 += 0.5 * (i**2 + i_new**2) * dth * started
         psi, i = new, i_new
         peak = np.maximum(peak, psi)
+    # the residual tail after alignment (up to 1 % of the peak flux) is not counted
     valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # flux must be gone by alignment
     return w_t, w_l, i2, valid
 

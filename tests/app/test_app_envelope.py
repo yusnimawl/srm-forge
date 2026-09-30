@@ -19,12 +19,18 @@ def test_low_speed_torque_matches_the_ideal_current_limited_stroke():
     env = _env()
     # ideal stroke at 20 A: ½ I² ΔL over the rising-inductance half pitch, ΔL ≈ 2 mH → 0.4 J
     ideal = 4 * NR * 0.4 / (2 * math.pi)
-    assert 0.9 * ideal < env.torque[0] <= 1.02 * ideal
+    assert 0.98 * ideal < env.torque[0] <= 1.02 * ideal
 
 
-def test_power_is_torque_times_speed():
+def test_power_and_torque_follow_the_stroke_work():
     env = _env()
-    np.testing.assert_allclose(env.power, env.torque * env.speeds_rpm * 2 * math.pi / 60)
+    np.testing.assert_allclose(env.torque, 4 * NR * env.work_torque / (2 * math.pi))
+    assert env.power[0] == pytest.approx(env.torque[0] * 2 * math.pi * 100.0 / 60)
+
+
+def test_no_torque_rise_with_speed_when_current_limited():
+    env = _env()
+    assert env.torque[0] >= 0.99 * env.torque[3]     # 100 rpm vs 3000 rpm
 
 
 # The synthetic machine is small (3 mH, 20 A), so the voltage limit only binds at a low bus voltage.
@@ -50,11 +56,13 @@ def test_loop_energy_matches_torque_work():
     np.testing.assert_allclose(env.work_loop[ok], env.work_torque[ok], rtol=0.05)
 
 
-def test_no_nan_or_infinite_values_even_when_flux_cannot_decay():
-    env = _env(volts=5.0)      # a tiny bus voltage cannot demagnetise before alignment at speed
+def test_no_nan_or_infinite_values_when_no_stroke_produces_torque():
+    env = _env(volts=0.5, l1=0.0)      # no saliency: no stroke produces torque, so the fallback row is used
+    assert np.all(env.torque == 0)
     for name in ("torque", "power", "copper_loss", "theta_on", "theta_off"):
         assert np.all(np.isfinite(getattr(env, name))), name
     assert np.all(env.torque >= 0)
+    assert np.all(env.theta_off > env.theta_on)
 
 
 def test_turn_off_comes_after_turn_on():
