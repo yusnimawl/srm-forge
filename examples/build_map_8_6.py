@@ -34,7 +34,7 @@ def main() -> None:
     print(f"mesh build alone: {time.perf_counter() - start:.1f} s (build_map meshes again, inside the map time)")
 
     def progress(done: int, total: int) -> None:
-        print(f"  angle {done}/{total}  t = {time.perf_counter() - start:.1f} s", flush=True)
+        print(f"  point {done}/{total}  t = {time.perf_counter() - start:.1f} s", flush=True)
 
     start = time.perf_counter()
     r = build_map(design, 20.0, solver=solver, workers=workers, progress=progress)

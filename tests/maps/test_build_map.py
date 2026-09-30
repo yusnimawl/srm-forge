@@ -20,6 +20,19 @@ def test_pool_result_equals_serial_result():
     assert np.array_equal(pooled.status, serial.status)
 
 
+def test_pool_matches_serial_to_1e12_and_progress_counts_points():
+    static = build_machine_mesh(DESIGN)
+    angles, currents = np.array([0.0, 2 * static.settings.band_pitch]), np.array([0.0, 2.5, 5.0])
+    ticks = []
+    serial = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=1)
+    pooled = run_map(static, DESIGN, angles, currents, solver_name="skfem_reference", workers=2,
+                     progress=lambda done, total: ticks.append((done, total)))
+    for name in ("psi", "torque_arkkio", "torque_virtual_work", "coenergy"):
+        assert np.allclose(getattr(pooled, name), getattr(serial, name), rtol=1e-12, atol=1e-15)
+    assert np.array_equal(pooled.iterations, serial.iterations)
+    assert ticks[-1] == (6, 6) and {t for _, t in ticks} == {6}
+
+
 def test_second_call_is_served_from_the_cache_without_meshing(tmp_path, monkeypatch):
     kw = dict(i_max=5.0, solver="skfem_reference", n_angles=2, n_currents=2, cache_dir=tmp_path, workers=1)
     first = api.build_map(DESIGN, **kw)

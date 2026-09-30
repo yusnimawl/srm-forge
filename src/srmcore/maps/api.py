@@ -35,7 +35,7 @@ def build_map(design: Design, i_max: float, *, solver: str = "ngsolve", excited:
         return hit
     # ponytail: half the logical CPUs stands in for the physical core count; psutil is not a dependency.
     workers = workers if workers is not None else max(1, (os.cpu_count() or 2) // 2)
-    workers = max(1, min(workers, len(angles), 61))          # 61: the Windows pool limit
+    workers = max(1, min(workers, len(angles) * len(currents), 61))          # 61: the Windows pool limit
     result = run_map(build_machine_mesh(design), design, angles, currents, solver_name=solver, excited=excited,
                      workers=workers, progress=progress, cancel=cancel)
     if cache_dir is not None:

@@ -1,8 +1,8 @@
 """Map runner: one excited circuit swept over an angle × current grid (spec §7.2, §8.1).
 
 Every point is an independent solve from A = 0. Warm starts from the neighbouring current saved under
-20 % of the Newton iterations on the 8/6, so points stay independent; each angle is one job of the
-process pool."""
+20 % of the Newton iterations on the 8/6, so points stay independent; each point is one job of the
+process pool, highest current first because those solves take the most Newton iterations."""
 import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -45,18 +45,12 @@ class MapResult:
     complete: bool
 
 
-def solve_angle(static, design: Design, solver: SolverAdapter, angle: float, currents,
-                excited: str) -> dict[str, np.ndarray]:
-    """All currents at one angle: one array per MapResult field, first axis over currents."""
-    points = [solve_point(static, design, angle, {excited: float(i)}, solver) for i in currents]
-    return {
-        "psi": np.array([p.psi for p in points]),
-        "torque_arkkio": np.array([p.torque_arkkio for p in points]),
-        "torque_virtual_work": np.array([p.torque_virtual_work for p in points]),
-        "coenergy": np.array([p.coenergy for p in points]),
-        "iterations": np.array([p.iterations for p in points]),
-        "status": np.array([_CODE[p.status] for p in points], dtype=np.int8),
-    }
+def solve_job(job) -> dict:
+    """One point of the map, solved in a worker: `job` is (angle, current, excited)."""
+    angle, current, excited = job
+    p = solve_point(_WORKER["static"], _WORKER["design"], angle, {excited: current}, _WORKER["solver"])
+    return {"psi": p.psi, "torque_arkkio": p.torque_arkkio, "torque_virtual_work": p.torque_virtual_work,
+            "coenergy": p.coenergy, "iterations": p.iterations, "status": _CODE[p.status]}
 
 
 def apply_failure_policy(result: MapResult) -> MapResult:
@@ -92,11 +86,6 @@ def _init_worker(static, design, solver_name, threads) -> None:
     _WORKER.update(static=static, design=design, solver=make_solver(solver_name, threads))
 
 
-def _solve_job(job):
-    angle, currents, excited = job
-    return solve_angle(_WORKER["static"], _WORKER["design"], _WORKER["solver"], angle, currents, excited)
-
-
 def check_excited(excited: str) -> None:
     # Only phase A is aligned at θ = 0; the aligned angle of the other phases is not derived, so the
     # aligned-position check of the failure policy would be wrong for them.
@@ -116,17 +105,19 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
     data = {name: np.full((n_a, n_i, len(circuits)) if name == "psi" else (n_a, n_i), np.nan) for name in _FIELDS}
     iterations = np.zeros((n_a, n_i), dtype=np.int32)
     status = np.full((n_a, n_i), STATUS_NOT_RUN, dtype=np.int8)
-    jobs = [(float(a), currents, excited) for a in angles]
+    # Longest solves first keeps the pool busy to the end; results are scattered back by grid index.
+    order = sorted(((a, i) for a in range(n_a) for i in range(n_i)), key=lambda ai: (-ai[1], ai[0]))
+    jobs = [(float(angles[a]), float(currents[i]), excited) for a, i in order]
     # Pool workers run single-threaded solvers; the pool supplies the parallelism.
-    rows = map_ordered(_solve_job, jobs, workers=workers, initializer=_init_worker,
+    rows = map_ordered(solve_job, jobs, workers=workers, initializer=_init_worker,
                        initargs=(static, design, solver_name, 1 if workers > 1 else None),
                        cancel=cancel, progress=progress)
-    for a, row in enumerate(rows):
+    for (a, i), row in zip(order, rows):
         if row is None:
             continue
         for name in _FIELDS:
-            data[name][a] = row[name]
-        iterations[a], status[a] = row["iterations"], row["status"]
+            data[name][a, i] = row[name]
+        iterations[a, i], status[a, i] = row["iterations"], row["status"]
     complete = all(row is not None for row in rows)
     result = MapResult(np.asarray(angles, float), np.asarray(currents, float), circuits, excited,
                        **data, iterations=iterations, status=status,

@@ -81,8 +81,9 @@ def test_cancel_keeps_partial_results_unfilled(monkeypatch):
     calls = []
     r = _run(cancel=lambda: len(calls) >= 3, progress=lambda done, total: calls.append(done))
     assert not r.complete and calls == [1, 2, 3]
-    assert np.all(r.status[3:] == run.STATUS_NOT_RUN) and np.isnan(r.psi[3:]).all()
-    assert np.all(r.status[:3] != run.STATUS_NOT_RUN) and not r.filled.any()
+    done = r.status != run.STATUS_NOT_RUN           # jobs run highest current first, then by angle
+    assert done.sum() == 3 and done[:3, -1].all()
+    assert np.isnan(r.psi[~done]).all() and not np.isnan(r.psi[done]).any() and not r.filled.any()
 
 
 @pytest.mark.parametrize("excited", ["Z", "B"])
