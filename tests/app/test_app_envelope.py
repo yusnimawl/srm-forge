@@ -79,3 +79,24 @@ def test_only_phase_a_maps_are_accepted():
 def test_incomplete_map_is_rejected():
     with pytest.raises(ValueError):
         envelope(synthetic_map(complete=False), MACHINE, 400.0, 0.0, SPEEDS)
+
+
+def test_current_limit_scales_the_low_speed_torque_with_the_square_of_the_current():
+    full, half = _env(), _env_limited(10.0)
+    assert half.torque[0] == pytest.approx(0.25 * full.torque[0], rel=0.03)
+
+
+def _env_limited(limit, volts=400.0, r=0.0):
+    return envelope(synthetic_map(n_angles=24), MACHINE, volts, r, SPEEDS, current_limit=limit)
+
+
+@pytest.mark.parametrize("limit", [0.0, -1.0, 20.5])
+def test_current_limit_outside_the_map_is_rejected(limit):
+    with pytest.raises(ValueError, match="current limit"):
+        _env_limited(limit)
+
+
+def test_finer_drive_discretisation_agrees_at_low_speed():
+    coarse = _env()
+    fine = envelope(synthetic_map(n_angles=24), MACHINE, 400.0, 0.0, SPEEDS, n_theta=361, n_on=80, n_off=80)
+    assert fine.torque[0] == pytest.approx(coarse.torque[0], rel=0.02)
