@@ -155,7 +155,7 @@ Open questions:
 
 ## v0a-2 stage-2 accuracy check (2026-10-01)
 
-`python -u examples/v0_angle_check.py 4 20` (wire mode: Ø1.0 mm round, 2.0 x 1.0 mm rectangular, 60 x Ø0.1 mm litz; 150 A; 10 kW, 32 N.m, 3000 to 9000 rpm, 400 V; `full` mesh). One candidate per pole set, winding chosen on the default map (30 angles x 20 currents, N_THETA 181, 40 x 40 on/off grid); each variant changes one knob. Ratios: torque at base speed and worst power over base..max speed, against the requirement. Wall time 5.3 h (about 1 to 2 h per design, three `full` maps each).
+`python -u examples/v0_angle_check.py 4 20` (wire mode: Ø1.0 mm round, 2.0 x 1.0 mm rectangular, 60 x Ø0.1 mm litz; 150 A; 10 kW, 32 N.m, 3000 to 9000 rpm, 400 V; `full` mesh). One candidate per pole set, winding chosen on the default map (30 angles x 20 currents, N_THETA 181, 40 x 40 on/off grid); each variant changes one knob. Ratios: torque at base speed and worst power over base..max speed, against the requirement. Wall time 5.4 h (about 1 to 2 h per design, three `full` maps each).
 
 ```
 
