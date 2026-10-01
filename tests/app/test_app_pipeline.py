@@ -16,12 +16,12 @@ def _req(**kw):
 
 
 def _fake(candidate, req, stage, **kw):
+    nan = float("nan")
     if kw["cancel"] is not None and kw["cancel"]():
-        return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.total, stage.i_map,
-                          *([float("nan")] * 5), False, None, None)
-    return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, stage.i_map, 1.2, 1.1,
-                      5500.0, 5.5 / stage.mass.total, 0.9, True,
-                      Envelope(*([np.zeros(2)] * 8)), None)
+        return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.iron, None,
+                          nan, nan, nan, nan, nan, False, None, None)
+    return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, None, 1.2, 1.1,
+                      5500.0, 5.5 / stage.mass.total, 0.9, True, Envelope(*([np.zeros(2)] * 8)), None)
 
 
 def test_search_runs_stages_in_order_and_respects_shortlist():
@@ -67,6 +67,13 @@ def test_j_peak_reaches_stage_one():
     assert seen and set(seen) == {25e6}
 
 
+def test_current_density_settings_reach_stage_two():
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
+    assert ev.call_args.kwargs["j_peak"] == 25e6 and ev.call_args.kwargs["j_limit"] == 30e6
+
+
 def test_progress_counts_designs():
     seen = []
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
@@ -80,7 +87,7 @@ def test_pareto_uses_feasible_designs_only():
 
     def ev(i, feasible, mass, density, eff):
         c = cands[i]
-        return Evaluation(c.id, c.design, "ok", "", mass, 10.0, 1.1, 1.1, 1000.0, density, eff, feasible, None, None)
+        return Evaluation(c.id, c.design, "ok", "", mass, None, 1.1, 1.1, 1000.0, density, eff, feasible, None, None)
     evals = (ev(0, True, 10.0, 3.0, 0.9), ev(1, True, 12.0, 2.0, 0.8), ev(2, False, 5.0, 9.0, 0.99),
              ev(3, True, 8.0, 3.5, 0.85))
     res = SearchResult(_req(), 4, {}, 0, evals, False)

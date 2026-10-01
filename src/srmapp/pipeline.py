@@ -56,7 +56,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
         if cancel is not None and cancel():
             cancelled = True
             break
-        evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, solver=solver, workers=workers,
+        evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, j_peak=settings.j_peak,
+                                     j_limit=settings.j_limit, solver=solver, workers=workers,
                                      cache_dir=cache_dir, cancel=cancel)
         if evaluation.status == "cancelled":
             cancelled = True
