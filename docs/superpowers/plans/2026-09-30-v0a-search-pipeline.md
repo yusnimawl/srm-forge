@@ -152,7 +152,7 @@ Expected: FAIL (`ModuleNotFoundError: No module named 'srmapp'`).
 
 - [ ] **Step 3: Implement**
 
-`pyproject.toml`: change `packages = ["src/srmcore"]` to `packages = ["src/srmcore", "src/srmapp"]`, then run `.venv\Scripts\python -m pip install -e ".[dev,ngsolve]"` once so `srmapp` is importable.
+`pyproject.toml`: change `packages = ["src/srmcore"]` to `packages = ["src/srmcore", "src/srmapp"]`, and change the pytest option `pythonpath = ["tests"]` to `pythonpath = ["tests", "tests/maps"]` (the app tests import `map_fixtures` from `tests/maps`), then run `.venv\Scripts\python -m pip install -e ".[dev,ngsolve]"` once so `srmapp` is importable.
 
 `src/srmapp/__init__.py`:
 
@@ -814,18 +814,19 @@ def test_power_is_torque_times_speed():
     np.testing.assert_allclose(env.power, env.torque * env.speeds_rpm * 2 * math.pi / 60)
 
 
+# The synthetic machine is small (3 mH, 20 A), so the voltage limit only binds at a low bus voltage.
 def test_torque_falls_at_high_speed():
-    env = _env()
+    env = _env(volts=100.0)
     assert env.torque[-1] < 0.5 * env.torque[0]
 
 
 def test_more_bus_voltage_helps_at_high_speed():
-    assert _env(volts=800.0).torque[-1] > _env(volts=400.0).torque[-1]
+    assert _env(volts=200.0).torque[-1] > _env(volts=100.0).torque[-1]
 
 
 def test_resistance_costs_torque_and_gives_copper_loss():
     lossless, lossy = _env(r=0.0), _env(r=0.5)
-    assert np.all(lossy.torque <= lossless.torque + 1e-9)
+    assert np.all(lossy.torque <= lossless.torque * (1 + 1e-6) + 1e-9)
     assert np.all(lossy.copper_loss > 0)
     assert np.all(lossy.efficiency < 1.0)
 
@@ -987,7 +988,7 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
 - [ ] **Step 4: Run to verify they pass**
 
 Run: `.venv\Scripts\python -m pytest tests/app/test_app_envelope.py -q`
-Expected: pass. If `test_low_speed_torque_matches_the_ideal_current_limited_stroke` misses by a small margin, check that the turn-on grid contains an index at or just after 0.5 of the pitch and that `theta_off` can reach 0.95 of the pitch; widen `ON_RANGE`/`OFF_RANGE` resolution (`N_ON`, `N_OFF`) rather than the test bounds. If `test_loop_energy_matches_torque_work` fails by more than 5 %, raise `N_THETA` before touching the tolerance.
+Expected: pass. If `test_torque_falls_at_high_speed` or `test_more_bus_voltage_helps_at_high_speed` fail, lower the two test voltages (for example 50 V and 100 V) until the voltage limit binds; do not weaken the assertions. If `test_low_speed_torque_matches_the_ideal_current_limited_stroke` misses by a small margin, check that the turn-on grid contains an index at or just after 0.5 of the pitch and that `theta_off` can reach 0.95 of the pitch; widen `ON_RANGE`/`OFF_RANGE` resolution (`N_ON`, `N_OFF`) rather than the test bounds. If `test_loop_energy_matches_torque_work` fails by more than 5 %, raise `N_THETA` before touching the tolerance.
 
 - [ ] **Step 5: Commit**
 

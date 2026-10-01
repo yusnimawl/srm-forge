@@ -22,10 +22,10 @@ dev = ["pytest>=8.0", "hypothesis>=6.100"]
 ngsolve = ["ngsolve>=6.2.2601"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/srmcore"]
+packages = ["src/srmcore", "src/srmapp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
+pythonpath = ["tests", "tests/maps"]
 addopts = "-ra"
 markers = ["slow: long-running validation tests (nightly or on demand)"]

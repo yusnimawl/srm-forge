@@ -121,3 +121,34 @@ What M5 inherits from M4:
 - Deferred: the saturation-knee-vs-Bsat check; reuse of the Newton factorisation for L_inc (about 0.15 s per point); temperature in the cache key; engine changes enter the cache key only through the srmcore version.
 - Iron B peaks reach 1.43–1.48 Js at the pole-tip corners on the example 8/6 (limit 1.5 Js); the material data behind that is provisional (spec §10).
 - M5 work: FEMM fixtures, TEAM 24 comparison, measured-data comparison, mesh-preset defaults from a convergence study (which also addresses the fidelity result), uncertainty budgets.
+
+## v0a grid study
+
+Example 8/6, `screening` mesh, I_max 20 A, relative error against the 12 x 8 map.
+
+```
+    grid   T_peak       La    T@300   T@3000   T@9000  wall s   (rel. error vs 12x8)
+  12x8      0.00%    0.00%    0.00%    0.00%    0.00%     154
+   8x4      3.13%    6.33%   16.29%   22.26%   44.98%      53
+  10x5      0.45%    4.47%   10.31%   13.63%   34.78%      85
+  10x6      0.45%    2.71%   10.31%   13.71%   35.92%      95
+  12x5      0.00%    4.47%    0.00%    0.27%    1.22%      93
+  12x6      0.00%    2.71%    0.00%    0.15%    0.31%     101
+```
+
+Chosen stage-2 grid: 12 x 5 (`StageTwoGrid` default).
+
+Caveats:
+- The 12 x 8 reference shares its angle set with 12 x 5 and 12 x 6 (`angle_grid` depends only on the angle count), so their errors are current-interpolation error only; 0.00 % at T_peak and T@300 is by construction.
+- Going from 12 to 10 angles at equal current count moves the envelope torque by 10 to 35 %, so the drive-model result is strongly sensitive to the angle count.
+- 11 x N and 12 x 4 were not tried.
+- A check of the 12-angle map against a 24 or 30 angle reference is open.
+
+### v0a search run
+
+`v0_search.py 24 6` (10 kW, 32 N.m, 3000 to 9000 rpm, 400 V, 20 A/mm2): sampled 24, dropped validator 2 / fit 3, stage 1 rejected 6, evaluated 6 in 1178 s (about 200 s per design). All six status ok; 0 of 6 feasible. Torque ratios 0.02 to 1.82, power ratios 0.01 to 0.56.
+
+Open questions:
+- Stage-2 time per design is about 10x the 20 s budget in the v0 spec.
+- The stage-1 torque bound is optimistic against FEM.
+- Power ratios are low. Analysis, not measurement: turns are sampled independently of bus voltage and max speed, and at fixed current density a turns change only rescales the same envelope in speed (flux linkage ~N, current ~1/N, resistance ~N^2), so a geometry may be fine with the wrong turn count. Choosing turns after the map is the follow-up (spec §9).
