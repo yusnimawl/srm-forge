@@ -98,6 +98,7 @@ Items taken from a comparison with JMAG-Express (`docs/jmag-express-srm-referenc
 Next, folded into the following work cycle (small, both change which designs count as feasible):
 1. **RMS current and RMS current density.** The current-density limit in wire mode applies to the peak current; cooling sees the RMS current, which in an SRM is roughly half the peak. Compute I_rms from the envelope's ∫i² and apply `j_limit` to it; the peak current stays limited by `phase_current_a`. Report I_rms and J_rms per evaluation.
 2. **Parallel pole paths.** Add the coil connection (series or parallel paths per phase) to the turns scan; `srmcore.physics.winding.phase_winding` already takes `parallel_paths`.
+Items 1 and 2 and decisions (a) and (b) are implemented as specified in `2026-10-01-rms-paths-grid-margin-design.md`.
 
 Own work cycles, in this order:
 3. **Iron loss** and efficiency including it (core roadmap §1.3 item 2). The fixed iron mesh nodes give per-element flux waveforms.
