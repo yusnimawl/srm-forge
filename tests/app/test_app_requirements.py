@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from srmapp.requirements import Requirements
+from srmapp.wire import RoundWire
 
 
 def _ok(**kw):
@@ -51,3 +52,29 @@ def test_millimetre_looking_outer_diameter_is_rejected():
 def test_no_extra_fields():
     with pytest.raises(ValidationError):
         _ok(colour="red")
+
+
+_WIRE = dict(kind="round", diameter=1.0e-3, outer_diameter=1.08e-3)
+
+
+def test_density_mode_by_default():
+    r = _ok()
+    assert r.wires == () and not r.wire_mode
+    assert r.phase_current_a is None and r.max_slot_fill == 0.6
+
+
+def test_wire_mode_needs_a_phase_current():
+    with pytest.raises(ValidationError, match="phase_current_a"):
+        _ok(wires=[_WIRE])
+    r = _ok(wires=[_WIRE], phase_current_a=150.0)
+    assert r.wire_mode and isinstance(r.wires[0], RoundWire)
+
+
+def test_density_mode_accepts_a_current_cap():
+    assert _ok(phase_current_a=200.0).phase_current_a == 200.0
+
+
+@pytest.mark.parametrize("fill", [0.0, 0.95])
+def test_slot_fill_range(fill):
+    with pytest.raises(ValidationError):
+        _ok(max_slot_fill=fill)
