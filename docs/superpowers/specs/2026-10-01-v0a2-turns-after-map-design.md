@@ -87,4 +87,26 @@ The speed-only levers in v0 spec §4 (half-pitch symmetry, skipping the zero-cur
 
 ## 9. Open
 
-AC and litz losses (skin, proximity); parallel pole paths; rectangular corner radius; iron loss; mutual coupling; flux past alignment (conservative at high speed, unmeasured); stage-1 false-drop rate.
+AC and litz losses (skin, proximity); parallel pole paths (scheduled, §10); rectangular corner radius; iron loss (scheduled, §10); mutual coupling; flux past alignment (conservative at high speed, unmeasured); stage-1 false-drop rate.
+
+## 10. Accuracy check results and roadmap (owner-agreed 2026-10-01)
+
+Results of §5 are in `docs/m4-handoff.md` ("v0a-2 stage-2 accuracy check"): 3 of 4 candidates feasible; angles, current count and N_THETA move the ratios by at most about 1 %; the 40 x 40 on/off grid moves them by +1.1 to +3.3 % (above 2 % on the 6/4). Still open for the owner: (a) raise the on/off grid default to 80 x 80 (recommended; scan time only); (b) a feasibility margin on the turns scan (e.g. worst ratio >= 1.05), because the selection rules place chosen designs close to ratio 1.0.
+
+Items taken from a comparison with JMAG-Express (`docs/jmag-express-srm-reference.md`). JMAG-Express is not followed where its method is weaker: it fixes one turn-on angle and width over the whole speed range (this project optimises them per speed), and its sizing derives turns from slot fill and wire area without reference to bus voltage or speed (the cause of the v0a 0-of-6 result).
+
+Next, folded into the following work cycle (small, both change which designs count as feasible):
+1. **RMS current and RMS current density.** The current-density limit in wire mode applies to the peak current; cooling sees the RMS current, which in an SRM is roughly half the peak. Compute I_rms from the envelope's ∫i² and apply `j_limit` to it; the peak current stays limited by `phase_current_a`. Report I_rms and J_rms per evaluation.
+2. **Parallel pole paths.** Add the coil connection (series or parallel paths per phase) to the turns scan; `srmcore.physics.winding.phase_winding` already takes `parallel_paths`.
+
+Own work cycles, in this order:
+3. **Iron loss** and efficiency including it (core roadmap §1.3 item 2). The fixed iron mesh nodes give per-element flux waveforms.
+4. **SRM efficiency maps** (speed vs torque) from the envelope by sweeping the current limit. JMAG-Express does not offer these for SRMs.
+5. **Thermal model** for direct liquid cooling (core roadmap item 3). JMAG-Express has none for SRMs.
+
+Later:
+6. Inverter rating (VA per kW) as an output and a possible Pareto objective.
+7. Correction factors (saturation, iron loss) to calibrate against test data, after M5.
+8. Tapered teeth in the generator (geometry already supports taper; the generator fixes it at zero).
+9. v0b web layer: keep every evaluation as a case (table, flags, comments, one-parameter sweeps, CSV/PDF export).
+10. Flux-linkage LUT export in a Simulink/PSIM-ready format (CSV and .mat exist).
