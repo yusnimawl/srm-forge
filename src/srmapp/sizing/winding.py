@@ -62,8 +62,9 @@ def density_windings(p: RadialSRMParams, req: Requirements, j_peak: float,
 
 
 def max_mmf(p: RadialSRMParams, req: Requirements, j_peak: float, j_limit: float) -> float:
-    """Largest peak ampere-turns per pole any allowed winding carries (spec §3.3); the map must cover it."""
-    a = coil_side_area(p)
+    """Largest peak ampere-turns per pole any allowed winding carries (spec §3.3); the map must cover it.
+    0 when wire mode allows no winding."""
     if req.wire_mode:
-        return j_limit * req.max_slot_fill * a * max(w.copper_area / w.outer_area for w in req.wires)
-    return j_peak * p.fill_factor * a
+        return max((w.turns * w.current for i in range(len(req.wires)) for w in wire_windings(p, req, i, j_limit)),
+                   default=0.0)
+    return j_peak * p.fill_factor * coil_side_area(p)

@@ -14,7 +14,7 @@ from srmcore.maps.tables import angle_spline
 from srmcore.model.design import RadialSRMParams
 
 N_THETA = 181                 # angle points over one rotor pole pitch
-N_CURRENT = 121               # current points over 0..I_max
+N_CURRENT = 121               # current points over 0..current limit
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
 OFF_RANGE = (0.45, 0.995)      # turn-off search range
 N_ON, N_OFF = 40, 40

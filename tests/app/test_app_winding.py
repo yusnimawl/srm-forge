@@ -86,6 +86,20 @@ def test_max_mmf_covers_every_wire_winding(wires):
         assert all(w.turns * w.current <= top * (1 + 1e-9) for w in wire_windings(P, req, i, 20e6))
 
 
+def test_max_mmf_is_the_largest_ampere_turns_of_the_allowed_windings():
+    req = _req(wires=[THIN, THICK], phase_current_a=60.0)
+    top = max(w.turns * w.current for i in range(2) for w in wire_windings(P, req, i, 20e6))
+    assert max_mmf(P, req, 20e6, 20e6) == top
+    thin = _req(wires=[THIN], phase_current_a=60.0)
+    old_bound = 20e6 * thin.max_slot_fill * A * max(w.copper_area / w.outer_area for w in thin.wires)
+    assert max_mmf(P, thin, 20e6, 20e6) < old_bound
+
+
+def test_max_mmf_is_zero_when_no_wire_fits():
+    huge = dict(kind="round", diameter=0.019, outer_diameter=0.0195)
+    assert max_mmf(P, _req(wires=[huge], phase_current_a=60.0), 20e6, 20e6) == 0.0
+
+
 def test_max_mmf_density_mode():
     assert max_mmf(P, _req(), 20e6, 99e6) == pytest.approx(20e6 * P.fill_factor * A)
     assert all(w.turns * w.current <= max_mmf(P, _req(), 20e6, 20e6) * (1 + 1e-9)

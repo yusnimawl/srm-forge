@@ -106,8 +106,19 @@ def test_wire_mode_evaluation_uses_the_inverter_current():
 
 
 def test_no_winding_is_reported_not_raised():
-    e, _ = _evaluate(_req(wires=[THICK], phase_current_a=1e6))
+    e, _ = _evaluate(_req(wires=[THICK], phase_current_a=100.0), j_limit=1.0)    # stricter than the stage-1 range
     assert e.status == "no_winding" and not e.feasible and e.winding is None and e.envelope is None
+
+
+def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    free, _ = _evaluate(req)
+    iron = stage1(req, make_8_6()).mass.iron
+    limit = iron + 0.5 * free.winding.copper_mass
+    e, stage = _evaluate(_req(wires=[THICK], phase_current_a=100.0, max_mass_kg=limit))
+    assert stage.passes and e.status == "ok" and not e.feasible
+    assert "mass" in e.error and f"{limit:.2f} kg limit" in e.error
+    assert free.error == ""
 
 
 @pytest.mark.slow

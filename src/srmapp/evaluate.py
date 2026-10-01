@@ -33,7 +33,7 @@ class Evaluation:
     id: str
     design: Design              # with the chosen turns per pole and copper fill once a winding is chosen
     status: str                 # "ok", "cancelled", "no_winding", or the name of the exception that stopped it
-    error: str
+    error: str                  # failure message; with status "ok", notes such as a scan at its limit or a mass over the limit
     mass_kg: float              # iron plus the chosen winding's copper; iron only without a winding
     winding: Winding | None
     torque_ratio: float         # achieved / required, at base speed
@@ -77,8 +77,12 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     peak_power = float(np.max(env.power))
     at_base = int(np.argmin(np.abs(env.speeds_rpm - req.base_speed_rpm)))
     key = key_numbers(rescale_turns(result, w.turns / machine.turns_per_pole), chosen)
-    note = (f"turn scan reached its limit of {max_turns}; more turns may also be feasible"
-            if not req.wire_mode and w.turns == max_turns else "")
-    return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", note, mass, w,
+    notes = []
+    if not req.wire_mode and w.turns == max_turns:
+        notes.append(f"turn scan reached its limit of {max_turns}; more turns may also be feasible")
+    over_mass = req.max_mass_kg is not None and mass > req.max_mass_kg
+    if over_mass:
+        notes.append(f"mass {mass:.2f} kg above the {req.max_mass_kg:.2f} kg limit")
+    return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
-                      float(env.efficiency[at_base]), choice.feasible, env, key, choice.scan)
+                      float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan)

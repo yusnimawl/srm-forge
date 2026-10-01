@@ -45,6 +45,8 @@ def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: f
     reason = ""
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
         reason = f"iron mass {mass.iron:.2f} kg above the {req.max_mass_kg:.2f} kg limit"
+    elif mmf == 0.0:
+        reason = "no winding meets the wire, phase current and current-density limits"
     elif upper < margin * req.peak_torque_nm:
         reason = f"torque upper bound {upper:.1f} N·m below the required {margin * req.peak_torque_nm:.1f} N·m"
     return Stage1(mass, mmf, mmf / p.turns_per_pole, upper, reason == "", reason)

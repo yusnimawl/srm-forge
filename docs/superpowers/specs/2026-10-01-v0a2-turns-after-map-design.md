@@ -47,7 +47,7 @@ Strand Ø is kept so an AC-loss model can be added later.
 
 ### 3.3 Map current range
 
-The map covers MMF up to `j_limit · fill · A_side · max(a_cu / a_out)` over the wires in wire mode, and `j_peak · 0.5 · A_side` in density mode. No N, wire or current combination allowed by the constraints exceeds it. The map's I_max is that MMF divided by N0.
+The map covers MMF up to the largest N·I over the allowed windings in wire mode (at most `j_limit · fill · A_side · max(a_cu / a_out)`), and `j_peak · 0.5 · A_side` in density mode. No N, wire or current combination allowed by the constraints exceeds it. The map's I_max is that MMF divided by N0.
 
 ### 3.4 Turns scan
 

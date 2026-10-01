@@ -3,6 +3,7 @@ from conftest import make_8_6
 
 from srmapp.requirements import Requirements
 from srmapp.sizing import estimates as est
+from srmapp.sizing.winding import wire_windings
 from srmapp.sizing.stage1 import stage1, torque_upper_bound
 
 
@@ -61,8 +62,17 @@ def test_current_density_raises_the_bound_and_the_map_current():
 
 def test_wire_mode_range_follows_the_cooling_limit():
     req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
-    lo, hi = stage1(req, make_8_6(), j_limit=10e6), stage1(req, make_8_6(), j_limit=20e6)
-    assert hi.mmf == pytest.approx(2 * lo.mmf)
+    p = make_8_6()
+    lo, hi = stage1(req, p, j_limit=10e6), stage1(req, p, j_limit=20e6)
+    assert hi.mmf >= lo.mmf
+    for s, j in ((lo, 10e6), (hi, 20e6)):
+        assert s.mmf == max(w.turns * w.current for w in wire_windings(p, req, 0, j))
+
+
+def test_wire_mode_without_a_possible_winding_fails():
+    req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=1e6)
+    s = stage1(req, make_8_6())
+    assert not s.passes and "no winding" in s.reason and s.mmf == 0.0
 
 
 def test_margin_tightens_the_filter():
