@@ -38,9 +38,9 @@ class Stage1:
 
 
 def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: float = J_PEAK,
-           j_limit: float = J_LIMIT) -> Stage1:
+           j_peak_max: float = 2 * J_LIMIT) -> Stage1:
     mass = active_mass(p)
-    mmf = max_mmf(p, req, j_peak, j_limit)
+    mmf = max_mmf(p, req, j_peak, j_peak_max)
     upper = torque_upper_bound(p, mmf)
     reason = ""
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
