@@ -24,7 +24,7 @@ Both modes use the same map and the same turns scan. They differ in what is fixe
 |---|---|---|
 | Fixed | wire list, phase current I, max slot fill | current density J (`j_peak`), fill factor 0.5 |
 | Per N | parallel strands p = floor(fill·A_side / (N·a_out)) | conductor area fill·A_side / N |
-| Constraint | I / (p·a_cu) ≤ j_limit, p ≥ 1 | i_peak(N) ≤ `max_phase_current_a` when set |
+| Constraint | I / (p·a_cu) ≤ j_limit, p ≥ 1 | i_peak(N) ≤ `phase_current_a` when set |
 | Choice | smallest N meeting torque and power; then the wire with the lowest R | largest N meeting torque and power (lowest current) |
 
 A_side is `coil_side_area` (one coil side). Each coil side holds N·p conductors.
@@ -42,7 +42,7 @@ Strand Ø is kept so an AC-loss model can be added later.
 ### 3.2 Requirements and settings
 
 - `Requirements.wires: list[Wire]`, `phase_current_a`, `max_slot_fill` (default 0.6, outer-area basis). Wire mode is active when `wires` is non-empty.
-- `Requirements.max_phase_current_a` (optional) caps the current in density mode.
+- `phase_current_a` is the inverter's peak phase current: required in wire mode, an optional cap in density mode.
 - `SearchSettings.j_limit` (A/m², cooling limit). The existing `j_peak` stays the density-mode J.
 
 ### 3.3 Map current range
