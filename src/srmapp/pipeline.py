@@ -7,7 +7,7 @@ import numpy as np
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
-from .sizing.estimates import J_PEAK
+from .sizing.estimates import J_LIMIT, J_PEAK
 from .sizing.generator import sample_candidates
 from .sizing.stage1 import stage1
 
@@ -20,6 +20,7 @@ class SearchSettings:
     grid: StageTwoGrid = field(default_factory=StageTwoGrid)
     margin: float = 1.0
     j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max
+    j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor current density (wire mode)
 
 
 @dataclass(frozen=True)
@@ -45,9 +46,9 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                progress: Callable[[int, int], None] | None = None,
                cancel: Callable[[], bool] | None = None) -> SearchResult:
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed)
-    scored = [(c, stage1(req, c.design.machine, settings.margin, settings.j_peak)) for c in candidates]
+    scored = [(c, stage1(req, c.design.machine, settings.margin, settings.j_peak, settings.j_limit)) for c in candidates]
     passing = [(c, s) for c, s in scored if s.passes]
-    passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.total, reverse=True)
+    passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.iron, reverse=True)
     shortlist = passing[:settings.shortlist]
     evaluations: list[Evaluation] = []
     cancelled = False

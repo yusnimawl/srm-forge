@@ -45,7 +45,7 @@ class Evaluation:
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str) -> Evaluation:
-    return Evaluation(candidate.id, candidate.design, status, error, stage.mass.total, stage.i_peak,
+    return Evaluation(candidate.id, candidate.design, status, error, stage.mass.total, stage.i_map,
                       _NAN, _NAN, _NAN, _NAN, _NAN, False, None, None)
 
 
@@ -56,7 +56,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     design = candidate.design
     machine = design.machine
     try:
-        result = build_map(design, stage.i_peak, solver=solver, workers=workers, n_angles=grid.n_angles,
+        result = build_map(design, stage.i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
     except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
         return _failed(candidate, stage, type(exc).__name__, str(exc))
@@ -66,6 +66,6 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     torque_ratio, power_ratio = requirement_ratios(env, req)
     peak_power = float(np.max(env.power))
     at_base = int(np.argmin(np.abs(env.speeds_rpm - req.base_speed_rpm)))
-    return Evaluation(candidate.id, design, "ok", "", stage.mass.total, stage.i_peak, torque_ratio, power_ratio,
+    return Evaluation(candidate.id, design, "ok", "", stage.mass.total, stage.i_map, torque_ratio, power_ratio,
                       peak_power, peak_power / 1000 / stage.mass.total, float(env.efficiency[at_base]),
                       torque_ratio >= 1.0 and power_ratio >= 1.0, env, key_numbers(result, machine))

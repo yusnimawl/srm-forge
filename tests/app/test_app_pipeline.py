@@ -17,9 +17,9 @@ def _req(**kw):
 
 def _fake(candidate, req, stage, **kw):
     if kw["cancel"] is not None and kw["cancel"]():
-        return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.total, stage.i_peak,
+        return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.total, stage.i_map,
                           *([float("nan")] * 5), False, None, None)
-    return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, stage.i_peak, 1.2, 1.1,
+    return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, stage.i_map, 1.2, 1.1,
                       5500.0, 5.5 / stage.mass.total, 0.9, True,
                       Envelope(*([np.zeros(2)] * 8)), None)
 
@@ -58,9 +58,9 @@ def test_j_peak_reaches_stage_one():
     seen = []
     real = __import__("srmapp.pipeline", fromlist=["stage1"]).stage1
 
-    def spy(req, p, margin, j_peak):
+    def spy(req, p, margin, j_peak, j_limit):
         seen.append(j_peak)
-        return real(req, p, margin, j_peak)
+        return real(req, p, margin, j_peak, j_limit)
     with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6))
