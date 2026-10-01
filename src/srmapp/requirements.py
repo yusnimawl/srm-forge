@@ -1,7 +1,8 @@
-"""Vehicle-motor requirements (v0 spec §3). Peak-only: no continuous rating."""
+"""Vehicle-motor requirements (v0 spec §3, v0a-2 spec §3.2). Peak-only: no continuous rating. Wire mode when wires are given, density mode otherwise."""
 import math
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from .wire import Wire
 
 # Same plausibility window as the srmcore validator's stator_outer_diameter unit rule.
