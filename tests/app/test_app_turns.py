@@ -4,7 +4,9 @@ from conftest import make_8_6
 from map_fixtures import synthetic_map
 
 from srmapp.drive.envelope import envelope
-from srmapp.turns import rescale_turns
+from srmapp.requirements import Requirements
+from srmapp.sizing.winding import max_mmf
+from srmapp.turns import choose_turns, requirement_ratios, rescale_turns, speed_grid
 
 MACHINE = make_8_6()
 SPEEDS = np.array([100.0, 1500.0, 6000.0, 12000.0])
@@ -46,3 +48,63 @@ def test_fem_map_at_double_turns_matches_the_rescale():
     np.testing.assert_allclose(double.psi, predicted.psi, rtol=1e-6, atol=1e-7 * psi_scale)
     t_scale = np.max(np.abs(double.torque_arkkio))
     np.testing.assert_allclose(double.torque_arkkio, predicted.torque_arkkio, rtol=1e-6, atol=1e-7 * t_scale)
+
+
+THICK = dict(kind="round", diameter=6.0e-3, outer_diameter=6.2e-3)
+THICKER = dict(kind="rectangular", width=7.0e-3, height=4.0e-3, insulation=0.1e-3)
+
+
+def _req(**kw):
+    values = dict(peak_power_w=10.47, peak_torque_nm=0.1, base_speed_rpm=1000.0, max_speed_rpm=2000.0)
+    values.update(kw)
+    return Requirements(**values)
+
+
+def _map_for(req, j_peak=20e6, j_limit=20e6):
+    top = max_mmf(MACHINE, req, j_peak, j_limit) / MACHINE.turns_per_pole
+    return synthetic_map(n_angles=24, currents=np.linspace(0.0, top, 9))
+
+
+def test_wire_mode_picks_the_lowest_resistance_feasible_winding():
+    req = _req(wires=[THICK, THICKER], phase_current_a=100.0)
+    c = choose_turns(_map_for(req), MACHINE, req)
+    assert c.point is not None and c.feasible and c.point.feasible
+    feasible = [s for s in c.scan if s.feasible]
+    assert c.point.winding.resistance == min(s.winding.resistance for s in feasible)
+    same_wire = [s.winding.turns for s in feasible if s.winding.wire == c.point.winding.wire]
+    assert c.point.winding.turns == min(same_wire)
+    assert {s.winding.wire for s in c.scan} == {0, 1}
+
+
+def test_density_mode_picks_the_most_turns():
+    req = _req()
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40)
+    assert c.feasible
+    assert c.point.winding.turns == max(s.winding.turns for s in c.scan if s.feasible)
+    assert len(c.scan) == 40
+
+
+def test_density_current_cap_limits_the_scan():
+    req = _req(phase_current_a=200.0)
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40)
+    assert c.scan and all(s.winding.current <= 200.0 * (1 + 1e-9) for s in c.scan)
+
+
+def test_infeasible_requirement_reports_the_closest_winding():
+    req = _req(peak_torque_nm=1e4, peak_power_w=1.047e6)
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=20)
+    assert not c.feasible and c.point is not None and not c.point.feasible
+    assert c.point.worst == max(s.worst for s in c.scan)
+
+
+def test_no_winding_when_nothing_fits():
+    req = _req(wires=[THICK], phase_current_a=1e6)
+    c = choose_turns(synthetic_map(n_angles=24), MACHINE, req)
+    assert c.point is None and not c.feasible and c.envelope is None and c.scan == ()
+
+
+def test_chosen_envelope_covers_the_full_speed_grid_and_matches_the_scan_ratios():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    c = choose_turns(_map_for(req), MACHINE, req)
+    np.testing.assert_array_equal(c.envelope.speeds_rpm, speed_grid(req))
+    assert requirement_ratios(c.envelope, req) == pytest.approx((c.point.torque_ratio, c.point.power_ratio))

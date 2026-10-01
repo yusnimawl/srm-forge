@@ -14,6 +14,7 @@ from .requirements import Requirements
 from .sizing.estimates import phase_resistance
 from .sizing.generator import Candidate
 from .sizing.stage1 import Stage1
+from .turns import requirement_ratios, speed_grid
 
 _NAN = float("nan")
 
@@ -23,19 +24,6 @@ class StageTwoGrid:
     """Reduced map grid. The default 12 x 5 was chosen from the v0a grid study in docs/m4-handoff.md."""
     n_angles: int = 12
     n_currents: int = 5
-
-
-def speed_grid(req: Requirements, n: int = 12) -> np.ndarray:
-    """Speeds in rpm from 10 % of base to the maximum; base and maximum speed are members exactly."""
-    base, top = req.base_speed_rpm, req.max_speed_rpm
-    return np.unique(np.concatenate([base * np.array([0.1, 0.25, 0.5]), np.linspace(base, top, n)]))
-
-
-def requirement_ratios(env: Envelope, req: Requirements) -> tuple[float, float]:
-    """(torque at base speed / required torque, lowest power between base and maximum speed / required power)."""
-    torque_at_base = float(np.interp(req.base_speed_rpm, env.speeds_rpm, env.torque))
-    band = (env.speeds_rpm >= req.base_speed_rpm) & (env.speeds_rpm <= req.max_speed_rpm)
-    return torque_at_base / req.peak_torque_nm, float(np.min(env.power[band])) / req.peak_power_w
 
 
 @dataclass(frozen=True)
