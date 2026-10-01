@@ -91,7 +91,7 @@ AC and litz losses (skin, proximity); parallel pole paths (scheduled, §10); rec
 
 ## 10. Accuracy check results and roadmap (owner-agreed 2026-10-01)
 
-Results of §5 are in `docs/m4-handoff.md` ("v0a-2 stage-2 accuracy check"): 3 of 4 candidates feasible; angles, current count and N_THETA move the ratios by at most about 1 %; the 40 x 40 on/off grid moves them by +1.1 to +3.3 % (above 2 % on the 6/4). Still open for the owner: (a) raise the on/off grid default to 80 x 80 (recommended; scan time only); (b) a feasibility margin on the turns scan (e.g. worst ratio >= 1.05), because the selection rules place chosen designs close to ratio 1.0.
+Results of §5 are in `docs/m4-handoff.md` ("v0a-2 stage-2 accuracy check"): 3 of 4 candidates feasible; angles, current count and N_THETA move the ratios by at most about 1 %; the 40 x 40 on/off grid moves them by +1.1 to +3.3 % (above 2 % on the 6/4). Decided 2026-10-01: (a) the on/off grid becomes at least 80 x 80; a coarse-to-fine search is allowed if it matches a dense reference within the accuracy-check tolerance; (b) a feasibility-margin setting, default 1.05, applied to the worst of the torque and power ratios; it reflects trust in the model and is revisited after M5. The Pareto plot shows each design's ratios.
 
 Items taken from a comparison with JMAG-Express (`docs/jmag-express-srm-reference.md`). JMAG-Express is not followed where its method is weaker: it fixes one turn-on angle and width over the whole speed range (this project optimises them per speed), and its sizing derives turns from slot fill and wire area without reference to bus voltage or speed (the cause of the v0a 0-of-6 result).
 
