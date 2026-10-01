@@ -11,6 +11,9 @@ from srmcore.model.design import RadialSRMParams
 # Default peak current density in the conductor, A/m². Provisional: a thermal model replaces it.
 J_PEAK = 20e6
 
+# Default cooling limit on the conductor current density in wire mode, A/m². Provisional: a thermal model replaces it.
+J_LIMIT = 20e6
+
 
 @dataclass(frozen=True)
 class Mass:
@@ -21,6 +24,10 @@ class Mass:
     @property
     def total(self) -> float:
         return self.stator_iron + self.rotor_iron + self.copper
+
+    @property
+    def iron(self) -> float:
+        return self.stator_iron + self.rotor_iron
 
 
 def pole_chord(radius: float, arc: float) -> float:
@@ -68,19 +75,26 @@ def _iron_areas(p: RadialSRMParams) -> tuple[float, float]:
     return stator, rotor
 
 
+def series_resistance(p: RadialSRMParams, turns: int, copper_area: float, temperature_c: float = 100.0) -> float:
+    """One phase at `temperature_c`, its poles in series, `turns` per pole, each turn of `copper_area` (m²)."""
+    copper = load_material(p.materials.coil)
+    rho = copper.resistivity * (1 + copper.temperature_coefficient * (temperature_c - copper.reference_temperature_c))
+    return rho * turns * p.n_stator_poles / p.n_phases * mean_turn_length(p) / copper_area
+
+
+def copper_mass(p: RadialSRMParams, turns: int, copper_area: float) -> float:
+    """Copper of all coils, `turns` per pole, each turn of `copper_area` (m²)."""
+    return load_material(p.materials.coil).density * p.n_stator_poles * turns * copper_area * mean_turn_length(p)
+
+
 def active_mass(p: RadialSRMParams) -> Mass:
     stator_area, rotor_area = _iron_areas(p)
     stator_mat, rotor_mat = load_material(p.materials.stator), load_material(p.materials.rotor)
-    copper = load_material(p.materials.coil)
-    copper_volume = (p.n_stator_poles * p.turns_per_pole * conductor_area(p) * mean_turn_length(p))
     return Mass(stator_iron=stator_mat.density * stator_mat.stacking_factor * stator_area * p.stack_length,
                 rotor_iron=rotor_mat.density * rotor_mat.stacking_factor * rotor_area * p.stack_length,
-                copper=copper.density * copper_volume)
+                copper=copper_mass(p, p.turns_per_pole, conductor_area(p)))
 
 
 def phase_resistance(p: RadialSRMParams, temperature_c: float = 100.0) -> float:
     """Series resistance of one phase at `temperature_c`."""
-    copper = load_material(p.materials.coil)
-    rho = copper.resistivity * (1 + copper.temperature_coefficient * (temperature_c - copper.reference_temperature_c))
-    turns_phase = p.turns_per_pole * p.n_stator_poles / p.n_phases
-    return rho * turns_phase * mean_turn_length(p) / conductor_area(p)
+    return series_resistance(p, p.turns_per_pole, conductor_area(p), temperature_c)
