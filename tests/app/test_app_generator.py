@@ -1,5 +1,5 @@
 from srmapp.requirements import Requirements
-from srmapp.sizing.generator import POLE_SETS, sample_candidates
+from srmapp.sizing.generator import POLE_SETS, REFERENCE_TURNS, sample_candidates
 from srmcore.model.validator import require_valid
 from srmcore.topology.radial import build_outline
 
@@ -38,10 +38,11 @@ def test_outer_diameter_limit_is_respected():
     assert all(c.design.machine.stator_outer_diameter <= 0.15 for c in cands)
 
 
-def test_screening_preset_and_speed_are_set():
-    c = sample_candidates(_req(), 4, seed=0)[0][0]
-    assert c.design.mesh.preset == "screening"
-    assert c.design.machine.max_speed_rpm == 9000.0
+def test_full_preset_reference_turns_and_speed_are_set():
+    cands, _ = sample_candidates(_req(), 8, seed=0)
+    assert all(c.design.mesh.preset == "full" for c in cands)
+    assert all(c.design.machine.turns_per_pole == REFERENCE_TURNS for c in cands)
+    assert cands[0].design.machine.max_speed_rpm == 9000.0
 
 
 def test_ids_are_unique():

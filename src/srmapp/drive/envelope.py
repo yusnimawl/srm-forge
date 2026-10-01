@@ -1,6 +1,6 @@
 """Minimal drive model: torque-speed envelope of a machine from the ψ/T map of phase A (v0 spec §4.5).
 
-Single-pulse voltage control with a hysteresis current limit at the map's I_max, ideal commutation, no
+Single-pulse voltage control with a hysteresis current limit (the map's I_max unless given), ideal commutation, no
 mutual coupling (the other phases are open in the map) and no iron loss. Peak-only and unvalidated."""
 import math
 from dataclasses import dataclass
@@ -14,7 +14,7 @@ from srmcore.maps.tables import angle_spline
 from srmcore.model.design import RadialSRMParams
 
 N_THETA = 181                 # angle points over one rotor pole pitch
-N_CURRENT = 121               # current points over 0..I_max
+N_CURRENT = 121               # current points over 0..current limit
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
 OFF_RANGE = (0.45, 0.995)      # turn-off search range
 N_ON, N_OFF = 40, 40
@@ -41,18 +41,18 @@ class Envelope:
 
 @dataclass(frozen=True)
 class _Tables:
-    theta: np.ndarray       # (N_THETA,), 0..period inclusive
-    current: np.ndarray     # (N_CURRENT,), 0..I_max
-    psi: np.ndarray         # (N_THETA, N_CURRENT), non-decreasing in current
-    torque: np.ndarray      # (N_THETA, N_CURRENT)
+    theta: np.ndarray       # (n_theta,), 0..period inclusive
+    current: np.ndarray     # (N_CURRENT,), 0..current limit
+    psi: np.ndarray         # (n_theta, N_CURRENT), non-decreasing in current
+    torque: np.ndarray      # (n_theta, N_CURRENT)
 
 
-def _tables(result: MapResult, period: float) -> _Tables:
+def _tables(result: MapResult, period: float, i_top: float, n_theta: int) -> _Tables:
     e = result.circuits.index(result.excited)
-    current = np.linspace(0.0, result.currents[-1], N_CURRENT)
+    current = np.linspace(0.0, i_top, N_CURRENT)
     psi = PchipInterpolator(result.currents, result.psi[..., e], axis=1)(current)
     torque = PchipInterpolator(result.currents, result.torque_arkkio, axis=1)(current)
-    theta = np.linspace(0.0, period, N_THETA)
+    theta = np.linspace(0.0, period, n_theta)
     psi_f = angle_spline(result.angles, psi, period)(theta)
     torque_f = angle_spline(result.angles, torque, period)(theta)
     return _Tables(theta, current, np.maximum.accumulate(np.maximum(psi_f, 0.0), axis=1), torque_f)
@@ -86,15 +86,21 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
 
 
 def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
-             speeds_rpm) -> Envelope:
+             speeds_rpm, *, current_limit: float | None = None, n_theta: int = N_THETA, n_on: int = N_ON,
+             n_off: int = N_OFF) -> Envelope:
+    """`current_limit` (A) is the hysteresis limit, at most the map's top current (the default)."""
     require_complete(result)
     if result.excited != "A":
         raise ValueError("the envelope needs the phase A map (excited='A')")
+    top_current = float(result.currents[-1])
+    i_top = top_current if current_limit is None else float(current_limit)
+    if not 0 < i_top <= top_current * (1 + 1e-6):
+        raise ValueError(f"current limit {i_top} A is outside the map's range (0, {top_current}] A")
     period = 2 * math.pi / machine.n_rotor_poles
-    t = _tables(result, period)
-    top = N_THETA - 1
-    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, N_ON) * top).astype(int))
-    off_axis = np.unique(np.round(np.linspace(*OFF_RANGE, N_OFF) * top).astype(int))
+    t = _tables(result, period, i_top, n_theta)
+    top = n_theta - 1
+    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
+    off_axis = np.unique(np.round(np.linspace(*OFF_RANGE, n_off) * top).astype(int))
     on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
     keep = off > on
     on, off = on[keep], off[keep]

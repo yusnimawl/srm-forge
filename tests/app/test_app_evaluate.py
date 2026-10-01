@@ -9,10 +9,13 @@ from map_fixtures import synthetic_map
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, speed_grid
 from srmapp.requirements import Requirements
+from srmapp.sizing import estimates as est
 from srmapp.sizing.generator import Candidate
 from srmapp.sizing.stage1 import stage1
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.errors import InputError, MapFailed, MeshRejected, WorkerCrashed
+
+THICK = dict(kind="round", diameter=6.0e-3, outer_diameter=6.2e-3)
 
 
 def _req(**kw):
@@ -23,6 +26,17 @@ def _req(**kw):
 
 def _cand():
     return Candidate("c0", Design(machine=make_8_6(), mesh=MeshSettings(preset="screening")))
+
+
+def _map(stage):
+    return synthetic_map(n_angles=24, currents=np.linspace(0.0, stage.i_map, 9))
+
+
+def _evaluate(req, **kw):
+    stage = stage1(req, make_8_6())
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
+            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+        return evaluate_stage2(_cand(), req, stage, max_turns=30, **kw), stage
 
 
 def test_speed_grid_contains_base_and_max_exactly():
@@ -41,12 +55,16 @@ def test_requirement_ratios():
     assert p_ratio == pytest.approx(min(power[1:]) / 1000.0)
 
 
+def test_stage_two_grid_defaults_to_the_preset():
+    assert StageTwoGrid() == StageTwoGrid(None, None)
+
+
 def test_failed_map_becomes_an_evaluation_and_does_not_raise():
     with mock.patch("srmapp.evaluate.build_map", side_effect=MapFailed(["3 of 50 points failed"], 3)):
         e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
     assert isinstance(e, Evaluation)
     assert e.status == "MapFailed" and "3 of 50" in e.error
-    assert not e.feasible and math.isnan(e.torque_ratio) and e.envelope is None
+    assert not e.feasible and math.isnan(e.torque_ratio) and e.envelope is None and e.winding is None
 
 
 def test_cancelled_map_is_reported():
@@ -56,25 +74,61 @@ def test_cancelled_map_is_reported():
     assert e.status == "cancelled" and not e.feasible
 
 
-def test_evaluation_of_a_synthetic_map_fills_the_metrics():
-    m = make_8_6()
-    with mock.patch("srmapp.evaluate.build_map", return_value=synthetic_map(n_angles=24)), \
+def test_map_is_built_over_the_stage_one_range():
+    stage = stage1(_req(), make_8_6())
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)) as bm, \
             mock.patch("srmapp.evaluate.key_numbers", return_value=None):
-        e = evaluate_stage2(_cand(), _req(), stage1(_req(), m))
-    assert e.status == "ok" and e.error == ""
-    assert e.mass_kg > 0 and e.peak_power_w > 0
+        evaluate_stage2(_cand(), _req(), stage, max_turns=5)
+    assert bm.call_args.args[1] == stage.i_map
+
+
+def test_density_mode_evaluation_fills_the_metrics():
+    e, stage = _evaluate(_req())
+    assert e.status == "ok" and e.winding is not None and e.winding.wire is None
+    m = e.design.machine
+    assert m.turns_per_pole == e.winding.turns
+    assert est.phase_resistance(m) == pytest.approx(e.winding.resistance)
+    assert e.mass_kg == pytest.approx(stage.mass.iron + e.winding.copper_mass)
+    assert len(e.scan) == 30
+    assert e.peak_power_w > 0
     assert e.power_density_kw_per_kg == pytest.approx(e.peak_power_w / 1000 / e.mass_kg)
     assert 0 < e.efficiency_base <= 1
     assert e.feasible == (e.torque_ratio >= 1 and e.power_ratio >= 1)
+
+
+def test_wire_mode_evaluation_uses_the_inverter_current():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    e, _ = _evaluate(req)
+    assert e.status == "ok" and e.winding.wire == 0
+    assert e.winding.current == 100.0 and e.winding.strands >= 1
+    assert e.winding.current_density <= 20e6 * (1 + 1e-9)
+    assert est.phase_resistance(e.design.machine) == pytest.approx(e.winding.resistance)
+
+
+def test_no_winding_is_reported_not_raised():
+    e, _ = _evaluate(_req(wires=[THICK], phase_current_a=100.0), j_limit=1.0)    # stricter than the stage-1 range
+    assert e.status == "no_winding" and not e.feasible and e.winding is None and e.envelope is None
+
+
+def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    free, _ = _evaluate(req)
+    iron = stage1(req, make_8_6()).mass.iron
+    limit = iron + 0.5 * free.winding.copper_mass
+    e, stage = _evaluate(_req(wires=[THICK], phase_current_a=100.0, max_mass_kg=limit))
+    assert stage.passes and e.status == "ok" and not e.feasible
+    assert "mass" in e.error and f"{limit:.2f} kg limit" in e.error
+    assert free.error == ""
 
 
 @pytest.mark.slow
 def test_real_8_6_evaluation():
     pytest.importorskip("ngsolve")
     req = _req(peak_power_w=2000.0, peak_torque_nm=6.4, base_speed_rpm=3000.0, max_speed_rpm=6000.0)
-    e = evaluate_stage2(_cand(), req, stage1(req, make_8_6()), grid=StageTwoGrid(8, 4), workers=4)
+    stage = stage1(req, make_8_6())
+    e = evaluate_stage2(_cand(), req, stage, grid=StageTwoGrid(8, 4), workers=4, max_turns=120)
     assert e.status == "ok", e.error
-    assert 1.0 < e.envelope.torque[0] < stage1(req, make_8_6()).torque_upper
+    assert 1.0 < e.envelope.torque[0] < stage.torque_upper
     assert e.key is not None and e.key.peak_torque > 0
 
 

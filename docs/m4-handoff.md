@@ -152,3 +152,52 @@ Open questions:
 - Stage-2 time per design is about 10x the 20 s budget in the v0 spec.
 - The stage-1 torque bound is optimistic against FEM.
 - Power ratios are low. Analysis, not measurement: turns are sampled independently of bus voltage and max speed, and at fixed current density a turns change only rescales the same envelope in speed (flux linkage ~N, current ~1/N, resistance ~N^2), so a geometry may be fine with the wrong turn count. Choosing turns after the map is the follow-up (spec §9).
+
+## v0a-2 stage-2 accuracy check (2026-10-01)
+
+`python -u examples/v0_angle_check.py 4 20` (wire mode: Ø1.0 mm round, 2.0 x 1.0 mm rectangular, 60 x Ø0.1 mm litz; 150 A; 10 kW, 32 N.m, 3000 to 9000 rpm, 400 V; `full` mesh). One candidate per pole set, winding chosen on the default map (30 angles x 20 currents, N_THETA 181, 40 x 40 on/off grid); each variant changes one knob. Ratios: torque at base speed and worst power over base..max speed, against the requirement. Wall time 5.4 h (about 1 to 2 h per design, three `full` maps each).
+
+```
+
+839f971fc14d 6/4 OD 288 mm (3799 s)
+  wire round, N 7, strands 21, R 13.1 mOhm
+  variant         T ratio  P ratio       dT       dP
+  default           1.063    1.068    0.00%    0.00%
+  60 angles         1.061    1.067   -0.14%   -0.14%
+  2x currents       1.063    1.069    0.01%    0.01%
+  n_theta 361       1.071    1.077    0.80%    0.80%
+  on/off 80         1.098    1.104    3.29%    3.29%
+
+ffbcf554bae4 8/6 OD 202 mm (4316 s)
+  wire rectangular, N 7, strands 10, R 8.7 mOhm
+  variant         T ratio  P ratio       dT       dP
+  default           1.040    1.046    0.00%    0.00%
+  60 angles         1.051    1.056    1.03%    1.03%
+  2x currents       1.040    1.046   -0.01%   -0.01%
+  n_theta 361       1.040    1.045   -0.03%   -0.03%
+  on/off 80         1.054    1.060    1.36%    1.36%
+
+0e978852bf31 12/8 OD 225 mm (7086 s)
+  wire round, N 9, strands 25, R 12.1 mOhm
+  variant         T ratio  P ratio       dT       dP
+  default           1.094    1.099    0.00%    0.00%
+  60 angles         1.095    1.101    0.11%    0.11%
+  2x currents       1.094    1.099    0.00%    0.00%
+  n_theta 361       1.100    1.106    0.57%    0.57%
+  on/off 80         1.106    1.112    1.12%    1.12%
+
+7dea4b9c6854 24/16 OD 147 mm (4206 s)
+  wire round, N 4, strands 11, R 21.6 mOhm
+  variant         T ratio  P ratio       dT       dP
+  default           0.519    0.522    0.00%    0.00%
+  60 angles         0.518    0.521   -0.25%   -0.25%
+  2x currents       0.519    0.522   -0.00%   -0.00%
+  n_theta 361       0.521    0.524    0.32%    0.32%
+  on/off 80         0.526    0.528    1.25%    1.25%
+```
+
+Findings:
+- Turns after the map works: 3 of 4 candidates are feasible (6/4, 8/6, 12/8; ratios 1.04 to 1.10). The 24/16 at OD 147 mm reaches 0.52 at its best winding (geometry too small for 32 N.m), and is reported as the closest winding, not dropped.
+- 60 against 30 angles: -0.25 to +1.03 %. 2x currents: within 0.01 % (the exact wire-mode map range keeps current resolution adequate). N_THETA 361: -0.03 to +0.80 %.
+- The on/off grid is the largest error source: 80 x 80 against 40 x 40 gives +1.12 to +3.29 %, always upward (the coarse grid misses the best firing angles). The 6/4 exceeds the 2 % limit of the v0a-2 spec §5. Owner decision: raise the default on/off grid (scan time only, no FEM). Not changed.
+- The selection rules put chosen designs close to ratio 1.0, so a few percent of drive-model error can flip feasibility. Owner decision: a feasibility margin. Not changed.
