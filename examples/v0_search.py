@@ -26,7 +26,7 @@ if __name__ == "__main__":
     print(f"sampled {res.sampled}, dropped {res.dropped}, stage 1 rejected {res.stage1_rejected}, "
           f"evaluated {len(res.evaluations)} in {time.perf_counter() - t0:.0f} s")
     front = {e.id for e in res.pareto()}
-    print(f"{'id':14}{'poles':>7}{'OD mm':>7}{'wire':>12}{'N':>5}{'par':>5}{'R mΩ':>8}{'J A/mm²':>9}{'mass kg':>9}"
+    print(f"{'id':14}{'poles':>7}{'OD mm':>7}{'wire':>12}{'N':>5}{'par':>5}{'R mOhm':>8}{'J A/mm2':>9}{'mass kg':>9}"
           f"{'T ratio':>9}{'P ratio':>9}{'kW/kg':>7}{'eff':>6}  status")
     for e in res.evaluations:
         m, w = e.design.machine, e.winding
