@@ -37,6 +37,8 @@ SI internally; conversion at the UI edge only.
 
 ## 4. Pipeline
 
+Superseded in part by `2026-10-01-v0a2-turns-after-map-design.md`: turns, wire and current are chosen after the map, stage 2 uses the `full` preset, and the speed-only levers below are dropped.
+
 1. **Generator** samples designs in a bounded box: pole set (6/4, 8/6, 12/8, 24/16), stator outer diameter, stack length, pole arcs, turns per pole, yoke thicknesses. Latin-hypercube sampling with a fixed seed. Designs the validator rejects (`InputError`) are dropped and counted. Peak current is the peak current density (default 20 A/mm², `SearchSettings.j_peak`) times the conductor area; provisional until the thermal model.
 2. **Mass** from geometry and material densities (active parts: stator and rotor iron, copper).
 3. **Stage 1, analytic filter** (milliseconds): closed-form upper bound on peak torque (saturated pole flux times the peak current, one energy rectangle per stroke) and the mass limit; the voltage limit is left to stage 2. Drops designs whose optimistic bound misses the requirements. The margin parameter defaults to 1.0. The bound is meant not to drop a design that stage 2 would keep, but its false-drop rate against stage 2 is not yet measured; a sample check is open.
