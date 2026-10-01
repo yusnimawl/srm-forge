@@ -77,13 +77,27 @@ def test_wire_mode_picks_the_lowest_resistance_feasible_winding():
     assert {s.winding.wire for s in c.scan} == {0, 1}
 
 
-def test_density_mode_picks_the_most_turns_then_the_fewest_paths():
+def _equivalent(s):
+    return s.winding.turns / s.winding.paths
+
+
+def test_density_mode_picks_the_most_equivalent_turns_then_the_fewest_paths():
     req = _req()
     c = choose_turns(_map_for(req), MACHINE, req, max_turns=40)
     assert c.feasible and len(c.scan) == 80          # 40 turn counts x paths 1 and 2
     feasible = [s for s in c.scan if s.feasible]
-    assert c.point.winding.turns == max(s.winding.turns for s in feasible)
-    assert c.point.winding.paths == min(s.winding.paths for s in feasible if s.winding.turns == c.point.winding.turns)
+    assert _equivalent(c.point) == max(_equivalent(s) for s in feasible)
+    assert c.point.winding.paths == min(s.winding.paths for s in feasible if _equivalent(s) == _equivalent(c.point))
+
+
+def test_density_mode_prefers_the_series_winding_over_the_same_machine_on_two_paths():
+    # worst ratio 112.6 on this map is met up to 8 equivalent turns, so the 16 turns on 2 paths are as feasible as
+    # the 8 in series; ranking by raw turns would pick them.
+    req = _req()
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=112.6)
+    parallel = next(s for s in c.scan if (s.winding.turns, s.winding.paths) == (16, 2))
+    assert parallel.feasible
+    assert (c.point.winding.turns, c.point.winding.paths) == (8, 1)
 
 
 def test_density_current_cap_limits_the_scan():

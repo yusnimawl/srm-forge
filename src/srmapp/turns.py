@@ -80,7 +80,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
     conductor RMS current density, `j_peak_max` (default 2 · `j_limit`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
-    resistance; density mode keeps the feasible winding with the most turns, then the fewest paths. With no
+    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
     feasible winding, the one with the largest worst ratio is reported."""
     cap = 2 * j_limit if j_peak_max is None else j_peak_max
     capped = False
@@ -107,6 +107,6 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     elif req.wire_mode:
         point = min(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
     else:
-        point = max(feasible, key=lambda s: (s.winding.turns, -s.winding.paths))
+        point = max(feasible, key=lambda s: (s.winding.turns / s.winding.paths, -s.winding.paths))
     return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid, j_limit), scan,
                        capped)

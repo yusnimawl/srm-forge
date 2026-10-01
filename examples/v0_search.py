@@ -26,13 +26,13 @@ if __name__ == "__main__":
     print(f"sampled {res.sampled}, dropped {res.dropped}, stage 1 rejected {res.stage1_rejected}, "
           f"evaluated {len(res.evaluations)} in {time.perf_counter() - t0:.0f} s")
     front = {e.id for e in res.pareto()}
-    print(f"{'id':14}{'poles':>7}{'OD mm':>7}{'wire':>12}{'N':>5}{'par':>5}{'R mOhm':>8}{'J A/mm2':>9}{'mass kg':>9}"
+    print(f"{'id':14}{'poles':>7}{'OD mm':>7}{'wire':>12}{'N':>5}{'str':>5}{'pa':>4}{'R mOhm':>8}{'Jrms A/mm2':>12}{'mass kg':>9}"
           f"{'T ratio':>9}{'P ratio':>9}{'kW/kg':>7}{'eff':>6}  status")
     for e in res.evaluations:
         m, w = e.design.machine, e.winding
         wire = "-" if w is None else req.wires[w.wire].kind
-        wind = (f"{'-':>5}{'-':>5}{'-':>8}{'-':>9}" if w is None else
-                f"{w.turns:5d}{w.strands:5d}{w.resistance * 1e3:8.1f}{w.current_density / 1e6:9.1f}")
+        wind = (f"{'-':>5}{'-':>5}{'-':>4}{'-':>8}{'-':>12}" if w is None else
+                f"{w.turns:5d}{w.strands:5d}{w.paths:4d}{w.resistance * 1e3:8.1f}{e.j_rms / 1e6:12.1f}")
         print(f"{e.id:14}{m.n_stator_poles:>4}/{m.n_rotor_poles:<2}{m.stator_outer_diameter * 1e3:7.0f}{wire:>12}{wind}"
               f"{e.mass_kg:9.2f}{e.torque_ratio:9.2f}{e.power_ratio:9.2f}{e.power_density_kw_per_kg:7.2f}"
               f"{e.efficiency_base:6.2f}  {e.status}{' *' if e.id in front else ''}")

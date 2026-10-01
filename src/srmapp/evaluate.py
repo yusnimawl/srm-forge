@@ -69,11 +69,13 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         return _failed(candidate, stage, type(exc).__name__, str(exc))
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")
-    choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=j_peak_max,
+    cap = stage.j_peak_max if j_peak_max is None else j_peak_max
+    choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
                           margin=margin, max_turns=max_turns)
     if choice.point is None:
+        cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
         return _failed(candidate, stage, "no_winding",
-                       "no turn count meets the wire, phase current and current-density limits")
+                       f"no turn count meets the wire, phase current and current-density limits{cap_text}")
     w, env = choice.point.winding, choice.envelope
     chosen = machine.model_copy(update={"turns_per_pole": w.turns,
                                         "fill_factor": w.turns * w.copper_area / coil_side_area(machine)})
@@ -83,7 +85,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     key = key_numbers(rescale_turns(result, turns_scale(machine, w)), chosen)
     i_rms = float(np.max(env.i_rms))
     notes = []
-    if not req.wire_mode and w.turns == max_turns:
+    if not req.wire_mode and w.turns / w.paths >= max_turns:
         notes.append(f"turn scan reached its limit of {max_turns}; more turns may also be feasible")
     if not choice.feasible and choice.capped:
         notes.append("no winding is feasible and j_peak_max left out windings that fit the slot; "

@@ -83,6 +83,30 @@ def test_map_is_built_over_the_stage_one_range():
     assert bm.call_args.args[1] == stage.i_map
 
 
+def test_stage_two_scans_within_the_stage_one_cap_by_default():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    stage = stage1(req, make_8_6())                    # cap 40 A/mm2
+    assert stage.j_peak_max == 40e6
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
+            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+        e = evaluate_stage2(_cand(), req, stage, j_limit=25e6)     # its own 2x would be 50 A/mm2
+    assert e.scan and all(s.winding.current_density <= 40e6 * (1 + 1e-9) for s in e.scan)
+
+
+def test_scan_limit_note_follows_the_equivalent_turns():
+    e, _ = _evaluate(_req())
+    assert e.winding.turns == 30 and e.winding.paths == 1 and "limit" in e.error
+    e, _ = _evaluate(_req(), margin=3.47)        # feasible up to 22 turns in series; 30 turns on 2 paths is only 15
+    assert next(s for s in e.scan if (s.winding.turns, s.winding.paths) == (30, 2)).feasible
+    assert (e.winding.turns, e.winding.paths) == (22, 1) and "limit" not in e.error
+
+
+def test_no_winding_reasons_name_the_cap_in_wire_mode():
+    req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=1e6)
+    s = stage1(req, make_8_6())
+    assert not s.passes and "no winding" in s.reason and "j_peak_max 40 A/mm2" in s.reason
+
+
 def test_density_mode_evaluation_fills_the_metrics():
     e, stage = _evaluate(_req())
     assert e.status == "ok" and e.winding is not None and e.winding.wire is None
@@ -115,7 +139,7 @@ def test_margin_reaches_the_turns_choice():
 
 def test_capped_infeasible_result_carries_a_note():
     req = _req(wires=[THICK], phase_current_a=800.0, peak_torque_nm=1e3, peak_power_w=314_159.0)
-    e, _ = _evaluate(req, j_limit=10e6)          # cap 20 A/mm² leaves out the one-strand windings
+    e, _ = _evaluate(req, j_limit=10e6, j_peak_max=20e6)          # cap 20 A/mm² leaves out the one-strand windings
     assert e.status == "ok" and not e.feasible
     assert "j_peak_max" in e.error
 

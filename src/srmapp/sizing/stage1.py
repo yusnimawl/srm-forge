@@ -35,6 +35,7 @@ class Stage1:
     torque_upper: float    # N·m
     passes: bool
     reason: str            # empty when the design passes
+    j_peak_max: float = 2 * J_LIMIT   # A/m², the peak current-density cap `mmf` was computed with
 
 
 def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: float = J_PEAK,
@@ -46,7 +47,9 @@ def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: f
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
         reason = f"iron mass {mass.iron:.2f} kg above the {req.max_mass_kg:.2f} kg limit"
     elif mmf == 0.0:
-        reason = "no winding meets the wire, phase current and current-density limits"
+        reason = ("no winding meets the wire, phase current and peak current-density "
+                  f"(j_peak_max {j_peak_max / 1e6:.0f} A/mm2) limits" if req.wire_mode else
+                  "no winding meets the wire, phase current and current-density limits")
     elif upper < margin * req.peak_torque_nm:
         reason = f"torque upper bound {upper:.1f} N·m below the required {margin * req.peak_torque_nm:.1f} N·m"
-    return Stage1(mass, mmf, mmf / p.turns_per_pole, upper, reason == "", reason)
+    return Stage1(mass, mmf, mmf / p.turns_per_pole, upper, reason == "", reason, j_peak_max)

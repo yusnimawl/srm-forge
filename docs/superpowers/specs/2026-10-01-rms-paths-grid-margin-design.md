@@ -27,7 +27,7 @@ Four changes that alter which designs count as feasible, done before M5:
 - `Winding.current` stays the peak phase current. `Winding.current_density` = current / (paths · copper_area).
 - The `Design` has no paths field; the chosen design keeps `turns_per_pole = N` and the paths are recorded in `Evaluation.winding.paths`. Key numbers are computed on the map rescaled by N/(a·N_ref), so La, Lu and ψ_max are phase values.
 - Wire mode: for each wire, path count and turn count, as many parallel strands as fit (unchanged rule), peak density ≤ `j_peak_max`. Choice: lowest resistance, ties to fewer turns, then fewer paths.
-- Density mode: turn counts 1..`max_turns` for each path count, coil current `j_peak · copper_area`, phase current a times that, left out above `phase_current_a`. Choice: most turns, ties to fewer paths.
+- Density mode: turn counts 1..`max_turns` for each path count, coil current `j_peak · copper_area`, phase current a times that, left out above `phase_current_a`. Choice: most equivalent turns (turns / paths), ties to fewer paths. (N = a·M turns on a paths is the same machine as M turns in series, so ranking by raw turns would always prefer the all-parallel connection.)
 
 ## 4. Settings
 
