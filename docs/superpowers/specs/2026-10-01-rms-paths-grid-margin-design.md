@@ -44,13 +44,13 @@ Four changes that alter which designs count as feasible, done before M5:
 
 - `ScanPoint`: add `i_rms` and `j_rms` (worst over base..max speed), `feasible` field.
 - `Evaluation`: add `i_rms_a` and `j_rms` (worst over the full speed grid of the chosen winding; NaN without a winding). `winding.paths` reported through `winding`.
-- Note in `Evaluation.error` (status "ok") when the chosen wire-mode winding's peak density is within 1e-9 of `j_peak_max`: more turns or thinner wire might also be feasible with a higher cap.
+- Note in `Evaluation.error` (status "ok") when no scanned winding is feasible in wire mode and `j_peak_max` left out windings that fit the slot (`TurnsChoice.capped`): a higher cap might allow a feasible winding. (A chosen winding sits exactly at the cap only by chance, since strand counts are whole numbers, so that case is not the trigger.)
 
 ## 7. Testing
 
 - Envelope: `rms_limit` above the unconstrained I_rms changes nothing; a binding `rms_limit` lowers torque at low speed and the chosen stroke's I_rms ≤ limit; `i_rms` matches √(∫i²/pitch) on a constant-current stroke.
 - Paths: an evaluation with a = 2 at N turns gives the same envelope as N/2 turns in series with R/4 (same phase current); invalid path counts are never generated (divisors only); R and coil current scale as stated.
-- Wire mode: windings with peak density above `j_peak_max` are left out; windings with peak density above `j_limit` but RMS within it are kept; the cap note appears.
+- Wire mode: windings with peak density above `j_peak_max` are left out; windings with peak density above `j_limit` but RMS within it are kept; the cap note appears on an infeasible, capped result.
 - Margin: a winding with worst ratio in [1.0, 1.05) is infeasible at the default and feasible at `margin=1.0`.
 - Existing tests updated for the new defaults.
 
