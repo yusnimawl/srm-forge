@@ -65,6 +65,7 @@ def test_failed_map_becomes_an_evaluation_and_does_not_raise():
     assert isinstance(e, Evaluation)
     assert e.status == "MapFailed" and "3 of 50" in e.error
     assert not e.feasible and math.isnan(e.torque_ratio) and e.envelope is None and e.winding is None
+    assert math.isnan(e.i_rms_a) and math.isnan(e.j_rms)
 
 
 def test_cancelled_map_is_reported():
@@ -87,9 +88,9 @@ def test_density_mode_evaluation_fills_the_metrics():
     assert e.status == "ok" and e.winding is not None and e.winding.wire is None
     m = e.design.machine
     assert m.turns_per_pole == e.winding.turns
-    assert est.phase_resistance(m) == pytest.approx(e.winding.resistance)
+    assert est.phase_resistance(m) == pytest.approx(e.winding.resistance * e.winding.paths**2)
     assert e.mass_kg == pytest.approx(stage.mass.iron + e.winding.copper_mass)
-    assert len(e.scan) == 30
+    assert len(e.scan) == 60          # 30 turn counts x paths 1 and 2
     assert e.peak_power_w > 0
     assert e.power_density_kw_per_kg == pytest.approx(e.peak_power_w / 1000 / e.mass_kg)
     assert 0 < e.efficiency_base <= 1
@@ -101,12 +102,26 @@ def test_wire_mode_evaluation_uses_the_inverter_current():
     e, _ = _evaluate(req)
     assert e.status == "ok" and e.winding.wire == 0
     assert e.winding.current == 100.0 and e.winding.strands >= 1
-    assert e.winding.current_density <= 20e6 * (1 + 1e-9)
-    assert est.phase_resistance(e.design.machine) == pytest.approx(e.winding.resistance)
+    assert e.winding.current_density <= 40e6 * (1 + 1e-9)
+    assert 0 < e.i_rms_a and e.j_rms <= 20e6 * (1 + 1e-9)
+    assert e.j_rms == pytest.approx(e.i_rms_a / (e.winding.paths * e.winding.copper_area))
+    assert est.phase_resistance(e.design.machine) == pytest.approx(e.winding.resistance * e.winding.paths**2)
+
+
+def test_margin_reaches_the_turns_choice():
+    e, _ = _evaluate(_req(), margin=1e6)
+    assert e.status == "ok" and not e.feasible
+
+
+def test_capped_infeasible_result_carries_a_note():
+    req = _req(wires=[THICK], phase_current_a=800.0, peak_torque_nm=1e3, peak_power_w=314_159.0)
+    e, _ = _evaluate(req, j_limit=10e6)          # cap 20 A/mm² leaves out the one-strand windings
+    assert e.status == "ok" and not e.feasible
+    assert "j_peak_max" in e.error
 
 
 def test_no_winding_is_reported_not_raised():
-    e, _ = _evaluate(_req(wires=[THICK], phase_current_a=100.0), j_limit=1.0)    # stricter than the stage-1 range
+    e, _ = _evaluate(_req(wires=[THICK], phase_current_a=100.0), j_peak_max=1.0)    # stricter than the stage-1 range
     assert e.status == "no_winding" and not e.feasible and e.winding is None and e.envelope is None
 
 
