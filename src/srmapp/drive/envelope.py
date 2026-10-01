@@ -17,13 +17,15 @@ N_THETA = 181                 # angle points over one rotor pole pitch
 N_CURRENT = 121               # current points over 0..current limit
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
 OFF_RANGE = (0.45, 0.995)      # turn-off search range
-N_ON, N_OFF = 40, 40
+N_ON, N_OFF = 80, 80
+_EPS = 1e-9
 
 
 @dataclass(frozen=True)
 class Envelope:
     """Per-speed best stroke. `torque` is the revolution average over all phases. `work_torque` is ∫T dθ and
-    `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation."""
+    `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation. `i_rms` is the phase RMS current
+    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid)."""
     speeds_rpm: np.ndarray
     torque: np.ndarray
     power: np.ndarray
@@ -32,6 +34,7 @@ class Envelope:
     theta_off: np.ndarray
     work_torque: np.ndarray
     work_loop: np.ndarray
+    i_rms: np.ndarray
 
     @property
     def efficiency(self) -> np.ndarray:
@@ -86,12 +89,15 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
 
 
 def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
-             speeds_rpm, *, current_limit: float | None = None, n_theta: int = N_THETA, n_on: int = N_ON,
-             n_off: int = N_OFF) -> Envelope:
-    """`current_limit` (A) is the hysteresis limit, at most the map's top current (the default)."""
+             speeds_rpm, *, current_limit: float | None = None, rms_limit: float | None = None,
+             n_theta: int = N_THETA, n_on: int = N_ON, n_off: int = N_OFF) -> Envelope:
+    """`current_limit` (A) is the hysteresis limit, at most the map's top current (the default). `rms_limit` (A)
+    caps the phase RMS current over a rotor pole pitch: strokes above it are not used."""
     require_complete(result)
     if result.excited != "A":
         raise ValueError("the envelope needs the phase A map (excited='A')")
+    if rms_limit is not None and not rms_limit > 0:
+        raise ValueError(f"rms limit {rms_limit} A must be positive")
     top_current = float(result.currents[-1])
     i_top = top_current if current_limit is None else float(current_limit)
     if not 0 < i_top <= top_current * (1 + 1e-6):
@@ -109,13 +115,17 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     for rpm in speeds:
         omega = rpm * 2 * math.pi / 60
         w_t, w_l, i2, valid = _simulate(t, omega, bus_voltage, resistance, on, off)
+        if rms_limit is not None:
+            valid &= i2 / period <= rms_limit**2 * (1 + _EPS)
         best = int(np.argmax(np.where(valid, w_t, -np.inf))) if valid.any() else -1
         if best < 0 or w_t[best] <= 0:
-            rows.append((0.0, 0.0, t.theta[on[0]], t.theta[off[0]], 0.0, 0.0))
+            rows.append((0.0, 0.0, t.theta[on[0]], t.theta[off[0]], 0.0, 0.0, 0.0))
             continue
         strokes_per_rev = machine.n_phases * machine.n_rotor_poles
         rows.append((strokes_per_rev * w_t[best] / (2 * math.pi),
                      machine.n_phases * resistance * i2[best] / period,
-                     t.theta[on[best]], t.theta[off[best]], w_t[best], w_l[best]))
-    torque, copper, th_on, th_off, work_t, work_l = (np.array(c) for c in zip(*rows))
-    return Envelope(speeds, torque, torque * speeds * 2 * math.pi / 60, copper, th_on, th_off, work_t, work_l)
+                     t.theta[on[best]], t.theta[off[best]], w_t[best], w_l[best],
+                     math.sqrt(i2[best] / period)))
+    torque, copper, th_on, th_off, work_t, work_l, i_rms = (np.array(c) for c in zip(*rows))
+    return Envelope(speeds, torque, torque * speeds * 2 * math.pi / 60, copper, th_on, th_off, work_t, work_l,
+                    i_rms)

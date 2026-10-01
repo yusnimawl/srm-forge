@@ -21,7 +21,7 @@ def _fake(candidate, req, stage, **kw):
         return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.iron, None,
                           nan, nan, nan, nan, nan, False, None, None)
     return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, None, 1.2, 1.1,
-                      5500.0, 5.5 / stage.mass.total, 0.9, True, Envelope(*([np.zeros(2)] * 8)), None)
+                      5500.0, 5.5 / stage.mass.total, 0.9, True, Envelope(*([np.zeros(2)] * 9)), None)
 
 
 def test_search_runs_stages_in_order_and_respects_shortlist():
