@@ -3,7 +3,10 @@
 usage: python examples/mesh_convergence.py run <design> <k...>     (refinement levels, scale = 2**(-k/2))
        python examples/mesh_convergence.py run-presets <design>    (screening, full and reference)
        python examples/mesh_convergence.py split <design>          (held-out error split of the stock full map)
+       python examples/mesh_convergence.py report                  (fit, write docs/m5a-convergence.md and PNGs)
 designs: 8_6, 8_6_sharp, 12_8, 24_16
+The data directory is docs/m5a-data unless the environment variable M5A_DATA names another; report then writes
+the markdown into that directory instead of docs/.
 Every run row pins the band divisions to a multiple of B = lcm(Ns, 2 Nr, 12 Nr) so the study angles sit on the
 band grid; preset rows use the nearest B-multiple to the stock division (within B/2 of it).
 
@@ -39,7 +42,7 @@ from srmcore.physics.build import machine_problem  # noqa: E402
 from srmcore.post.quantities import saturation_report  # noqa: E402
 from srmcore.solvers.factory import make_solver  # noqa: E402
 
-DATA = ROOT / "docs" / "m5a-data"
+DATA = Path(os.environ.get("M5A_DATA", ROOT / "docs" / "m5a-data"))
 DESIGNS = {
     "8_6": lambda: make_8_6(),
     "8_6_sharp": lambda: make_8_6(stator_fillet_radius=0, rotor_fillet_radius=0),
@@ -228,7 +231,242 @@ def run_split(name, machine, solver):
           "max err_t", max(r["err_t"] for r in angle_only + current_only), "band rms", rms, flush=True)
 
 
+TARGETS = {"screening": (2.0, 3.0), "full": (0.5, 1.0), "reference": (0.1, 0.2)}  # percent: (psi/W', torque)
+PRESETS = tuple(TARGETS)
+TORQUE_STATES = ("tau/12_imax", "tau/6_imax")
+GROUPS = ("psi", "t_ark", "t_vw", "wc")
+
+
+def load_records():
+    """Last line wins per (design, level); returns {design: {level: record}}."""
+    out = {}
+    path = DATA / "convergence.jsonl"
+    for line in path.read_text().splitlines():
+        if line.strip():
+            rec = json.loads(line)
+            out.setdefault(rec["design"], {})[rec["level"]] = rec
+    return out
+
+
+def load_splits():
+    path = DATA / "split.jsonl"
+    out = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                out[rec["design"]] = rec
+    return out
+
+
+def quantity_values(rec):
+    """{(group, state): value} for one record."""
+    q = {}
+    for row in rec["rows"]:
+        q["psi", row["state"]] = row["psi"]
+        if row["state"] in TORQUE_STATES:
+            q["t_ark", row["state"]] = row["t_ark"]
+            q["t_vw", row["state"]] = row["t_vw"]
+        if row["state"] == "aligned_imax":
+            q["wc", row["state"]] = row["wc"]
+    return q
+
+
+def fit_series(h, q):
+    """Fit q = qinf + C h^p; h ordered coarse to fine. Returns dict(qinf, p, rms, flag, bound)."""
+    from scipy.optimize import curve_fit
+
+    h, q = np.asarray(h, float), np.asarray(q, float)
+    bound = 3 * abs(q[-1] - q[-2]) if len(q) > 1 else float("nan")
+    d = np.diff(q)
+    monotone = bool(np.all(d > 0) or np.all(d < 0))
+    res = dict(qinf=float(q[-1]), p=float("nan"), rms=float("nan"), flag="", bound=bound)
+    if len(h) < 4:
+        res["flag"] = "insufficient levels"
+        return res
+    try:
+        popt, _ = curve_fit(lambda x, qi, c, p: qi + c * x ** p, h, q, p0=(q[-1], q[0] - q[-1], 1.5), maxfev=20000)
+    except RuntimeError:
+        res["flag"] = "fit failed"
+        return res
+    res.update(qinf=float(popt[0]), p=float(popt[2]),
+               rms=float(np.sqrt(np.mean((popt[0] + popt[1] * h ** popt[2] - q) ** 2))))
+    flags = []
+    if not 0.5 <= popt[2] <= 3:
+        flags.append("p out of range")
+    if not monotone:
+        flags.append("non-monotone")
+    res["flag"] = ", ".join(flags)
+    return res
+
+
+def analyse_design(recs):
+    """Fits and errors (fractions) for one design. errors[(group, state)] = {level_or_preset: error}."""
+    levels = sorted((k for k in recs if not isinstance(k, str)), key=lambda k: recs[k]["scale"], reverse=True)
+    finest = recs[levels[-1]] if levels else None
+    vals = {k: quantity_values(r) for k, r in recs.items()}
+    peak = max((abs(vals[levels[-1]][g, s]) for g in ("t_ark",) for s in TORQUE_STATES
+                if (g, s) in vals[levels[-1]]), default=float("nan")) if levels else float("nan")
+    out = {}
+    for key in vals[levels[-1]] if levels else {}:
+        lv = [k for k in levels if key in vals[k]]
+        h = [recs[k]["scale"] for k in lv]
+        f = fit_series(h, [vals[k][key] for k in lv]) if len(lv) > 1 else None
+        if f is None:
+            continue
+        flagged = bool(f["flag"])
+        norm = peak if key[0] in ("t_ark", "t_vw") else abs(f["qinf"])
+        err = {k: abs(vals[k][key] - f["qinf"]) / norm for k in recs if key in vals[k]}
+        if flagged:
+            err[lv[-1]] = f["bound"] / norm
+        out[key] = dict(fit=f, err=err, norm=norm)
+    return dict(levels=levels, finest=finest, peak=peak, q=out, vals=vals)
+
+
+def worst(analysis, keys, who):
+    """Worst error over the quantities in keys for level/preset `who` (nan if none)."""
+    e = [v["err"][who] for k, v in analysis["q"].items() if k[0] in keys and who in v["err"]]
+    return max(e) if e else float("nan")
+
+
+def plots(name, recs, analysis):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    levels = analysis["levels"]
+    nodes = [recs[k]["nodes"] for k in levels]
+    fig, ax = plt.subplots(figsize=(6, 4.5))
+    for g in GROUPS:
+        ax.loglog(nodes, [max(worst(analysis, (g,), k), 1e-16) for k in levels], "o-", label=g)
+        for p in PRESETS:
+            if p in recs:
+                ax.loglog([recs[p]["nodes"]], [max(worst(analysis, (g,), p), 1e-16)], "x", color="gray")
+    ax.set(xlabel="nodes", ylabel="worst |error| (fraction)", title=f"{name}: error vs nodes (x = presets)")
+    ax.legend()
+    ax.grid(True, which="both", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(DATA / f"convergence_{name}.png", dpi=120)
+    plt.close(fig)
+    return levels
+
+
+def gap_plot(all_analyses, all_recs):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(6, 4.5))
+    for name, an in all_analyses.items():
+        recs = all_recs[name]
+        keys = [(g, s) for g in ("t_ark",) for s in TORQUE_STATES]
+        xs, ys = [], []
+        for k in an["levels"] + [p for p in PRESETS if p in recs]:
+            gaps = [abs(an["vals"][k][("t_ark", s)] - an["vals"][k][("t_vw", s)]) / an["peak"]
+                    for _, s in keys if ("t_ark", s) in an["vals"][k]]
+            if gaps:
+                xs.append(recs[k]["nodes"])
+                ys.append(max(max(gaps), 1e-16))
+        order = np.argsort(xs)
+        ax.loglog(np.array(xs)[order], np.array(ys)[order], "o-", label=name)
+    ax.set(xlabel="nodes", ylabel="|T_ark - T_vw| / peak", title="Arkkio vs virtual-work gap")
+    ax.legend()
+    ax.grid(True, which="both", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(DATA / "convergence_torque_gap.png", dpi=120)
+    plt.close(fig)
+
+
+def pct(x):
+    return "n/a" if x != x else f"{100 * x:.4g}"
+
+
+def report():
+    recs_all = load_records()
+    splits = load_splits()
+    names = [n for n in DESIGNS if n in recs_all]
+    analyses = {n: analyse_design(recs_all[n]) for n in names if any(not isinstance(k, str) for k in recs_all[n])}
+    md = ["# M5a mesh convergence study", "",
+          "Generated by `examples/mesh_convergence.py report`. Errors are percent.", "",
+          "## Method", "",
+          "Per design and quantity the k-level series (h = scale) is fitted with q = qinf + C h^p by least squares "
+          "(`scipy.optimize.curve_fit`). psi and W' errors are relative to |qinf|; torque errors are relative to the "
+          "design's peak torque at I_max (largest |T_ark| of the finest level at tau/12 and tau/6). Torque is fitted "
+          "at I_max only. A quantity is flagged when p is outside [0.5, 3], the series is not monotone, the fit "
+          "fails, or fewer than 4 levels exist; for a flagged quantity qinf is the finest-level value and the "
+          "finest-level error is the GCI-style bound 3 x |q_finest - q_second|. Each design/level appears once "
+          "(the last run wins).", ""]
+    for name in names:
+        recs = recs_all[name]
+        an = analyses.get(name)
+        md += [f"## Design {name}", "", f"I_max = {recs[next(iter(recs))]['i_max']:g} A", ""]
+        md += ["| level | scale | nodes | elements | band divisions | mesh s | peak GB |", "|---|---|---|---|---|---|---|"]
+        order = (an["levels"] if an else []) + [p for p in PRESETS if p in recs]
+        for k in order:
+            r = recs[k]
+            md.append(f"| {k} | {r['scale']:.4g} | {r['nodes']} | {r['elements']} | {r['divisions']} | "
+                      f"{r['mesh_s']:.1f} | {r['peak_gb']:.2f} |")
+        md.append("")
+        if not an:
+            continue
+        md += [f"Peak torque at I_max: {an['peak']:.6g} N m", ""]
+        cols = an["levels"] + [p for p in PRESETS if p in recs]
+        md += ["| quantity | state | p | qinf | fit rms | flag | " + " | ".join(str(k) for k in cols) + " |",
+               "|" + "---|" * (6 + len(cols))]
+        for (g, s), v in an["q"].items():
+            f = v["fit"]
+            md.append(f"| {g} | {s} | {f['p']:.3f} | {f['qinf']:.6g} | {f['rms']:.3g} | {f['flag'] or '-'} | " +
+                      " | ".join(pct(v["err"].get(k, float("nan"))) for k in cols) + " |")
+        md.append("")
+        plots(name, recs, an)
+        md += [f"![{name}](convergence_{name}.png)", ""]
+    if analyses:
+        gap_plot(analyses, {n: recs_all[n] for n in analyses})
+        md += ["![gap](convergence_torque_gap.png)", ""]
+        md += ["## Summary against targets", "",
+               "Worst error over all designs and quantities. Target columns are the spec section 5 values; "
+               "pass is against the target, margin against target/2.", "",
+               "| preset | psi/W' worst | target | pass | margin | torque worst | target | pass | margin |",
+               "|---|---|---|---|---|---|---|---|---|"]
+        for p in PRESETS:
+            w = [max((worst(a, ("psi", "wc"), p) for a in analyses.values() if p in a["q"][next(iter(a["q"]))]["err"]),
+                     default=float("nan")),
+                 max((worst(a, ("t_ark", "t_vw"), p) for a in analyses.values()
+                      if p in a["q"][next(iter(a["q"]))]["err"]), default=float("nan"))]
+            cells = []
+            for val, tgt in zip(w, TARGETS[p]):
+                v = 100 * val
+                cells += [pct(val), f"{tgt:g}", "n/a" if v != v else "pass" if v <= tgt else "FAIL",
+                          "n/a" if v != v else "pass" if v <= tgt / 2 else "FAIL"]
+            md.append(f"| {p} | " + " | ".join(cells) + " |")
+        md += ["", "| level | psi/W' worst | torque worst |", "|---|---|---|"]
+        ks = sorted({k for a in analyses.values() for k in a["levels"]}, key=float)
+        for k in ks:
+            ws = [a for a in analyses.values() if k in a["levels"]]
+            md.append(f"| {k} | " + " | ".join(pct(max(worst(a, g, k) for a in ws)) for g in
+                                                (("psi", "wc"), ("t_ark", "t_vw"))) + " |")
+        md.append("")
+    if splits:
+        md += ["## Grid-error split (full preset)", "",
+               "| design | angle-only psi | angle-only torque | current-only psi | current-only torque | band rms |",
+               "|---|---|---|---|---|---|"]
+        for n, s in splits.items():
+            md.append(f"| {n} | {pct(max(r['err_psi'] for r in s['angle_only']))} | "
+                      f"{pct(max(r['err_t'] for r in s['angle_only']))} | "
+                      f"{pct(max(r['err_psi'] for r in s['current_only']))} | "
+                      f"{pct(max(r['err_t'] for r in s['current_only']))} | {pct(s['band']['rms_residual'])} |")
+        md.append("")
+    out = DATA / "m5a-convergence.md" if "M5A_DATA" in os.environ else ROOT / "docs" / "m5a-convergence.md"
+    out.write_text("\n".join(md), encoding="utf-8")
+    print("wrote", out)
+
+
 def main(argv):
+    if argv[:1] == ["report"]:
+        report()
+        return
     if len(argv) < 2 or argv[1] not in DESIGNS or argv[0] not in ("run", "run-presets", "split") \
             or (argv[0] == "run" and len(argv) < 3):
         raise SystemExit(__doc__)
