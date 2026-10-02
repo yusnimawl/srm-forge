@@ -20,7 +20,7 @@ from .run import STATUS_NONCONVERGED, MapResult, _init_worker, require_complete,
 from .tables import angle_spline
 
 PSI_TOLERANCE = 0.005            # of ψ_max
-TORQUE_TOLERANCE = 0.03          # of peak torque; provisional (owner, 2026-09-30) until the M5 convergence study
+TORQUE_TOLERANCE = 0.017         # of peak torque; M5a worst held-out error 1.10 % (24/16 `full` map, 64 samples), x 1.5
 BAND_RADIUS_TOLERANCE = 0.01     # of peak torque
 
 
@@ -75,9 +75,10 @@ def _band_radius_check(design: Design, static, result: MapResult, solver: str, p
 
 
 def fem_checks(design: Design, result: MapResult, *, solver: str = "ngsolve", workers: int | None = None,
-               n_samples: int = 16) -> tuple[Check, ...]:
+               n_samples: int = 64) -> tuple[Check, ...]:
     """Empty for the screening preset. Otherwise: `held_out_psi` and `held_out_torque` compare FEM solves at
-    grid mid-points (angle mid-points × non-zero current mid-points, evenly subsampled to `n_samples`) with the
+    grid mid-points (angle mid-points × non-zero current mid-points, evenly subsampled to `n_samples`; 16
+    samples under-read the worst error by up to 2.8x in M5a) with the
     periodic-spline × PCHIP interpolant of the map; `band_radius` compares the torque from the two air-gap
     layers with the band torque."""
     if design.mesh.preset == "screening":
