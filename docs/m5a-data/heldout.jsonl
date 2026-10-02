@@ -1,0 +1,8 @@
+{"design": "8_6", "n_samples": 16, "held_out_psi": 0.00024943710330743734, "held_out_torque": 0.0024975709397306776, "band_radius": 0.0015984563076446921}
+{"design": "8_6", "n_samples": 64, "held_out_psi": 0.0011721382822402534, "held_out_torque": 0.0054323542022895336, "band_radius": 0.0015984563076446921}
+{"design": "8_6_sharp", "n_samples": 16, "held_out_psi": 0.0002612704494700803, "held_out_torque": 0.00248171222792805, "band_radius": 0.0016085339670129665}
+{"design": "8_6_sharp", "n_samples": 64, "held_out_psi": 0.0011630973285443149, "held_out_torque": 0.005483091677977167, "band_radius": 0.0016085339670129665}
+{"design": "12_8", "n_samples": 16, "held_out_psi": 4.925496123164819e-05, "held_out_torque": 0.002139221954983575, "band_radius": 0.0010773426174102894}
+{"design": "12_8", "n_samples": 64, "held_out_psi": 8.964754328489345e-05, "held_out_torque": 0.0021843525397184926, "band_radius": 0.0010773426174102894}
+{"design": "24_16", "n_samples": 16, "held_out_psi": 9.61762949608855e-05, "held_out_torque": 0.003967155172344183, "band_radius": 0.004786379224765794}
+{"design": "24_16", "n_samples": 64, "held_out_psi": 0.0008756155671220613, "held_out_torque": 0.01102763655721717, "band_radius": 0.004786379224765794}
