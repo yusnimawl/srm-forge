@@ -20,6 +20,7 @@ import os
 import sys
 import tempfile
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -274,29 +275,37 @@ def quantity_values(rec):
 
 def fit_series(h, q):
     """Fit q = qinf + C h^p; h ordered coarse to fine. Returns dict(qinf, p, rms, flag, bound)."""
-    from scipy.optimize import curve_fit
+    from scipy.optimize import OptimizeWarning, curve_fit
 
     h, q = np.asarray(h, float), np.asarray(q, float)
     bound = 3 * abs(q[-1] - q[-2]) if len(q) > 1 else float("nan")
     d = np.diff(q)
-    monotone = bool(np.all(d > 0) or np.all(d < 0))
+    d[np.abs(d) <= 1e-12 * np.max(np.abs(q))] = 0.0
     res = dict(qinf=float(q[-1]), p=float("nan"), rms=float("nan"), flag="", bound=bound)
+    if not d.any():
+        res["bound"] = 0.0
+        return res
+    monotone = bool(np.all(d > 0) or np.all(d < 0))
     if len(h) < 4:
         res["flag"] = "insufficient levels"
         return res
     try:
-        popt, _ = curve_fit(lambda x, qi, c, p: qi + c * x ** p, h, q, p0=(q[-1], q[0] - q[-1], 1.5), maxfev=20000)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", OptimizeWarning)
+            popt, _ = curve_fit(lambda x, qi, c, p: qi + c * x ** p, h, q, p0=(q[-1], q[0] - q[-1], 1.5),
+                                maxfev=20000)
     except RuntimeError:
         res["flag"] = "fit failed"
         return res
-    res.update(qinf=float(popt[0]), p=float(popt[2]),
-               rms=float(np.sqrt(np.mean((popt[0] + popt[1] * h ** popt[2] - q) ** 2))))
+    res.update(p=float(popt[2]), rms=float(np.sqrt(np.mean((popt[0] + popt[1] * h ** popt[2] - q) ** 2))))
     flags = []
     if not 0.5 <= popt[2] <= 3:
         flags.append("p out of range")
     if not monotone:
         flags.append("non-monotone")
     res["flag"] = ", ".join(flags)
+    if not flags:
+        res["qinf"] = float(popt[0])
     return res
 
 
@@ -316,9 +325,8 @@ def analyse_design(recs):
             continue
         flagged = bool(f["flag"])
         norm = peak if key[0] in ("t_ark", "t_vw") else abs(f["qinf"])
-        err = {k: abs(vals[k][key] - f["qinf"]) / norm for k in recs if key in vals[k]}
-        if flagged:
-            err[lv[-1]] = f["bound"] / norm
+        err = {k: (abs(vals[k][key] - f["qinf"]) + (f["bound"] if flagged else 0.0)) / norm
+               for k in recs if key in vals[k]}
         out[key] = dict(fit=f, err=err, norm=norm)
     return dict(levels=levels, finest=finest, peak=peak, q=out, vals=vals)
 
@@ -326,7 +334,12 @@ def analyse_design(recs):
 def worst(analysis, keys, who):
     """Worst error over the quantities in keys for level/preset `who` (nan if none)."""
     e = [v["err"][who] for k, v in analysis["q"].items() if k[0] in keys and who in v["err"]]
-    return max(e) if e else float("nan")
+    return nanmax(e)
+
+
+def nanmax(values):
+    v = [x for x in values if x == x]
+    return max(v) if v else float("nan")
 
 
 def plots(name, recs, analysis):
@@ -383,9 +396,14 @@ def pct(x):
     return "n/a" if x != x else f"{100 * x:.4g}"
 
 
+def report_path():
+    return DATA / "m5a-convergence.md" if "M5A_DATA" in os.environ else ROOT / "docs" / "m5a-convergence.md"
+
+
 def report():
     recs_all = load_records()
     splits = load_splits()
+    out = report_path()
     names = [n for n in DESIGNS if n in recs_all]
     analyses = {n: analyse_design(recs_all[n]) for n in names if any(not isinstance(k, str) for k in recs_all[n])}
     md = ["# M5a mesh convergence study", "",
@@ -395,9 +413,16 @@ def report():
           "(`scipy.optimize.curve_fit`). psi and W' errors are relative to |qinf|; torque errors are relative to the "
           "design's peak torque at I_max (largest |T_ark| of the finest level at tau/12 and tau/6). Torque is fitted "
           "at I_max only. A quantity is flagged when p is outside [0.5, 3], the series is not monotone, the fit "
-          "fails, or fewer than 4 levels exist; for a flagged quantity qinf is the finest-level value and the "
-          "finest-level error is the GCI-style bound 3 x |q_finest - q_second|. Each design/level appears once "
-          "(the last run wins).", ""]
+          "fails, or fewer than 4 levels exist. For a flagged quantity qinf = q_finest, the GCI-style bound is "
+          "U = 3 x |q_finest - q_second| (normalised like the errors), and the error of every row (each level "
+          "including the finest, and each preset) is |q - q_finest| / norm + U. A series whose successive "
+          "differences are all below 1e-12 of its magnitude counts as converged (qinf = q_finest, U = 0, not "
+          "flagged). A quantity present at only one level is dropped. Each design/level appears once (the last "
+          "run wins).", ""]
+
+    def link(file):
+        return os.path.relpath(DATA / file, out.parent).replace("\\", "/")
+
     for name in names:
         recs = recs_all[name]
         an = analyses.get(name)
@@ -421,20 +446,18 @@ def report():
                       " | ".join(pct(v["err"].get(k, float("nan"))) for k in cols) + " |")
         md.append("")
         plots(name, recs, an)
-        md += [f"![{name}](convergence_{name}.png)", ""]
+        md += [f"![{name}]({link(f'convergence_{name}.png')})", ""]
     if analyses:
         gap_plot(analyses, {n: recs_all[n] for n in analyses})
-        md += ["![gap](convergence_torque_gap.png)", ""]
+        md += [f"![gap]({link('convergence_torque_gap.png')})", ""]
         md += ["## Summary against targets", "",
                "Worst error over all designs and quantities. Target columns are the spec section 5 values; "
                "pass is against the target, margin against target/2.", "",
                "| preset | psi/W' worst | target | pass | margin | torque worst | target | pass | margin |",
                "|---|---|---|---|---|---|---|---|---|"]
         for p in PRESETS:
-            w = [max((worst(a, ("psi", "wc"), p) for a in analyses.values() if p in a["q"][next(iter(a["q"]))]["err"]),
-                     default=float("nan")),
-                 max((worst(a, ("t_ark", "t_vw"), p) for a in analyses.values()
-                      if p in a["q"][next(iter(a["q"]))]["err"]), default=float("nan"))]
+            have = [a for n, a in analyses.items() if p in recs_all[n]]
+            w = [nanmax(worst(a, g, p) for a in have) for g in (("psi", "wc"), ("t_ark", "t_vw"))]
             cells = []
             for val, tgt in zip(w, TARGETS[p]):
                 v = 100 * val
@@ -445,7 +468,7 @@ def report():
         ks = sorted({k for a in analyses.values() for k in a["levels"]}, key=float)
         for k in ks:
             ws = [a for a in analyses.values() if k in a["levels"]]
-            md.append(f"| {k} | " + " | ".join(pct(max(worst(a, g, k) for a in ws)) for g in
+            md.append(f"| {k} | " + " | ".join(pct(nanmax(worst(a, g, k) for a in ws)) for g in
                                                 (("psi", "wc"), ("t_ark", "t_vw"))) + " |")
         md.append("")
     if splits:
@@ -458,7 +481,6 @@ def report():
                       f"{pct(max(r['err_psi'] for r in s['current_only']))} | "
                       f"{pct(max(r['err_t'] for r in s['current_only']))} | {pct(s['band']['rms_residual'])} |")
         md.append("")
-    out = DATA / "m5a-convergence.md" if "M5A_DATA" in os.environ else ROOT / "docs" / "m5a-convergence.md"
     out.write_text("\n".join(md), encoding="utf-8")
     print("wrote", out)
 
