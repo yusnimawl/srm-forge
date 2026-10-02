@@ -21,7 +21,7 @@ def _fake(candidate, req, stage, **kw):
         return Evaluation(candidate.id, candidate.design, "cancelled", "map cancelled", stage.mass.iron, None,
                           nan, nan, nan, nan, nan, False, None, None)
     return Evaluation(candidate.id, candidate.design, "ok", "", stage.mass.total, None, 1.2, 1.1,
-                      5500.0, 5.5 / stage.mass.total, 0.9, True, Envelope(*([np.zeros(2)] * 8)), None)
+                      5500.0, 5.5 / stage.mass.total, 0.9, True, Envelope(*([np.zeros(2)] * 9)), None)
 
 
 def test_search_runs_stages_in_order_and_respects_shortlist():
@@ -54,24 +54,32 @@ def test_cancel_returns_partial_results():
     assert all(e.status == "ok" for e in res.evaluations)
 
 
-def test_j_peak_reaches_stage_one():
+def test_settings_reach_stage_one():
     seen = []
     real = __import__("srmapp.pipeline", fromlist=["stage1"]).stage1
 
-    def spy(req, p, margin, j_peak, j_limit):
-        seen.append(j_peak)
-        return real(req, p, margin, j_peak, j_limit)
+    def spy(req, p, margin, j_peak, j_peak_max):
+        seen.append((margin, j_peak, j_peak_max))
+        return real(req, p, margin, j_peak, j_peak_max)
     with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
-                   SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6))
-    assert seen and set(seen) == {25e6}
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
+    assert seen and set(seen) == {(1.05, 25e6, 60e6)}
 
 
-def test_current_density_settings_reach_stage_two():
+def test_settings_reach_stage_two():
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
-    assert ev.call_args.kwargs["j_peak"] == 25e6 and ev.call_args.kwargs["j_limit"] == 30e6
+    kw = ev.call_args.kwargs
+    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, 60e6, 1.05)
+
+
+def test_explicit_peak_cap_is_used():
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak_max=33e6))
+    assert ev.call_args.kwargs["j_peak_max"] == 33e6
 
 
 def test_progress_counts_designs():

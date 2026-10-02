@@ -60,8 +60,8 @@ def _req(**kw):
     return Requirements(**values)
 
 
-def _map_for(req, j_peak=20e6, j_limit=20e6):
-    top = max_mmf(MACHINE, req, j_peak, j_limit) / MACHINE.turns_per_pole
+def _map_for(req, j_peak=20e6, j_peak_max=40e6):
+    top = max_mmf(MACHINE, req, j_peak, j_peak_max) / MACHINE.turns_per_pole
     return synthetic_map(n_angles=24, currents=np.linspace(0.0, top, 9))
 
 
@@ -71,17 +71,33 @@ def test_wire_mode_picks_the_lowest_resistance_feasible_winding():
     assert c.point is not None and c.feasible and c.point.feasible
     feasible = [s for s in c.scan if s.feasible]
     assert c.point.winding.resistance == min(s.winding.resistance for s in feasible)
-    same_wire = [s.winding.turns for s in feasible if s.winding.wire == c.point.winding.wire]
-    assert c.point.winding.turns == min(same_wire)
+    same = [s.winding.turns for s in feasible
+            if (s.winding.wire, s.winding.paths) == (c.point.winding.wire, c.point.winding.paths)]
+    assert c.point.winding.turns == min(same)
     assert {s.winding.wire for s in c.scan} == {0, 1}
 
 
-def test_density_mode_picks_the_most_turns():
+def _equivalent(s):
+    return s.winding.turns / s.winding.paths
+
+
+def test_density_mode_picks_the_most_equivalent_turns_then_the_fewest_paths():
     req = _req()
     c = choose_turns(_map_for(req), MACHINE, req, max_turns=40)
-    assert c.feasible
-    assert c.point.winding.turns == max(s.winding.turns for s in c.scan if s.feasible)
-    assert len(c.scan) == 40
+    assert c.feasible and len(c.scan) == 80          # 40 turn counts x paths 1 and 2
+    feasible = [s for s in c.scan if s.feasible]
+    assert _equivalent(c.point) == max(_equivalent(s) for s in feasible)
+    assert c.point.winding.paths == min(s.winding.paths for s in feasible if _equivalent(s) == _equivalent(c.point))
+
+
+def test_density_mode_prefers_the_series_winding_over_the_same_machine_on_two_paths():
+    # worst ratio 112.6 on this map is met up to 8 equivalent turns, so the 16 turns on 2 paths are as feasible as
+    # the 8 in series; ranking by raw turns would pick them.
+    req = _req()
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=112.6)
+    parallel = next(s for s in c.scan if (s.winding.turns, s.winding.paths) == (16, 2))
+    assert parallel.feasible
+    assert (c.point.winding.turns, c.point.winding.paths) == (8, 1)
 
 
 def test_density_current_cap_limits_the_scan():
@@ -108,3 +124,41 @@ def test_chosen_envelope_covers_the_full_speed_grid_and_matches_the_scan_ratios(
     c = choose_turns(_map_for(req), MACHINE, req)
     np.testing.assert_array_equal(c.envelope.speeds_rpm, speed_grid(req))
     assert requirement_ratios(c.envelope, req) == pytest.approx((c.point.torque_ratio, c.point.power_ratio))
+
+
+def test_two_paths_scan_like_the_series_winding_of_half_the_turns():
+    req = _req()
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40)
+    by = {(s.winding.turns, s.winding.paths): s for s in c.scan}
+    for n in (1, 7, 20):          # 2n turns on 2 paths act as n turns in series
+        two, one = by[(2 * n, 2)], by[(n, 1)]
+        assert (two.torque_ratio, two.power_ratio) == pytest.approx((one.torque_ratio, one.power_ratio), rel=1e-9)
+        assert two.i_rms == pytest.approx(one.i_rms, rel=1e-9)
+        assert two.j_rms == pytest.approx(one.j_rms, rel=1e-9)
+
+
+def test_margin_sets_feasibility():
+    req = _req()
+    base = choose_turns(_map_for(req), MACHINE, req, max_turns=20, margin=1.0)
+    assert all(s.feasible == (s.worst >= 1.0) for s in base.scan)
+    bar = base.point.worst * 1.001
+    strict = choose_turns(_map_for(req), MACHINE, req, max_turns=20, margin=bar)
+    assert all(s.feasible == (s.worst >= bar) for s in strict.scan)
+    assert not any(s.feasible for s in strict.scan if s.winding == base.point.winding)
+
+
+def test_rms_limit_binds_the_scan():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    m = _map_for(req, j_peak_max=40e6)
+    loose = choose_turns(m, MACHINE, req, j_limit=1e9, j_peak_max=40e6)
+    limit = 0.5 * float(np.median([s.j_rms for s in loose.scan]))
+    tight = choose_turns(m, MACHINE, req, j_limit=limit, j_peak_max=40e6)
+    assert [s.winding for s in tight.scan] == [s.winding for s in loose.scan]
+    assert all(s.j_rms <= limit * (1 + 1e-9) for s in tight.scan)
+    assert any(t.torque_ratio < l.torque_ratio for t, l in zip(tight.scan, loose.scan))
+
+
+def test_capped_flag_reports_windings_left_out_by_the_peak_cap():
+    req = _req(wires=[THICK], phase_current_a=800.0)       # one THICK strand at 800 A is about 28 A/mm²
+    assert choose_turns(_map_for(req, j_peak_max=20e6), MACHINE, req, j_peak_max=20e6).capped
+    assert not choose_turns(_map_for(req, j_peak_max=1e12), MACHINE, req, j_peak_max=1e12).capped

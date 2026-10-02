@@ -60,13 +60,18 @@ def test_current_density_raises_the_bound_and_the_map_current():
     assert hi.torque_upper == pytest.approx(3 * lo.torque_upper)
 
 
-def test_wire_mode_range_follows_the_cooling_limit():
+def test_wire_mode_range_follows_the_peak_cap():
     req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
     p = make_8_6()
-    lo, hi = stage1(req, p, j_limit=10e6), stage1(req, p, j_limit=20e6)
+    lo, hi = stage1(req, p, j_peak_max=10e6), stage1(req, p, j_peak_max=20e6)
     assert hi.mmf >= lo.mmf
     for s, j in ((lo, 10e6), (hi, 20e6)):
-        assert s.mmf == max(w.turns * w.current for w in wire_windings(p, req, 0, j))
+        assert s.mmf == max(w.turns * w.coil_current for w in wire_windings(p, req, 0, j))
+
+
+def test_stage1_default_cap_is_twice_the_cooling_limit():
+    req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
+    assert stage1(req, make_8_6()).mmf == stage1(req, make_8_6(), j_peak_max=40e6).mmf
 
 
 def test_wire_mode_without_a_possible_winding_fails():

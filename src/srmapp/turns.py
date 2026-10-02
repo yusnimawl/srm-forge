@@ -1,5 +1,6 @@
 """Turns, wire and current chosen after the map (v0a-2 spec §2-3)."""
 import dataclasses
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -39,14 +40,17 @@ class ScanPoint:
     winding: Winding
     torque_ratio: float     # achieved / required, at base speed
     power_ratio: float      # achieved / required, worst over base..max speed
+    i_rms: float            # A, phase RMS current, worst over base..max speed
+    feasible: bool          # worst ratio at least the margin
 
     @property
     def worst(self) -> float:
         return min(self.torque_ratio, self.power_ratio)
 
     @property
-    def feasible(self) -> bool:
-        return self.worst >= 1.0
+    def j_rms(self) -> float:
+        """A/m², conductor RMS current density."""
+        return self.i_rms / (self.winding.paths * self.winding.copper_area)
 
 
 @dataclass(frozen=True)
@@ -55,33 +59,54 @@ class TurnsChoice:
     feasible: bool
     envelope: Envelope | None      # chosen winding over the full speed grid
     scan: tuple[ScanPoint, ...]    # every winding tried, in scan order
+    capped: bool                   # wire mode: the peak current-density cap left out windings that fit the slot
 
 
-def _envelope(result: MapResult, machine: RadialSRMParams, req: Requirements, w: Winding, speeds) -> Envelope:
-    return envelope(rescale_turns(result, w.turns / machine.turns_per_pole), machine, req.bus_voltage_v,
-                    w.resistance, speeds, current_limit=w.current)
+def turns_scale(machine: RadialSRMParams, w: Winding) -> float:
+    """Rescale factor from the map at `machine.turns_per_pole` to winding `w`: `paths` parallel paths of N turns
+    act as N / paths turns in series."""
+    return w.turns / (w.paths * machine.turns_per_pole)
+
+
+def _envelope(result: MapResult, machine: RadialSRMParams, req: Requirements, w: Winding, speeds,
+              j_limit: float) -> Envelope:
+    return envelope(rescale_turns(result, turns_scale(machine, w)), machine, req.bus_voltage_v, w.resistance,
+                    speeds, current_limit=w.current, rms_limit=j_limit * w.paths * w.copper_area)
 
 
 def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements, *, j_peak: float = J_PEAK,
-                 j_limit: float = J_LIMIT, max_turns: int = DENSITY_MAX_TURNS) -> TurnsChoice:
-    """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). Wire mode keeps the
-    feasible winding with the lowest resistance; density mode keeps the feasible winding with the most turns. With
-    no feasible winding, the one with the largest worst ratio is reported."""
+                 j_limit: float = J_LIMIT, j_peak_max: float | None = None, margin: float = 1.0,
+                 max_turns: int = DENSITY_MAX_TURNS) -> TurnsChoice:
+    """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
+    conductor RMS current density, `j_peak_max` (default 2 · `j_limit`) the peak density in wire mode. A winding is
+    feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
+    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
+    feasible winding, the one with the largest worst ratio is reported."""
+    cap = 2 * j_limit if j_peak_max is None else j_peak_max
+    capped = False
     if req.wire_mode:
-        windings = [w for i in range(len(req.wires)) for w in wire_windings(machine, req, i, j_limit)]
+        windings = [w for i in range(len(req.wires)) for w in wire_windings(machine, req, i, cap)]
+        capped = len(windings) < sum(len(wire_windings(machine, req, i, math.inf)) for i in range(len(req.wires)))
     else:
         windings = density_windings(machine, req, j_peak, max_turns)
     grid = speed_grid(req)
     band = grid[grid >= req.base_speed_rpm]
-    scan = tuple(ScanPoint(w, *requirement_ratios(_envelope(result, machine, req, w, band), req)) for w in windings)
+
+    def scan_point(w: Winding) -> ScanPoint:
+        env = _envelope(result, machine, req, w, band, j_limit)
+        torque_ratio, power_ratio = requirement_ratios(env, req)
+        return ScanPoint(w, torque_ratio, power_ratio, float(np.max(env.i_rms)),
+                         min(torque_ratio, power_ratio) >= margin)
+
+    scan = tuple(scan_point(w) for w in windings)
     if not scan:
-        return TurnsChoice(None, False, None, ())
+        return TurnsChoice(None, False, None, (), capped)
     feasible = [s for s in scan if s.feasible]
     if not feasible:
         point = max(scan, key=lambda s: (s.worst, -s.winding.resistance))
     elif req.wire_mode:
-        # for one wire, resistance grows with turns (fewer strands fit), so this is also that wire's smallest N
-        point = min(feasible, key=lambda s: (s.winding.resistance, s.winding.turns))
+        point = min(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
     else:
-        point = max(feasible, key=lambda s: s.winding.turns)
-    return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid), scan)
+        point = max(feasible, key=lambda s: (s.winding.turns / s.winding.paths, -s.winding.paths))
+    return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid, j_limit), scan,
+                       capped)

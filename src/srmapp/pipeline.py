@@ -18,9 +18,14 @@ class SearchSettings:
     seed: int = 0
     shortlist: int = 40
     grid: StageTwoGrid = field(default_factory=StageTwoGrid)
-    margin: float = 1.0
-    j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max
-    j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor current density (wire mode)
+    margin: float = 1.05            # feasible when the worst of torque and power ratio is at least this
+    j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max (density mode)
+    j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor RMS current density
+    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is 2 x j_limit
+
+    @property
+    def peak_cap(self) -> float:
+        return 2 * self.j_limit if self.j_peak_max is None else self.j_peak_max
 
 
 @dataclass(frozen=True)
@@ -46,7 +51,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                progress: Callable[[int, int], None] | None = None,
                cancel: Callable[[], bool] | None = None) -> SearchResult:
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed)
-    scored = [(c, stage1(req, c.design.machine, settings.margin, settings.j_peak, settings.j_limit)) for c in candidates]
+    scored = [(c, stage1(req, c.design.machine, settings.margin, settings.j_peak, settings.peak_cap))
+              for c in candidates]
     passing = [(c, s) for c, s in scored if s.passes]
     passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.iron, reverse=True)
     shortlist = passing[:settings.shortlist]
@@ -57,7 +63,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
             cancelled = True
             break
         evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, j_peak=settings.j_peak,
-                                     j_limit=settings.j_limit, solver=solver, workers=workers,
+                                     j_limit=settings.j_limit, j_peak_max=settings.peak_cap,
+                                     margin=settings.margin, solver=solver, workers=workers,
                                      cache_dir=cache_dir, cancel=cancel)
         if evaluation.status == "cancelled":
             cancelled = True
