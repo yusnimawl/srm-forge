@@ -70,6 +70,12 @@ def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSe
         r_mid = (p.band_inner_radius + p.band_outer_radius) / 2
         target = 2 * math.pi * r_mid / (preset.band_aspect * gap)
         divisions = base * math.ceil(target / base)
+        if s.scale != 1:
+            divisions = base * max(1, round(divisions / s.scale / base))
+    if s.scale != 1:
+        gap *= s.scale
+        sizes = {k: v * s.scale for k, v in sizes.items()}
+        refinement = {k: (size * s.scale, 1 + (g - 1) * s.scale) for k, (size, g) in refinement.items()}
     return ResolvedMeshSettings(
         gap_size=gap, region_sizes=sizes, refinement=refinement, band_divisions=divisions,
         min_angle_deg=s.min_angle_deg, band_min_angle_deg=s.band_min_angle_deg,

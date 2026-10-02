@@ -94,6 +94,9 @@ class MeshSettings(_Frozen):
     # Radial thickness of an air ring outside the stator OD (spec §4.3); 0 = none. A = 0 then sits on the
     # ring's outer circle instead of the stator OD, which admits yoke-saturation leakage flux.
     outer_air_thickness: float = 0.0
+    # Uniform refinement factor applied to every resolved length after preset and user values
+    # (mesh convergence studies); a fixed scale also defines a finer preset. Below 1 refines.
+    scale: float = Field(1.0, gt=0)
 
 
 class Design(_Frozen):

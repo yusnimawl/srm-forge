@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from conftest import make_8_6, make_12_8, make_24_16
 from srmcore.model.design import EdgeRefinement, MeshSettings
@@ -21,6 +22,39 @@ def test_full_preset_defaults(srm_8_6):
     assert r.band_pitch == pytest.approx(2 * math.pi / r.band_divisions)
     assert set(r.region_sizes) == set(REGION_SIZE_KEYS)
     assert r.region_sizes["airgap"] == r.gap_size
+
+
+def test_scale_one_is_identity(srm_8_6):
+    for preset in ("screening", "full", "reference"):
+        a = resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset))
+        assert resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset, scale=1.0)) == a
+
+
+def test_scale_half_halves_lengths_and_doubles_divisions(srm_8_6):
+    a = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening"))
+    b = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=0.5))
+    assert b.gap_size == pytest.approx(a.gap_size / 2)
+    assert all(b.region_sizes[k] == pytest.approx(v / 2) for k, v in a.region_sizes.items())
+    for tag, (size, g) in a.refinement.items():
+        assert b.refinement[tag] == pytest.approx((size / 2, 1 + (g - 1) / 2))
+    assert b.band_divisions == 2 * a.band_divisions
+
+
+@pytest.mark.parametrize("scale", [2 ** -0.5, 0.3, 0.05, 3.0])
+def test_scaled_divisions_stay_multiples_of_the_base(srm_8_6, scale):
+    base = math.lcm(srm_8_6.n_stator_poles, 2 * srm_8_6.n_rotor_poles)
+    d = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=scale)).band_divisions
+    assert d % base == 0 and d >= base
+
+
+def test_explicit_divisions_are_not_scaled(srm_8_6):
+    s = MeshSettings(preset="screening", scale=0.5, airgap_circumferential_divisions=1000)
+    assert resolve_mesh_settings(srm_8_6, s).band_divisions == 1000
+
+
+def test_scale_must_be_positive():
+    with pytest.raises(ValidationError):
+        MeshSettings(scale=0)
 
 
 def test_presets_are_ordered(srm_8_6):
