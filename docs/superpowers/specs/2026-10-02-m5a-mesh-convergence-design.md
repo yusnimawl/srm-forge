@@ -41,7 +41,7 @@ Findings:
 
 ### 3.3 `MeshSettings.scale`
 - New field `scale: float = 1.0`, `gt=0`. In the design JSON, so in provenance.
-- `resolve_mesh_settings` applies it last, to the resolved preset and user values alike: every region size, the gap size and every refinement size × scale; every growth g → 1 + (g − 1)·scale (keeps the grading self-similar); band divisions → `base · max(1, round(divisions / scale / base))` with base = lcm(Ns, 2·Nr), so aligned and unaligned positions stay on the band grid. An explicit `airgap_circumferential_divisions` is scaled the same way.
+- `resolve_mesh_settings` applies it last, to the resolved preset and user values alike: every region size, the gap size and every refinement size × scale; every growth g → 1 + (g − 1)·scale (keeps the grading self-similar); band divisions → `base · max(1, round(divisions / scale / base))` with base = lcm(Ns, 2·Nr), so aligned and unaligned positions stay on the band grid. An explicit `airgap_circumferential_divisions` is used as given (the user pinned it; the study pins it per level so its angles stay on every grid). Band divisions are only re-rounded when `scale != 1`.
 - `scale = 1` reproduces today's meshes exactly (test).
 
 ## 4. Study
@@ -52,7 +52,7 @@ Public API only (`build_machine_mesh`, `solve_point`, `make_solver`, `resolve_me
 - Designs: conftest 8/6, 12/8, 24/16, and the 8/6 with both fillet radii 0.
 - Levels: `MeshSettings(preset="screening", scale=2**(-k/2))`, k = 0…5; plus the stock `screening`, `full` and `reference` presets as extra rows. If a design's finest level does not fit in memory, its finest feasible level is the last.
 - I_max per design: 20 A for the 8/6 variants (as in M4); for the others, doubling from 5 A on the `screening` mesh at the aligned angle until the stator-pole peak |B| (`saturation_report`) reaches 2.0 T. Stated per design in the report.
-- States: aligned, unaligned, mid-stroke and quarter-stroke angles, each a multiple of the coarsest band pitch so it is on every level's grid; currents i_La and I_max. Quantities: ψ, Arkkio and virtual-work torque, W′.
+- States: aligned (0), unaligned (τ/2), τ/12 and τ/6 (partial overlap), τ = 2π/Nr; currents i_La and I_max. Each level pins `airgap_circumferential_divisions` to the nearest multiple of B = lcm(Ns, 2·Nr, 12·Nr) to the scaled default, so every state angle is on every level's band grid. Quantities: ψ, Arkkio and virtual-work torque, W′.
 - Fit: least-squares q = q∞ + C·h^p over all levels (h = scale). Report p, q∞, fit residual, and for torque the value relative to peak torque. Flag quantities with p outside [0.5, 3] or a non-monotone series; for those the error bound is the finest-level spread × 3 (GCI safety factor), not the extrapolation.
 
 ### 4.2 Grid-error split (`full` preset, each design)
