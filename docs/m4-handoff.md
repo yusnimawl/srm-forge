@@ -201,3 +201,22 @@ Findings:
 - 60 against 30 angles: -0.25 to +1.03 %. 2x currents: within 0.01 % (the exact wire-mode map range keeps current resolution adequate). N_THETA 361: -0.03 to +0.80 %.
 - The on/off grid is the largest error source: 80 x 80 against 40 x 40 gives +1.12 to +3.29 %, always upward (the coarse grid misses the best firing angles). The 6/4 exceeds the 2 % limit of the v0a-2 spec §5. Owner decision: raise the default on/off grid (scan time only, no FEM). Not changed.
 - The selection rules put chosen designs close to ratio 1.0, so a few percent of drive-model error can flip feasibility. Owner decision: a feasibility margin. Not changed.
+
+## Small-cycle accuracy check (2026-10-02)
+
+`python -u examples/v0_angle_check.py` (4 candidates, 20 currents) on branch `small-cycle-rms-paths`, at the search defaults: margin 1.05, `j_limit` 20 A/mm2 on the RMS current, peak cap 40 A/mm2, parallel paths, 80 x 80 on/off grid. Same requirement and wires as the v0a-2 check. Wall time about 5.3 h (the map range doubled with the peak cap, so the maps were rebuilt). Log: `out/angle_check_small_cycle.log`.
+
+| Design | Winding | J_rms A/mm2 | Default T / P ratio | 60 angles | 2x currents | N_THETA 361 | On/off 160 vs 80 (at N_THETA 361) |
+|---|---|---|---|---|---|---|---|
+| 6/4 OD 288 | round, N 7, paths 1, strands 21, 13.1 mOhm | 5.8 | 1.097 / 1.103, feasible | -0.13 % | +0.04 % | -0.04 % | +0.8 % |
+| 8/6 OD 202 | rect., N 7, paths 1, strands 10, 8.7 mOhm | 4.9 | 1.054 / 1.060, feasible | +1.01 % | +0.02 % | +0.60 % | +0.6 % |
+| 12/8 OD 225 | round, N 9, paths 1, strands 25, 12.1 mOhm | 4.8 | 1.106 / 1.112, feasible | +0.14 % | +0.01 % | -0.49 % | +0.5 % |
+| 24/16 OD 147 | round, N 13, paths 2, strands 3, 64.3 mOhm | 18.9 | 0.757 / 0.761, infeasible | -0.02 % | 0.00 % | -0.41 % | +0.1 % |
+
+The on/off column is the "361, on/off 160" row against the "n_theta 361" row.
+
+Findings:
+- The 80 x 80 on/off grid is within 0.8 % of 160 x 160 on every design (limit 2 %, decision §10 (a) met). Every other variant stays within 1.01 %.
+- The 6/4, 8/6 and 12/8 windings are the same as in the v0a-2 check; their ratios rose by 1 to 3 % from the finer on/off grid alone. All three pass the 1.05 margin. The 8/6 passes by 0.4 %, inside the 60-angle effect (+1.0 %), and the variants all move its ratios up, so the default settings err on the low side.
+- J_rms of the three feasible designs is 4.8 to 5.8 A/mm2 at a 150 A peak. The RMS limit does not bind; their windings are set by the lowest-resistance rule.
+- The 24/16 improves from 0.52 to 0.76: with the limit on the RMS current, it takes 13 turns on 2 paths, a peak density of about 25 A/mm2 and J_rms 18.9 A/mm2, close to the limit. The geometry is still too small for 32 N.m.
