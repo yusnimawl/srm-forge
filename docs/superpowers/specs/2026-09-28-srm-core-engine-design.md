@@ -144,7 +144,7 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 | Edge/corner refinement | size + growth rate per auto-tag: `pole_tip`, `pole_root` (pole roots — filleted or, as yoke corners, unfilleted) |
 | Skin-depth layers | boundary-layer hook on conductors/shaft from max frequency & conductivity (used by sub-project #2) |
 | Quality report | element count, min angle, aspect ratio, band skew; below threshold → `MeshRejected` |
-| Adaptive refinement | energy-error-driven; used by the *reference* preset (M5) |
+| Adaptive refinement | energy-error-driven; deferred, not built (the *reference* preset is the screening knobs at uniform scale 0.25) |
 | Presets | `screening` (coarse), `full`, `reference`; defaults set by the M5a study: the screening knobs, with `full` and `reference` at fixed `MeshSettings.scale` (2^(-1/2) and 0.25); an adaptive `reference` is not built (§11, 2026-10-03) |
 
 ---
@@ -200,7 +200,7 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 - **End-effect hooks:** analytic end-winding inductance (implemented); 3D fringing factor (implemented only after calibration against measured data). Unaligned inductance accuracy is treated as critical.
 
 ### 7.2 Map generation (`maps/`)
-- **Fidelity presets:** `screening` (~12 angles × ~8 currents, coarse mesh — used by optimizer), `full` (~30 × ~20 — Pareto candidates), `reference` (fine/adaptive — validation). The optimizer never runs full maps on every candidate.
+- **Fidelity presets:** `screening` (40 angles × 8 currents, coarse mesh — used by optimizer), `full` (48 × 20 — Pareto candidates), `reference` (120 × 40, screening knobs at scale 0.25 — validation); angles × power-law currents, plus the La current; the angle grid is clustered at the pole corners (M5a). The optimizer never runs full maps on every candidate.
 - **Angle grid:** one rotor pole pitch 2π/Nr, the full pitch is solved (no mirror reduction; decided 2026-09-30, §11); denser near overlap start and near alignment; snapped to band pitch.
 - **Current grid:** non-uniform, denser at low current and around the saturation knee; mandatory i = 0 row (ψ = 0 exactly); `I_max = max(1.2 × peak demand, device current limit) + chopping-overshoot margin` (absolute, not "× rated"). For #1 without requirements, I_max is a user parameter.
 - **Excitation:** one circuit at a time (diagonal maps) **plus a coarse two-phase overlap map** `ψ, T(θ, i_k, i_k+1)` (~8 × 8 × 10) over the overlap angle window, generated for the `full` and `reference` presets (not `screening`). **Mutual-coupling check** reports Δψ and ΔT vs superposition (threshold 2 %).
@@ -216,15 +216,15 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 
   | Preset | Included | Budget |
   |---|---|---|
-  | `screening` | diagonal map (~12 × 8) + cheap §7.3 checks | < ~90 s per design (original target 30 s) |
-  | `full` | diagonal map (~30 × ~20) + cheap §7.3 checks | < 13 min (original target 5 min) |
+  | `screening` | diagonal map (40 × 8) + cheap §7.3 checks | < ~90 s per design (original target 30 s) |
+  | `full` | diagonal map (48 × 20) + cheap §7.3 checks | < 13 min (original target 5 min) |
   | `full` extras | overlap map (~640 solves) + held-out interpolation solves | separate budget, < 7 min |
-  | `reference` | everything, adaptive mesh | no budget (validation only) |
+  | `reference` | everything, 120 × 40 grid, `reference` mesh (uniform scale 0.25; adaptive refinement deferred, not built) | no budget (validation only) |
 
 ### 7.3 Map-level consistency checks (automatic; checks needing extra FEM solves — held-out interpolation, band-radius independence — run only for `full` and `reference`)
 - **Co-energy torque:** stroke-average torque from ΔW′ vs Arkkio within 2 %; pointwise comparison only after θ-smoothing and away from overlap start.
 - Arkkio vs nodal-force torque within 1 % of peak torque.
-- **Held-out interpolation test:** extra FEM solves at grid mid-points; interpolated ψ within 0.5 %, T within 3 % of peak (provisional until the M5 convergence study; target 1 %).
+- **Held-out interpolation test:** extra FEM solves at grid mid-points; interpolated ψ within 0.5 %, T within 1.7 % of peak torque at 64 held-out samples (set by M5a, §11).
 - Energy identity `W + W′ = Σ_k ψ_k·i_k` per point (reduces to ψ·i for a single circuit); loop energy `∮ i dψ = ∫ T dθ` per stroke.
 - ∫T dθ over a full pitch = 0 at constant current; T = 0 at aligned/unaligned; correct sign pattern; T(−θ) = −T(θ) under mirror.
 - Arkkio torque independent of band radius.
@@ -273,10 +273,10 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 | Cross-solver (same mesh) | ≤ 1e-4 relative | — |
 | Arkkio vs nodal | ≤ 1 % of peak | — |
 | Co-energy (stroke average) vs Arkkio | ≤ 2 % | — |
-| Held-out interpolation | ψ ≤ 0.5 %, T ≤ 3 % of peak (provisional until the M5 convergence study; target 1 %) | — |
+| Held-out interpolation | ψ ≤ 0.5 %, T ≤ 1.7 % of peak torque at 64 held-out samples (set by M5a, §11) | — |
 | Mutual-coupling check threshold | Δψ, ΔT 2 % | — |
 | Zero-current torque noise | < 1 % of average torque | — |
-| Screening vs full | La ≤ 5 %, other key numbers ≤ 3 %, ranking Spearman ρ ≥ 0.95 | — |
+| Screening vs full | all key numbers ≤ 3 % (La read at 5 % of I_max, M5a), ranking Spearman ρ ≥ 0.95 | — |
 
 ### 8.4 Uncertainty budget
 Every key result (La, Lu, peak torque, ψ at I_max) carries a worst-case uncertainty from: material confidence grade, mesh convergence estimate, 2D end-effect correction uncertainty, digitisation error where applicable.
@@ -299,7 +299,7 @@ Every key result (La, Lu, peak torque, ψ at I_max) carries a worst-case uncerta
 | **M2** | minimal material schema (identity, one B-H, stacking factor, conductor ρ, density, cost) + B-H pipeline incl. tail; per-region materials; skfem_reference linear then nonlinear; connection matrix; ψ per circuit; energies; Arkkio at one angle; saturation report | B-H units, MMS, toroid, zero-current, linear Arkkio = co-energy, high-initial-permeability stiffness test (synthetic CoFe-like curve; real CoFe data arrives in M5) |
 | **M3 (go/no-go)** | ngsolve_adapter at parity incl. moving-band rotation; nodal-force torque; TEAM 24 set up (using the existing NGSolve reference as a guide); decision recorded: NGSolve accepted, or fallback to skfem as primary | cross-solver ≤ 1e-4, band-pitch convergence, Arkkio vs nodal |
 | **M4 — engine usable (complete 2026-09-30; speed, fidelity and held-out torque items open in §10)** | grids + fidelity presets; HDF5 datasets; persistent worker pool; cache; L_inc, ∂ψ/∂θ; inverse tables; overlap map + coupling check; standard results & key numbers; LUT exports (CSV, .mat); per-pole force arrays; all §7.3 checks; screening-vs-full fidelity check; error policy, cancellation, crash retry | map monotonicity, held-out interpolation, symmetry, coupling, screening fidelity, error policy, goldens |
-| **M5 — EM-validated** | FEMM fixtures; TEAM 24 comparison (magnetostatic scope, §2.3); SRM measured-data comparison; end-winding hook + end-effect calibration; adaptive reference preset; mesh-preset defaults from convergence study; uncertainty budgets; validation report; library adds 10JNEX900, Hiperco 50A/50HS | FEMM tolerances, measured comparisons, reference convergence, speed benchmark |
+| **M5 — EM-validated** | FEMM fixtures; TEAM 24 comparison (magnetostatic scope, §2.3); SRM measured-data comparison; end-winding hook + end-effect calibration; (mesh-preset defaults done in M5a; adaptive reference preset deferred); uncertainty budgets; validation report; library adds 10JNEX900, Hiperco 50A/50HS | FEMM tolerances, measured comparisons, reference convergence, speed benchmark |
 
 **Go/no-go rule for M3:** if NGSolve cannot reach cross-solver agreement and TEAM 24 behaviour within 2 weeks of M3 start, the scikit-fem solver becomes the primary engine for #1 and NGSolve is re-evaluated when 3D/thermal work begins. The owner makes the call and records it in the spec's decision log.
 

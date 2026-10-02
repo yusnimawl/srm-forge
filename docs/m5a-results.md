@@ -6,12 +6,12 @@ Data: `docs/m5a-data/`. The generated study report `docs/m5a-convergence.md` is 
 
 `screening` is unchanged. `full` is the screening knobs at `MeshSettings.scale` = 2^(-1/2); `reference` is the screening knobs at scale 0.25. The finest feasible convergence level on the 24/16 was level 4: level 5 (3.2 M nodes) paged on the 16 GB laptop.
 
-Worst mesh error over the 4 designs (8/6, 12/8, 24/16 and a variant), against the extrapolated limit:
+Worst mesh error over the 4 designs (8/6, 12/8, 24/16 and `8_6_sharp`, the 8/6 with both fillet radii 0), against the extrapolated limit:
 
 | preset | psi | torque (of peak) |
 |---|---|---|
-| screening | 0.46 % | 0.64 % |
-| full | 0.25 % | 0.36 % |
+| screening (level 0) | 0.46 % | 0.64 % |
+| full (level 1 scale) | 0.25 % | 0.36 % |
 | reference (level 4 scale) | 0.04 % | 0.09 % |
 
 ## Angle grid

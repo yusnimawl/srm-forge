@@ -78,9 +78,8 @@ def fem_checks(design: Design, result: MapResult, *, solver: str = "ngsolve", wo
                n_samples: int = 64) -> tuple[Check, ...]:
     """Empty for the screening preset. Otherwise: `held_out_psi` and `held_out_torque` compare FEM solves at
     grid mid-points (angle mid-points × non-zero current mid-points, evenly subsampled to `n_samples`; 16
-    samples under-read the worst error by up to 2.8x in M5a) with the
-    periodic-spline × PCHIP interpolant of the map; `band_radius` compares the torque from the two air-gap
-    layers with the band torque."""
+    samples under-read the worst error by up to 2.8x in M5a) with the periodic-spline × PCHIP interpolant of
+    the map; `band_radius` compares the torque from the two air-gap layers with the band torque."""
     if design.mesh.preset == "screening":
         return ()
     require_complete(result)
