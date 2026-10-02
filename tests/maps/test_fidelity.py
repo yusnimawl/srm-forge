@@ -50,8 +50,8 @@ def test_not_ok_when_one_key_number_four_percent_off(monkeypatch):
     assert not rep.ok
 
 
-@pytest.mark.parametrize("la_error, ok", [(0.04, True), (0.06, False)])
-def test_la_tolerance_is_five_percent(monkeypatch, la_error, ok):
+@pytest.mark.parametrize("la_error, ok", [(0.02, True), (0.04, False)])
+def test_la_tolerance_is_three_percent(monkeypatch, la_error, ok):
     last = {}
     fake = _fake()
 

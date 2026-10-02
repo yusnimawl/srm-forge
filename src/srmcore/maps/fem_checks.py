@@ -35,7 +35,8 @@ def _coprime_step(m: int) -> int:
 def _held_out_samples(result: MapResult, tau: float, n_samples: int) -> list[tuple[float, float]]:
     """Angle mid-points (wrap interval included) × non-zero current mid-points, n_samples of them. Angle and
     current indices are spread separately, so a coarse subsample of the flattened product cannot alias onto
-    a few current columns. The sample angles are off the band pitch; the mesh handles any angle."""
+    a few current columns. The sample angles are interval mid-points, which fall on the band pitch for
+    intervals spanning an even number of pitches; the mesh handles any angle."""
     ang = np.append(result.angles, result.angles[0] + tau)
     cur = result.currents[result.currents > 0]
     mid_a, mid_i = (ang[:-1] + ang[1:]) / 2, (cur[:-1] + cur[1:]) / 2

@@ -11,14 +11,14 @@ from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.mesh.sizing import size_at
 
 
-def test_full_preset_defaults(srm_8_6):
-    r = resolve_mesh_settings(srm_8_6, MeshSettings())
+def test_screening_preset_defaults(srm_8_6):
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening"))
     assert r.gap_size == pytest.approx(0.0004 / 4)
     assert r.band_divisions % 24 == 0
     r_mid = (srm_8_6.band_inner_radius + srm_8_6.band_outer_radius) / 2
     pitch_length = r_mid * r.band_pitch
-    assert pitch_length <= 1.5 * r.gap_size + 1e-15   # divisions rounded up => pitch not above target
-    assert pitch_length > 1.5 * r.gap_size * r.band_divisions / (r.band_divisions + 24)
+    assert pitch_length <= 3.0 * r.gap_size + 1e-15   # divisions rounded up => pitch not above target
+    assert pitch_length > 3.0 * r.gap_size * r.band_divisions / (r.band_divisions + 24)
     assert r.band_pitch == pytest.approx(2 * math.pi / r.band_divisions)
     assert set(r.region_sizes) == set(REGION_SIZE_KEYS)
     assert r.region_sizes["airgap"] == r.gap_size
@@ -28,6 +28,17 @@ def test_scale_one_is_identity(srm_8_6):
     for preset in ("screening", "full", "reference"):
         a = resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset))
         assert resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset, scale=1.0)) == a
+
+
+@pytest.mark.parametrize("preset, scale", [("full", 2 ** -0.5), ("reference", 0.25)])
+def test_presets_are_scaled_screening(srm_8_6, preset, scale):
+    assert resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset)) == \
+        resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=scale))
+
+
+def test_preset_and_user_scale_multiply(srm_8_6):
+    assert resolve_mesh_settings(srm_8_6, MeshSettings(preset="full", scale=0.5)) == \
+        resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=0.5 * 2 ** -0.5))
 
 
 def test_scale_half_halves_lengths_and_doubles_divisions(srm_8_6):
@@ -65,6 +76,7 @@ def test_presets_are_ordered(srm_8_6):
 
 def test_user_overrides(srm_8_6):
     s = MeshSettings(
+        preset="screening",
         airgap_radial_layers=6,
         airgap_circumferential_divisions=480,
         region_sizes={"shaft": 0.01},
@@ -79,22 +91,22 @@ def test_user_overrides(srm_8_6):
 
 
 def test_airgap_region_size_override_propagates_to_gap_and_refinement(srm_8_6):
-    r = resolve_mesh_settings(srm_8_6, MeshSettings(region_sizes={"airgap": 5e-5}))
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", region_sizes={"airgap": 5e-5}))
     assert r.gap_size == pytest.approx(5e-5)
-    assert r.refinement["pole_tip"][0] == pytest.approx(2.0 * 5e-5)  # full preset tip_factor
+    assert r.refinement["pole_tip"][0] == pytest.approx(3.0 * 5e-5)  # screening preset tip_factor
     assert r.band_divisions % 24 == 0
     r_mid = (srm_8_6.band_inner_radius + srm_8_6.band_outer_radius) / 2
     pitch_length = r_mid * r.band_pitch
-    assert pitch_length <= 1.5 * r.gap_size + 1e-15
+    assert pitch_length <= 3.0 * r.gap_size + 1e-15
 
 
 def test_airgap_interface_refinement_is_gap_size(srm_8_6):
-    r = resolve_mesh_settings(srm_8_6, MeshSettings())
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening"))
     assert r.refinement["airgap_interface"] == (r.gap_size, 1.3)
 
 
 def test_slot_liner_refinement_is_max_of_liner_and_gap(srm_8_6):
-    r = resolve_mesh_settings(srm_8_6, MeshSettings())
+    r = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening"))
     assert r.refinement["slot_liner"] == (max(srm_8_6.slot_liner_thickness, r.gap_size), 1.3)
 
 

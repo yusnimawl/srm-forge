@@ -1,4 +1,6 @@
-"""Turn user mesh settings into concrete sizes. Preset numbers are provisional until the M5 convergence study."""
+"""Turn user mesh settings into concrete sizes. The preset numbers come from the M5a convergence study
+(docs/m5a-convergence.md); `full` and `reference` are the screening knobs at a fixed scale."""
+import dataclasses
 import math
 from dataclasses import dataclass
 
@@ -11,12 +13,14 @@ class _Preset:
     iron_factor: float
     band_aspect: float
     tip_factor: float
+    scale: float = 1.0
 
 
+_SCREENING = _Preset(iron_factor=0.08, band_aspect=3.0, tip_factor=3.0)
 PRESETS: dict[str, _Preset] = {
-    "screening": _Preset(iron_factor=0.08, band_aspect=3.0, tip_factor=3.0),
-    "full": _Preset(iron_factor=0.04, band_aspect=1.5, tip_factor=2.0),
-    "reference": _Preset(iron_factor=0.02, band_aspect=1.0, tip_factor=1.5),
+    "screening": _SCREENING,
+    "full": dataclasses.replace(_SCREENING, scale=2 ** -0.5),
+    "reference": dataclasses.replace(_SCREENING, scale=0.25),
 }
 DEFAULT_GROWTH = 1.3
 
@@ -38,6 +42,7 @@ class ResolvedMeshSettings:
 
 def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSettings:
     preset = PRESETS[s.preset]
+    scale = preset.scale * s.scale
     iron = p.bore_radius * preset.iron_factor
     # Every REGION_SIZE_KEYS entry gets an iron-scale default; shaft and airgap override it below.
     sizes = {key: iron for key in REGION_SIZE_KEYS}
@@ -70,12 +75,12 @@ def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSe
         r_mid = (p.band_inner_radius + p.band_outer_radius) / 2
         target = 2 * math.pi * r_mid / (preset.band_aspect * gap)
         divisions = base * math.ceil(target / base)
-        if s.scale != 1:
-            divisions = base * max(1, round(divisions / s.scale / base))
-    if s.scale != 1:
-        gap *= s.scale
-        sizes = {k: v * s.scale for k, v in sizes.items()}
-        refinement = {k: (size * s.scale, 1 + (g - 1) * s.scale) for k, (size, g) in refinement.items()}
+        if scale != 1:
+            divisions = base * max(1, round(divisions / scale / base))
+    if scale != 1:
+        gap *= scale
+        sizes = {k: v * scale for k, v in sizes.items()}
+        refinement = {k: (size * scale, 1 + (g - 1) * scale) for k, (size, g) in refinement.items()}
     return ResolvedMeshSettings(
         gap_size=gap, region_sizes=sizes, refinement=refinement, band_divisions=divisions,
         min_angle_deg=s.min_angle_deg, band_min_angle_deg=s.band_min_angle_deg,
