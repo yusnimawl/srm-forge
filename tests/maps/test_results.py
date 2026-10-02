@@ -1,3 +1,4 @@
+import dataclasses
 import math
 from types import SimpleNamespace
 
@@ -6,7 +7,7 @@ import pytest
 from conftest import make_8_6, make_12_8
 from map_fixtures import L0, L1, PERIOD, synthetic_map
 
-from srmcore.maps.grids import aligned_angle
+from srmcore.maps.grids import aligned_angle, current_grid
 from srmcore.maps.results import inductance_curves, key_numbers
 
 D = math.radians
@@ -58,15 +59,25 @@ def test_inductance_curves():
         inductance_curves(r, [1.2345])
 
 
-def test_key_numbers_use_lowest_current_when_saturating():
-    r = synthetic_map(psi_sat=0.05)
+def test_key_numbers_read_la_at_five_percent_of_i_max():
+    r = synthetic_map(psi_sat=0.05, currents=current_grid(20.0, 8))
     k = key_numbers(r, make_8_6())
-    i1 = r.currents[1]
-    la_lo = 0.05 * np.tanh((L0 + L1) * i1 / 0.05) / i1
-    assert k.la == pytest.approx(la_lo, rel=1e-12)
+    i = 0.05 * 20.0
+    assert k.la == pytest.approx(0.05 * np.tanh((L0 + L1) * i / 0.05) / i, rel=1e-9)
     assert k.psi_max == pytest.approx(0.05 * np.tanh((L0 + L1) * 20 / 0.05), rel=1e-12)
     assert abs(k.psi_max / 20 - k.la) > 0.05 * k.la  # I_max secant would differ
     assert k.la_lu == pytest.approx(k.la / k.lu)
+
+
+def test_key_numbers_after_turns_rescale():
+    r = synthetic_map(currents=current_grid(20.0, 8))
+    r = dataclasses.replace(r, currents=r.currents / 3.0, psi=r.psi * 3.0)
+    key_numbers(r, make_8_6())                         # must not raise
+
+
+def test_key_numbers_without_la_current_raises():
+    with pytest.raises(ValueError, match="0.05"):
+        key_numbers(synthetic_map(currents=np.linspace(0, 20, 9), la_node=False), make_8_6())
 
 
 def test_inductance_curves_rejects_zero_current():

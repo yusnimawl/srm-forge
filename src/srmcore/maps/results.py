@@ -6,15 +6,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..model.design import RadialSRMParams
-from .grids import aligned_angle
+from .grids import LA_CURRENT_FRACTION, aligned_angle
 from .run import MapResult, require_complete
 from .tables import angle_spline
 
 
 @dataclass(frozen=True)
 class KeyNumbers:
-    la: float               # aligned secant inductance ψ/i at the lowest non-zero grid current, H
-    lu: float               # unaligned secant inductance at the lowest non-zero grid current, H
+    la: float               # aligned secant inductance ψ/i at LA_CURRENT_FRACTION · I_max, H
+    lu: float               # unaligned secant inductance at LA_CURRENT_FRACTION · I_max, H
     la_lu: float
     peak_torque: float      # max |Arkkio torque| over the grid, N·m
     psi_max: float          # excited ψ at the aligned angle and I_max, Wb-turns
@@ -31,12 +31,15 @@ def key_numbers(result: MapResult, machine: RadialSRMParams) -> KeyNumbers:
     th_u = th_a + tau / 2
     i_max = float(result.currents[-1])
     e = result.circuits.index(result.excited)
-    i_lo = float(result.currents[1])
+    i_lo = LA_CURRENT_FRACTION * i_max
+    hit = np.flatnonzero(np.isclose(result.currents, i_lo, rtol=1e-9, atol=0))
+    if hit.size == 0:
+        raise ValueError(f"map has no current at {LA_CURRENT_FRACTION} x I_max = {i_lo:.6g} A")
 
     def at(k):
         return angle_spline(result.angles, result.psi[:, k, e], tau)([th_a, th_u])
 
-    (lo_a, lo_u), (hi_a, _) = at(1), at(-1)
+    (lo_a, lo_u), (hi_a, _) = at(int(hit[0])), at(-1)
     return KeyNumbers(lo_a / i_lo, lo_u / i_lo, lo_a / lo_u, float(np.max(np.abs(result.torque_arkkio))),
                       float(hi_a), i_max, th_a, th_u)
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from conftest import make_8_6, make_12_8
-from srmcore.maps.grids import GRID_SIZES, aligned_angle, angle_grid, current_grid
+from srmcore.maps.grids import GRID_SIZES, LA_CURRENT_FRACTION, aligned_angle, angle_grid, current_grid
 from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.model.design import MeshSettings
 
@@ -42,6 +42,19 @@ def test_current_grid_starts_at_zero_ends_at_i_max_and_is_denser_at_low_current(
     c = current_grid(20.0, 8)
     assert c[0] == 0.0 and c[-1] == 20.0 and np.all(np.diff(c) > 0)
     assert np.diff(c)[0] < np.diff(c)[-1]
+
+
+def test_current_grid_contains_the_la_current_once():
+    c = current_grid(20.0, 8)
+    assert len(c) == 9 and np.all(np.diff(c) > 0)
+    assert np.isclose(c, LA_CURRENT_FRACTION * 20.0, rtol=0, atol=1e-12).sum() == 1
+
+
+def test_current_grid_no_duplicate_when_la_current_is_a_node():
+    c = current_grid(20.0, 2, exponent=1.0)   # nodes 0, 20; then add 1.0
+    assert list(c) == [0.0, 1.0, 20.0]
+    c2 = current_grid(1.0, 21, exponent=1.0)  # 0.05 is already a node
+    assert len(c2) == 21 and np.all(np.diff(c2) > 0)
 
 
 @pytest.mark.parametrize("excited, k", [("B", 1), ("C", 2), ("D", 3)])

@@ -9,6 +9,9 @@ from ..model.design import RadialSRMParams
 # (angles, currents) per fidelity preset, following the mesh preset. Provisional until the M5 study.
 GRID_SIZES = {"screening": (12, 8), "full": (30, 20), "reference": (60, 40)}
 
+# La and Lu are secant inductances at this fraction of I_max, so they do not depend on the grid spacing.
+LA_CURRENT_FRACTION = 0.05
+
 
 def angle_grid(machine: RadialSRMParams, band_divisions: int, n: int, cluster: float = 0.5,
                aligned: float = 0.0) -> np.ndarray:
@@ -28,8 +31,13 @@ def angle_grid(machine: RadialSRMParams, band_divisions: int, n: int, cluster: f
 
 
 def current_grid(i_max: float, n: int, exponent: float = 2.0) -> np.ndarray:
-    """n currents from 0 to i_max, denser at low current: i_max·(k/(n−1))^exponent."""
-    return i_max * (np.arange(n) / (n - 1)) ** exponent
+    """The n power-law currents i_max·(k/(n−1))^exponent, denser at low current, plus the La current
+    LA_CURRENT_FRACTION·i_max (where `key_numbers` reads La and Lu), sorted and without duplicates."""
+    nodes = i_max * (np.arange(n) / (n - 1)) ** exponent
+    i_la = LA_CURRENT_FRACTION * i_max
+    if np.isclose(nodes, i_la, rtol=1e-9, atol=0).any():
+        return nodes
+    return np.union1d(nodes, [i_la])
 
 
 def aligned_angle(machine: RadialSRMParams, excited: str) -> float:
