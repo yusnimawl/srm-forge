@@ -1,8 +1,10 @@
 """Mesh-convergence study runner.
 
 usage: python examples/mesh_convergence.py run <design> <k...>     (refinement levels, scale = 2**(-k/2))
-       python examples/mesh_convergence.py run-presets <design>    (stock screening and full)
+       python examples/mesh_convergence.py run-presets <design>    (screening, full and reference)
 designs: 8_6, 8_6_sharp, 12_8, 24_16
+Every row pins the band divisions to a multiple of B = lcm(Ns, 2 Nr, 12 Nr) so the study angles sit on the
+band grid; preset rows use the nearest B-multiple to the stock division (within B/2 of it).
 
 Appends one JSON line per level to docs/m5a-data/convergence.jsonl. Peak memory is the process
 running maximum, so run each level in its own process for clean per-level numbers.
@@ -17,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
 from conftest import make_8_6, make_12_8, make_24_16  # noqa: E402
 
+from srmcore.fields.solution import SolveStatus  # noqa: E402
 from srmcore.maps.grids import LA_CURRENT_FRACTION  # noqa: E402
 from srmcore.maps.point import solve_point  # noqa: E402
 from srmcore.mesh import build_machine_mesh, mesh_at_angle  # noqa: E402
@@ -33,6 +36,7 @@ DESIGNS = {
     "12_8": make_12_8,
     "24_16": make_24_16,
 }
+BASELINE_GB = 0.0
 SATURATION_T = 2.0
 I_MAX_CAP = 640.0
 
@@ -74,6 +78,8 @@ def find_i_max(name, machine, solver):
     amps = 5.0
     while True:
         point = solve_point(static, design, 0.0, {"A": amps}, solver, keep_field=True)
+        if point.status is SolveStatus.NONCONVERGED:
+            raise SystemExit(f"i_max search {name}: solve did not converge at {amps} A")
         problem = machine_problem(mesh_at_angle(static, 0.0), design, {"A": amps})
         peak = saturation_report(problem, point.field, machine)["stator_poles"].peak
         print(f"i_max search {name}: {amps} A -> {peak:.3f} T", flush=True)
@@ -109,7 +115,7 @@ def run_level(name, machine, solver, level, scale, settings):
             print(name, level, rows[-1]["state"], f"psi={rows[-1]['psi']:.5f}", rows[-1]["status"], flush=True)
     rec = dict(design=name, level=level, scale=scale,
                divisions=resolve_mesh_settings(machine, settings).band_divisions, nodes=nodes,
-               elements=elements, mesh_s=mesh_s, peak_gb=peak_gb(), i_max=i_max, rows=rows)
+               elements=elements, mesh_s=mesh_s, baseline_gb=BASELINE_GB, peak_gb=peak_gb(), i_max=i_max, rows=rows)
     DATA.mkdir(parents=True, exist_ok=True)
     with (DATA / "convergence.jsonl").open("a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -117,28 +123,31 @@ def run_level(name, machine, solver, level, scale, settings):
           "peak_gb", round(rec["peak_gb"], 2), flush=True)
 
 
-def level_settings(machine, k):
-    scale = 2.0 ** (-k / 2)
-    d = resolve_mesh_settings(machine, MeshSettings(preset="screening", scale=scale)).band_divisions
+def pinned_settings(machine, preset, scale=1.0):
+    """Settings whose band divisions are the nearest multiple of B to the resolved default."""
+    d = resolve_mesh_settings(machine, MeshSettings(preset=preset, scale=scale)).band_divisions
     base = math.lcm(machine.n_stator_poles, 2 * machine.n_rotor_poles, 12 * machine.n_rotor_poles)
-    return scale, MeshSettings(preset="screening", scale=scale,
-                               airgap_circumferential_divisions=base * max(1, round(d / base)))
+    return MeshSettings(preset=preset, scale=scale, airgap_circumferential_divisions=base * max(1, round(d / base)))
 
 
 def main(argv):
+    if len(argv) < 2 or argv[1] not in DESIGNS or argv[0] not in ("run", "run-presets") \
+            or (argv[0] == "run" and len(argv) < 3):
+        raise SystemExit(__doc__)
     mode, name = argv[0], argv[1]
     machine = DESIGNS[name]()
+    global BASELINE_GB
+    BASELINE_GB = peak_gb()
     solver = make_solver("ngsolve")
     if mode == "run":
         for k in argv[2:]:
             k = float(k)
-            scale, settings = level_settings(machine, k)
-            run_level(name, machine, solver, int(k) if k == int(k) else k, scale, settings)
-    elif mode == "run-presets":
-        for preset in ("screening", "full"):
-            run_level(name, machine, solver, preset, 1.0, MeshSettings(preset=preset))
+            scale = 2.0 ** (-k / 2)
+            run_level(name, machine, solver, int(k) if k == int(k) else k, scale,
+                      pinned_settings(machine, "screening", scale))
     else:
-        raise SystemExit(__doc__)
+        for preset in ("screening", "full", "reference"):
+            run_level(name, machine, solver, preset, 1.0, pinned_settings(machine, preset))
 
 
 if __name__ == "__main__":
