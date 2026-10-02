@@ -4,16 +4,18 @@ usage: python examples/mesh_convergence.py run <design> <k...>     (refinement l
        python examples/mesh_convergence.py run-presets <design>    (screening, full and reference)
        python examples/mesh_convergence.py split <design>          (held-out error split of the stock full map)
 designs: 8_6, 8_6_sharp, 12_8, 24_16
-Every row pins the band divisions to a multiple of B = lcm(Ns, 2 Nr, 12 Nr) so the study angles sit on the
+Every run row pins the band divisions to a multiple of B = lcm(Ns, 2 Nr, 12 Nr) so the study angles sit on the
 band grid; preset rows use the nearest B-multiple to the stock division (within B/2 of it).
 
-Appends one JSON line per level to docs/m5a-data/convergence.jsonl. Peak memory is the process
-running maximum, so run each level in its own process for clean per-level numbers.
+run and run-presets append one JSON line per level to docs/m5a-data/convergence.jsonl. Peak memory is the
+process running maximum, so run each level in its own process for clean per-level numbers. split uses the
+stock full settings and appends one line to docs/m5a-data/split.jsonl.
 """
 import json
 import math
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -144,8 +146,25 @@ def _spread(items, n):
     return [items[k] for k in idx]
 
 
+def on_pitch_midpoints(angles, tau, pitch, n):
+    """n angles on the band pitch, one per chosen grid interval (wrap interval included): the pitch multiple
+    nearest the interval mid-point (down on a tie) strictly inside the interval; intervals with no interior
+    pitch point are skipped."""
+    ang = np.append(angles, angles[0] + tau)
+    found = []
+    for lo, hi in zip(ang[:-1], ang[1:]):
+        k_lo, k_hi = round(lo / pitch), round(hi / pitch)
+        if k_hi - k_lo < 2:
+            continue
+        k = min(max(math.ceil((lo + hi) / 2 / pitch - 0.5 - 1e-9), k_lo + 1), k_hi - 1)
+        found.append(k * pitch)
+    return _spread(found, n)
+
+
 def run_split(name, machine, solver):
-    """Held-out error of the stock full map split into angle, current and band-noise parts."""
+    """Held-out error of the stock full map split into angle, current and band-noise parts. angle_only is the
+    pure angle-interpolation error (points on the band pitch), band is the off-pitch noise; together they
+    bound what the held-out torque check of fem_checks sees. current_only uses grid angles (on pitch)."""
     smoke = os.environ.get("M5A_SMOKE") == "1"
     n_samples = 2 if smoke else 8
     n_pitches = 1 if smoke else 4
@@ -153,7 +172,8 @@ def run_split(name, machine, solver):
     i_max = find_i_max(name, machine, solver)
     tau = 2 * math.pi / machine.n_rotor_poles
     t0 = time.perf_counter()
-    result = build_map(design, i_max, workers=None, **(dict(n_angles=8, n_currents=4) if smoke else {}))
+    result = build_map(design, i_max, workers=None, cache_dir=Path(tempfile.gettempdir()) / "m5a-map-cache",
+                       **(dict(n_angles=8, n_currents=4) if smoke else {}))
     map_s = time.perf_counter() - t0
     print(name, "map built", result.psi.shape[:2], round(map_s, 1), "s", flush=True)
     key = key_numbers(result, machine)
@@ -172,16 +192,18 @@ def run_split(name, machine, solver):
         return dict(angle=float(angle), i=float(amps), err_psi=abs(float(r.psi[e]) - psi_i) / key.psi_max,
                     err_t=abs(r.torque_arkkio - t_i) / key.peak_torque)
 
-    ang = np.append(result.angles, result.angles[0] + tau)
-    mid_angles = _spread(list((ang[:-1] + ang[1:]) / 2), n_samples)
+    pitch = 2 * math.pi / resolve_mesh_settings(machine, design.mesh).band_divisions
+    mid_angles = on_pitch_midpoints(result.angles, tau, pitch, n_samples)
     cur = result.currents[result.currents > 0]
     mid_currents = _spread(list((cur[:-1] + cur[1:]) / 2), 3 if not smoke else 2)
-    near = lambda target: float(result.currents[np.argmin(abs(result.currents - target))])
+
+    def near(target):
+        return float(result.currents[np.argmin(abs(result.currents - target))])
+
     grid_currents = sorted({near(LA_CURRENT_FRACTION * i_max), near(i_max / 2), float(result.currents[-1])})
     angle_only = [error(a, i) for a in mid_angles for i in grid_currents]
     current_only = [error(float(a), i) for a in _spread(list(result.angles), n_samples) for i in mid_currents]
 
-    pitch = 2 * math.pi / resolve_mesh_settings(machine, design.mesh).band_divisions
     start = float(result.angles[np.argmin(abs(result.angles - tau / 6))])
     angles = [start + j * pitch / 8 for j in range(8 * n_pitches + 1)]
     torque = []
