@@ -2,6 +2,7 @@
 
 usage: python examples/mesh_convergence.py run <design> <k...>     (refinement levels, scale = 2**(-k/2))
        python examples/mesh_convergence.py run-presets <design>    (screening, full and reference)
+       python examples/mesh_convergence.py split <design>          (held-out error split of the stock full map)
 designs: 8_6, 8_6_sharp, 12_8, 24_16
 Every row pins the band divisions to a multiple of B = lcm(Ns, 2 Nr, 12 Nr) so the study angles sit on the
 band grid; preset rows use the nearest B-multiple to the stock division (within B/2 of it).
@@ -11,17 +12,24 @@ running maximum, so run each level in its own process for clean per-level number
 """
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
+
+import numpy as np
+from scipy.interpolate import PchipInterpolator
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
 from conftest import make_8_6, make_12_8, make_24_16  # noqa: E402
 
 from srmcore.fields.solution import SolveStatus  # noqa: E402
+from srmcore.maps.api import build_map  # noqa: E402
 from srmcore.maps.grids import LA_CURRENT_FRACTION  # noqa: E402
 from srmcore.maps.point import solve_point  # noqa: E402
+from srmcore.maps.results import key_numbers  # noqa: E402
+from srmcore.maps.tables import angle_spline  # noqa: E402
 from srmcore.mesh import build_machine_mesh, mesh_at_angle  # noqa: E402
 from srmcore.mesh.settings import resolve_mesh_settings  # noqa: E402
 from srmcore.model.design import Design, MeshSettings  # noqa: E402
@@ -130,8 +138,76 @@ def pinned_settings(machine, preset, scale=1.0):
     return MeshSettings(preset=preset, scale=scale, airgap_circumferential_divisions=base * max(1, round(d / base)))
 
 
+def _spread(items, n):
+    """n items evenly chosen from a list, first and last included."""
+    idx = sorted({round(k) for k in np.linspace(0, len(items) - 1, min(n, len(items)))})
+    return [items[k] for k in idx]
+
+
+def run_split(name, machine, solver):
+    """Held-out error of the stock full map split into angle, current and band-noise parts."""
+    smoke = os.environ.get("M5A_SMOKE") == "1"
+    n_samples = 2 if smoke else 8
+    n_pitches = 1 if smoke else 4
+    design = Design(machine=machine, mesh=MeshSettings(preset="full"))
+    i_max = find_i_max(name, machine, solver)
+    tau = 2 * math.pi / machine.n_rotor_poles
+    t0 = time.perf_counter()
+    result = build_map(design, i_max, workers=None, **(dict(n_angles=8, n_currents=4) if smoke else {}))
+    map_s = time.perf_counter() - t0
+    print(name, "map built", result.psi.shape[:2], round(map_s, 1), "s", flush=True)
+    key = key_numbers(result, machine)
+    e = result.circuits.index(result.excited)
+    psi_spl = angle_spline(result.angles, result.psi[..., e], tau)
+    t_spl = angle_spline(result.angles, result.torque_arkkio, tau)
+    static = build_machine_mesh(design)
+
+    def error(angle, amps):
+        r = solve_point(static, design, angle, {result.excited: amps}, solver)
+        if r.status is SolveStatus.NONCONVERGED:
+            raise SystemExit(f"{name}: held-out solve did not converge at {angle} rad, {amps} A")
+        psi_i = float(PchipInterpolator(result.currents, psi_spl(angle))(amps))
+        t_i = float(PchipInterpolator(result.currents, t_spl(angle))(amps))
+        print(name, f"split angle={math.degrees(angle):.3f}deg i={amps:.3f}", flush=True)
+        return dict(angle=float(angle), i=float(amps), err_psi=abs(float(r.psi[e]) - psi_i) / key.psi_max,
+                    err_t=abs(r.torque_arkkio - t_i) / key.peak_torque)
+
+    ang = np.append(result.angles, result.angles[0] + tau)
+    mid_angles = _spread(list((ang[:-1] + ang[1:]) / 2), n_samples)
+    cur = result.currents[result.currents > 0]
+    mid_currents = _spread(list((cur[:-1] + cur[1:]) / 2), 3 if not smoke else 2)
+    near = lambda target: float(result.currents[np.argmin(abs(result.currents - target))])
+    grid_currents = sorted({near(LA_CURRENT_FRACTION * i_max), near(i_max / 2), float(result.currents[-1])})
+    angle_only = [error(a, i) for a in mid_angles for i in grid_currents]
+    current_only = [error(float(a), i) for a in _spread(list(result.angles), n_samples) for i in mid_currents]
+
+    pitch = 2 * math.pi / resolve_mesh_settings(machine, design.mesh).band_divisions
+    start = float(result.angles[np.argmin(abs(result.angles - tau / 6))])
+    angles = [start + j * pitch / 8 for j in range(8 * n_pitches + 1)]
+    torque = []
+    for a in angles:
+        r = solve_point(static, design, a, {result.excited: float(result.currents[-1])}, solver)
+        if r.status is SolveStatus.NONCONVERGED:
+            raise SystemExit(f"{name}: band-noise solve did not converge at {a} rad")
+        torque.append(r.torque_arkkio)
+    print(name, "band sweep done", flush=True)
+    x, t = (np.array(angles) - start) / pitch, np.array(torque)
+    on = np.arange(len(angles)) % 8 == 0
+    fit = np.polyfit(x[on], t[on], min(3, int(on.sum()) - 1))
+    rms = float(np.sqrt(np.mean((t[~on] - np.polyval(fit, x[~on])) ** 2)) / key.peak_torque)
+    rec = dict(design=name, i_max=i_max, peak_torque=key.peak_torque, psi_max=key.psi_max,
+               n_angles=len(result.angles), n_currents=len(result.currents), map_s=map_s,
+               angle_only=angle_only, current_only=current_only,
+               band=dict(pitch=pitch, angles=angles, torque=torque, rms_residual=rms))
+    DATA.mkdir(parents=True, exist_ok=True)
+    with (DATA / "split.jsonl").open("a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(name, "split: max err_psi", max(r["err_psi"] for r in angle_only + current_only),
+          "max err_t", max(r["err_t"] for r in angle_only + current_only), "band rms", rms, flush=True)
+
+
 def main(argv):
-    if len(argv) < 2 or argv[1] not in DESIGNS or argv[0] not in ("run", "run-presets") \
+    if len(argv) < 2 or argv[1] not in DESIGNS or argv[0] not in ("run", "run-presets", "split") \
             or (argv[0] == "run" and len(argv) < 3):
         raise SystemExit(__doc__)
     mode, name = argv[0], argv[1]
@@ -139,7 +215,9 @@ def main(argv):
     global BASELINE_GB
     BASELINE_GB = peak_gb()
     solver = make_solver("ngsolve")
-    if mode == "run":
+    if mode == "split":
+        run_split(name, machine, solver)
+    elif mode == "run":
         for k in argv[2:]:
             k = float(k)
             scale = 2.0 ** (-k / 2)
