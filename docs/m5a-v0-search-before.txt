@@ -1,0 +1,15 @@
+  1/6 designs
+  2/6 designs
+  3/6 designs
+  4/6 designs
+  5/6 designs
+  6/6 designs
+sampled 24, dropped {'validator': 3, 'fit': 12}, stage 1 rejected 2, evaluated 6 in 12260 s
+id              poles  OD mm        wire    N  str  pa  R mOhm  Jrms A/mm2  mass kg  T ratio  P ratio  kW/kg   eff  status
+9b8821c78b94     8/6     324       round   21   46   2     2.6         1.5    56.31     1.09     1.10   0.43  0.99  ok *
+b3bed8d6cc2b    24/16    321       round    7   34   2     7.5         1.9   130.18     1.05     1.01   0.10  0.98  ok
+ae31d9555281    24/16    254       round   51    3   8    15.6         5.5    27.45     0.98     0.98   0.47  0.96  ok
+27d03124dc6c     8/6     244       round   13   50   2     2.6         1.3    75.90     1.10     1.10   0.31  0.99  ok *
+4b8f637dd89a    12/8     335 rectangular   33    6   4     5.0         2.2    54.21     1.09     1.10   0.39  0.99  ok *
+54268501ec25     8/6     267       round   15   41   1     6.2         3.3    26.53     1.06     1.07   0.97  0.98  ok *
+* = Pareto front (feasible designs; mass down, kW/kg up, copper-only efficiency up)
