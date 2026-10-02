@@ -26,10 +26,13 @@ def test_angle_grid_is_sorted_on_the_band_grid_inside_one_pole_pitch(preset):
     assert np.allclose(a / pitch, np.round(a / pitch), atol=1e-9)
 
 
-def test_angle_grid_is_denser_near_alignment():
-    a = angle_grid(MACHINE, _divisions("full"), 30)
-    gaps = np.diff(a)
-    assert gaps[:2].mean() <= gaps[len(gaps) // 2 - 1: len(gaps) // 2 + 1].mean()
+def test_angle_grid_is_denser_near_the_pole_corners():
+    a = angle_grid(MACHINE, _divisions("full"), 48)
+    theta_c = (MACHINE.stator_pole_arc + MACHINE.rotor_pole_arc) / 2
+    near = np.flatnonzero(np.abs(a - theta_c) <= math.radians(1.5))
+    assert len(near) >= 2
+    near_gaps = np.diff(a)[near[0]:near[-1]]
+    assert near_gaps.min() < 0.5 * np.diff(a).mean()
 
 
 def test_tiny_grid_and_coarse_band_pitch_drop_duplicates_but_keep_zero():
