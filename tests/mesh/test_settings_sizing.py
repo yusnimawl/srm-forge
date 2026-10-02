@@ -32,13 +32,23 @@ def test_scale_one_is_identity(srm_8_6):
 
 @pytest.mark.parametrize("preset, scale", [("full", 2 ** -0.5), ("reference", 0.25)])
 def test_presets_are_scaled_screening(srm_8_6, preset, scale):
-    assert resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset)) == \
-        resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=scale))
+    _assert_same_mesh(resolve_mesh_settings(srm_8_6, MeshSettings(preset=preset)),
+                      resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=scale)))
 
 
 def test_preset_and_user_scale_multiply(srm_8_6):
-    assert resolve_mesh_settings(srm_8_6, MeshSettings(preset="full", scale=0.5)) == \
-        resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=0.5 * 2 ** -0.5))
+    _assert_same_mesh(resolve_mesh_settings(srm_8_6, MeshSettings(preset="full", scale=0.5)),
+                      resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=0.5 * 2 ** -0.5)))
+
+
+def _assert_same_mesh(a, b):
+    """Equal up to floating-point rounding of the scale products."""
+    assert a.band_divisions == b.band_divisions
+    assert a.gap_size == pytest.approx(b.gap_size, rel=1e-12)
+    assert a.region_sizes == pytest.approx(b.region_sizes, rel=1e-12)
+    assert a.refinement.keys() == b.refinement.keys()
+    for tag, values in a.refinement.items():
+        assert values == pytest.approx(b.refinement[tag], rel=1e-12)
 
 
 def test_scale_half_halves_lengths_and_doubles_divisions(srm_8_6):
@@ -51,7 +61,7 @@ def test_scale_half_halves_lengths_and_doubles_divisions(srm_8_6):
     assert b.band_divisions == 2 * a.band_divisions
 
 
-@pytest.mark.parametrize("scale", [2 ** -0.5, 0.3, 0.05, 3.0])
+@pytest.mark.parametrize("scale", [2 ** -0.5, 0.3, 0.05])
 def test_scaled_divisions_stay_multiples_of_the_base(srm_8_6, scale):
     base = math.lcm(srm_8_6.n_stator_poles, 2 * srm_8_6.n_rotor_poles)
     d = resolve_mesh_settings(srm_8_6, MeshSettings(preset="screening", scale=scale)).band_divisions
@@ -66,6 +76,18 @@ def test_explicit_divisions_are_not_scaled(srm_8_6):
 def test_scale_must_be_positive():
     with pytest.raises(ValidationError):
         MeshSettings(scale=0)
+
+
+def test_scale_above_one_is_rejected():
+    with pytest.raises(ValidationError):
+        MeshSettings(scale=1.5)
+
+
+def test_preset_scale_leaves_explicit_sizes_exact(srm_8_6):
+    s = MeshSettings(preset="full", region_sizes={"stator_iron": 0.002})
+    assert resolve_mesh_settings(srm_8_6, s).region_sizes["stator_iron"] == 0.002
+    s = MeshSettings(preset="full", scale=0.5, region_sizes={"stator_iron": 0.002})
+    assert resolve_mesh_settings(srm_8_6, s).region_sizes["stator_iron"] == pytest.approx(0.001)
 
 
 def test_presets_are_ordered(srm_8_6):

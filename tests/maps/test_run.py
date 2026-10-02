@@ -7,6 +7,7 @@ import pytest
 from conftest import make_8_6
 from srmcore.fields.solution import SolveStatus
 from srmcore.maps import run
+from srmcore.maps.grids import LA_CURRENT_FRACTION, current_grid
 from srmcore.maps.point import PointResult, solve_point
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings
@@ -104,6 +105,15 @@ def test_map_fails_on_the_policy_conditions(monkeypatch, failing, reason):
     with pytest.raises(MapFailed) as e:
         _run()
     assert any(reason in r for r in e.value.reasons) and e.value.n_failed == len(failing)
+
+
+def test_map_fails_on_a_point_at_the_la_current(monkeypatch):
+    currents = current_grid(20.0, 8)
+    i_la = int(np.flatnonzero(np.isclose(currents, LA_CURRENT_FRACTION * 20.0))[0])
+    _fake(monkeypatch, failing={(2, i_la)}, currents=currents)
+    with pytest.raises(MapFailed) as e:
+        run.run_map(None, DESIGN, ANGLES, currents)
+    assert any("La current" in r for r in e.value.reasons) and e.value.n_failed == 1
 
 
 def test_cancel_keeps_partial_results_unfilled(monkeypatch):

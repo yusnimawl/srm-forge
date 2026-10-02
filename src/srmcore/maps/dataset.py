@@ -28,7 +28,9 @@ _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "curre
 def provenance(design: Design, angles: np.ndarray, currents: np.ndarray, excited: str,
                solver: SolverAdapter) -> dict:
     """Everything that decides the numbers in a map. The design JSON covers geometry, the mesh preset name and material
-    names; the resolved mesh settings cover the preset's numbers and the sizing code that turns them into lengths; the
+    names; the resolved mesh settings cover the numbers `resolve_mesh_settings` produces (region and gap sizes,
+    refinement, band divisions and the quality limits), so a change to a preset or to that resolution invalidates
+    cached maps, while a change to the size field or meshing code is covered only by the srmcore version; the
     material files' hashes cover their data, and the versions of the numerical libraries cover the rest."""
     mesh_resolved = json.loads(json.dumps(dataclasses.asdict(resolve_mesh_settings(design.machine, design.mesh))))
     names = sorted(set(design.machine.materials.model_dump().values()))

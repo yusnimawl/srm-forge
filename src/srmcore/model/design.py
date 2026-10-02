@@ -95,8 +95,9 @@ class MeshSettings(_Frozen):
     # ring's outer circle instead of the stator OD, which admits yoke-saturation leakage flux.
     outer_air_thickness: float = 0.0
     # Uniform refinement factor applied to every resolved length after preset and user values
-    # (mesh convergence studies); a fixed scale also defines a finer preset. Below 1 refines.
-    scale: float = Field(1.0, gt=0)
+    # (mesh convergence studies). Below 1 refines; values above 1 would coarsen the gap below the
+    # validator's minimum layer count, so they are rejected.
+    scale: float = Field(1.0, gt=0, le=1)
 
 
 class Design(_Frozen):

@@ -16,7 +16,7 @@ from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..model.errors import MapFailed
 from ..solvers.factory import make_solver
-from .grids import aligned_angle
+from .grids import LA_CURRENT_FRACTION, aligned_angle
 from .point import solve_point
 from .pool import map_ordered
 
@@ -79,7 +79,7 @@ def solve_job(job) -> dict:
 def apply_failure_policy(result: MapResult, aligned: float, tau: float, atol: float = 1e-9) -> MapResult:
     """`aligned` is the aligned angle of the excited phase; angles are compared with it modulo the rotor
     pole pitch `tau`, within `atol`. Interpolate isolated NONCONVERGED points along current (PCHIP) and
-    flag them, or raise MapFailed when more than 2 % of the points fail or the aligned angle or I_max has a failure."""
+    flag them, or raise MapFailed when more than 2 % of the points fail or the aligned angle, zero current, the La current or I_max has a failure."""
     failed = result.status == STATUS_NONCONVERGED
     n_failed = int(failed.sum())
     if n_failed == 0:
@@ -94,6 +94,10 @@ def apply_failure_policy(result: MapResult, aligned: float, tau: float, atol: fl
         reasons.append("a point at I_max failed")
     if failed[:, 0].any():
         reasons.append("a point at zero current failed")
+    # key_numbers reads La and Lu at this current
+    at_la = np.isclose(result.currents, LA_CURRENT_FRACTION * result.currents[-1], rtol=1e-9, atol=0.0)
+    if failed[:, at_la].any():
+        reasons.append("a point at the La current failed")
     if reasons:
         raise MapFailed(reasons, n_failed)
     data = {name: getattr(result, name).copy() for name in _FIELDS}
