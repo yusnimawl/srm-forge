@@ -23,7 +23,7 @@ _NAN = float("nan")
 
 @dataclass(frozen=True)
 class StageTwoGrid:
-    """Map grid; None takes the design's preset grid (30 x 20 for `full`)."""
+    """Map grid; None takes the design's preset grid (`GRID_SIZES`, 48 x 20 for `full`)."""
     n_angles: int | None = None
     n_currents: int | None = None
 

@@ -53,6 +53,12 @@ La is read at 5 % of I_max. At equal current `screening` and `full` agree to 0.0
 
 Check statuses that changed: `coenergy_torque` warn to pass, `loop_energy` warn to pass, `iron_b_peak` pass to warn.
 
+`iron_b_peak` warns because the corner-clustered angle grid now reaches the angles where the pole-corner field is singular. The check reads the pointwise peak element |B|, which grows as the mesh and the grid resolve the corner, so it is mesh dependent. Redefining the check (area-averaged, or excluding corner elements) or accepting the warning is an owner item (spec §10).
+
+## Band noise
+
+The new `full` keeps the band aspect at 3, so it has fewer band divisions than the old `full` (8/6: 1224 vs 1728). Band torque RMS rose from 0.04-0.11 % to 0.15-0.47 % of peak torque. On the 24/16 the held-out 1.10 % is dominated by band noise (angle grid only 0.20 %, current grid only 0.05 %), so the 1.7 % held-out limit is in effect a band-noise limit. Raising the `full` band divisions (a finer band aspect) would cut it at extra cost; owner item in spec §10.
+
 ## Decisions
 
 Owner approved the presets and the angle grid on 2026-10-02.
@@ -62,6 +68,10 @@ Owner approved the presets and the angle grid on 2026-10-02.
 - Held-out limits: torque 1.7 % of peak (1.10 % measured x 1.5), 64 samples by default; psi 0.5 % unchanged.
 - Fidelity check: La tolerance back to 3 %, same as the other key numbers (the 5 % allowance only covered the old definition).
 - Provenance hashes the resolved mesh settings (`scale` included).
+
+## Speed
+
+The speed budgets in spec §7.2 were set for the pre-M5a grids and `full` mesh. The new `full` maps took 1628-4068 s (27-68 min, 8 workers; `docs/m5a-data/split.jsonl` `map_s`), and the held-out check now runs 64 samples. Re-baselining the budgets is an owner item (spec §10).
 
 ## Not done
 
