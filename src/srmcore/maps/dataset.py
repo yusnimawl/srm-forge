@@ -1,4 +1,5 @@
 """Map dataset: provenance hash, HDF5 file with labelled axes, and the complete-maps-only cache (spec §7.2)."""
+import dataclasses
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import h5py
 import numpy as np
 
 from ..materials import library
+from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..solvers.settings import SolverAdapter
 from .overlap import OverlapResult
@@ -25,12 +27,14 @@ _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "curre
 
 def provenance(design: Design, angles: np.ndarray, currents: np.ndarray, excited: str,
                solver: SolverAdapter) -> dict:
-    """Everything that decides the numbers in a map. The design JSON covers geometry, mesh and material names;
-    the material files' hashes cover their data, and the versions of the numerical libraries cover the rest."""
+    """Everything that decides the numbers in a map. The design JSON covers geometry, the mesh preset name and material
+    names; the resolved mesh settings cover the preset's numbers and the sizing code that turns them into lengths; the
+    material files' hashes cover their data, and the versions of the numerical libraries cover the rest."""
+    mesh_resolved = json.loads(json.dumps(dataclasses.asdict(resolve_mesh_settings(design.machine, design.mesh))))
     names = sorted(set(design.machine.materials.model_dump().values()))
     materials = {n: hashlib.sha256((library._data_dir() / f"{n}.json").read_bytes()).hexdigest() for n in names}
     libraries = {d: version(d) for d in ("gmsh", "numpy", "scipy", "h5py")}
-    return {"srmcore": version("srmcore"), "libraries": libraries, "design": json.loads(design.to_json()), "materials": materials,
+    return {"srmcore": version("srmcore"), "libraries": libraries, "design": json.loads(design.to_json()), "mesh_resolved": mesh_resolved, "materials": materials,
             "angles": np.asarray(angles, float).tolist(), "currents": np.asarray(currents, float).tolist(),
             "excited": excited, "solver": solver.name, "solver_version": solver.version}
 
