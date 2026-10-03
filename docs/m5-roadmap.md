@@ -21,12 +21,12 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 - **Goal:** the magnetostatic TEAM 24 comparison counts as validation evidence (spec §2.3, §8.2 suite 5).
 - **Have:** `tests/team24_fixture.py`, `examples/team24_check.py`, `docs/m5b-team24-results.md` (static torque -13.1 % vs measured; current rise up to +18.6 % ahead; both solvers agree to 1e-13).
-- **Owner decisions first:**
-  1. Table I H-column units: confirm 400–39634 A/m (the fixture's reading) against the printed table.
-  2. Acceptance criterion: proposed static torque within 10 % at 7.41 A, current rise "follows the measured shape". Decide the shape criterion in numbers.
-  3. The 2 ms (−12.5 %) and 10–40 ms (+12 %) current-rise deviations: investigate cause, or accept and put in the uncertainty budget.
-- **Scope:** turn the feasibility script into a slow test with the agreed criteria; uncertainty budget entry (3D end effects, measured R 3.09 vs 3.12 Ω, assumed Js 2.6 T, digitisation); a section of the validation report. Optional: torque vs current at the same current (removes the time-axis error).
-- **Done:** slow test green on Windows and Linux; result with error and uncertainty recorded; spec §10 TEAM 24 item closed in §11.
+- **Owner decisions (2026-10-04):**
+  1. Table I H read as ×10⁴ A-t/m, points 1–17 used, Js 2.0 T assumed.
+  2. No pass/fail gate; the result is reported as error ± uncertainty.
+  3. Current-rise and static deviations are attributed to the omitted 3D end flux and eddy currents; Table V (rotor-pole flux) is compared.
+- **Scope (done):** slow test, uncertainty budget and results doc; see `docs/m5b-team24-results.md` and the spec §11 entry.
+- **Done:** slow test green locally on Windows (Linux coverage of the slow test waits for M5e's "all suites on CI" item); result with error and uncertainty recorded; spec §10 TEAM 24 item closed in §11.
 - **Size:** small (FEM runs are seconds).
 
 ## M5c: FEMM fixtures (cross-tool)

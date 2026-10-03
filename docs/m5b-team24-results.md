@@ -4,7 +4,7 @@
 
 - The 2D static torque at 7.41 A is 2.7996 N·m against 3.22 measured: -13.1 %.
 - The rotor-pole flux is 3.9069e-04 Wb against 4.72e-04: -17.2 %.
-- The model current runs ahead of the measurement by up to +18.6 % between 5 and 50 ms (+18.9 % with the Table II voltage).
+- The model current runs ahead of the measurement by up to +18.6 % between 5 and 50 ms (R 3.09 Ω, 23.1 V); across the R and voltage variants the maximum is 18.1 % to 18.9 % (+18.9 % at R 3.12 Ω with the Table II voltage).
 - All deviations have the sign of the omitted 3D end flux (and, for the current rise, eddy currents).
 - There is no pass/fail gate (owner decision 2026-10-04).
 - Reproduce with `python examples\team24_check.py`. The slow test is `tests/validation/test_team24.py`; the model is `tests/team24_fixture.py::team24_problem`.
@@ -117,7 +117,7 @@ Regression pins in the slow test: torque 2.7996 N·m, ψ 0.3676 Wb-turns (relati
 | Voltage overshoot (Table II vs 23.1 V) | none | max \|dev\| 18.1 % to 18.9 % (t ≥ 5 ms, R 3.12 Ω) | none | computed |
 | Js 1.98–2.05 T | < 1e-6 (only 4 corner elements above the table) | not computed | not computed | computed |
 | Mesh (scale 0.5) | -0.004 % | not computed | not computed | computed |
-| Table rounding (2 decimals) | ±0.005/3.22 = ±0.16 % on final torque | ±0.005/i (±0.5 % at 0.91 A) | ±0.005/4.72 = ±0.11 % on the final value | arithmetic |
+| Table rounding (2 decimals) | ±0.005/3.22 = ±0.16 % on final torque | ±0.005/i (±0.55 % at 0.91 A) | ±0.005/4.72 = ±0.11 % on the final value | arithmetic |
 | Table I reading / B-H | measured EN9 curve, annealed; no grade or tolerance given | same | same | Table I |
 | Search-coil position | not applicable | not applicable | Table V assumed flux per turn; chord 8.7 mm from the corner along the flank | Fig. 1 |
 
