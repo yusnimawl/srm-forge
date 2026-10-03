@@ -6,7 +6,7 @@ Goal: the magnetostatic TEAM 24 comparison counts as validation evidence (core s
 
 1. **Table I units: H in ×10⁴ A-t/m.** The printed table header reads "(×10⁴ A-t/m)" with entries 00.400 … 39.634, and Fig. 3's H axis runs 0 … 4.0 ×10⁵ A/m with the curve at 2.47 T near 4×10⁵. So H = 4 000 … 396 340 A/m. The fixture's earlier reading (400 … 39 634 A/m, from the NGSolve TEAM 24 page) was 10× too soft and is replaced. With the correct reading, J = B − μ0·H rises to 1.979 T at point 17 (240 kA/m) and then dips by up to 5 mT (points 18–21), which is at the digitisation level of the table.
 2. **No pass/fail gate against the measurement.** The 2D magnetostatic model omits two effects of known sign: 3D end flux (axial length 25.4 mm ≈ 9× the 2.7 mm gap; lowers 2D ψ and torque) and eddy currents in the solid steel (σ = 4.54 MS/m; act like a shorted secondary, so early in a voltage step the measured coil current is higher and the measured flux and torque lower, decaying to zero at steady state). The comparison is reported with error and an uncertainty budget. The slow test pins the 2D result (regression), checks the expected signs and a sanity band of 25 %. The M5d end-effect hook, calibrated on the Krishnan machine, is later applied to TEAM 24 as an independent check of the hook.
-3. **Current-rise deviations: accepted, attributed.** With the corrected B-H the model runs up to +18 % ahead of the measurement between 5 and 50 ms, and the 2 ms point is −1.7 %. Eddy currents would make the model current lag early, which fits the 2 ms point, and make the model torque and flux high at the measured current early; they have the opposite sign to the mid-rise lead. The lead is consistent with the lower 2D inductance (omitted 3D end flux) and the interpolated low-field B-H; plausible, not established. No further investigation in M5b.
+3. **Current-rise deviations: accepted, attributed.** With the corrected B-H the model runs up to +18 % ahead of the measurement between 5 and 50 ms, and the 2 ms point is −1.7 %. Eddy currents would make the model current lag early, which fits the 2 ms point, and make the model torque and flux high at the measured current early. Because ∫(V − R·i) dt = ψ_final, a measured current raised early is lower than the eddy-free current later, so eddy currents also give a mid-rise lead. The lower 2D ψ_final (omitted 3D end flux) gives ∫(i_model − i_meas) dt = (ψ_meas − ψ_model)/R > 0, also a net lead, and the interpolated low-field B-H is a third candidate. The lead is consistent with all three; none is established, and only the 3D end flux explains the steady-state deficit. No further investigation in M5b.
 4. **Rotor-pole flux (Table V) is compared** in the results table, not gated.
 
 ## Spike results (throwaway, NGSolve, default mesh)
@@ -16,7 +16,7 @@ Goal: the magnetostatic TEAM 24 comparison counts as validation evidence (core s
 | Static torque at 7.41 A (Arkkio) | 2.800 N·m | 3.22 | −13.1 % |
 | ψ(7.41 A) | 0.3676 Wb-turns | — | — |
 | Current, max |error| for t ≥ 5 ms | — | Table III | +18.6 % (at 20 ms) |
-| Torque at the measured current | — | Table IV | −7.5 … +10.2 … −13.1 % |
+| Torque at the measured current | — | Table IV | −7.5 % (5 ms), +10.2 % (10 ms), −13.3 % (200 ms), settling at −13.1 % |
 
 Sensitivities: Js 1.98–2.05 T and truncate-vs-clamp of the J dip: < 0.01 % (peak iron B 2.29 T, barely in the tail). Mesh size ×0.5: torque 0.004 %. R 3.09 vs 3.12 Ω and Table II voltage vs constant 23.1 V: ≤ 1 % on current.
 
@@ -45,7 +45,7 @@ Prints: solver agreement; static torque and ψ; current table (model vs Table II
   | Entry | Static torque | Current rise | Basis |
   |---|---|---|---|
   | 3D end flux | dominant, sign − (model low) | sign + (lower 2D inductance, model fast) | not quantified in 2D; M5d hook checks it |
-  | Eddy currents | 0 (steady state); early: measured lower at a given current | measured current higher early, so model lags early (opposite to the mid-rise lead) | out of scope (§2.3) |
+  | Eddy currents | 0 (steady state); early: measured lower at a given current | measured higher early, lower later, so model lags early and leads mid-rise | out of scope (§2.3) |
   | R 3.09 vs 3.12 Ω | — | from script | computed |
   | Voltage overshoot (Table II) | — | from script | computed |
   | Js tail | from script | from script | computed |

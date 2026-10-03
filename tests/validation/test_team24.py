@@ -115,7 +115,7 @@ def test_current_rise(lr_map):
     model = t24.current_rise(psi, t24.TABLE_TIME)
     error = (model - t24.TABLE_CURRENT) / t24.TABLE_CURRENT
     mid = (t24.TABLE_TIME >= 0.005) & (t24.TABLE_TIME <= 0.100)
-    assert np.all(model[mid] >= t24.TABLE_CURRENT[mid])   # lower 2D inductance (no 3D end flux): model runs ahead
+    assert np.all(model[mid] >= t24.TABLE_CURRENT[mid])   # model runs ahead mid-rise: lower 2D inductance and no eddy currents
     assert np.all(np.abs(error) < 0.25)
     assert model[t24.TABLE_TIME == 0.020][0] == pytest.approx(CURRENT_20MS_2D, rel=2e-3)
     assert model[-1] == pytest.approx(t24.VOLTAGE / t24.RESISTANCE, rel=2e-3)
