@@ -11,12 +11,15 @@ from dataclasses import dataclass
 
 import gmsh
 import numpy as np
+from matplotlib.tri import LinearTriInterpolator, Triangulation
+from scipy.integrate import solve_ivp
 
 from srmcore.materials.bh import process_bh
 from srmcore.materials.laws import VACUUM
 from srmcore.materials.schema import BHTable
 from srmcore.physics.problem import BandInfo, Magnetostatic2D
 from srmcore.physics.winding import Winding
+from srmcore.post.quantities import arkkio_torque, flux_linkage
 
 MM = 1e-3
 # Fig. 1
@@ -40,15 +43,32 @@ COIL_THICKNESS = 17.0 * MM                           # extent along y
 COIL_MID_Y = 63.0 * MM
 RESISTANCE = 3.09
 VOLTAGE = 23.1
+# Tables III-V share these sample times (s); point 1 (t = 0, all zero) is omitted.
+TABLE_TIME = np.array([0.002, 0.005, 0.010, 0.015, 0.020, 0.030, 0.040, 0.050, 0.060, 0.070, 0.080, 0.090,
+                       0.100, 0.120, 0.140, 0.160, 0.180, 0.200, 0.240, 0.300])
+TABLE_CURRENT = np.array([0.91, 1.80, 2.95, 3.82, 4.49, 5.45, 6.05, 6.45, 6.71, 6.91, 7.04, 7.15, 7.22, 7.31,
+                          7.36, 7.38, 7.40, 7.40, 7.41, 7.41])                      # Table III, A
+TABLE_TORQUE = np.array([0.02, 0.17, 0.39, 0.68, 0.96, 1.48, 1.90, 2.24, 2.48, 2.68, 2.82, 2.93, 3.02, 3.11,
+                         3.17, 3.19, 3.21, 3.22, 3.22, 3.22])                       # Table IV, N.m
+TABLE_ROTOR_FLUX = 1e-4 * np.array([0.29, 0.77, 1.44, 1.99, 2.44, 3.11, 3.58, 3.91, 4.14, 4.31, 4.43, 4.52,
+                                    4.58, 4.65, 4.69, 4.71, 4.72, 4.72, 4.72, 4.72])  # Table V, Wb
+# Table II: measured coil voltage (s, V); constant 23.10 V after the last point.
+VOLTAGE_TIME = np.array([0, 0.0002, 0.002, 0.005, 0.010, 0.030, 0.050, 0.070, 0.090, 0.120, 0.140])
+VOLTAGE_TABLE = np.array([0, 23.60, 23.48, 23.38, 23.32, 23.18, 23.13, 23.12, 23.10, 23.10, 23.10])
+# Rotor-pole search coil: wound around the rotor pole 8.7 mm from the pole corner (Fig. 1).
+SEARCH_COIL_FROM_CORNER = 8.7 * MM
 
-# Table I, H in A/m and B in T.
-H_TABLE = (0, 400, 801, 1601, 2402, 3203, 4003, 4804, 6405, 8007, 9608, 11210, 12811, 14412, 17615, 20818,
-           24020, 27223, 30426, 33629, 39634)
+# Table I. The printed H column is in units of 1e4 A-t/m (entries 00.400 .. 39.634), confirmed by Fig. 3's
+# H axis (0 .. 4.0e5 A/m). J = B - mu0*H peaks at 1.979 T at point 17 (240.2 kA/m) and then falls by up to
+# 5 mT (points 18-21), which is at the table's digitisation level; process_bh needs J non-decreasing, so
+# the table stops at point 17.
+H_TABLE = tuple(1e4 * h for h in (0, 0.400, 0.801, 1.601, 2.402, 3.203, 4.003, 4.804, 6.405, 8.007, 9.608,
+                                  11.210, 12.811, 14.412, 17.615, 20.818, 24.020))
 B_TABLE = (0, 1.413, 1.594, 1.751, 1.839, 1.896, 1.936, 1.967, 2.008, 2.042, 2.073, 2.101, 2.127, 2.151,
-           2.197, 2.240, 2.281, 2.321, 2.361, 2.400, 2.472)
-# The table stops at J = 2.42 T; the C1 tail beyond it needs a saturation polarisation, which the report
-# does not give. This value is an assumption (the last table slope is still above mu0).
-ASSUMED_JS = 2.6
+           2.197, 2.240, 2.281)
+# Saturation polarisation of the C1 tail beyond point 17 (assumed; the dropped points sit at J = 1.974 to
+# 1.979 T). Peak iron |B| at 7.41 A is about 2.3 T, so results move < 0.01 % over Js = 1.98 .. 2.05 T.
+ASSUMED_JS = 2.0
 
 # Band (air-gap annulus for Arkkio and virtual work) sits inside the 2.7 mm gap.
 BAND_INNER = 51.6 * MM
@@ -206,3 +226,60 @@ def team24_problem(current: float, size_scale: float = 1.0, js: float = ASSUMED_
         element_coil=coil, winding=winding, currents=np.array([current]), dirichlet_nodes=outer, depth=DEPTH,
         band=BandInfo(m.band_elements, BAND_INNER, BAND_OUTER),
     )
+
+
+def table_ii_voltage(t: float) -> float:
+    """Measured coil voltage at time t (s), linear between the Table II points."""
+    return float(np.interp(t, VOLTAGE_TIME, VOLTAGE_TABLE))
+
+
+def current_rise(psi_of_i, times, resistance: float = RESISTANCE, voltage=VOLTAGE) -> np.ndarray:
+    """Series-circuit current (A) at `times` (s) after a voltage step on the locked rotor, from
+    dpsi/dt = V(t) - R*i on the psi(i) map: di/dt = (V(t) - R*i) / psi'(i). `psi_of_i` is a scipy
+    piecewise polynomial (PCHIP) in Wb-turns; `voltage` is a constant in V or a callable of t."""
+    v = voltage if callable(voltage) else (lambda t: voltage)
+    dpsi = psi_of_i.derivative()
+    times = np.asarray(times, float)
+    sol = solve_ivp(lambda t, y: [(v(t) - resistance * y[0]) / float(dpsi(y[0]))], (0.0, float(times.max())),
+                    [0.0], t_eval=times, max_step=2e-4, rtol=1e-8, atol=1e-10)
+    if not sol.success:
+        raise RuntimeError(f"current rise integration failed: {sol.message}")
+    return sol.y[0]
+
+
+def rotor_pole_flux(problem: Magnetostatic2D, solution, pole: int = 1) -> float:
+    """Flux (Wb) through the rotor pole on the chord across both flanks at the search-coil position:
+    SEARCH_COIL_FROM_CORNER along the flank from the tip corner. pole = 1 is the rotor pole under the
+    top stator pole, -1 the opposite one. Flux = depth * |A(flank 1) - A(flank 2)|."""
+    half = POLE_WIDTH_ROTOR / 2
+    dist = math.sqrt(R_ROTOR_TIP ** 2 - half ** 2) - SEARCH_COIL_FROM_CORNER
+    axis = pole * np.array([math.sin(-ROTOR_ANGLE), math.cos(-ROTOR_ANGLE)])
+    normal = np.array([axis[1], -axis[0]])
+    a = LinearTriInterpolator(Triangulation(problem.nodes[:, 0], problem.nodes[:, 1], problem.triangles),
+                              solution.a)
+    p1, p2 = dist * axis + half * normal, dist * axis - half * normal
+    a1, a2 = a(*p1), a(*p2)
+    if np.ma.is_masked(a1) or np.ma.is_masked(a2):
+        raise ValueError("search-coil chord end lies outside the mesh")
+    return DEPTH * abs(float(a1) - float(a2))
+
+
+# Locked-rotor map currents (A): dense below 1 A where psi(i) bends, to 7.75 A (above V/R = 7.48 A).
+MAP_CURRENTS = np.concatenate([np.linspace(0.0, 1.0, 9), np.linspace(1.25, 7.75, 27)])
+
+
+def locked_rotor_map(solver, currents=MAP_CURRENTS, size_scale: float = 1.0, js: float = ASSUMED_JS) -> dict:
+    """psi (Wb-turns), Arkkio torque (N.m, absolute) and rotor-pole flux (Wb) at each current, each point
+    started from the previous solution. Raises if a point does not converge."""
+    out = {"current": np.asarray(currents, float), "psi": [], "torque": [], "rotor_flux": []}
+    a0 = None
+    for i in out["current"]:
+        p = team24_problem(float(i), size_scale, js)
+        s = solver.solve(p, initial=a0)
+        if s.status.value != "OK":
+            raise RuntimeError(f"TEAM 24 solve at {i} A: {s.status}")
+        a0 = s.a
+        out["psi"].append(flux_linkage(p, s)[0])
+        out["torque"].append(abs(arkkio_torque(p, s)))
+        out["rotor_flux"].append(rotor_pole_flux(p, s))
+    return {k: np.asarray(v, float) for k, v in out.items()}
