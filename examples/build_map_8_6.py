@@ -10,6 +10,7 @@ import time
 import numpy as np
 
 from srmcore.maps import analyse_map, build_map
+from srmcore.maps.grids import LA_CURRENT_FRACTION
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams
 
@@ -47,8 +48,9 @@ def main() -> None:
     print(f"iterations: {r.iterations.min()}..{r.iterations.max()}")
     print(f"peak torque (Arkkio): {np.nanmax(np.abs(r.torque_arkkio)):.2f} N m")
     unaligned = int(np.argmin(np.abs(r.angles - math.pi / machine.n_rotor_poles)))
-    ratio = r.psi[0, 1, 0] / r.psi[unaligned, 1, 0]
-    print(f"psi_aligned / psi_unaligned at {r.currents[1]:.3f} A: {ratio:.2f}")
+    i_la = int(np.argmin(np.abs(r.currents - LA_CURRENT_FRACTION * r.currents[-1])))
+    ratio = r.psi[0, i_la, 0] / r.psi[unaligned, i_la, 0]
+    print(f"psi_aligned / psi_unaligned at {r.currents[i_la]:.3f} A: {ratio:.2f}")
 
     report = analyse_map(r, design)
     k = report.key_numbers

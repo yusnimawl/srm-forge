@@ -68,16 +68,16 @@ def test_empty_window_returns_none():
 def test_fem_overlap_reciprocity_and_coupling():
     pytest.importorskip("ngsolve")
     r = build_overlap_map(DESIGN, 20.0, workers=4, n_angles=2, n_currents=3)
-    assert r.complete and r.psi.shape == (2, 3, 3, 4) and r.l_inc.shape == (2, 3, 3, 2, 2)
+    assert r.complete and r.psi.shape == (2, 4, 4, 4) and r.l_inc.shape == (2, 4, 4, 2, 2)
     checks = {c.name: c for c in coupling_checks(r)}
     assert checks["reciprocity"].status == "pass"
     # ib = 0 column equals a single-phase solve
     from srmcore.maps.point import solve_point
     from srmcore.mesh import build_machine_mesh
     from srmcore.solvers.factory import make_solver
-    p = solve_point(build_machine_mesh(DESIGN), DESIGN, float(r.angles[0]), {"A": float(r.currents_a[2])},
+    p = solve_point(build_machine_mesh(DESIGN), DESIGN, float(r.angles[0]), {"A": float(r.currents_a[3])},
                     make_solver("ngsolve"))
-    assert r.psi[0, 2, 0, 0] == pytest.approx(p.psi[0], rel=1e-9)
+    assert r.psi[0, 3, 0, 0] == pytest.approx(p.psi[0], rel=1e-9)
 
 
 def test_nonconverged_point_fails_the_map(monkeypatch):

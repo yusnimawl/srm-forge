@@ -6,6 +6,8 @@ import numpy as np
 
 from conftest import make_8_6
 from srmcore.maps import dataset
+from srmcore.mesh import settings
+from srmcore.mesh.settings import resolve_mesh_settings
 from srmcore.materials import library
 from srmcore.maps.run import STATUS_OK, MapResult
 from srmcore.model.design import Design, MeshSettings
@@ -72,6 +74,19 @@ def test_corrupt_or_mismatched_cache_file_is_a_miss(tmp_path):
     path = tmp_path / f"map_{dataset.provenance_hash(prov)}.h5"
     path.write_bytes(b"not hdf5")
     assert dataset.cached_map(tmp_path, prov) is None
+
+
+def test_provenance_changes_when_preset_numbers_change(monkeypatch):
+    before = dataset.provenance_hash(_prov())
+    monkeypatch.setitem(settings.PRESETS, DESIGN.mesh.preset,
+                        dataclasses.replace(settings.PRESETS[DESIGN.mesh.preset], iron_factor=0.5))
+    assert dataset.provenance_hash(_prov()) != before
+
+
+def test_provenance_holds_resolved_mesh_settings():
+    p = _prov()
+    assert p["mesh_resolved"]["band_divisions"] == resolve_mesh_settings(DESIGN.machine, DESIGN.mesh).band_divisions
+    json.dumps(p)
 
 
 def test_provenance_is_json_serialisable():

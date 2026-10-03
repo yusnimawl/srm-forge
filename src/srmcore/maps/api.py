@@ -69,7 +69,7 @@ def build_overlap_map(design: Design, i_max: float, *, solver: str = "ngsolve", 
     prov = overlap_provenance(design, angles, currents, currents, adapter)
     if cache_dir is not None and (hit := cached_overlap(cache_dir, prov)) is not None:
         return hit
-    workers = default_workers(workers, len(angles) * n_currents**2)
+    workers = default_workers(workers, len(angles) * len(currents) ** 2)
     result = run_overlap_map(build_machine_mesh(design), design, angles, currents, currents, solver_name=solver,
                              workers=workers, progress=progress, cancel=cancel)
     if cache_dir is not None:

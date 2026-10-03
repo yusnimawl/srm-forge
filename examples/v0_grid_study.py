@@ -1,4 +1,4 @@
-"""Compare reduced stage-2 map grids with the 12 x 8 `screening` map on the example 8/6 (I_max 20 A).
+"""Compare reduced stage-2 map grids with a 12 x 8 map on the example 8/6 (I_max 20 A).
 
     PYTHONPATH=tests python examples/v0_grid_study.py
 

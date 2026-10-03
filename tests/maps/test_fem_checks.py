@@ -45,7 +45,7 @@ def test_fem_checks_skips_screening():
 def test_held_out_samples_spread(n_a, n_i, n):
     from map_fixtures import PERIOD, synthetic_map
     from srmcore.maps.fem_checks import _held_out_samples
-    r = synthetic_map(n_angles=n_a, currents=np.linspace(0, 20, n_i))
+    r = synthetic_map(n_angles=n_a, currents=np.linspace(0, 20, n_i), la_node=False)
     s = _held_out_samples(r, PERIOD, n)
     ang = np.append(r.angles, r.angles[0] + PERIOD)
     cur = r.currents[1:]

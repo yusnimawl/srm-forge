@@ -18,13 +18,15 @@ def dinductance(theta):
 
 
 def synthetic_map(n_angles=16, currents=None, psi_sat=None, complete=True, circuits=("A", "B", "C", "D"),
-                  l0=L0, l1=L1, b_peak=1.0, excited="A"):
+                  l0=L0, l1=L1, b_peak=1.0, excited="A", la_node=True):
     # warped, non-uniform angle grid on [0, PERIOD)
     angles = PERIOD * np.linspace(0, 1, n_angles, endpoint=False) ** 1.3
     k = circuits.index(excited)
     shift = k * PERIOD / len(circuits)                # aligned angle of the excited phase
     angles = np.sort((angles + shift) % PERIOD)
     cur = np.linspace(0, 20, 9) if currents is None else np.asarray(currents, float)
+    if la_node:                                       # the current where key_numbers reads La and Lu
+        cur = np.union1d(cur, [0.05 * cur[-1]])
     lam = (l0 + l1 * np.cos(NR * (angles - shift)))[:, None] * cur[None, :]
     psi = np.zeros((n_angles, len(cur), len(circuits)))
     psi[..., k] = lam if psi_sat is None else psi_sat * np.tanh(lam / psi_sat)
