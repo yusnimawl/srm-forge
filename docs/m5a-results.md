@@ -81,4 +81,17 @@ The speed budgets in spec §7.2 were set for the pre-M5a grids and `full` mesh. 
 
 ## srmapp before/after
 
-Filled in by the controller after the after-run.
+Run time: 12260 s before M5a, 34267 s after (2.8× increase due to full mesh and 48-angle grid).
+
+| Poles | OD | Winding | T ratio | P ratio | Mass (kg) | Pareto |
+|---|---|---|---|---|---|---|
+| 8/6 | 324 | r 21×46×2 → r 21×46×2 | 1.09→1.10 | 1.10→1.11 | 56.31→56.31 | ✓ |
+| 24/16 | 321 | r 7×34×2 → r 27×8×8 | 1.05→1.01 | 1.01→1.01 | 130.18→127.85 | – |
+| 24/16 | 254 | r 51×3×8 → r 51×3×8 | 0.98→0.98 | 0.98→0.98 | 27.45→27.45 | – |
+| 8/6 | 244 | r 13×50×2 → r 13×50×2 | 1.10→1.10 | 1.10→1.11 | 75.90→75.90 | ✓ |
+| 12/8 | 335 | rect 33×6×4 → r 8×62×1 | 1.09→1.05 | 1.10→1.06 | 54.21→53.99 | ✓ |
+| 8/6 | 267 | r 15×41×1 → r 15×41×1 | 1.06→1.06 | 1.07→1.07 | 26.53→26.53 | ✓ |
+
+Pareto front unchanged (same 4 designs). No feasibility flips. Two designs changed winding: 24/16 OD 321 (T ratio 1.05→1.01, mass −2.33 kg) and 12/8 OD 335 (T ratio 1.09→1.05, mass −0.22 kg). Other T and P ratios move by at most 0.01, except the 12/8 OD 335 P ratio which decreased by 0.04 (1.10→1.06) with its winding change.
+
+The 24/16 OD 254 design shows status ok with T ratio 0.98 in both runs (below the 1.05 margin) — pre-existing, not caused by M5a; worth checking what `status` and `torque_ratio` mean in srmapp before relying on it.
