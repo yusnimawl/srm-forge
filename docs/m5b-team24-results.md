@@ -5,7 +5,7 @@
 - The 2D static torque at 7.41 A is 2.7996 N·m against 3.22 measured: -13.1 %.
 - The rotor-pole flux is 3.9069e-04 Wb against 4.72e-04: -17.2 %.
 - The model current runs ahead of the measurement by up to +18.6 % between 5 and 50 ms (R 3.09 Ω, 23.1 V); across the R and voltage variants the maximum is 18.1 % to 18.9 % (+18.9 % at R 3.12 Ω with the Table II voltage).
-- All deviations have the sign of the omitted 3D end flux (and, for the current rise, eddy currents).
+- At steady state the model is low (torque -13.1 %, rotor flux -17.2 %), the sign of the omitted 3D end flux. During the rise (up to about 20 ms) the model at the measured current is high (T(i_meas) up to +10 %, F(i_meas) +61 % at 2 ms) and the current at 2 ms is -1.7 %. That is consistent with eddy currents in the solid steel delaying and shielding the flux in the measurement, and with the interpolated low-field B-H (see the budget). The current then runs up to +18.6 % ahead.
 - There is no pass/fail gate (owner decision 2026-10-04).
 - Reproduce with `python examples\team24_check.py`. The slow test is `tests/validation/test_team24.py`; the model is `tests/team24_fixture.py::team24_problem`.
 
@@ -35,7 +35,7 @@ Source: Allen & Rodger, "Description of TEAM Workshop Problem 24" (compumag.org 
 
 Read from figures: Fig. 1 hub radius (the 12.7 dimension) and the 21.4 yoke thickness are labels in the image. Geometry choices not in the report: the 3 mm fillets (stated on the NGSolve page) are omitted, the domain ends at the stator outer surface with A = 0 (no outer air), the gap band is r = 51.6..53.2 mm.
 
-Other assumptions: the steel is solid (stacking factor 1) and eddy currents are neglected (spec §2.3). Table V is read as flux per turn (the figure is labelled "rotor pole flux (Wb)"). The search coil sits on the rotor pole under the top stator pole, on a chord 8.7 mm from the corner along the flank (Fig. 1). Both rotor poles carry the same flux by symmetry.
+Other assumptions: the steel is solid (stacking factor 1) and eddy currents are neglected (spec §2.3). Table V is read as flux per turn, the pole flux: Fig. 8 is titled "SEARCH COIL FLUX (5 TURNS)" but its axis is "ROTOR POLE FLUX (Wb)" and Table V is "rotor pole flux (×10⁻⁴ Wb)", so the 5 turns are taken as a note on the figure. The search coil sits on the rotor pole under the top stator pole, on a chord 8.7 mm from the corner along the flank (Fig. 1). Both rotor poles carry the same flux by symmetry.
 
 ## Table I reading
 
@@ -112,13 +112,14 @@ Regression pins in the slow test: torque 2.7996 N·m, ψ 0.3676 Wb-turns (relati
 | Entry | Static torque | Current rise | Rotor-pole flux | Basis |
 |---|---|---|---|---|
 | 3D end flux | dominant, model low; not quantified in 2D; M5d end-effect hook to be checked here | model fast | dominant, model low; not quantified in 2D; M5d end-effect hook to be checked here | axial length 25.4 mm is about 9× the 2.7 mm gap |
-| Eddy currents (σ = 4.54 MS/m, solid steel) | 0 at steady state | model fast; out of scope (§2.3) | 0 at steady state | steady state has no eddy currents |
+| Eddy currents (σ = 4.54 MS/m, solid steel) | 0 at steady state | model fast; out of scope (§2.3) | 0 at steady state; model high at the measured current during the transient (T(i_meas) up to +10 %, F(i_meas) +61 % at 2 ms) | steady state has no eddy currents |
 | R 3.09 vs 3.12 Ω | none | max \|dev\| 18.6 % to 18.1 % (t ≥ 5 ms); i at 300 ms 7.476 to 7.404 A | none | computed |
 | Voltage overshoot (Table II vs 23.1 V) | none | max \|dev\| 18.1 % to 18.9 % (t ≥ 5 ms, R 3.12 Ω) | none | computed |
 | Js 1.98–2.05 T | < 1e-6 (only 4 corner elements above the table) | not computed | not computed | computed |
-| Mesh (scale 0.5) | -0.004 % | not computed | not computed | computed |
+| Mesh (scale 0.5) | -0.004 % | ψ +0.26 % (affects the current rise) | not computed | computed |
 | Table rounding (2 decimals) | ±0.005/3.22 = ±0.16 % on final torque | ±0.005/i (±0.55 % at 0.91 A) | ±0.005/4.72 = ±0.11 % on the final value | arithmetic |
 | Table I reading / B-H | measured EN9 curve, annealed; no grade or tolerance given | same | same | Table I |
+| Low-field B-H | none | Table I has no point between 0 and 1.413 T (at 4000 A/m); μr ≈ 300–390 along the first segment is interpolated; drives the early current rise | same; drives the early rows | not quantified |
 | Search-coil position | not applicable | not applicable | Table V assumed flux per turn; chord 8.7 mm from the corner along the flank | Fig. 1 |
 
 ## Not compared

@@ -52,6 +52,8 @@ MEASURED_TORQUE = 3.22
 # 2D results at 7.41 A on the default mesh (docs/m5b-team24-results.md); regression pins.
 TORQUE_2D = 2.7996
 PSI_2D = 0.3676
+ROTOR_FLUX_2D = 3.9069e-4
+CURRENT_20MS_2D = 5.308
 
 
 def _rel(x, y):
@@ -101,6 +103,7 @@ def test_rotor_pole_flux_symmetric(final_point):
     p, s = final_point
     top, bottom = t24.rotor_pole_flux(p, s, 1), t24.rotor_pole_flux(p, s, -1)
     assert _rel(bottom, top) < 1e-3
+    assert top == pytest.approx(ROTOR_FLUX_2D, rel=1e-3)
     per_turn = flux_linkage(p, s)[0] / (2 * t24.TURNS)
     assert 0.5 * per_turn < top < per_turn            # pole flux is the coil flux less leakage
     assert -0.25 < (top - t24.TABLE_ROTOR_FLUX[-1]) / t24.TABLE_ROTOR_FLUX[-1] < 0
@@ -114,4 +117,5 @@ def test_current_rise(lr_map):
     mid = (t24.TABLE_TIME >= 0.005) & (t24.TABLE_TIME <= 0.100)
     assert np.all(model[mid] >= t24.TABLE_CURRENT[mid])   # end flux and eddy currents: model runs ahead
     assert np.all(np.abs(error) < 0.25)
+    assert model[t24.TABLE_TIME == 0.020][0] == pytest.approx(CURRENT_20MS_2D, rel=2e-3)
     assert model[-1] == pytest.approx(t24.VOLTAGE / t24.RESISTANCE, rel=2e-3)

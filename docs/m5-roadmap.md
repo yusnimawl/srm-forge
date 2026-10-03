@@ -20,7 +20,7 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 **Done 2026-10-04:** see `docs/m5b-team24-results.md`.
 
 - **Goal:** the magnetostatic TEAM 24 comparison counts as validation evidence (spec §2.3, §8.2 suite 5).
-- **Have:** `tests/team24_fixture.py`, `examples/team24_check.py`, `docs/m5b-team24-results.md` (static torque -13.1 % vs measured; current rise up to +18.6 % ahead; both solvers agree to 1e-13).
+- **Have:** `tests/team24_fixture.py`, `examples/team24_check.py`, `docs/m5b-team24-results.md` (static torque -13.1 % vs measured; current rise up to +18.6 % ahead; both solvers agree to 5e-13).
 - **Owner decisions (2026-10-04):**
   1. Table I H read as ×10⁴ A-t/m, points 1–17 used, Js 2.0 T assumed.
   2. No pass/fail gate; the result is reported as error ± uncertainty.
