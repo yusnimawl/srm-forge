@@ -17,8 +17,10 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 ## M5b: TEAM Problem 24
 
+**Done 2026-10-04:** see `docs/m5b-team24-results.md`.
+
 - **Goal:** the magnetostatic TEAM 24 comparison counts as validation evidence (spec §2.3, §8.2 suite 5).
-- **Have:** `tests/team24_fixture.py`, `examples/team24_check.py`, `docs/team24-feasibility.md` (static torque +6.4 % vs measured; current rise within 12 %, faster than measured between 10 and 40 ms; both solvers agree to 1e-13).
+- **Have:** `tests/team24_fixture.py`, `examples/team24_check.py`, `docs/m5b-team24-results.md` (static torque -13.1 % vs measured; current rise up to +18.6 % ahead; both solvers agree to 1e-13).
 - **Owner decisions first:**
   1. Table I H-column units: confirm 400–39634 A/m (the fixture's reading) against the printed table.
   2. Acceptance criterion: proposed static torque within 10 % at 7.41 A, current rise "follows the measured shape". Decide the shape criterion in numbers.
@@ -47,7 +49,7 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
   1. Missing fields: `shaft_diameter`, `rotor_yoke_thickness` (the single "back iron" figure is assumed stator), `fill_factor`, `slot_liner_thickness`, `coil_inner_clearance`.
   2. Lamination grade and B-H source for the 6/4 (grade C library curve; M43 if named).
   3. End-winding model: which hook (analytic end-turn inductance added to ψ, an axial-length factor, or a calibrated correction), and what it may be calibrated on (calibrating on the same data it is judged against is circular).
-- **Scope:** build the 6/4 inside `waive_rules("self_starting")`; maps at the measured points; end-winding hook in the engine (spec §9: hook + end-effect calibration); comparison table with error and an uncertainty budget (material grade, mesh estimate from M5a, end-effect correction, digitisation).
+- **Scope:** build the 6/4 inside `waive_rules("self_starting")`; maps at the measured points; end-winding hook in the engine (spec §9: hook + end-effect calibration); comparison table with error and an uncertainty budget (material grade, mesh estimate from M5a, end-effect correction, digitisation); apply the end-effect hook to TEAM 24 (`tests/validation/test_team24.py`) as an independent check (TEAM 24 is not used for calibration).
 - **Done:** report table before and after the end-effect correction, each with uncertainty; hook tested; spec §11 entry.
 - **Size:** medium.
 

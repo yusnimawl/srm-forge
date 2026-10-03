@@ -41,7 +41,7 @@ Sensitivities: Js 1.98–2.05 T and truncate-vs-clamp of the J dip: < 0.01 % (pe
 Prints: solver agreement; static torque and ψ; current table (model vs Table III); torque vs time (via model current) and torque vs measured current (T(i_meas), removes the time-axis error); rotor-pole flux vs Table V (vs time via model current and vs measured current); sensitivity rows (R 3.09/3.12 Ω, constant vs Table II voltage, Js 1.98/2.0/2.05 T, mesh scale 1 and 0.5). Its output is the source of the results doc tables.
 
 ### 4. Docs
-- `docs/m5b-team24-results.md` replaces `docs/team24-feasibility.md` (deleted; the feasibility doc's input table and geometry choices move across, its B-H and result sections are rewritten). Contents: inputs and the Table I evidence; results tables; uncertainty budget per result:
+- `docs/m5b-team24-results.md` replaces the former feasibility doc (deleted; the feasibility doc's input table and geometry choices move across, its B-H and result sections are rewritten). Contents: inputs and the Table I evidence; results tables; uncertainty budget per result:
   | Entry | Static torque | Current rise | Basis |
   |---|---|---|---|
   | 3D end flux | dominant, sign − (model low) | sign + (model fast) | not quantified in 2D; M5d hook checks it |

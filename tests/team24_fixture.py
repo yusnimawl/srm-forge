@@ -1,6 +1,6 @@
 """TEAM Problem 24 (Allen & Rodger, Univ. of Bath) as a 2D Magnetostatic2D: the locked-rotor test rig,
 meshed with Gmsh directly. Dimensions in mm below are read from the report's Fig. 1 and Fig. 2 (see
-docs/team24-feasibility.md for the source of every number). Fillets (3 mm) are omitted.
+docs/m5b-team24-results.md for the source of every number). Fillets (3 mm) are omitted.
 
 Layout (x right, y up): a solid-steel stator ring with two poles at +y and -y, a two-pole rotor with a
 non-magnetic shaft, and one 350-turn coil around each stator pole. In the x-y section each coil shows
