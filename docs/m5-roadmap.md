@@ -24,7 +24,7 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 - **Owner decisions (2026-10-04):**
   1. Table I H read as ×10⁴ A-t/m, points 1–17 used, Js 2.0 T assumed.
   2. No pass/fail gate; the result is reported as error ± uncertainty.
-  3. Current-rise and static deviations are consistent with the omitted 3D end flux and eddy currents; Table V (rotor-pole flux) is compared.
+  3. Current-rise and static deviations are consistent with the omitted 3D end flux (steady state, mid-rise current lead) and eddy currents (early transient only, opposite sign for the current); Table V (rotor-pole flux) is compared.
 - **Scope (done):** slow test, uncertainty budget and results doc; see `docs/m5b-team24-results.md` and the spec §11 entry.
 - **Done:** slow test green locally on Windows (Linux coverage of the slow test waits for M5e's "all suites on CI" item); result with error and uncertainty recorded; spec §10 TEAM 24 item closed in §11.
 - **Size:** small (FEM runs are seconds).
