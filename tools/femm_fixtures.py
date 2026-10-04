@@ -34,6 +34,7 @@ MM = 1000.0
 KRISHNAN_BORE_MM = 50.3                      # reference size for the iron and slot-air element sizes
 CONVERGENCE_LIMIT = 0.005                    # level F-1 → F: ψ relative, torque in fractions of peak
 PROBE_LIMIT = 0.001
+MIN_PROBE_SAMPLES = 30                       # iron samples the B-H probe must compare
 
 try:
     import femm
@@ -144,8 +145,13 @@ def solve(name: str, theta: float, current: float, level: int, age: bool, tag: s
         cx, cy = (np.array([s.start for s in side.boundary]) * MM).mean(axis=0)
         _label(cx, cy, "Air", hi, phases[side.phase], 0, side.sign * p.turns_per_pole)
 
-    femm.mi_saveas(str(WORK / f"{tag}.fem"))
+    fem = WORK / f"{tag}.fem"
+    ans = fem.with_suffix(".ans")
+    ans.unlink(missing_ok=True)
+    femm.mi_saveas(str(fem))
     femm.mi_analyze(1)
+    if not ans.exists():
+        raise RuntimeError(f"FEMM produced no solution file for {tag}")
     femm.mi_loadsolution()
     femm.mo_smooth("off")
     res = {"psi": float(np.real(femm.mo_getcircuitproperties("A")[2])), "nodes": int(femm.mo_numnodes())}
@@ -155,6 +161,10 @@ def solve(name: str, theta: float, current: float, level: int, age: bool, tag: s
         femm.mo_groupselectblock(1)
         res["torque"] = float(np.real(femm.mo_blockintegral(22)))
         femm.mo_clearblock()
+    if tag != f"{name}_probe":      # the probe reads the open solution afterwards
+        femm.mo_close()
+        fem.unlink(missing_ok=True)
+        ans.unlink(missing_ok=True)
     return res
 
 
@@ -164,27 +174,25 @@ def probe_bh(name: str) -> float:
     d = fm.design(name)
     p = d.machine
     law = library_law(p.materials.stator)
-    worst = 0.0
+    worst, kept = 0.0, 0
     radii = np.linspace(p.bore_radius + 0.0005, p.stator_outer_radius - 0.0005, 40) * MM
-    for r in radii:
-        v = femm.mo_getpointvalues(r, 0.0)
+    r_yoke = (p.stator_outer_radius - p.stator_yoke_thickness / 2) * MM
+    pts = [(r, 0.0) for r in radii] + [(r_yoke, a) for a in np.linspace(0.0, 2 * math.pi, 41)[:-1]]
+    for r, a in pts:
+        v = femm.mo_getpointvalues(r * math.cos(a), r * math.sin(a))
         b = math.hypot(np.real(v[1]), np.real(v[2]))
         h = math.hypot(np.real(v[5]), np.real(v[6]))
         if b < 0.05 or abs(h * MU0 / b - 1) < 0.01:       # air or near-zero field
             continue
+        kept += 1
         worst = max(worst, abs(h / float(law.h_of_b(np.array([b]))[0]) - 1))
-    return worst
-
-
-_opened = False
+    return worst, kept
 
 
 def _init_worker():
-    global _opened
     WORK.mkdir(parents=True, exist_ok=True)
     femm.openfemm(1)
     femm.smartmesh(0)
-    _opened = True
 
 
 def solve_point(args) -> dict:
@@ -203,7 +211,11 @@ def _probe(name: str, level: int) -> float:
     d = fm.design(name)
     i_max = fm.currents(d.machine)[-1]
     solve(name, 0.0, i_max, level, False, f"{name}_probe")
-    return probe_bh(name)
+    worst, kept = probe_bh(name)
+    if kept < MIN_PROBE_SAMPLES:
+        raise RuntimeError(f"B-H probe kept only {kept} iron samples (< {MIN_PROBE_SAMPLES}): "
+                           "FEMM may not have loaded the B-H curve")
+    return worst, kept
 
 
 def convergence_failures(points: list[dict]) -> list[str]:
@@ -236,8 +248,8 @@ def main() -> None:
     pts = fm.points(d)[: a.only or None]
     jobs = [(name, k, th, i, a.level) for k, (th, i) in enumerate(pts)]
     with ProcessPoolExecutor(a.workers, initializer=_init_worker) as pool:
-        probe = pool.submit(_probe, name, a.level).result()
-        print(f"B-H probe: max relative deviation {probe:.4%}", flush=True)
+        probe, kept = pool.submit(_probe, name, a.level).result()
+        print(f"B-H probe: max relative deviation {probe:.4%} over {kept} iron samples", flush=True)
         if probe > PROBE_LIMIT:
             sys.exit(f"B-H probe deviation {probe:.4%} above {PROBE_LIMIT:.2%}")
         results = []
@@ -257,6 +269,7 @@ def main() -> None:
             "srmcore_version": version("srmcore"), "pyfemm_version": version("pyfemm"),
             "femm": "FEMM 4.2 (C:\\femm42)", "level": a.level,
             "sizes_mm": level_sizes(d.machine, a.level), "bh_probe_max_rel_dev": probe,
+            "bh_probe_samples": kept,
             "date": datetime.date.today().isoformat(), "git_commit": commit,
         },
         "points": results,
