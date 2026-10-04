@@ -31,6 +31,8 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 ## M5c: FEMM fixtures (cross-tool)
 
+**Done 2026-10-04:** see `docs/m5c-femm-results.md`.
+
 - **Goal:** agreement with FEMM 4.2 within §8.3 (ψ ±2 %, mid-range torque ±3 %, near-alignment/saturated torque ±5 %) on M19 reference machines: Krishnan 8/6 plus one published 12/8 or 24/16 with full geometry.
 - **Have:** FEMM 4.2 installed; pyfemm starts it (install with `.venv\Scripts\python -m pip install pyfemm` when M5c starts). `docs/reference-machines.md` audits the machines.
 - **Owner decisions first:**
@@ -66,3 +68,9 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
   7. All fast and slow suites green on Windows and Linux (CI).
   8. Revisit: adaptive `reference` preset only if a design fails the uniform `reference` check.
 - **Done:** M5 definition of done in `docs/handoff-2026-10-02-m5.md` met; spec §9 M5 row marked complete; then revisit the search margin and move to v0b.
+
+## After M5: visualization (noted 2026-10-04, unscheduled)
+
+- The core stays plot-free and returns arrays. Static figures use matplotlib (PNG); interactive charts use Plotly as an optional `[viz]` extra in examples and reports, and plotly.js in the web UI (sub-project #9).
+- Queued: a rotating-rotor field animation (`examples/animate_rotation.py`, matplotlib to GIF/MP4 from `solve_point(..., keep_field=True)`) and an interactive map viewer (`examples/map_viewer.py`, HTML).
+- ParaView only if interactive field inspection is ever needed (VTK export via meshio).
