@@ -4,7 +4,7 @@
 
 - srmcore `full` (NGSolve) agrees with FEMM 4.2 on all three machines far inside spec §8.3: ψ within 0.16 %, torque within 0.60 % relative (where |T| is at least 5 % of the peak at that current) and 0.45 % of peak.
 - The largest error / limit ratio is 0.11 (Krishnan 8/6), 0.09 (Jiang 24/16) and 0.20 (synthetic 12/8).
-- FEMM's own discretisation estimate (last level change) is up to 0.26 % in ψ and 0.21 % of peak in torque, the same size as the differences, so the remaining difference is at FEMM's mesh noise.
+- FEMM's own discretisation estimate (last level change) is up to 0.26 % in ψ, the same size as the ψ differences. The torque differences (up to 0.45 % of peak) are larger than FEMM's own torque estimate at the worst points (section 6).
 - Reproduce with `python examples\femm_check.py` (needs `PYTHONPATH=tests`). The slow test is `tests/validation/test_femm.py` (5 checks per machine, all pass: Krishnan 104 s, synthetic 12/8 173 s, Jiang 241 s).
 
 ## 1. Purpose
@@ -71,25 +71,25 @@ Built by `tools/femm_fixtures.py` with pyfemm 0.1.3 on FEMM 4.2.
 
 | Machine | FEMM level | Nodes per point | Gap / iron / slot-air element (mm) | B-H probe max deviation | Worst FEMM error estimate: ψ / torque (% of peak) |
 |---|---|---|---|---|---|
-| Krishnan 8/6 | 2 | about 308k | 0.042 / 0.375 / 0.75 | 0.037 % (80 samples) | 0.187 % / 0.184 % |
-| Synthetic 12/8 | 2 | about 367k | 0.025 / 0.375 / 0.75 | 0.007 % (79 samples) | 0.177 % / 0.211 % |
-| Jiang 24/16 | 2 | about 338k | 0.042 / 0.686 / 1.37 | 0.028 % (79 samples) | 0.255 % / 0.199 % |
+| Krishnan 8/6 | 2 | 308.2k to 308.9k | 0.042 / 0.375 / 0.75 | 0.037 % (80 samples) | 0.187 % / 0.184 % |
+| Synthetic 12/8 | 2 | 366.6k to 367.2k | 0.025 / 0.375 / 0.75 | 0.007 % (79 samples) | 0.177 % / 0.211 % |
+| Jiang 24/16 | 2 | 337.1k to 338.2k | 0.042 / 0.686 / 1.37 | 0.028 % (79 samples) | 0.255 % / 0.199 % |
 
 Jiang's level was set by a one-point timing run: probe plus one point (four solves) took 29.6 min on one worker at level 2, under the 30 min per point rule for the next level.
 
 ## 4. Points and tolerance rule
 
-- **Angles.** Fractions (0, 4, 8, 15, 22, 28, 30) / 30 of the unaligned angle π/Nr, each snapped to the band pitch. The 2° fraction of an earlier trial was replaced by 4°: at 2° the rotor and stator pole corners coincide on the Krishnan 8/6 ((βr - βs)/2), and that point converges slowest in both tools.
+- **Angles.** Fractions (0, 4, 8, 15, 22, 28, 30) / 30 of the unaligned angle π/Nr, each snapped to the band pitch. The grid uses 4° and not 2°: at 2° the rotor and stator pole corners coincide on the Krishnan 8/6 ((βr - βs)/2), and that point converges slowest in both tools.
 - **Currents.** (0.4, 1.7, 3.9) x i_k with the knee current i_k = 1.5 T x g / (μ0 x N_pole), rounded to 2 significant figures: linear, rated, deep saturation.
 
 | Machine | i_k | Currents (A) |
 |---|---|---|
 | Krishnan 8/6 | 7.75 A | 3.1, 13, 30 |
-| Synthetic 12/8 | 12 A | 4.8, 20, 47 |
-| Jiang 24/16 | 40 A | 16, 68, 160 |
+| Synthetic 12/8 | 11.9 A | 4.8, 20, 47 |
+| Jiang 24/16 | 39.8 A | 16, 68, 160 |
 
 - **ψ.** |ψ - ψ_FEMM| <= 2 % of |ψ_FEMM|.
-- **Torque.** T_pk(i) is the largest |T_age| over the angles at that current. |T_arkkio - T_age| <= max(tol x |T_age|, 1 % of T_pk(i)). The tolerance tol is 3 % when the angle is between 1/6 and 5/6 of the unaligned angle and the current is at most 1.7 i_k, and 5 % otherwise (§8.3). The 1 % floor exists because the aligned and unaligned torque is numerical noise (1e-4 to 1e-3 N·m) in both tools, so a relative error there is meaningless.
+- **Torque.** T_pk(i) is the largest |T_age| over the angles at that current. |T_arkkio - T_age| <= max(tol x |T_age|, 1 % of T_pk(i)). The tolerance tol is 3 % when the angle is between 1/6 and 5/6 of the unaligned angle and the current is at most 1.7 i_k, and 5 % otherwise (§8.3). The 1 % floor exists because the aligned and unaligned torque is numerical noise (up to 6e-3 N·m) in both tools, so a relative error there is meaningless.
 - **FEMM self-consistency.** |T_age - T_wst| <= 1 % of T_pk(i) at every point (air-gap element against weighted stress tensor).
 
 ## 5. Results
@@ -188,12 +188,14 @@ Krishnan and Irwin (Ch. 2, section 2.3.4) give the 8/6 inductances at the rated 
 
 ## 6. Deviations explained
 
-- **Size.** Every ψ difference is below 0.16 % and every torque difference below 0.6 % relative or 0.45 % of peak. FEMM's own level-to-level change is up to 0.26 %, so the differences are at FEMM's mesh-noise level and no systematic offset is visible.
-- **Largest relative torque errors** fall on the lowest current at mid-stroke or late-stroke angles, where |T| is smallest: synthetic 12/8 at 6.07° and 4.8 A (-0.47 %) and 16.43° and 4.8 A (-0.60 %); Krishnan at 7.96° and 3.1 A (+0.34 %); Jiang at 1.56° and 160 A (-0.42 %, deep saturation). All are below 0.20 of their limit.
+- **Size.** Every ψ difference is below 0.16 % and every torque difference is within 0.6 % relative and 0.45 % of peak (at most 0.20 of the limit).
+- **ψ offset.** dψ (srmcore minus FEMM) is negative at all 21 Krishnan points and at 20 of 21 synthetic points (-0.02 to -0.16 %). On Jiang the sign is mixed: 10 points negative, 11 zero or positive (-0.14 to +0.08 %). The Krishnan and synthetic offset is of the same order as FEMM's own level F-1 to F change (up to 0.26 % in ψ), so whether it comes from FEMM's mesh is not resolved.
+- **Torque against FEMM's own estimate.** At the worst torque points the difference is well above FEMM's level-to-level change: Krishnan 7.96° and 3.1 A, 0.330 % of peak against 0.010 %; synthetic 6.07° and 4.8 A, 0.451 % against 0.013 %. The torque differences are therefore not explained by FEMM's mesh error alone; they stay within 0.2 of the limit.
+- **Largest relative torque errors** mostly fall at the lowest current at mid-stroke or late-stroke angles, where |T| is smallest: synthetic 12/8 at 6.07° and 4.8 A (-0.47 %) and 16.43° and 4.8 A (-0.60 %); Krishnan at 7.96° and 3.1 A (+0.34 %). The exception is Jiang at 1.56° and 160 A (-0.42 %), early stroke at the highest current (deep saturation). All are below 0.20 of their limit.
 - **Largest errors in % of peak.** Synthetic 12/8 6.07° and 4.8 A (0.451 %), Jiang 1.56° and 16 A (0.334 %), Krishnan 7.96° and 3.1 A (0.330 %). Each is below the 1 % floor.
-- **Aligned and unaligned angles** (0° and the last angle): torque is numerical noise (at most 0.0062 N·m) in both tools. These points are judged by the floor only, which is why the relative column reads "n/a".
+- **Aligned and unaligned angles** (0° and the last angle): torque is numerical noise (at most 0.0062 N·m) in both tools. These points are judged by the floor only. The relative column reads "n/a" wherever |T| is below 5 % of the peak at that current: these points, and also 27.86° at 3.1 and 13 A (Krishnan), 10.47° at 16 and 68 A (Jiang) and 21.07° at 4.8 and 20 A (synthetic), which sit close to the unaligned angle.
 - **Pole-corner coincidence.** On the Krishnan 8/6 the rotor and stator pole corners coincide at (βr - βs)/2 = 2°, the slowest-converging point in both tools. The comparison grid uses 4° (3.98° after snapping) instead.
-- **FEMM torque methods.** The air-gap element and the weighted stress tensor agree within 0.06 % of peak at every point of every machine. On a coarse mesh the stress tensor shows spurious torque at symmetric positions; the air-gap element is exactly symmetric, so it is the primary torque.
+- **FEMM torque methods.** The air-gap element and the weighted stress tensor agree within 0.06 % of peak at every point of every machine. A spike study on the Krishnan 8/6 (before the fixtures) showed that on a coarse FEMM mesh the stress tensor gives spurious torque at symmetric positions while the air-gap element is exactly symmetric, so the air-gap element is the primary torque.
 - **B-H handoff.** FEMM's interpolation of the sampled curve is within 0.037 % of `h_of_b` (probe maxima in section 3), far below the 0.1 % limit.
 
 ## 7. How to regenerate
