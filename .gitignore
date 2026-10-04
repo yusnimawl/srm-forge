@@ -8,3 +8,4 @@ dist/
 *.msh
 out/
 .superpowers/
+tools/femm_work/
