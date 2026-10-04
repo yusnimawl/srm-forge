@@ -66,3 +66,9 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
   7. All fast and slow suites green on Windows and Linux (CI).
   8. Revisit: adaptive `reference` preset only if a design fails the uniform `reference` check.
 - **Done:** M5 definition of done in `docs/handoff-2026-10-02-m5.md` met; spec §9 M5 row marked complete; then revisit the search margin and move to v0b.
+
+## After M5: visualization (noted 2026-10-04, unscheduled)
+
+- The core stays plot-free and returns arrays. Static figures use matplotlib (PNG); interactive charts use Plotly as an optional `[viz]` extra in examples and reports, and plotly.js in the web UI (sub-project #9).
+- Queued: a rotating-rotor field animation (`examples/animate_rotation.py`, matplotlib to GIF/MP4 from `solve_point(..., keep_field=True)`) and an interactive map viewer (`examples/map_viewer.py`, HTML).
+- ParaView only if interactive field inspection is ever needed (VTK export via meshio).
