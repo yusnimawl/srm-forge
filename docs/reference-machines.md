@@ -67,12 +67,12 @@ Source: Krishnan & Irwin, *Switched Reluctance Motor Drives*, CRC Press 2001, Ch
 | stator_fillet_radius | 0.0 | not found — schema default |
 | rotor_fillet_radius | 0.0 | not found — schema default |
 | turns_per_pole | 77 | derived: Krishnan's stated `Tph` = 154 is turns per PHASE, wound over the 2 poles of that phase (8/6 has 4 phases × 2 poles/phase = 8 poles) — `turns_per_pole` = `Tph` / 2 = 77. (Corrected from an earlier draft of this audit, which took `Tph` as already per-pole and used 154; Eq. 2.7 `F1 = Tph·i` is the phase MMF across both series-connected poles of the phase, not the MMF contributed per individual pole.) |
-| fill_factor | — | **not found** |
-| slot_liner_thickness | — | **not found** |
-| coil_inner_clearance | — | **not found** |
+| fill_factor | 0.22 | assumed (M5c): 77 turns × 1.588 mm² in a 550 mm² coil side |
+| slot_liner_thickness | 0.0005 m | assumed (M5c) |
+| coil_inner_clearance | 0.001 m | assumed (M5c) |
 | lamination_thickness | — | **not found** |
 | max_speed_rpm | 1500 | stated |
-| materials.stator / materials.rotor | "M43" | stated ("Lamination material M43") |
+| materials.stator / materials.rotor | "M43" | stated ("Lamination material M43"); the M5c FEMM fixture uses M19 |
 | materials.shaft | — | not found — schema default (`steel_1010`) |
 | materials.coil | "copper" | implied (conductor area given; no explicit grade) — schema default |
 
@@ -134,15 +134,15 @@ Source: James Weisheng Jiang, PhD thesis, McMaster University, Dec. 2015, Tables
 | stator_pole_arc | 0.1222 rad | stated (7.0° → rad, held fixed during rotor-arc sweep) |
 | rotor_pole_arc | 0.1257 rad | stated (7.2° → rad, selected optimization Case C3) |
 | stator_pole_taper | 0.1047 rad | stated (6° → rad, selected Case B7) |
-| rotor_pole_taper | — | **not found** (only an initial 3–8° sizing range; no final selection reported) |
+| rotor_pole_taper | 0.0960 rad (5.5°) | assumed (M5c): middle of the initial 3–8° sizing range; no final selection reported |
 | stator_yoke_thickness | 0.015 m | stated (selected Case B7) |
-| rotor_yoke_thickness | — | **not found** |
+| rotor_yoke_thickness | 0.0455 m | assumed (M5c): 0.0915 − 0.026 (shaft radius) − 0.020 (assumed rotor pole height) |
 | stator_fillet_radius | — | **not applicable — do not map.** The thesis's 1 mm fillet (Case D3) is a **pole-shoe** fillet (the corner where the flared pole tip meets the air gap), not a **pole-root** fillet. `stator_fillet_radius` in `RadialSRMParams` builds the pole-ROOT arc only (`src/srmcore/topology/radial.py`, tagged `*_pole_root`); the M1 topology has no pole-shoe geometry at all (poles are untapered rectangles/trapezoids with no flared tip) and no slot-wedge region. (Corrected from an earlier draft of this audit, which mapped the 1 mm value into `stator_fillet_radius` as if it were the pole-root fillet — it is not.) Recorded as an unrepresentable-in-M1 gap; see spec §10 M5 open item. |
 | rotor_fillet_radius | — | **not found** (no rotor pole-root fillet is stated; the thesis's rotor pole-tip treatment, if any, is likewise a pole-shoe-class feature not represented in M1) |
 | turns_per_pole | 15 | stated (15 turns/coil; also 10 parallel strands of 20 AWG wire per turn — not representable in this schema) |
 | fill_factor | 0.54 | stated (target; 0.539–0.54 achieved for the selected design) |
-| slot_liner_thickness | — | **not found** |
-| coil_inner_clearance | — | **not found** |
+| slot_liner_thickness | 0.0003 m | assumed (M5c) |
+| coil_inner_clearance | 0.001 m | assumed (M5c) |
 | lamination_thickness | 0.0001 m | stated (0.1 mm) |
 | max_speed_rpm | 13500 | stated as the target/rated speed (matching the Prius motor); note the FEA torque-speed sweep (Fig. 6.17) extends to 14,000 rpm — the thesis is not fully consistent between "target" and "as-simulated" speed |
 | materials.stator / materials.rotor | "10JNEX900" | stated (JFE Steel "Super Core", saturation flux density 1.91 T; no B-H curve reproduced) |
