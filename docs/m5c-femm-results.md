@@ -89,7 +89,7 @@ Jiang's level was set by a one-point timing run: probe plus one point (four solv
 | Jiang 24/16 | 39.8 A | 16, 68, 160 |
 
 - **ψ.** |ψ - ψ_FEMM| <= 2 % of |ψ_FEMM|.
-- **Torque.** T_pk(i) is the largest |T_age| over the angles at that current. |T_arkkio - T_age| <= max(tol x |T_age|, 1 % of T_pk(i)). The tolerance tol is 3 % when the angle is between 1/6 and 5/6 of the unaligned angle and the current is at most 1.7 i_k, and 5 % otherwise (§8.3). The 1 % floor exists because the aligned and unaligned torque is numerical noise (up to 6e-3 N·m) in both tools, so a relative error there is meaningless.
+- **Torque.** T_pk(i) is the largest |T_age| over the angles at that current. |T_arkkio - T_age| <= max(tol x |T_age|, 1 % of T_pk(i)). The tolerance tol is 3 % when the angle is between 1/6 and 5/6 of the unaligned angle and the current is at or below the rated current (1.7 i_k rounded to 2 significant figures), and 5 % otherwise (§8.3). The 1 % floor exists because the aligned and unaligned torque is numerical noise (up to 6e-3 N·m) in both tools, so a relative error there is meaningless.
 - **FEMM self-consistency.** |T_age - T_wst| <= 1 % of T_pk(i) at every point (air-gap element against weighted stress tensor).
 
 ## 5. Results
@@ -189,7 +189,7 @@ Krishnan and Irwin (Ch. 2, section 2.3.4) give the 8/6 inductances at the rated 
 ## 6. Deviations explained
 
 - **Size.** Every ψ difference is below 0.16 % and every torque difference is within 0.6 % relative and 0.45 % of peak (at most 0.20 of the limit).
-- **ψ offset.** dψ (srmcore minus FEMM) is negative at all 21 Krishnan points and at 20 of 21 synthetic points (-0.02 to -0.16 %). On Jiang the sign is mixed: 10 points negative, 11 zero or positive (-0.14 to +0.08 %). The Krishnan and synthetic offset is of the same order as FEMM's own level F-1 to F change (up to 0.26 % in ψ), so whether it comes from FEMM's mesh is not resolved.
+- **ψ offset.** dψ (srmcore minus FEMM) is negative at all 21 Krishnan points and at 20 of 21 synthetic points (-0.01 to -0.16 %). On Jiang the sign is mixed: 10 points negative, 11 zero or positive (-0.14 to +0.08 %). The Krishnan and synthetic offset is of the same order as FEMM's own level F-1 to F change (up to 0.26 % in ψ), so whether it comes from FEMM's mesh is not resolved.
 - **Torque against FEMM's own estimate.** At the worst torque points the difference is well above FEMM's level-to-level change: Krishnan 7.96° and 3.1 A, 0.330 % of peak against 0.010 %; synthetic 6.07° and 4.8 A, 0.451 % against 0.013 %. The torque differences are therefore not explained by FEMM's mesh error alone; they stay within 0.2 of the limit.
 - **Largest relative torque errors** mostly fall at the lowest current at mid-stroke or late-stroke angles, where |T| is smallest: synthetic 12/8 at 6.07° and 4.8 A (-0.47 %) and 16.43° and 4.8 A (-0.60 %); Krishnan at 7.96° and 3.1 A (+0.34 %). The exception is Jiang at 1.56° and 160 A (-0.42 %), early stroke at the highest current (deep saturation). All are below 0.20 of their limit.
 - **Largest errors in % of peak.** Synthetic 12/8 6.07° and 4.8 A (0.451 %), Jiang 1.56° and 16 A (0.334 %), Krishnan 7.96° and 3.1 A (0.330 %). Each is below the 1 % floor.

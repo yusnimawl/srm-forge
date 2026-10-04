@@ -1,5 +1,7 @@
 """Fast checks of the M5c FEMM comparison definitions (no meshing, no solving)."""
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -53,6 +55,26 @@ def test_bh_table_dense_monotone_to_4_tesla():
     assert len(b) >= 300
     assert b[0] == 0.0 and h[0] == 0.0 and b[-1] == pytest.approx(4.0)
     assert np.all(np.diff(b) > 0) and np.all(np.diff(h) > 0)
+
+
+def _fixture_problems(name, fixture):
+    d = fm.design(name)
+    prov = fixture["provenance"]
+    problems = [k for k, now in (("design_sha256", fm.design_sha256(d)), ("bh_sha256", fm.bh_sha256(d)))
+                if prov[k] != now]
+    got = [(q["angle"], q["current"], q["tolerance"]) for q in fixture["points"]]
+    want = [(a, i, fm.tolerance(d, a, i)) for a, i in fm.points(d)]
+    if got != want:
+        problems.append("points")
+    return problems
+
+
+@pytest.mark.parametrize("name", list(fm.MACHINES))
+def test_committed_fixture_is_fresh(name):
+    path = Path(__file__).parent / "fixtures" / f"femm_{name}.json"
+    problems = _fixture_problems(name, json.loads(path.read_text()))
+    assert not problems, (f"FEMM fixture for {name} is stale ({', '.join(problems)} changed); regenerate "
+                          f"with tools/femm_fixtures.py {name}")
 
 
 def test_hashes_are_stable_and_sensitive():
