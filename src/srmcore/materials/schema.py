@@ -68,6 +68,7 @@ class SoftMagneticMaterial(_Sourced):
     stacking_factor_source: str
     saturation_polarisation: float = Field(gt=0)
     saturation_polarisation_source: str
+    digitisation_error: float | None = Field(default=None, ge=0, lt=0.5)   # relative B error of a digitised curve
 
 
 class ConductorMaterial(_Sourced):
