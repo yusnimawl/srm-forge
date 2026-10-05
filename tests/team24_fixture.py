@@ -19,6 +19,7 @@ from srmcore.materials.laws import VACUUM
 from srmcore.materials.schema import BHTable
 from srmcore.physics.problem import BandInfo, Magnetostatic2D
 from srmcore.physics.winding import Winding
+from srmcore.post.end_winding import end_turn_inductance
 from srmcore.post.quantities import arkkio_torque, flux_linkage
 
 MM = 1e-3
@@ -43,6 +44,16 @@ COIL_THICKNESS = 17.0 * MM                           # extent along y
 COIL_MID_Y = 63.0 * MM
 RESISTANCE = 3.09
 VOLTAGE = 23.1
+
+
+def end_winding_inductance(image_factor: float = 1.0) -> float:
+    """End-turn inductance of the two series coils, H (srmcore.post.end_winding): overhang span is the mean
+    turn across the pole (hole + build), separation the stack depth plus the build."""
+    one = end_turn_inductance(TURNS, 2 * COIL_INNER_HALF_WIDTH + COIL_BUILD, COIL_BUILD, COIL_THICKNESS,
+                              DEPTH + COIL_BUILD, image_factor)
+    return 2 * one
+
+
 # Tables III-V share these sample times (s); point 1 (t = 0, all zero) is omitted.
 TABLE_TIME = np.array([0.002, 0.005, 0.010, 0.015, 0.020, 0.030, 0.040, 0.050, 0.060, 0.070, 0.080, 0.090,
                        0.100, 0.120, 0.140, 0.160, 0.180, 0.200, 0.240, 0.300])

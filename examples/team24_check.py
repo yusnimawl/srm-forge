@@ -74,6 +74,19 @@ for label, r, v in [("R 3.09, V 23.1", t24.RESISTANCE, t24.VOLTAGE),
     d = pct(i, t24.TABLE_CURRENT)
     print(f"{label:<20} {np.abs(d[1:]).max():5.1f} {d[4]:+6.1f} {i[-1]:.3f} A")
 
+print("--- end-winding correction (srmcore.post.end_winding, image factor 1 / 2, midpoint used)")
+l1, l2 = t24.end_winding_inductance(1.0), t24.end_winding_inductance(2.0)
+l_end = 0.5 * (l1 + l2)
+psi_final = float(psi_i(I_FINAL))
+print(f"L_end {l1 * 1e3:.3f} / {l2 * 1e3:.3f} mH (midpoint {l_end * 1e3:.3f} mH); psi at {I_FINAL} A "
+      f"{psi_final:.5f} -> {psi_final + l_end * I_FINAL:.5f} Wb-turns ({100 * l_end * I_FINAL / psi_final:+.1f} %)")
+i_after = t24.current_rise(PchipInterpolator(m["current"], m["psi"] + l_end * m["current"]), t24.TABLE_TIME)
+print(f"{'t/s':>6} {'i meas':>7} {'before':>8} {'dev %':>6} {'after':>8} {'dev %':>6}")
+for k, t in enumerate(t24.TABLE_TIME):
+    im = t24.TABLE_CURRENT[k]
+    print(f"{t:6.3f} {im:7.2f} {i_model[k]:8.3f} {pct(i_model[k], im):+6.1f} {i_after[k]:8.3f} {pct(i_after[k], im):+6.1f}")
+print("(static torque and rotor-pole flux are unchanged: a constant end inductance adds neither)")
+
 print("--- sensitivity of the static point (torque N.m, psi Wb-turns, peak iron |B| T)")
 for label, scale, js in [("Js 1.98", 1.0, 1.98), ("Js 2.05", 1.0, 2.05), ("mesh x0.5", 0.5, t24.ASSUMED_JS)]:
     q, r, b = static(scale, js)
