@@ -57,7 +57,7 @@ def _patch(monkeypatch, *, ref_scale=1.0, minus_ok=True, nan_key=None, fem_statu
             raise InputError([])
         v = {k: x * (1 + 0.01 * (js_factor - 1) / V.JS_STEP) for k, x in GOOD.items()}
         if static == "reference":
-            v = {k: x * ref_scale for k, x in v.items()}
+            v = {k: x * (ref_scale[k] if isinstance(ref_scale, dict) else ref_scale) for k, x in v.items()}
         if nan_key and static == "full":
             v[nan_key] = float("nan")
         return v
@@ -111,6 +111,21 @@ def test_mesh_difference_beyond_tolerance_fails_and_enters_the_budget(monkeypatc
     assert status["point_convergence_psi"] == "fail" and status["point_convergence_torque"] == "pass"
     mesh = next(r for r in v.budget.rows if r.source == "mesh")
     assert mesh.rel["la"] == pytest.approx(0.01 / 1.01)
+
+
+def test_failing_psi_check_names_the_worst_key(monkeypatch):
+    _patch(monkeypatch, ref_scale={"la": 1.0, "lu": 1.02, "peak_torque": 1.0, "psi_max": 1.01})
+    c = {c.name: c for c in V.em_validate(DESIGN, _map()).checks}["point_convergence_psi"]
+    assert c.status == "fail" and "worst at lu" in c.detail
+
+
+def test_nonconverged_psi_key_is_named(monkeypatch):
+    _patch(monkeypatch, nan_key="la")
+    v = V.em_validate(DESIGN, _map())
+    c = {c.name: c for c in v.checks}["point_convergence_psi"]
+    assert c.status == "fail" and "la key-point solve non-converged" in c.detail and "full" in c.detail
+    material = next(row for row in v.budget.rows if row.source == "material")
+    assert "non-converged Js solve at la" in material.note
 
 
 def test_nonconverged_key_point_fails_its_check(monkeypatch):

@@ -2,10 +2,9 @@
 import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
+from importlib.metadata import version
 
 import numpy as np
-
-from importlib.metadata import version
 
 from ..fields.solution import SolveStatus
 from ..materials.laws import ReluctivityLaw, law_for_material, library_law
@@ -114,6 +113,20 @@ def _rel(a: float, b: float) -> float:
     return abs(a - b) / abs(b)
 
 
+def _point_check(name: str, keys: Sequence[str], vals: dict[str, dict[str, float]], rel: dict[str, float],
+                 limit: float, what: str) -> Check:
+    """Upper-limit check on the worst key-point error; the detail names the key (and the mesh whose solve
+    did not converge)."""
+    bad = [k for k in keys if not np.isfinite(rel[k])]
+    if bad:
+        k = bad[0]
+        meshes = [m for m in ("full", "reference") if not np.isfinite(vals[m][k])]
+        return _upper(name, float("nan"), limit,
+                      f"{k} key-point solve non-converged on the {' and '.join(meshes)} mesh; {what}")
+    k = max(keys, key=lambda key: rel[key])
+    return _upper(name, rel[k], limit, f"worst at {k} ({rel[k]:.3%}); {what}")
+
+
 def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
                 workers: int | None = None) -> EmValidation:
     """The EM-validated checks and the uncertainty budget of a complete map. `label` is LABEL only when every
@@ -152,8 +165,11 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     else:
         js = {k: abs(plus[k] - minus[k]) / 2 / abs(nominal[k]) for k in KEYS}
         js_note = "Js ±2 %"
+    js_solves = [nominal, plus] + ([minus] if minus is not None else [])
+    nan_keys = [k for k in KEYS if any(not np.isfinite(v[k]) for v in js_solves)]
+    nan_note = f"; non-converged Js solve at {', '.join(nan_keys)}, row is NaN" if nan_keys else ""
     material_row = BudgetRow("material", {k: js[k] + GRADE_ALLOWANCE[worst] for k in KEYS},
-                             f"{js_note}; B-H data grade {worst}")
+                             f"{js_note}; B-H data grade {worst}{nan_note}")
     l1, l2 = (end_winding_inductance(machine, f) for f in END_WINDING_IMAGE)
     half, l_mid = (l2 - l1) / 2, (l1 + l2) / 2
     values = {"la": key.la + l_mid, "lu": key.lu + l_mid, "peak_torque": key.peak_torque,
@@ -175,10 +191,10 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
               f"map preset {own}; the label needs full or reference"),
         Check("no_filled_points", "fail" if n_filled else "pass", n_filled, 0.0,
               "points replaced by interpolation after a non-converged solve"),
-        _upper("point_convergence_psi", float(np.max([mesh_row.rel[k] for k in ("la", "lu", "psi_max")])),
-               PSI_POINT_TOLERANCE, "full vs reference mesh ψ at the La, Lu and ψ_max points"),
-        _upper("point_convergence_torque", mesh_row.rel["peak_torque"], TORQUE_POINT_TOLERANCE,
-               "full vs reference mesh torque at the peak-torque point, relative to peak torque"),
+        _point_check("point_convergence_psi", ("la", "lu", "psi_max"), vals, mesh_row.rel, PSI_POINT_TOLERANCE,
+                     "full vs reference mesh ψ at the La, Lu and ψ_max points"),
+        _point_check("point_convergence_torque", ("peak_torque",), vals, mesh_row.rel, TORQUE_POINT_TOLERANCE,
+                     "full vs reference mesh torque at the peak-torque point, relative to peak torque"),
         *(fem or (Check("fem_checks", "fail", float("nan"), float("nan"),
                         "held-out and band-radius checks run only on full and reference maps"),)),
         Check("material_grade", "pass" if all(grades.values()) else "fail", float("nan"), float("nan"),
