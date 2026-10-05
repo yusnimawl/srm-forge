@@ -111,7 +111,7 @@ Regression pins in the slow test: torque 2.7996 N·m, ψ 0.3676 Wb-turns (relati
 
 | Entry | Static torque | Current rise | Rotor-pole flux | Basis |
 |---|---|---|---|---|
-| 3D end flux | dominant, model low; not quantified in 2D; end turns add no torque (see the M5d section) | lower 2D inductance → model fast; the M5d end-winding hook (6.6–13.1 mH) cuts the mid-rise lead from +18.6 % to +8.1 % | dominant, model low; not quantified in 2D; end turns add no rotor flux | axial length 25.4 mm is about 9× the 2.7 mm gap |
+| 3D end flux | dominant, model low; not quantified in 2D; end turns add no torque (see the M5d section) | lower 2D inductance → model fast; the M5d end-winding hook (6.6–13.1 mH) cuts the mid-rise lead from +18.6 % to +8.1 %; early over-correction: 2 ms −1.7 % → −17.3 % | dominant, model low; not quantified in 2D; end turns add no rotor flux | axial length 25.4 mm is about 9× the 2.7 mm gap |
 | Eddy currents (σ = 4.54 MS/m, solid steel) | 0 at steady state; early: measured lower at a given current → model high at i_meas | measured higher early, lower later → model lags early, leads mid-rise; out of scope (§2.3) | 0 at steady state; early: measured lower at a given current → model high at i_meas | steady state has no eddy currents |
 | R 3.09 vs 3.12 Ω | none | max \|dev\| 18.6 % to 18.1 % (t ≥ 5 ms); i at 300 ms 7.476 to 7.404 A | none | computed |
 | Voltage overshoot (Table II vs 23.1 V) | none | max \|dev\| 18.1 % to 18.9 % (t ≥ 5 ms, R 3.12 Ω) | none | computed |
@@ -154,7 +154,7 @@ An independent check of the analytic end-winding hook (`srmcore.post.end_winding
 | 0.200 | 7.40 | 7.476 | +1.0 | 7.476 | +1.0 |
 | 0.300 | 7.41 | 7.476 | +0.9 | 7.476 | +0.9 |
 
-The mid-rise lead shrinks: the maximum deviation for t ≥ 5 ms falls from +18.6 % (15 ms) to +8.1 % (30 ms), and at 20 ms from +18.2 % to +7.4 %. The lead is not removed. The early points move the other way: at 2 ms the model goes from -1.7 % to -17.3 %, and at 5 ms from +12.4 % to -3.8 %, so the early lag grows (the 2 ms point is also the one most affected by eddy currents and the interpolated low-field B-H). The steady-state current is unchanged (7.476 A, set by V/R). The remaining lead is consistent with the other candidates in the budget (eddy currents, 3D iron fringing). Static torque and rotor-pole flux are unchanged: a constant end inductance adds neither, so their -13 %/-17 % deficit is 3D fringing of the iron, not end turns.
+The mid-rise lead shrinks: the maximum deviation for t ≥ 5 ms falls from +18.6 % (15 ms) to +8.1 % (30 ms), and at 20 ms from +18.2 % to +7.4 %. The lead is not removed. The early points move the other way: at 2 ms the model goes from -1.7 % to -17.3 %, and at 5 ms from +12.4 % to -3.8 %, so the early lag grows (the 2 ms point is also the one most affected by eddy currents and the interpolated low-field B-H). The steady-state current is unchanged (7.476 A, set by V/R). The remaining lead is consistent with the other candidates in the budget (eddy currents, 3D iron fringing). Static torque and rotor-pole flux are unchanged: a constant end inductance adds neither, so their -13 %/-17 % deficit is not from the end turns; 3D iron fringing remains the leading candidate.
 
 ## Not compared
 

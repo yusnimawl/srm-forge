@@ -36,7 +36,7 @@ Core length 60.37 mm, OD 190 mm, gap 0.25 mm, arcs 24°/36°, 536 turns/phase, A
 - Our 2D Lu (33–45 mH) is far above Materu's FEA (25.8 mH) and near the measured value.
 - Coil placement drives Lu: moving the coil from the bore to the yoke (clearance 0.5 → 18 mm) raises Lu 37 → 45 mH (bore 102.06); La moves < 1 %.
 - Material moves La at 1 A by 20 % and La at 20 A by 4 %; Lu not at all.
-- Measured La at 20 A (89 mH) means φ = 3.3 mWb: ≈ 2.6 T over the stator pole (21.4 × 60.4 mm) or ≈ 2.6 T in the 10.5 mm yoke halves, above any steel's Js. The deep-saturation deficit cannot come from the 2D lamination model; it is end flux or the measurement.
+- Measured La at 20 A (89 mH) means φ = 3.3 mWb: ≈ 2.6 T over the stator pole (21.4 × 60.4 mm) or ≈ 2.6 T in the 10.5 mm yoke halves, if all linked flux crossed the pole (an upper bound; slot and end leakage carry part of it), above any steel's Js. The deficit is therefore unlikely to come from the M19/steel_1010 lamination curves alone, and the budget has no row for the unidentified "E140" steel's Js; it is end flux or the measurement, outside the stated model uncertainty.
 
 ## Owner decisions (2026-10-05)
 
@@ -85,6 +85,7 @@ Core length 60.37 mm, OD 190 mm, gap 0.25 mm, arcs 24°/36°, 536 turns/phase, A
 
 - Fast: `tests/post/test_end_winding.py`: the formula against a hand-computed circular-loop value; `image_factor` scaling; `ValueError` cases. `tests/maps/test_with_end_winding.py`: on a small synthetic `MapResult` (no FEM), ψ, energies and L_inc shift exactly and torque does not. `coil_geometry` on `make_8_6`: area equals the coil region area of the static mesh within 0.5 % (reuse an existing session fixture if one exists; otherwise mark slow).
 - Slow: `tests/validation/test_krishnan_6_4.py` pins the 2D and corrected tables (rtol 1e-3) and the signs (after correction Lu error moves toward 0 or flips sign; La within the stated uncertainty band at 1 A). TEAM 24 slow test pins the corrected steady-state ψ.
+  - As built: the Krishnan slow test pins the full 2D table and L_end; the TEAM 24 slow test pins the 20 ms current. The expectation that Lu moves toward the measurement was disproved (Lu moved away: 10 A +13.0 % to +27.3 %); see `docs/m5d-krishnan-results.md`.
 - Import rules: `post/end_winding.py` imports only numpy/math; `maps/end_winding.py` may import topology.
 
 ### 7. Docs

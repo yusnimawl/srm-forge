@@ -29,7 +29,7 @@ AIR_GAP, SHAFT, ROTOR_POLE_HEIGHT = 0.25e-3, 28.56e-3, 27.25e-3
 BORES = {"book": (0.10206, 0.010515), "dissertation": (0.1220, 0.01015)}   # bore diameter, stator back iron
 LINER = 0.3e-3
 ASSUMED = {
-    "bore": "book 102.06 mm / back iron 10.515 mm (reproduces Materu's 2D FEA at 1 A); dissertation 122.0 / 10.15 mm as a budget row",
+    "bore": "book 102.06 mm / back iron 10.515 mm (reproduces Materu's 2D FEA La at 1 A); dissertation 122.0 / 10.15 mm as a budget row",
     "shaft, rotor pole height": "dissertation Appendix A (28.56 mm, 27.25 mm); rotor yoke derived",
     "coil": "packed against the yoke, bundle packing 0.5 (175 mm² copper in 350 mm²); 0.35-0.65 as a budget row",
     "slot_liner_thickness": "0.3 mm, not in the source",

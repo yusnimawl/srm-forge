@@ -53,7 +53,8 @@ def coil_geometry(machine: RadialSRMParams) -> CoilGeometry:
 
 def end_winding_inductance(machine: RadialSRMParams, image_factor: float = 1.0) -> float:
     """End-winding inductance of one phase, H: the series coils of its poles; coupling between them is
-    neglected (they sit on opposite sides of the machine)."""
+    neglected (they sit on opposite sides of the machine). `image_factor` 1.0 (default) is the free-air
+    lower bound, 2.0 the iron-image upper bound; reports use the midpoint 1.5."""
     g = coil_geometry(machine)
     per_coil = end_turn_inductance(machine.turns_per_pole, g.span, g.build, g.depth,
                                    machine.stack_length + g.build, image_factor)
@@ -61,7 +62,8 @@ def end_winding_inductance(machine: RadialSRMParams, image_factor: float = 1.0) 
 
 
 def with_end_winding(result: MapResult, l_end: float) -> MapResult:
-    """`result` with the excited phase's end-winding inductance `l_end` (H) added to ψ, W, W′ and L_inc."""
+    """`result` with the excited phase's end-winding inductance `l_end` (H) added to ψ, W, W′ and L_inc.
+    Apply once; the result must not be stored under the 2D map's provenance (store_map / write_map)."""
     if l_end < 0:
         raise ValueError(f"l_end must be non-negative, got {l_end}")
     k = result.circuits.index(result.excited)

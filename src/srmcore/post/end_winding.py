@@ -20,8 +20,9 @@ def parallel_filament_mutual(length: float, distance: float) -> float:
 
 def end_turn_inductance(turns: int, span: float, build: float, depth: float, separation: float,
                         image_factor: float = 1.0) -> float:
-    """End-winding inductance of one coil of `turns` turns, H. `image_factor` 1 is the coil in free air
-    (lower bound), 2 a coil against an infinitely permeable end face (upper bound)."""
+    """End-winding inductance of one coil of `turns` turns, H. `image_factor` 1.0 (default) is the coil in
+    free air (lower bound), 2.0 a coil against an infinitely permeable end face (iron-image upper bound);
+    reports use the midpoint 1.5."""
     if turns <= 0:
         raise ValueError(f"turns must be positive, got {turns}")
     for name, value in (("span", span), ("build", build), ("depth", depth), ("separation", separation)):

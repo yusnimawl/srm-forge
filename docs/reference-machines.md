@@ -125,7 +125,7 @@ inside `waive_rules("self_starting")` (decided 2026-09-30, spec §11).
 | Rotor pole height | not given | 27.25 mm |
 | Core material | M19 | "E140 steel" (not identified, not in the library) |
 
-Choice (M5d spec decision 1): the book bore and back iron, with shaft and rotor pole height from the dissertation (rotor yoke derived, 9.25 mm). The book bore reproduces Materu's own 2D FEA at 1 A; the dissertation bore and back iron are a sensitivity (budget) row. Material is the M19 library curve, with steel_1010 as a crude bound. The measured T_avg is computed from the measured flux linkage (Materu p. 49), not from a torque sensor. Results: `docs/m5d-krishnan-results.md`.
+Choice (M5d spec decision 1): the book bore and back iron, with shaft and rotor pole height from the dissertation (rotor yoke derived, 9.25 mm). The book bore reproduces Materu's own 2D FEA La at 1 A (Lu does not match: 45.7 vs 25.8 mH); the dissertation bore and back iron are a sensitivity (budget) row. Material is the M19 library curve, with steel_1010 as a crude bound. The measured T_avg is computed from the measured flux linkage (Materu p. 49), not from a torque sensor. Results: `docs/m5d-krishnan-results.md`.
 
 Measured comparison data available for this machine (Table 2.3, for validation-report use, not `RadialSRMParams` fields): unaligned inductance, aligned inductance, and stroke-averaged electromagnetic torque, each given as Analytical / FEM / **Measured** at phase currents 1 A, 10 A, 20 A (measured values: 35.5/40.7/35.6 mH unaligned; 879/155/89 mH aligned; 0.90/20.30/41.60 N·m stroke-averaged torque).
 
