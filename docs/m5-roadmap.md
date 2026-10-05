@@ -45,6 +45,8 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 ## M5d: measured Krishnan 6/4 + end-winding hook
 
+**Done 2026-10-05:** see `docs/m5d-krishnan-results.md` (decisions in spec §11). Decisions: book bore with dissertation shaft and rotor pole height, coil packed against the yoke at packing 0.5, M19, analytic end-winding hook (Grover partial inductances, image factor 1–2, midpoint reported, no calibration), Table 1 values only. Results: the correction moves La toward the measurement (20 A: -21.6 % to -15.0 %) but Lu away (10 A: +13.0 % to +27.3 %, the 2D Lu is already above measured); T_avg is unchanged (-16.9 % at 10 A, -28.5 % at 20 A), about 9 % of it at 20 A from the too-high 2D Lu and the rest from the saturated La; the 20 A La residual is not explained by the 2D model or end turns (3D iron-end fringing or the measurement). TEAM 24 independent check: mid-rise current lead +18.6 % to +8.1 %, with early over-correction (2 ms: -1.7 % to -17.3 %). Open for M5e: the uncertainty budget and report must carry these as residuals; fringing stays uncalibrated.
+
 - **Goal:** measured-SRM comparison reported **with error and uncertainty, before and after end-effect correction** (spec §2.3).
 - **Have:** Krishnan 6/4 measured La, Lu and stroke-averaged torque at 2 rotor positions × 3 currents (1, 10, 20 A), Table 2.3 (`docs/reference-machines.md`).
 - **Owner decisions first:**
