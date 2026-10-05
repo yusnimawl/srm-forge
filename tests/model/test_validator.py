@@ -184,3 +184,11 @@ def test_only_waivable_rules_can_be_waived():
     with pytest.raises(ValueError, match="cannot be waived"):
         with waive_rules("min_width"):
             pass
+
+
+def test_coil_clearance_units_range():
+    # a coil set back from the bore (packed against the yoke) needs more than 20 mm on a 190 mm machine
+    assert ("coil_inner_clearance", "units") not in _errors(validate_params(make_8_6(coil_inner_clearance=0.003)))
+    p = make_8_6(coil_inner_clearance=0.025)
+    assert ("coil_inner_clearance", "units") not in _errors(validate_params(p))
+    assert ("coil_inner_clearance", "units") in _errors(validate_params(make_8_6(coil_inner_clearance=1.0)))
