@@ -63,3 +63,13 @@ def test_stacking_factor_is_required():
     del data["stacking_factor"]
     with pytest.raises(ValidationError):
         SoftMagneticMaterial.model_validate(data)
+
+
+def test_digitisation_error_is_optional_and_bounded():
+    m = load_material("M19")
+    assert m.digitisation_error is None
+    data = m.model_dump()
+    assert SoftMagneticMaterial.model_validate({**data, "digitisation_error": 0.02}).digitisation_error == 0.02
+    for bad in (-0.01, 0.5):
+        with pytest.raises(ValidationError):
+            SoftMagneticMaterial.model_validate({**data, "digitisation_error": bad})

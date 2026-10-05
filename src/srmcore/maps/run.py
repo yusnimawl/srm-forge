@@ -44,7 +44,7 @@ class MapResult:
     coenergy: np.ndarray               # J
     l_inc: np.ndarray                  # (n_angles, n_currents, n_circuits), H: ∂ψ_k/∂i_excited, NaN where withheld
     pole_force: np.ndarray             # (n_angles, n_currents, n_poles, 2), N: [radial outward, tangential ccw]
-    b_peak: np.ndarray                 # (n_angles, n_currents), T: peak |B| over the stator and rotor iron elements
+    b_peak: np.ndarray                 # (n_angles, n_currents), T: area-weighted B_PEAK_QUANTILE of |B| over the stator and rotor iron
     iterations: np.ndarray
     status: np.ndarray
     filled: np.ndarray

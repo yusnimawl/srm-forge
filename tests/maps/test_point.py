@@ -6,7 +6,7 @@ import pytest
 
 from conftest import make_8_6
 from srmcore.fields.solution import FieldSolution, SolveStatus
-from srmcore.maps.point import PointResult, solve_point
+from srmcore.maps.point import PointResult, area_quantile, solve_point
 from srmcore.mesh import build_machine_mesh, mesh_at_angle
 from srmcore.model.design import Design, MeshSettings
 from srmcore.physics.build import machine_problem
@@ -37,6 +37,28 @@ def test_matches_the_manual_chain(static):
     assert result.energy == solution.energy and result.coenergy == solution.coenergy
     assert result.status is SolveStatus.OK and result.iterations == solution.iterations
     assert result.field is None
+    kind = np.array([problem.region_kind[n] for n in problem.region_names])[problem.element_region]
+    iron = (kind == "stator_iron") | (kind == "rotor_iron")
+    t = problem.nodes[problem.triangles[iron]]
+    area = 0.5 * np.abs((t[:, 1, 0] - t[:, 0, 0]) * (t[:, 2, 1] - t[:, 0, 1])
+                        - (t[:, 2, 0] - t[:, 0, 0]) * (t[:, 1, 1] - t[:, 0, 1]))
+    b = np.hypot(solution.b[iron, 0], solution.b[iron, 1])
+    assert result.b_peak == pytest.approx(area_quantile(b, area), rel=1e-12)
+    assert result.b_peak < b.max()
+
+
+def test_area_quantile_ignores_a_tiny_hot_element():
+    values = np.array([1.0] * 999 + [9.0])
+    areas = np.array([1.0] * 999 + [1e-6])
+    assert area_quantile(values, areas) == 1.0
+
+
+def test_area_quantile_of_a_uniform_field_is_that_field():
+    assert area_quantile(np.full(5, 2.0), np.arange(1.0, 6.0)) == 2.0
+
+
+def test_area_quantile_sees_a_hot_region_with_real_area():
+    assert area_quantile(np.array([1.0, 3.0]), np.array([0.5, 0.5])) == 3.0
 
 
 def test_keep_field_returns_the_field(static):

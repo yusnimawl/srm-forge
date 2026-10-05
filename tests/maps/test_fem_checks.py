@@ -41,6 +41,28 @@ def test_fem_checks_skips_screening():
     assert fem_checks(design, synthetic_map()) == ()
 
 
+@pytest.mark.parametrize("n_skipped", [0, 1])
+def test_held_out_converged_reports_skipped_samples(monkeypatch, n_skipped):
+    from map_fixtures import synthetic_map
+    import importlib
+    F = importlib.import_module("srmcore.maps.fem_checks")   # the package attribute is the function
+    from srmcore.maps.checks import Check
+    r = synthetic_map()
+    n = 4
+
+    def fake_rows(job, items, **kw):
+        ok = {"status": 0, "psi": np.zeros(len(r.circuits)), "torque_arkkio": 0.0}
+        bad = dict(ok, status=F.STATUS_NONCONVERGED)
+        return [bad] * n_skipped + [ok] * (len(items) - n_skipped)
+    monkeypatch.setattr(F, "map_ordered", fake_rows)
+    monkeypatch.setattr(F, "build_machine_mesh", lambda d: None)
+    monkeypatch.setattr(F, "_band_radius_check", lambda *a: Check("band_radius", "pass", 0.0, 1.0, ""))
+    design = Design(machine=make_8_6(), mesh=MeshSettings(preset="full"))
+    by = {c.name: c for c in fem_checks(design, r, n_samples=n)}
+    c = by["held_out_converged"]
+    assert c.value == n_skipped and c.status == ("warn" if n_skipped else "pass")
+
+
 @pytest.mark.parametrize("n_a, n_i, n", [(8, 4, 8), (30, 20, 16), (16, 8, 16), (30, 20, 1000)])
 def test_held_out_samples_spread(n_a, n_i, n):
     from map_fixtures import PERIOD, synthetic_map
@@ -69,7 +91,7 @@ def test_fem_checks_full_preset(capsys):
         print(f"FEM_CHECKS wall {time.perf_counter() - t0:.1f} s")
         for c in checks:
             print(f"CHECK {c.name:16s} {c.status:5s} value={c.value:.4g} limit={c.limit:.4g}")
-    assert [c.name for c in checks] == ["held_out_psi", "held_out_torque", "band_radius"]
+    assert [c.name for c in checks] == ["held_out_psi", "held_out_torque", "held_out_converged", "band_radius"]
     by = {c.name: c for c in checks}
     assert by["band_radius"].status == "pass"
     assert by["held_out_psi"].value < 0.1 and by["held_out_torque"].value < 1.0
