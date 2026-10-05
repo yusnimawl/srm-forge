@@ -32,7 +32,8 @@ VALIDATED_VERSIONS: tuple[str, ...] = ()
 LABEL = "EM-validated"
 PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
 TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point
-JS_STEP = 0.02                    # relative change of the saturation polarisation in the material row
+MAP_MATCH_TOLERANCE = 1e-3        # peak-torque solve on the design's mesh vs the map value (solvers agree to 1e-4)
+JS_STEP = 0.02                   # relative change of the saturation polarisation in the material row
 GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade -> relative allowance
 END_WINDING_IMAGE = (1.0, 2.0)    # image-factor bounds of the end-winding inductance; corrected values use the midpoint
 
@@ -96,8 +97,8 @@ class BudgetRow:
 class UncertaintyBudget:
     values_2d: dict[str, float]   # key numbers of the 2D map
     values: dict[str, float]      # with the mid-range end-winding inductance added
-    rows: tuple[BudgetRow, ...]
-    total: dict[str, float]       # sum of the rows per key (worst case)
+    rows: tuple[BudgetRow, ...]   # all relative to `values`
+    total: dict[str, float]       # sum of the rows per key (worst case), relative to `values`
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,8 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
         minus = point_values(static, design, points, result.excited, adapter, js_factor=1 - JS_STEP)
     except InputError:
         minus = None
-    fem = fem_checks(design, result, solver=solver, workers=workers)
+    del meshes, static      # fem_checks builds its own mesh; keep the peak memory to one
+    fem =fem_checks(design, result, solver=solver, workers=workers)
 
     key = key_numbers(result, machine)
     values_2d = {k: getattr(key, k) for k in KEYS}
@@ -157,7 +159,16 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     grades = {part: m.confidence for part, m in loaded.items()}
     worst = max(grades.values())
 
-    mesh_row = BudgetRow("mesh", {k: _rel(vals["full"][k], vals["reference"][k]) for k in KEYS},
+    # The mesh and material spreads are relative to 2D values; the budget is relative to the end-corrected
+    # values, so those rows are rescaled to the same absolute spread.
+    l1, l2 = (end_winding_inductance(machine, f) for f in END_WINDING_IMAGE)
+    half, l_mid = (l2 - l1) / 2, (l1 + l2) / 2
+    values = {"la": key.la + l_mid, "lu": key.lu + l_mid, "peak_torque": key.peak_torque,
+              "psi_max": key.psi_max + l_mid * key.i_max}
+    to_corrected = {k: values_2d[k] / values[k] for k in KEYS}
+
+    mesh_rel = {k: _rel(vals["full"][k], vals["reference"][k]) for k in KEYS}
+    mesh_row = BudgetRow("mesh", {k: mesh_rel[k] * to_corrected[k] for k in KEYS},
                          "full vs reference mesh at the key points")
     if minus is None:
         js = {k: _rel(plus[k], nominal[k]) for k in KEYS}
@@ -168,12 +179,8 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     js_solves = [nominal, plus] + ([minus] if minus is not None else [])
     nan_keys = [k for k in KEYS if any(not np.isfinite(v[k]) for v in js_solves)]
     nan_note = f"; non-converged Js solve at {', '.join(nan_keys)}, row is NaN" if nan_keys else ""
-    material_row = BudgetRow("material", {k: js[k] + GRADE_ALLOWANCE[worst] for k in KEYS},
+    material_row = BudgetRow("material", {k: (js[k] + GRADE_ALLOWANCE[worst]) * to_corrected[k] for k in KEYS},
                              f"{js_note}; B-H data grade {worst}{nan_note}")
-    l1, l2 = (end_winding_inductance(machine, f) for f in END_WINDING_IMAGE)
-    half, l_mid = (l2 - l1) / 2, (l1 + l2) / 2
-    values = {"la": key.la + l_mid, "lu": key.lu + l_mid, "peak_torque": key.peak_torque,
-              "psi_max": key.psi_max + l_mid * key.i_max}
     end_row = BudgetRow("end_effect", {"la": half / values["la"], "lu": half / values["lu"], "peak_torque": 0.0,
                                        "psi_max": half * key.i_max / values["psi_max"]},
                         "end winding, image factor 1 to 2; iron-end 3D fringing not modelled")
@@ -183,6 +190,10 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     budget = UncertaintyBudget(values_2d, values, rows, {k: sum(r.rel[k] for r in rows) for k in KEYS})
 
     n_filled = float(np.sum(result.filled))
+    a, i = np.unravel_index(np.argmax(np.abs(result.torque_arkkio)), result.torque_arkkio.shape)
+    t_map, t_solve = abs(float(result.torque_arkkio[a, i])), nominal["peak_torque"]
+    match = abs(t_solve - t_map) / t_map if np.isfinite(t_solve) else float("nan")
+    not_finite = [k for k in KEYS if not np.isfinite(budget.total[k])]
     checks = (
         Check("engine_version", "pass" if version("srmcore") in VALIDATED_VERSIONS else "fail", float("nan"),
               float("nan"), f"srmcore {version('srmcore')}; validated versions: "
@@ -191,14 +202,18 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
               f"map preset {own}; the label needs full or reference"),
         Check("no_filled_points", "fail" if n_filled else "pass", n_filled, 0.0,
               "points replaced by interpolation after a non-converged solve"),
-        _point_check("point_convergence_psi", ("la", "lu", "psi_max"), vals, mesh_row.rel, PSI_POINT_TOLERANCE,
+        _upper("map_matches_design", match, MAP_MATCH_TOLERANCE,
+               "peak-torque key-point solve on the design's own mesh against the map's value at that grid point"),
+        _point_check("point_convergence_psi", ("la", "lu", "psi_max"), vals, mesh_rel, PSI_POINT_TOLERANCE,
                      "full vs reference mesh ψ at the La, Lu and ψ_max points"),
-        _point_check("point_convergence_torque", ("peak_torque",), vals, mesh_row.rel, TORQUE_POINT_TOLERANCE,
+        _point_check("point_convergence_torque", ("peak_torque",), vals, mesh_rel, TORQUE_POINT_TOLERANCE,
                      "full vs reference mesh torque at the peak-torque point, relative to peak torque"),
         *(fem or (Check("fem_checks", "fail", float("nan"), float("nan"),
                         "held-out and band-radius checks run only on full and reference maps"),)),
         Check("material_grade", "pass" if all(grades.values()) else "fail", float("nan"), float("nan"),
               f"stator {grades['stator']}, rotor {grades['rotor']}"),
+        Check("budget_finite", "fail" if not_finite else "pass", float(len(not_finite)), 0.0,
+              f"non-finite budget total at {', '.join(not_finite)}" if not_finite else "every budget total is finite"),
     )
     label = LABEL if all(c.status == "pass" for c in checks) else None
     return EmValidation(label, checks, budget, version("srmcore"), grades)

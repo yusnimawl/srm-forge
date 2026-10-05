@@ -93,10 +93,12 @@ def em_validate(design, result, *, solver="ngsolve", workers=None) -> EmValidati
 | `engine_version` | `version("srmcore")` in `VALIDATED_VERSIONS` |
 | `preset` | map preset is `full` or `reference` |
 | `no_filled_points` | map complete and `filled` has no True (no interpolated NONCONVERGED point) |
+| `map_matches_design` | the peak-torque key point (an exact grid point of the map) solved on the design's own mesh agrees with the map's \|Arkkio torque\| there within `MAP_MATCH_TOLERANCE` = 0.1 % (the solvers agree to 1e-4); a non-converged solve fails. Catches a map of another design or preset |
 | `point_convergence_psi` | max over La, Lu, ψ_max points of \|ψ_full − ψ_ref\| / \|ψ_ref\| ≤ 0.5 % |
 | `point_convergence_torque` | \|T_full − T_ref\| / peak torque ≤ 1 % at the peak point |
-| `held_out_psi`, `held_out_torque`, `band_radius` | from `fem_checks(design, result)` |
+| `held_out_psi`, `held_out_torque`, `held_out_converged`, `band_radius` | from `fem_checks(design, result)`; `held_out_converged` passes only when no held-out solve was skipped as non-converged |
 | `material_grade` | stator and rotor materials carry a confidence grade (always true with the schema; recorded) |
+| `budget_finite` | every `total[k]` is finite (a non-converged Js solve makes a row NaN) |
 
 A failing or non-converged key-point solve makes its check `fail` with the point named in the detail.
 
@@ -106,6 +108,8 @@ A failing or non-converged key-point solve makes its check `fail` with the point
 - `material`: Js half-spread on the map's mesh, (|v₊ − v₋|)/2 / |v₀| or |v₊ − v₀| / |v₀| when −2 % is forbidden (note says which), plus `GRADE_ALLOWANCE` of the worse stator/rotor grade.
 - `end_effect`: (L_end(k=2) − L_end(k=1))/2 · i / corrected value for La, Lu (i = i_lo) and ψ_max (i = I_max); 0 for torque. Note: "iron-end 3D fringing not modelled".
 - `digitisation`: max of stator and rotor `digitisation_error` (0 when None), all keys.
+
+The `mesh` and `material` spreads are relative to 2D values, so both rows are multiplied by `values_2d[k] / values[k]` (the same absolute spread over the corrected value; 1 for torque). `digitisation` is a relative B error and is not rescaled. The point-convergence checks use the unscaled mesh error.
 
 `total` = sum of the rows per key. `values` = `values_2d` with La, Lu + L_end(1.5) and ψ_max + L_end(1.5) · I_max.
 

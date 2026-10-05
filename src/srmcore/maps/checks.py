@@ -148,7 +148,8 @@ def _map_checks(result: MapResult, design: Design, key: KeyNumbers | None) -> tu
     b_last = min(library_law(m.materials.stator).bn, library_law(m.materials.rotor).bn)
     b = float(np.max(result.b_peak)) / b_last
     checks.append(_upper("iron_b_peak", b, 1.0,
-                         "area p99.9 iron |B| / last stacked B-H point (beyond it the law is the Js tail)", bad="warn"))
+                         "area p99.9 iron |B| / last stacked B-H point, the smaller of the stator and rotor materials' "
+                         "(beyond it the law is the Js tail)", bad="warn"))
     return tuple(checks)
 
 

@@ -79,7 +79,8 @@ def fem_checks(design: Design, result: MapResult, *, solver: str = "ngsolve", wo
     """Empty for the screening preset. Otherwise: `held_out_psi` and `held_out_torque` compare FEM solves at
     grid mid-points (angle mid-points × non-zero current mid-points, evenly subsampled to `n_samples`; 16
     samples under-read the worst error by up to 2.8x in M5a) with the periodic-spline × PCHIP interpolant of
-    the map; `band_radius` compares the torque from the two air-gap layers with the band torque."""
+    the map; `held_out_converged` warns when any held-out solve was skipped as non-converged; `band_radius`
+    compares the torque from the two air-gap layers with the band torque."""
     if design.mesh.preset == "screening":
         return ()
     require_complete(result)
@@ -116,4 +117,7 @@ def fem_checks(design: Design, result: MapResult, *, solver: str = "ngsolve", wo
             _upper("held_out_torque", err_t, TORQUE_TOLERANCE,
                    f"FEM torque against the map interpolant at {used} held-out points, relative to peak torque{skipped}"),
         )
-    return held + (_band_radius_check(design, static, result, solver, key.peak_torque),)
+    n_skipped = len(samples) - used
+    converged = Check("held_out_converged", "warn" if n_skipped else "pass", float(n_skipped), 0.0,
+                      "held-out solves skipped because they did not converge")
+    return held + (converged, _band_radius_check(design, static, result, solver, key.peak_torque),)
