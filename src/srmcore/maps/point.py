@@ -13,6 +13,15 @@ from ..post.forces import pole_forces
 from ..post.quantities import arkkio_torque, flux_linkage, incremental_inductance, virtual_work_torque
 from ..solvers.settings import SolverAdapter
 
+B_PEAK_QUANTILE = 0.999   # area fraction of iron below b_peak; the element maximum diverges at the pole corners
+
+
+def area_quantile(values: np.ndarray, areas: np.ndarray, q: float = B_PEAK_QUANTILE) -> float:
+    """Smallest value v such that elements with value <= v hold at least the fraction q of the total area."""
+    order = np.argsort(values)
+    cum = np.cumsum(areas[order])
+    return float(values[order][np.searchsorted(cum, q * cum[-1])])
+
 
 @dataclass(frozen=True, eq=False)
 class PointResult:
@@ -33,7 +42,7 @@ class PointResult:
     load_fraction: float
     field: FieldSolution | None = None
     l_inc: np.ndarray | None = None    # H; only when requested and the solve converged at full load
-    b_peak: float = float("nan")       # T: peak |B| over the stator and rotor iron elements
+    b_peak: float = float("nan")       # T: area-weighted B_PEAK_QUANTILE of |B| over the stator and rotor iron
 
 
 def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapping[str, float],
@@ -49,7 +58,10 @@ def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapp
         l_inc = incremental_inductance(problem, solver.sensitivity(problem, solution.a))
     kind = np.array([problem.region_kind[n] for n in problem.region_names])[problem.element_region]
     iron = (kind == "stator_iron") | (kind == "rotor_iron")
-    b_peak = float(np.hypot(solution.b[iron, 0], solution.b[iron, 1]).max())
+    t = problem.nodes[problem.triangles[iron]]
+    area = 0.5 * np.abs((t[:, 1, 0] - t[:, 0, 0]) * (t[:, 2, 1] - t[:, 0, 1])
+                        - (t[:, 2, 0] - t[:, 0, 0]) * (t[:, 1, 1] - t[:, 0, 1]))
+    b_peak = area_quantile(np.hypot(solution.b[iron, 0], solution.b[iron, 1]), area)
     return PointResult(
         angle=mesh.rotor_angle, circuits=problem.winding.circuits, currents=problem.currents,
         psi=flux_linkage(problem, solution),

@@ -131,9 +131,12 @@ def test_lu_air_slot_fails_below_estimate():
     assert c.status == "fail" and c.value == pytest.approx(0.5, rel=1e-2)
 
 
-def test_iron_b_peak_warns_above_1p5_js():
-    assert by_name(good_map(b_peak=1.0))["iron_b_peak"].status == "pass"
-    assert by_name(good_map(b_peak=5.0))["iron_b_peak"].status == "warn"
+def test_iron_b_peak_warns_above_the_last_bh_point():
+    from srmcore.materials.laws import library_law
+    b_last = min(library_law(M.materials.stator).bn, library_law(M.materials.rotor).bn)
+    ok = by_name(good_map(b_peak=0.99 * b_last))["iron_b_peak"]
+    assert ok.status == "pass" and ok.limit == 1.0 and ok.value == pytest.approx(0.99)
+    assert by_name(good_map(b_peak=1.01 * b_last))["iron_b_peak"].status == "warn"
 
 
 def test_analyse_map_report():

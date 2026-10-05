@@ -6,6 +6,7 @@ from typing import Literal
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
+from ..materials.laws import library_law
 from ..materials.library import load_material
 from ..model.design import Design
 from .grids import aligned_angle
@@ -143,8 +144,11 @@ def _map_checks(result: MapResult, design: Design, key: KeyNumbers | None) -> tu
     ratio = np.float64(key.lu) / lu_est
     checks.append(Check("lu_air_slot", "pass" if np.isfinite(ratio) and ratio >= 1 else "fail", ratio, 1.0,
                         "Lu / Lu_est, Lu_est = p·N²·µ0·r·βs·L/(g + h_r); the air path is a lower bound"))
-    b = float(np.max(result.b_peak)) / js
-    checks.append(_upper("iron_b_peak", b, 1.5, "peak iron |B| / Js", bad="warn"))
+    # Above the last stacked B-H point the law is the Js tail, not data.
+    b_last = min(library_law(m.materials.stator).bn, library_law(m.materials.rotor).bn)
+    b = float(np.max(result.b_peak)) / b_last
+    checks.append(_upper("iron_b_peak", b, 1.0,
+                         "area p99.9 iron |B| / last stacked B-H point (beyond it the law is the Js tail)", bad="warn"))
     return tuple(checks)
 
 
