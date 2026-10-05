@@ -139,3 +139,13 @@ def test_triangle_count_regression_within_25pct_of_baseline(static_8_6):
     s = static_8_6
     assert len(s.stator.triangles) == pytest.approx(54674, rel=0.25)
     assert len(s.rotor.triangles) == pytest.approx(29310, rel=0.25)
+
+
+def test_coil_geometry_area_matches_mesh(static_8_6):
+    from srmcore.maps.end_winding import coil_geometry
+    p = make_8_6()
+    name = build_outline(p).coil_sides[0].name
+    rid = static_8_6.region_names.index(name)
+    part = static_8_6.stator if static_8_6.region_part[name] == "stator" else static_8_6.rotor
+    mesh_area = _areas(part.nodes, part.triangles[part.region_ids == rid]).sum()
+    assert coil_geometry(p).area == pytest.approx(mesh_area, rel=5e-3)

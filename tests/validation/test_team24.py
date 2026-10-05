@@ -54,6 +54,7 @@ TORQUE_2D = 2.7996
 PSI_2D = 0.3676
 ROTOR_FLUX_2D = 3.9069e-4
 CURRENT_20MS_2D = 5.308
+CURRENT_20MS_END = 4.822     # 20 ms current with the end-winding inductance (midpoint of image factors 1 and 2)
 
 
 def _rel(x, y):
@@ -107,6 +108,25 @@ def test_rotor_pole_flux_symmetric(final_point):
     per_turn = flux_linkage(p, s)[0] / (2 * t24.TURNS)
     assert 0.5 * per_turn < top < per_turn            # pole flux is the coil flux less leakage
     assert -0.25 < (top - t24.TABLE_ROTOR_FLUX[-1]) / t24.TABLE_ROTOR_FLUX[-1] < 0
+
+
+def test_end_winding_inductance_geometry():
+    from srmcore.post.end_winding import end_turn_inductance
+    one = end_turn_inductance(350, 0.058, 0.024, 0.017, 0.0254 + 0.024)
+    assert t24.end_winding_inductance() == pytest.approx(2 * one)
+    assert t24.end_winding_inductance(2.0) == pytest.approx(4 * one)
+
+
+@pytest.mark.slow
+def test_current_rise_with_end_winding(lr_map):
+    psi = PchipInterpolator(lr_map["current"], lr_map["psi"])
+    l_end = 0.5 * (t24.end_winding_inductance(1.0) + t24.end_winding_inductance(2.0))
+    before = t24.current_rise(psi, t24.TABLE_TIME)
+    after = t24.current_rise(PchipInterpolator(lr_map["current"], lr_map["psi"] + l_end * lr_map["current"]),
+                             t24.TABLE_TIME)
+    assert np.all(after[:-3] <= before[:-3] + 1e-9)     # more inductance: slower rise
+    assert after[-1] == pytest.approx(t24.VOLTAGE / t24.RESISTANCE, rel=2e-3)
+    assert after[t24.TABLE_TIME == 0.020][0] == pytest.approx(CURRENT_20MS_END, rel=2e-3)
 
 
 @pytest.mark.slow

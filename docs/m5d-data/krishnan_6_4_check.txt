@@ -1,0 +1,40 @@
+machine: clearance 21.46 mm, coil 350 mm? (build 29.9 x depth 11.7 mm, span 51.7 mm), rotor yoke 9.25 mm
+assumed bore: book 102.06 mm / back iron 10.515 mm (reproduces Materu's 2D FEA at 1 A); dissertation 122.0 / 10.15 mm as a budget row
+assumed shaft, rotor pole height: dissertation Appendix A (28.56 mm, 27.25 mm); rotor yoke derived
+assumed coil: packed against the yoke, bundle packing 0.5 (175 mm? copper in 350 mm?); 0.35-0.65 as a budget row
+assumed slot_liner_thickness: 0.3 mm, not in the source
+assumed fillets, tapers: 0, not in the source
+assumed materials: M19 (book); the dissertation names 'E140 steel', not in the library; steel_1010 as a crude bound
+assumed validator: built inside waive_rules('self_starting') (stator arc 24 deg < 30 deg)
+end winding per phase: 3.87 mH (image 1) .. 7.74 mH (image 2); reported 5.80 mH
+
+all tables (SI):
+  reference      La [0.85592 0.13155 0.06981]  Lu [0.04573 0.04601 0.04572]  T_avg [ 0.80161 16.86105 29.72959]
+  full           La [0.85542 0.13147 0.06978]  Lu [0.04568 0.04596 0.04568]  T_avg [ 0.80119 16.85075 29.71777]
+  steel_1010     La [0.68326 0.13456 0.07262]  Lu [0.04555 0.04551 0.0452 ]  T_avg [ 0.62684 16.94964 30.78235]
+  dissertation   La [0.9105  0.13085 0.06943]  Lu [0.03794 0.03815 0.03807]  T_avg [ 0.92558 17.8195  32.71065]
+  packing_0.35   La [0.85357 0.13119 0.06974]  Lu [0.04339 0.04367 0.04346]  T_avg [ 0.80137 17.01761 30.51181]
+  packing_0.65   La [0.85635 0.13163 0.06979]  Lu [0.04681 0.04709 0.04675]  T_avg [ 0.80111 16.77243 29.33091]
+
+| Quantity | I (A) | Measured | Materu FEA | 2D | 2D + end winding | Error before | ? before | Error after | ? after |
+|---|---|---|---|---|---|---|---|---|---|
+| La (mH) | 1 | 879 | 843 | 855.9 | 861.7 | -2.6 % | 13.1 % + meas. n/s | -2.0 % | 13.4 % + meas. n/s |
+| La (mH) | 10 | 155 | 133 | 131.6 | 137.4 | -15.1 % | 1.4 % + meas. n/s | -11.4 % | 2.6 % + meas. n/s |
+| La (mH) | 20 | 89 | 75.5 | 69.81 | 75.62 | -21.6 % | 1.9 % + meas. n/s | -15.0 % | 4.0 % + meas. n/s |
+| Lu (mH) | 1 | 35.5 | 25.8 | 45.73 | 51.53 | +28.8 % | 22.9 % | +45.2 % | 28.3 % |
+| Lu (mH) | 10 | 40.7 | 25.8 | 46.01 | 51.81 | +13.0 % | 21.3 % | +27.3 % | 26.1 % |
+| Lu (mH) | 20 | 35.6 | 25.8 | 45.72 | 51.53 | +28.4 % | 22.9 % | +44.7 % | 28.4 % |
+| T_avg (N?m) | 1 | 0.9 | 0.8 | 0.8016 | 0.8016 | -10.9 % | 16.7 % + meas. n/s | -10.9 % | 16.7 % + meas. n/s |
+| T_avg (N?m) | 10 | 20.3 | 18.5 | 16.86 | 16.86 | -16.9 % | 3.3 % + meas. n/s | -16.9 % | 3.3 % + meas. n/s |
+| T_avg (N?m) | 20 | 41.6 | 37.8 | 29.73 | 29.73 | -28.5 % | 6.3 % + meas. n/s | -28.5 % | 6.3 % + meas. n/s |
+
+budget rows (% of measured), before / after:
+  mesh               La 0.06/0.06/0.04  Lu 0.14/0.11/0.13  T_avg 0.05/0.05/0.03
+  material           La 9.79/1.00/1.60  Lu 0.18/0.56/0.67  T_avg 9.69/0.24/1.28
+  geometry           La 3.13/0.20/0.19  Lu 10.90/9.60/10.68  T_avg 6.91/2.39/3.60
+  coil packing       La 0.16/0.14/0.03  Lu 4.81/4.21/4.63  T_avg 0.01/0.60/1.42
+  end-winding model  La 0.22/1.25/2.17  Lu 5.45/4.75/5.43  T_avg 0.00/0.00/0.00
+  measurement        Lu 6.8 % (La, T_avg: not stated)
+
+Seward 3D/2D end leakage (reference line, not a correction): La 7.5 %, Lu 35.0 %
+our end-winding share of the corrected inductance at 10 A: La 4.2 %, Lu 11.2 %

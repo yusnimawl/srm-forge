@@ -47,7 +47,7 @@ _UNIT_RANGES: dict[str, tuple[float, float]] = {
     "stator_fillet_radius": (1e-5, 0.02),
     "rotor_fillet_radius": (1e-5, 0.02),
     "slot_liner_thickness": (1e-5, 0.01),
-    "coil_inner_clearance": (1e-5, 0.02),
+    "coil_inner_clearance": (1e-5, 0.1),
 }
 _TOL = 1e-9
 

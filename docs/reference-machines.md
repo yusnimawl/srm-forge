@@ -112,8 +112,20 @@ Source: same book, Ch. 2, dimensions table preceding Table 2.3.
 poles, `src/srmcore/model/validator.py` requires min(βs, βr) ≥ 2π/(m·Nr) = 30°. This machine's stated
 βs = 0.418 rad = 24.0° < 30° (βr = 0.628 rad = 36.0° passes on its own but the rule takes the minimum), so
 building this machine's stated geometry as-is through `RadialSRMParams`/the validator raises a `self_starting`
-`InputError` — it cannot be constructed unmodified. The validator is not being changed for this; see the new
-M5 open item in spec §10 for the owner's options.
+`InputError` — it cannot be constructed unmodified. The validator is not being changed for this; M5d builds the machine
+inside `waive_rules("self_starting")` (decided 2026-09-30, spec §11).
+
+**Second source (M5d, 2026-10-05).** The same machine is documented in P. N. Materu, PhD dissertation, Virginia Tech, 1989 (chair R. Krishnan), Table 1 p. 41 and Appendix A pp. 287–288: https://vtechworks.lib.vt.edu/server/api/core/bitstreams/42cbb685-1d45-43ad-b5c4-ff568e609f1c/content . It gives measured La, Lu and T_avg (the book's Table 2.3 values) and fills several gaps. Appendix A against the book table:
+
+| Quantity | Book (Table 2.3 geometry) | Dissertation Appendix A |
+|---|---|---|
+| Bore (stator inner diameter) | 102.06 mm | 122.0 mm |
+| Back iron | 10.515 mm | 10.15 mm |
+| Shaft diameter | not given | 28.56 mm |
+| Rotor pole height | not given | 27.25 mm |
+| Core material | M19 | "E140 steel" (not identified, not in the library) |
+
+Choice (M5d spec decision 1): the book bore and back iron, with shaft and rotor pole height from the dissertation (rotor yoke derived, 9.25 mm). The book bore reproduces Materu's own 2D FEA La at 1 A (Lu does not match: 45.7 vs 25.8 mH); the dissertation bore and back iron are a sensitivity (budget) row. Material is the M19 library curve, with steel_1010 as a crude bound. The measured T_avg is computed from the measured flux linkage (Materu p. 49), not from a torque sensor. Results: `docs/m5d-krishnan-results.md`.
 
 Measured comparison data available for this machine (Table 2.3, for validation-report use, not `RadialSRMParams` fields): unaligned inductance, aligned inductance, and stroke-averaged electromagnetic torque, each given as Analytical / FEM / **Measured** at phase currents 1 A, 10 A, 20 A (measured values: 35.5/40.7/35.6 mH unaligned; 879/155/89 mH aligned; 0.90/20.30/41.60 N·m stroke-averaged torque).
 
