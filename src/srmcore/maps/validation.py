@@ -5,20 +5,37 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from importlib.metadata import version
+
 from ..fields.solution import SolveStatus
 from ..materials.laws import ReluctivityLaw, law_for_material, library_law
 from ..materials.library import load_material
+from ..mesh import build_machine_mesh
 from ..mesh.machine import mesh_at_angle
 from ..mesh.static import StaticMesh
 from ..model.design import Design, RadialSRMParams
+from ..model.errors import InputError
 from ..physics.build import machine_problem
 from ..post.quantities import arkkio_torque, flux_linkage
+from ..solvers.factory import make_solver
 from ..solvers.settings import SolverAdapter
+from .checks import Check, _upper
+from .end_winding import end_winding_inductance
+from .fem_checks import fem_checks
 from .grids import LA_CURRENT_FRACTION
 from .results import key_numbers
-from .run import MapResult
+from .run import MapResult, require_complete
 
 KEYS = ("la", "lu", "peak_torque", "psi_max")
+
+# srmcore versions whose results the validation campaign has covered; the label needs the running one in here.
+VALIDATED_VERSIONS: tuple[str, ...] = ()
+LABEL = "EM-validated"
+PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
+TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point
+JS_STEP = 0.02                    # relative change of the saturation polarisation in the material row
+GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade -> relative allowance
+END_WINDING_IMAGE = (1.0, 2.0)    # image-factor bounds of the end-winding inductance; corrected values use the midpoint
 
 
 @dataclass(frozen=True)
@@ -67,3 +84,105 @@ def point_values(static: StaticMesh, design: Design, points: Sequence[KeyPoint],
         out[p.key] = {"la": psi / p.current, "lu": psi / p.current, "psi_max": psi,
                       "peak_torque": abs(arkkio_torque(problem, sol))}[p.key]
     return out
+
+
+@dataclass(frozen=True)
+class BudgetRow:
+    source: str
+    rel: dict[str, float]     # key -> relative half-width of this source
+    note: str
+
+
+@dataclass(frozen=True)
+class UncertaintyBudget:
+    values_2d: dict[str, float]   # key numbers of the 2D map
+    values: dict[str, float]      # with the mid-range end-winding inductance added
+    rows: tuple[BudgetRow, ...]
+    total: dict[str, float]       # sum of the rows per key (worst case)
+
+
+@dataclass(frozen=True)
+class EmValidation:
+    label: str | None
+    checks: tuple[Check, ...]
+    budget: UncertaintyBudget
+    engine_version: str
+    material_grades: dict[str, str]
+
+
+def _rel(a: float, b: float) -> float:
+    return abs(a - b) / abs(b)
+
+
+def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
+                workers: int | None = None) -> EmValidation:
+    """The EM-validated checks and the uncertainty budget of a complete map. `label` is LABEL only when every
+    check passes. Solves the four key points on the full and reference meshes and at Js ± JS_STEP."""
+    require_complete(result)
+    machine = design.machine
+    points = key_points(result, machine)
+    adapter = make_solver(solver)
+    meshes, vals = {}, {}
+    for preset in ("full", "reference"):
+        d = design.model_copy(update={"mesh": design.mesh.model_copy(update={"preset": preset})})
+        meshes[preset] = build_machine_mesh(d)
+        vals[preset] = point_values(meshes[preset], d, points, result.excited, adapter)
+    own = design.mesh.preset
+    static = meshes[own] if own in meshes else build_machine_mesh(design)
+    nominal = vals[own] if own in vals else point_values(static, design, points, result.excited, adapter)
+    plus = point_values(static, design, points, result.excited, adapter, js_factor=1 + JS_STEP)
+    try:
+        minus = point_values(static, design, points, result.excited, adapter, js_factor=1 - JS_STEP)
+    except InputError:
+        minus = None
+    fem = fem_checks(design, result, solver=solver, workers=workers)
+
+    key = key_numbers(result, machine)
+    values_2d = {k: getattr(key, k) for k in KEYS}
+    mats = {"stator": machine.materials.stator, "rotor": machine.materials.rotor}
+    loaded = {part: load_material(name) for part, name in mats.items()}
+    grades = {part: m.confidence for part, m in loaded.items()}
+    worst = max(grades.values())
+
+    mesh_row = BudgetRow("mesh", {k: _rel(vals["full"][k], vals["reference"][k]) for k in KEYS},
+                         "full vs reference mesh at the key points")
+    if minus is None:
+        js = {k: _rel(plus[k], nominal[k]) for k in KEYS}
+        js_note = "Js +2 % only (B-H data exceed Js − 2 %)"
+    else:
+        js = {k: abs(plus[k] - minus[k]) / 2 / abs(nominal[k]) for k in KEYS}
+        js_note = "Js ±2 %"
+    material_row = BudgetRow("material", {k: js[k] + GRADE_ALLOWANCE[worst] for k in KEYS},
+                             f"{js_note}; B-H data grade {worst}")
+    l1, l2 = (end_winding_inductance(machine, f) for f in END_WINDING_IMAGE)
+    half, l_mid = (l2 - l1) / 2, (l1 + l2) / 2
+    values = {"la": key.la + l_mid, "lu": key.lu + l_mid, "peak_torque": key.peak_torque,
+              "psi_max": key.psi_max + l_mid * key.i_max}
+    end_row = BudgetRow("end_effect", {"la": half / values["la"], "lu": half / values["lu"], "peak_torque": 0.0,
+                                       "psi_max": half * key.i_max / values["psi_max"]},
+                        "end winding, image factor 1 to 2; iron-end 3D fringing not modelled")
+    digitisation = max(m.digitisation_error or 0.0 for m in loaded.values())
+    digitisation_row = BudgetRow("digitisation", {k: digitisation for k in KEYS}, "digitised B-H curve")
+    rows = (mesh_row, material_row, end_row, digitisation_row)
+    budget = UncertaintyBudget(values_2d, values, rows, {k: sum(r.rel[k] for r in rows) for k in KEYS})
+
+    n_filled = float(np.sum(result.filled))
+    checks = (
+        Check("engine_version", "pass" if version("srmcore") in VALIDATED_VERSIONS else "fail", float("nan"),
+              float("nan"), f"srmcore {version('srmcore')}; validated versions: "
+                            f"{', '.join(VALIDATED_VERSIONS) or 'none'}"),
+        Check("preset", "pass" if own in ("full", "reference") else "fail", float("nan"), float("nan"),
+              f"map preset {own}; the label needs full or reference"),
+        Check("no_filled_points", "fail" if n_filled else "pass", n_filled, 0.0,
+              "points replaced by interpolation after a non-converged solve"),
+        _upper("point_convergence_psi", float(np.max([mesh_row.rel[k] for k in ("la", "lu", "psi_max")])),
+               PSI_POINT_TOLERANCE, "full vs reference mesh ψ at the La, Lu and ψ_max points"),
+        _upper("point_convergence_torque", mesh_row.rel["peak_torque"], TORQUE_POINT_TOLERANCE,
+               "full vs reference mesh torque at the peak-torque point, relative to peak torque"),
+        *(fem or (Check("fem_checks", "fail", float("nan"), float("nan"),
+                        "held-out and band-radius checks run only on full and reference maps"),)),
+        Check("material_grade", "pass" if all(grades.values()) else "fail", float("nan"), float("nan"),
+              f"stator {grades['stator']}, rotor {grades['rotor']}"),
+    )
+    label = LABEL if all(c.status == "pass" for c in checks) else None
+    return EmValidation(label, checks, budget, version("srmcore"), grades)

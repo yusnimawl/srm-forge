@@ -7,7 +7,9 @@ from .overlap import OverlapResult, coupling_checks, overlap_window
 from .results import KeyNumbers
 from .run import MapResult
 from .tables import DriveTables
+from .validation import VALIDATED_VERSIONS, BudgetRow, EmValidation, UncertaintyBudget, em_validate
 
-__all__ = ["Check", "CoilGeometry", "DriveTables", "KeyNumbers", "MapReport", "MapResult", "OverlapResult",
-           "analyse_map", "build_map", "build_overlap_map", "coil_geometry", "coupling_checks", "end_winding_inductance",
+__all__ = ["BudgetRow", "Check", "CoilGeometry", "DriveTables", "EmValidation", "KeyNumbers", "MapReport",
+           "MapResult", "OverlapResult", "UncertaintyBudget", "VALIDATED_VERSIONS", "analyse_map", "build_map",
+           "build_overlap_map", "coil_geometry", "coupling_checks", "em_validate", "end_winding_inductance",
            "export_csv", "export_mat", "fem_checks", "overlap_window", "with_end_winding"]
