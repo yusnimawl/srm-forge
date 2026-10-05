@@ -41,7 +41,7 @@ Core length 60.37 mm, OD 190 mm, gap 0.25 mm, arcs 24°/36°, 536 turns/phase, A
 ## Owner decisions (2026-10-05)
 
 1. **Geometry: book bore 102.06 mm and back iron 10.515 mm; shaft 28.56 mm and rotor pole height 27.25 mm from the dissertation** (rotor yoke = 50.78 − 14.28 − 27.25 = 9.25 mm). The dissertation's bore 122.0 / back iron 10.15 mm is a sensitivity row in the uncertainty budget. Fillets and tapers 0. Built inside `waive_rules("self_starting")` (βs 24° < 30°).
-2. **Coil: packed against the yoke, bundle packing 0.5.** Copper per coil side 268 × 0.653 mm² (AWG 19 bare) = 175 mm²; coil-side area 350 mm²; `coil_inner_clearance` solved so the topology coil side has that area. Liner 0.3 mm. Packing 0.35–0.65 is an uncertainty row. `fill_factor` 0.5 (it does not change ψ or T).
+2. **Coil: packed against the yoke, bundle packing 0.5.** Copper per coil side 268 × 0.653 mm² (AWG 19 bare) = 175 mm²; coil-side area 350 mm²; `coil_inner_clearance` solved so the topology coil side has that area. Liner 0.3 mm. Packing 0.35–0.65 is an uncertainty row. The clearance comes out ≈ 21.5 mm, above the validator's `units` guard for `coil_inner_clearance` (20 mm); that guard is widened to 0.1 m (the yoke-thickness limit), still catching millimetre inputs. `fill_factor` 0.5 (it does not change ψ or T).
 3. **Material: M19 library curve (grade C)** for stator and rotor; "E140" is unidentified. Material row: the M19 vs steel_1010 spread per point, labelled a crude bound. No new library curve; new grades stay a JSON file each.
 4. **End-winding hook: analytic end-turn inductance, no calibration.** Not an axial-length factor (the right factor depends on position) and not a correction fitted to the 6/4 (circular). The 3D fringing of the iron ends stays uncorrected and is reported as the residual.
 5. **Data: Table 1 values only** (typed, no digitisation error). The figure curves are not digitised.
@@ -50,17 +50,19 @@ Core length 60.37 mm, OD 190 mm, gap 0.25 mm, arcs 24°/36°, 536 turns/phase, A
 
 ### 1. End-turn formula (`srmcore/post/end_winding.py`)
 
-`end_turn_inductance(turns, span, build, depth, image_factor=1.0) -> float` (H per coil), plain numbers in SI.
+`end_turn_inductance(turns, span, build, depth, separation, image_factor=1.0) -> float` (H per coil), plain numbers in SI.
 
-- The two end overhangs of one pole coil together form one closed loop around the pole end. They are modelled as a circular loop of mean diameter `span` (the coil's mean span across the pole), with conductor bundle of rectangular section `build × depth`.
-- L = image_factor · μ0 · N² · R · (ln(8R / g) − 2), R = span / 2, g = 0.2235 · (build + depth) (geometric mean distance of a rectangle). Thin circular loop (Rosa / Grover, *Inductance Calculations*, 1946); the implementer confirms the formula and the GMD constant from a source and cites it in the docstring.
-- `image_factor` 1 is the coil in free air (no iron image; lower bound); 2 is a coil against an infinitely permeable end face (upper bound). Default 1. The 1-to-2 spread is the "end-winding model" uncertainty row.
-- Raises `ValueError` on non-positive inputs or g ≥ R.
+- Partial-inductance method (Grover, *Inductance Calculations*, 1946; Ruehli 1972). The 2D model already holds the two straight coil sides. The two end overhangs are straight bars of length `span` (mean coil span across the pole end) and bundle section `build × depth`, carrying opposite currents, `separation` apart (stack length + build: their centre lines sit half a build outside each end face). Overhangs are perpendicular to the coil sides, so no mutual with them.
+- M(l, d) = μ0/2π · [l·ln((l + √(l² + d²))/d) − √(l² + d²) + d] (two parallel filaments of length l at distance d). Bar self inductance = M(l, g), g = 0.2235 · (build + depth) (geometric mean distance of a rectangle from itself).
+- L = image_factor · N² · 2 · (M(span, g) − M(span, separation)).
+- `image_factor` 1: coil in free air (no iron image, lower bound); 2: coil against an infinitely permeable end face (upper bound). Must be in [1, 2]. Reports use the midpoint 1.5 with the 1-to-2 half-spread as the "end-winding model" uncertainty row.
+- The thin-loop circular formula was rejected: the 6/4 bundle (about 30 × 12 mm) is as large as the loop, where ln(8R/g) − 2 ≈ 0.
+- Raises `ValueError` on non-positive lengths or turns, or `image_factor` outside [1, 2].
 
 ### 2. Machine adapter and map correction (`srmcore/maps/end_winding.py`)
 
 - `coil_geometry(machine: RadialSRMParams) -> CoilGeometry` (frozen dataclass: `area`, `depth`, `build`, `span`, m and m²): from `topology.build_outline` coil side A1+; area by shoelace over the boundary with arcs sampled finely; depth = r_out − r_in; build = area / depth; span = stator pole chord width at mid-depth + 2 · liner + build.
-- `end_winding_inductance(machine, image_factor=1.0) -> float`: H per phase = `end_turn_inductance(turns_per_pole, ...)` × poles per phase (series; mutual coupling between a phase's coils neglected, they sit on opposite sides).
+- `end_winding_inductance(machine, image_factor=1.0) -> float`: H per phase = `end_turn_inductance(turns_per_pole, span, build, depth, stack_length + build, image_factor)` × poles per phase (series; mutual coupling between a phase's coils neglected, they sit on opposite sides).
 - `with_end_winding(result: MapResult, l_end: float) -> MapResult`: ψ[..., excited] += l_end · i; energy and coenergy += ½ · l_end · i²; l_inc[..., excited] += l_end where not NaN. Torque unchanged. Pure, returns a new result.
 - The 2D FEM map, its cache key, goldens and FEMM fixtures are unchanged: the correction is never applied inside `build_map`.
 
@@ -73,7 +75,7 @@ Core length 60.37 mm, OD 190 mm, gap 0.25 mm, arcs 24°/36°, 536 turns/phase, A
 
 ### 4. Report (`examples/krishnan_6_4_check.py` → `docs/m5d-krishnan-results.md`)
 
-`PYTHONPATH=tests .venv\Scripts\python examples\krishnan_6_4_check.py` prints and writes the tables: for La, Lu, T_avg at 1/10/20 A: measured, Materu FEA, srmcore 2D, srmcore 2D + end winding, error % before and after, uncertainty ±% before and after, and the Seward 3D reference line. The doc explains: measured T_avg is derived from measured ψ; the 20 A La saturation argument; the residual end flux the hook does not model.
+`PYTHONPATH=tests .venv\Scripts\python examples\krishnan_6_4_check.py` prints and writes the tables: for La, Lu, T_avg at 1/10/20 A: measured, Materu FEA, srmcore 2D, srmcore 2D + end winding (image factor 1.5), error % before and after, uncertainty ±% before and after, and the Seward 3D reference line. The doc explains: measured T_avg is derived from measured ψ; the 20 A La saturation argument; the residual end flux the hook does not model.
 
 ### 5. TEAM 24 independent check
 
