@@ -1,4 +1,4 @@
-# M5 roadmap: M5b–M5e
+# M5 roadmap: M5b–M5e2
 
 M5 earns `srmcore` the **"EM-validated"** label (core spec §2.3, §8.2–8.6, §9). M5a (mesh convergence, presets, angle grid) is done: see `docs/m5a-results.md` and spec §11 (2026-10-03). Each remaining sub-milestone runs in its own session with the usual cycle: brainstorm → spec → plan → subagent-driven build → final review → local merge on the owner's yes.
 
@@ -8,9 +8,9 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 | Item | Needed by | Where |
 |---|---|---|
-| Speed budgets re-baseline (`full` maps now 27–68 min) | M5e (exit criterion "speed budgets met") | spec §10 [M5a→M5] |
-| Band noise in `full` (dominates held-out error; option: more band divisions) | M5c (FEMM ±2 %/±3 % comparisons), M5e | spec §10 [M5a→M5] |
-| `iron_b_peak` check definition (corner singularity, warns on the 8/6 golden) | any milestone; best before M5e | spec §10 [M5a→M5] |
+| Speed budgets re-baseline (`full` maps now 27–68 min) | M5e2 (exit criterion "speed budgets met") | spec §10 [M5a→M5] |
+| Band noise in `full` (accepted, covered by the 1.7 % held-out limit; decided 2026-10-05) | closed | spec §11 2026-10-05 |
+| `iron_b_peak` check definition (area p99.9; decided 2026-10-05) | closed | spec §11 2026-10-05 |
 | Material data: M19 / steel_1010 Js and densities are unchecked FEMM/handbook values (grade C) | M5c, M5d (uncertainty), M5e (±2 % Js check) | spec §10 [M2→M5] |
 | Outer air ring default (`outer_air_thickness` = 0 now) | M5c (FEMM boundary must match) | spec §11 2026-09-29 |
 | Search margin 1.05 revisit | after M5e | handoff 2026-10-02 |
@@ -57,19 +57,21 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 - **Done:** report table before and after the end-effect correction, each with uncertainty; hook tested; spec §11 entry.
 - **Size:** medium.
 
-## M5e: uncertainty budgets, report, label
+## M5e1: label logic and uncertainty budget (engine)
+
+**Done 2026-10-05:** spec `docs/superpowers/specs/2026-10-05-m5e1-label-budget-design.md`, decisions in core spec §11. `srmcore.maps.validation.em_validate(design, result)` returns the §8.5 checks (point convergence on `full` vs `reference`, held-out checks, no filled points, preset, material grade, engine version) and the §8.4 worst-case budget (mesh, material with the Js ±2 % check, end effect, digitisation) on the end-winding-corrected key numbers. `VALIDATED_VERSIONS` is empty, so no label is awarded yet. `b_peak` is now the area-weighted 99.9th percentile of iron |B| and the `iron_b_peak` check compares it with the last stacked B-H point (the band-noise and `iron_b_peak` owner items are closed). Example: `examples/em_validate_8_6.py`.
+
+## M5e2: library, report, validated version, CI, speed
 
 - **Goal:** close M5: the engine version is "EM-validated".
 - **Scope (spec §8.4–8.6, §9):**
-  1. Uncertainty budget per key result (La, Lu, peak torque, ψ at I_max): material grade, mesh error (M5a: `full` ψ 0.25 %, torque 0.36 %; held-out 1.7 %), end-effect correction (M5d), digitisation.
-  2. §5.2 ±2 % Js sensitivity check.
-  3. Library adds: JFE 10JNEX900, Hiperco 50A and 50HS (grade B), M43 (grade C) if not done in M5c/M5d.
-  4. Validation report (markdown + plots): engine version, pinned dependency versions and licences, every comparison (M5a–M5d) with pass/fail or error ± uncertainty.
-  5. Label logic (§8.5): `reference`-preset convergence check per design, no interpolated NONCONVERGED points, material grade recorded.
-  6. Speed budgets met on the owner's machine (after the owner re-baselines them).
-  7. All fast and slow suites green on Windows and Linux (CI).
-  8. Revisit: adaptive `reference` preset only if a design fails the uniform `reference` check.
-- **Done:** M5 definition of done in `docs/handoff-2026-10-02-m5.md` met; spec §9 M5 row marked complete; then revisit the search margin and move to v0b.
+  1. Library adds: JFE 10JNEX900, Hiperco 50A and 50HS (grade B, digitised; `digitisation_error`), M43 (grade C) if not done in M5c/M5d.
+  2. Validation report (markdown + plots): engine version, pinned dependency versions and licences, every comparison (M5a–M5d) with pass/fail or error ± uncertainty, and the `examples/em_validate_8_6.py` result.
+  3. Add the engine version to `VALIDATED_VERSIONS` once the report passes.
+  4. All fast and slow suites green on Windows and Linux (CI slow-suite runner).
+  5. Speed budgets met on the owner's machine (after the owner re-baselines them).
+  6. Revisit: adaptive `reference` preset only if a design fails the uniform `reference` point check.
+- **Done:** M5 definition of done in `docs/handoff-2026-10-02-m5.md` met; spec §9 M5 row marked complete; then revisit the search margin and move to v0b. Handoff: `docs/handoff-2026-10-05-m5e2.md`.
 
 ## After M5: visualization (noted 2026-10-04, unscheduled)
 

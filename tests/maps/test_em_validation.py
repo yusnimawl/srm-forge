@@ -173,3 +173,19 @@ def test_worse_grade_sets_the_allowance(monkeypatch):
     assert v.material_grades == {"stator": "B", "rotor": "C"}
     material = next(row for row in v.budget.rows if row.source == "material")
     assert material.rel["la"] == pytest.approx(0.01 + V.GRADE_ALLOWANCE["C"])
+
+
+@pytest.mark.slow
+def test_em_validate_end_to_end_on_the_8_6_full_mesh(tmp_path):
+    pytest.importorskip("ngsolve")
+    from srmcore.maps import build_map, em_validate
+    r = build_map(DESIGN, 20.0, n_angles=16, n_currents=6, cache_dir=tmp_path)
+    v = em_validate(DESIGN, r)
+    status = {c.name: c.status for c in v.checks}
+    assert v.label is None and status["engine_version"] == "fail"
+    for name in ("preset", "no_filled_points", "point_convergence_psi", "point_convergence_torque", "material_grade"):
+        assert status[name] == "pass", name
+    assert {"held_out_psi", "held_out_torque", "band_radius"} <= set(status)
+    for k in ("la", "lu", "peak_torque", "psi_max"):
+        assert 0 < v.budget.total[k] < 0.5 and np.isfinite(v.budget.values[k])
+    assert "+2 % only" in next(row for row in v.budget.rows if row.source == "material").note
