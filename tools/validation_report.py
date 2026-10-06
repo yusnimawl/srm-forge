@@ -36,6 +36,11 @@ def _save_plot(fig, path: Path) -> None:
     plt.close(fig)
 
 
+def _num(x, scale: float = 1, fmt: str = "g") -> str:
+    """A number cell; the producer writes null for non-finite values."""
+    return "—" if x is None else format(scale * x, fmt)
+
+
 def _pct(x: float) -> str:
     return f"{100 * x:.2f} %"
 
@@ -153,18 +158,18 @@ def em_section(data, plot_dir: Path):
     for c in data["checks"]:
         if c["name"] != "engine_version":
             statuses.append(c["status"] if c["status"] == "pass" else "fail")
-        out.append(f"| {c['name']} | {c['status']} | {c['value']} | {c['limit']} | {c['detail']} |")
+        out.append(f"| {c['name']} | {c['status']} | {_num(c['value'])} | {_num(c['limit'])} | {c['detail']} |")
     b = data["budget"]
     keys = b["keys"]
     out += ["", "Uncertainty budget (worst case, % of the corrected value):\n",
             "| Source | " + " | ".join(keys) + " |\n|---|" + "---|" * len(keys)]
-    out.append("| 2D value | " + " | ".join(f"{b['values_2d'][k]:g}" for k in keys) + " |")
-    out.append("| corrected value | " + " | ".join(f"{b['values'][k]:g}" for k in keys) + " |")
+    out.append("| 2D value | " + " | ".join(_num(b["values_2d"][k]) for k in keys) + " |")
+    out.append("| corrected value | " + " | ".join(_num(b["values"][k]) for k in keys) + " |")
     for r in b["rows"]:
-        out.append(f"| {r['source']} | " + " | ".join(f"{100 * r['rel'][k]:.2f}" for k in keys) + " |")
-    out.append("| **total** | " + " | ".join(f"**{100 * b['total'][k]:.2f}**" for k in keys) + " |")
+        out.append(f"| {r['source']} | " + " | ".join(_num(r["rel"][k], 100, ".2f") for k in keys) + " |")
+    out.append("| **total** | " + " | ".join(f"**{_num(b['total'][k], 100, '.2f')}**" for k in keys) + " |")
     fig, ax = plt.subplots(figsize=(5, 3))
-    ax.bar(keys, [100 * b["total"][k] for k in keys])
+    ax.bar(keys, [float("nan") if b["total"][k] is None else 100 * b["total"][k] for k in keys])
     ax.set_ylabel("total uncertainty (%)")
     _save_plot(fig, plot_dir / "budget.png")
     return head + "\n".join(out) + "\n\n![budget](validation/budget.png)\n", statuses

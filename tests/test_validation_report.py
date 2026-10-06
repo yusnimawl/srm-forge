@@ -75,3 +75,15 @@ def test_unset_speed_budget_is_missing(tmp_path):
     _write_inputs(tmp_path / "v", tmp_path / "m")
     (tmp_path / "v" / "speed_budgets.json").write_text(json.dumps({"screening": None, "full": None, "full_extras": None}))
     assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+
+
+def test_null_budget_values_fail_without_crashing(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    p = tmp_path / "v" / "em_validate_8_6.json"
+    data = json.loads(p.read_text())
+    none = {k: None for k in KEYS}
+    data["budget"].update(values_2d=none, total=none, rows=[{"source": "mesh", "rel": none, "note": ""}])
+    data["checks"].append({"name": "budget_finite", "status": "fail", "value": None, "limit": None, "detail": ""})
+    p.write_text(json.dumps(data))
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+    assert (tmp_path / "report.md").is_file()
