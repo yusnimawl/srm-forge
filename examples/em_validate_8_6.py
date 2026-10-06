@@ -1,10 +1,12 @@
 r"""EM-validated label checks and uncertainty budget for the 8/6 golden design on a `full` map.
 
-Usage: python examples\em_validate_8_6.py [workers]   (default grids, about 1 h)
+Usage: python examples\em_validate_8_6.py [workers] [--json PATH]   (default grids, about 1 h)
 """
+import json
 import math
 import sys
 import time
+from pathlib import Path
 
 from srmcore.maps import build_map, em_validate
 from srmcore.maps.validation import KEYS
@@ -25,8 +27,32 @@ def design_8_6() -> Design:
     return Design(machine=machine, mesh=MeshSettings(preset="full"))
 
 
+def _num(x: float) -> float | None:
+    return None if not math.isfinite(x) else float(x)
+
+
+def validation_json(v, map_s: float, validate_s: float) -> dict:
+    b = v.budget
+    return {"engine_version": v.engine_version, "label": v.label, "material_grades": dict(v.material_grades),
+            "map_s": map_s, "validate_s": validate_s,
+            "checks": [{"name": c.name, "status": c.status, "value": _num(c.value), "limit": _num(c.limit),
+                        "detail": c.detail} for c in v.checks],
+            "budget": {"keys": list(KEYS),
+                       "values_2d": {k: _num(b.values_2d[k]) for k in KEYS},
+                       "values": {k: _num(b.values[k]) for k in KEYS},
+                       "rows": [{"source": r.source, "rel": {k: _num(r.rel[k]) for k in KEYS}, "note": r.note}
+                                for r in b.rows],
+                       "total": {k: _num(b.total[k]) for k in KEYS}}}
+
+
 def main() -> None:
-    workers = int(sys.argv[1]) if len(sys.argv) > 1 else None
+    args = sys.argv[1:]
+    out_path = None
+    if "--json" in args:
+        i = args.index("--json")
+        out_path = Path(args[i + 1])
+        del args[i:i + 2]
+    workers = int(args[0]) if args else None
     design = design_8_6()
     t0 = time.perf_counter()
     result = build_map(design, 20.0, workers=workers)
@@ -48,6 +74,9 @@ def main() -> None:
     print(f"  {'2D map':14s}" + "".join(f"{b.values_2d[k]:14.5g}" for k in KEYS))
     print(f"  {'end-corrected':14s}" + "".join(f"{b.values[k]:14.5g}" for k in KEYS))
     print(f"\nlabel: {v.label}")
+    if out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(validation_json(v, t1 - t0, t2 - t1), indent=1))
 
 
 if __name__ == "__main__":

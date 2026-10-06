@@ -1,0 +1,22 @@
+name: slow
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+jobs:
+  slow:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1
+      - run: python -m pip install -e ".[dev,ngsolve]"
+      - run: python -m pytest -m slow --durations=25

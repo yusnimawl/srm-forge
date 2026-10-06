@@ -1,0 +1,171 @@
+{
+ "engine_version": "0.4.0",
+ "label": "EM-validated",
+ "material_grades": {
+  "stator": "C",
+  "rotor": "C"
+ },
+ "map_s": 1888.1058455000166,
+ "validate_s": 600.400872200029,
+ "checks": [
+  {
+   "name": "engine_version",
+   "status": "pass",
+   "value": null,
+   "limit": null,
+   "detail": "srmcore 0.4.0; validated versions: 0.4.0"
+  },
+  {
+   "name": "preset",
+   "status": "pass",
+   "value": null,
+   "limit": null,
+   "detail": "map preset full, design preset full; the label needs full or reference"
+  },
+  {
+   "name": "map_identity",
+   "status": "pass",
+   "value": null,
+   "limit": null,
+   "detail": "map design hash 3e236049813f230f, this design 3e236049813f230f"
+  },
+  {
+   "name": "no_filled_points",
+   "status": "pass",
+   "value": 0.0,
+   "limit": 0.0,
+   "detail": "points replaced by interpolation after a non-converged solve"
+  },
+  {
+   "name": "map_matches_design",
+   "status": "pass",
+   "value": 0.0,
+   "limit": 0.001,
+   "detail": "peak-torque key-point solve on the design's own mesh against the map's value at that grid point"
+  },
+  {
+   "name": "point_convergence_psi",
+   "status": "pass",
+   "value": 0.0016843559096368023,
+   "limit": 0.005,
+   "detail": "worst at lu (0.168%); full vs reference mesh \u03c8 at the La, Lu and \u03c8_max points"
+  },
+  {
+   "name": "point_convergence_torque",
+   "status": "pass",
+   "value": 0.0011348225166842585,
+   "limit": 0.01,
+   "detail": "worst at peak_torque (0.113%); full vs reference mesh torque at the peak-torque point, relative to peak torque"
+  },
+  {
+   "name": "held_out_psi",
+   "status": "pass",
+   "value": 0.0011721382822402534,
+   "limit": 0.005,
+   "detail": "FEM \u03c8 against the map interpolant at 64 held-out points, relative to \u03c8_max"
+  },
+  {
+   "name": "held_out_torque",
+   "status": "pass",
+   "value": 0.0054323542022895336,
+   "limit": 0.017,
+   "detail": "FEM torque against the map interpolant at 64 held-out points, relative to peak torque"
+  },
+  {
+   "name": "held_out_converged",
+   "status": "pass",
+   "value": 0.0,
+   "limit": 0.0,
+   "detail": "held-out solves skipped because they did not converge"
+  },
+  {
+   "name": "band_radius",
+   "status": "pass",
+   "value": 0.0015984563076446921,
+   "limit": 0.01,
+   "detail": "Arkkio torque over each air-gap layer against the band at 3 angles and I_max, relative to peak torque"
+  },
+  {
+   "name": "material_grade",
+   "status": "pass",
+   "value": null,
+   "limit": null,
+   "detail": "stator C, rotor C"
+  },
+  {
+   "name": "budget_finite",
+   "status": "pass",
+   "value": 0.0,
+   "limit": 0.0,
+   "detail": "every budget total is finite"
+  }
+ ],
+ "budget": {
+  "keys": [
+   "la",
+   "lu",
+   "peak_torque",
+   "psi_max"
+  ],
+  "values_2d": {
+   "la": 0.032869043888660104,
+   "lu": 0.0035886888099700798,
+   "peak_torque": 12.4355952259937,
+   "psi_max": 0.32030278627709863
+  },
+  "values": {
+   "la": 0.03299862319744348,
+   "lu": 0.003718268118753456,
+   "peak_torque": 12.4355952259937,
+   "psi_max": 0.32289437245276614
+  },
+  "rows": [
+   {
+    "source": "mesh",
+    "rel": {
+     "la": 0.0011764257562251422,
+     "lu": 0.0016256571639989804,
+     "peak_torque": 0.0011348225166842585,
+     "psi_max": 0.00032336738172000117
+    },
+    "note": "full vs reference mesh at the key points"
+   },
+   {
+    "source": "material",
+    "rel": {
+     "la": 0.09960731904477331,
+     "lu": 0.09651506280222694,
+     "peak_torque": 0.10003486128558485,
+     "psi_max": 0.09919762618632004
+    },
+    "note": "Js +2 % only (B-H data exceed Js \u2212 2 %); B-H data grade C"
+   },
+   {
+    "source": "end_effect",
+    "rel": {
+     "la": 0.0013089365174222935,
+     "lu": 0.01161645732591027,
+     "peak_torque": 0.0,
+     "psi_max": 0.0026753704376876737
+    },
+    "note": "end winding, image factor 1 to 2; iron-end 3D fringing not modelled"
+   },
+   {
+    "source": "digitisation",
+    "rel": {
+     "la": 0.0,
+     "lu": 0.0,
+     "peak_torque": 0.0,
+     "psi_max": 0.0
+    },
+    "note": "digitised B-H curve"
+   }
+  ],
+  "total": {
+   "la": 0.10209268131842075,
+   "lu": 0.10975717729213619,
+   "peak_torque": 0.10116968380226911,
+   "psi_max": 0.10219636400572771
+  }
+ }
+}

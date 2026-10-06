@@ -3,9 +3,11 @@ agreement, static torque, current rise, torque and rotor-pole flux against time 
 current, and the sensitivity of each to R, the voltage waveform, Js and the mesh. The output is the
 source of docs/m5b-team24-results.md.
 
-Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py
+Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--json PATH]
 """
+import json
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +18,12 @@ import team24_fixture as t24  # noqa: E402
 
 from srmcore.post.quantities import arkkio_torque, flux_linkage, virtual_work_torque  # noqa: E402
 from srmcore.solvers.skfem_reference import SkfemReference  # noqa: E402
+
+JSON_PATH = None
+if "--json" in sys.argv:
+    _i = sys.argv.index("--json")
+    JSON_PATH = Path(sys.argv[_i + 1])
+    del sys.argv[_i:_i + 2]
 
 I_FINAL, T_MEASURED = 7.41, 3.22
 skfem = SkfemReference()
@@ -92,3 +100,14 @@ for label, scale, js in [("Js 1.98", 1.0, 1.98), ("Js 2.05", 1.0, 2.05), ("mesh 
     q, r, b = static(scale, js)
     tq = arkkio_torque(q, r)
     print(f"{label:<10} T {tq:.4f} ({pct(tq, t_ark):+.3f} % vs default)  psi {flux_linkage(q, r)[0]:.5f}  B {b:.2f}")
+
+if JSON_PATH:
+    JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+    JSON_PATH.write_text(json.dumps({
+        "srmcore": version("srmcore"),
+        "static_torque": {"model": float(t_ark), "measured": T_MEASURED, "error_pct": float(pct(t_ark, T_MEASURED))},
+        "rotor_flux": {"model": float(flux), "measured": float(t24.TABLE_ROTOR_FLUX[-1]),
+                       "error_pct": float(pct(flux, t24.TABLE_ROTOR_FLUX[-1]))},
+        "current_rise_max_dev_pct": {
+            "before": float(np.abs(pct(i_model, t24.TABLE_CURRENT)[1:]).max()),
+            "after": float(np.abs(pct(i_after, t24.TABLE_CURRENT)[1:]).max())}}, indent=1))

@@ -22,13 +22,15 @@ from .checks import Check, _upper
 from .end_winding import end_winding_inductance
 from .fem_checks import fem_checks
 from .grids import LA_CURRENT_FRACTION
+from .identity import design_hash
 from .results import key_numbers
 from .run import MapResult, require_complete
 
 KEYS = ("la", "lu", "peak_torque", "psi_max")
 
-# srmcore versions whose results the validation campaign has covered; the label needs the running one in here.
-VALIDATED_VERSIONS: tuple[str, ...] = ()
+# srmcore versions whose results the validation campaign has covered (docs/validation-report.md); the label needs
+# the running one in here.
+VALIDATED_VERSIONS: tuple[str, ...] = ("0.4.0",)
 LABEL = "EM-validated"
 PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
 TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point
@@ -165,7 +167,7 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     half, l_mid = (l2 - l1) / 2, (l1 + l2) / 2
     values = {"la": key.la + l_mid, "lu": key.lu + l_mid, "peak_torque": key.peak_torque,
               "psi_max": key.psi_max + l_mid * key.i_max}
-    to_corrected = {k: values_2d[k] / values[k] for k in KEYS}
+    to_corrected = {k: values_2d[k] / values[k] if values[k] else float("nan") for k in KEYS}
 
     mesh_rel = {k: _rel(vals["full"][k], vals["reference"][k]) for k in KEYS}
     mesh_row = BudgetRow("mesh", {k: mesh_rel[k] * to_corrected[k] for k in KEYS},
@@ -189,21 +191,30 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     rows = (mesh_row, material_row, end_row, digitisation_row)
     budget = UncertaintyBudget(values_2d, values, rows, {k: sum(r.rel[k] for r in rows) for k in KEYS})
 
+    expected_hash = design_hash(design)
     n_filled = float(np.sum(result.filled))
     a, i = np.unravel_index(np.argmax(np.abs(result.torque_arkkio)), result.torque_arkkio.shape)
     t_map, t_solve = abs(float(result.torque_arkkio[a, i])), nominal["peak_torque"]
-    match = abs(t_solve - t_map) / t_map if np.isfinite(t_solve) else float("nan")
+    if t_map == 0.0:
+        match_check = Check("map_matches_design", "fail", float("nan"), MAP_MATCH_TOLERANCE,
+                            "map has zero peak torque; nothing to compare the design's solve with")
+    else:
+        match = abs(t_solve - t_map) / t_map if np.isfinite(t_solve) else float("nan")
+        match_check = _upper("map_matches_design", match, MAP_MATCH_TOLERANCE,
+                             "peak-torque key-point solve on the design's own mesh against the map's value at that grid point")
     not_finite = [k for k in KEYS if not np.isfinite(budget.total[k])]
     checks = (
         Check("engine_version", "pass" if version("srmcore") in VALIDATED_VERSIONS else "fail", float("nan"),
               float("nan"), f"srmcore {version('srmcore')}; validated versions: "
                             f"{', '.join(VALIDATED_VERSIONS) or 'none'}"),
-        Check("preset", "pass" if own in ("full", "reference") else "fail", float("nan"), float("nan"),
-              f"map preset {own}; the label needs full or reference"),
+        Check("preset", "pass" if result.preset == own and own in ("full", "reference") else "fail",
+              float("nan"), float("nan"),
+              f"map preset {result.preset or 'unknown'}, design preset {own}; the label needs full or reference"),
+        Check("map_identity", "pass" if result.design_hash == expected_hash else "fail", float("nan"), float("nan"),
+              f"map design hash {result.design_hash or 'unknown'}, this design {expected_hash}"),
         Check("no_filled_points", "fail" if n_filled else "pass", n_filled, 0.0,
               "points replaced by interpolation after a non-converged solve"),
-        _upper("map_matches_design", match, MAP_MATCH_TOLERANCE,
-               "peak-torque key-point solve on the design's own mesh against the map's value at that grid point"),
+        match_check,
         _point_check("point_convergence_psi", ("la", "lu", "psi_max"), vals, mesh_rel, PSI_POINT_TOLERANCE,
                      "full vs reference mesh ψ at the La, Lu and ψ_max points"),
         _point_check("point_convergence_torque", ("peak_torque",), vals, mesh_rel, TORQUE_POINT_TOLERANCE,

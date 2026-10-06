@@ -8,7 +8,7 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 | Item | Needed by | Where |
 |---|---|---|
-| Speed budgets re-baseline (`full` maps now 27–68 min) | M5e2 (exit criterion "speed budgets met") | spec §10 [M5a→M5] |
+| Speed budgets re-baseline (decided and measured 2026-10-06) | closed | spec §11 2026-10-05 |
 | Band noise in `full` (accepted, covered by the 1.7 % held-out limit; decided 2026-10-05) | closed | spec §11 2026-10-05 |
 | `iron_b_peak` check definition (area p99.9; decided 2026-10-05) | closed | spec §11 2026-10-05 |
 | Material data: M19 / steel_1010 Js and densities are unchecked FEMM/handbook values (grade C) | M5c, M5d (uncertainty), M5e (±2 % Js check) | spec §10 [M2→M5] |
@@ -62,6 +62,8 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 **Done 2026-10-05:** spec `docs/superpowers/specs/2026-10-05-m5e1-label-budget-design.md`, decisions in core spec §11. `srmcore.maps.validation.em_validate(design, result)` returns the §8.5 checks (point convergence on `full` vs `reference`, held-out checks, no filled points, preset, material grade, engine version) and the §8.4 worst-case budget (mesh, material with the Js ±2 % check, end effect, digitisation) on the end-winding-corrected key numbers. `VALIDATED_VERSIONS` is empty, so no label is awarded yet. `b_peak` is now the area-weighted 99.9th percentile of iron |B| and the `iron_b_peak` check compares it with the last stacked B-H point (the band-noise and `iron_b_peak` owner items are closed). Example: `examples/em_validate_8_6.py`.
 
 ## M5e2: library, report, validated version, CI, speed
+
+**Done 2026-10-06 (CI slow run on the `v0.4.0` tag pending):** spec `docs/superpowers/specs/2026-10-05-m5e2-validated-release-design.md`, report `docs/validation-report.md`. srmcore 0.4.0 is in `VALIDATED_VERSIONS`; the 8/6 `full` map earns "EM-validated". Library adds 10JNEX900 (B), Hiperco 50A (B), Hiperco 50HS 720/740/760 °C (C), M43 (C). Speed budgets re-baselined: `screening` < 430 s, `full` < 44 min, `full` extras < 31 min. Slow suite locally 52 passed in 38 min (peak 5.1 GB per process).
 
 - **Goal:** close M5: the engine version is "EM-validated".
 - **Scope (spec §8.4–8.6, §9):**

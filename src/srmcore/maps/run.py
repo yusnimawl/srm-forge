@@ -17,6 +17,7 @@ from ..model.design import Design
 from ..model.errors import MapFailed
 from ..solvers.factory import make_solver
 from .grids import LA_CURRENT_FRACTION, aligned_angle
+from .identity import design_hash
 from .point import solve_point
 from .pool import map_ordered
 
@@ -32,7 +33,8 @@ _FIELDS = ("psi", "torque_arkkio", "torque_virtual_work", "energy", "coenergy", 
 class MapResult:
     """ψ and torque of a design with `excited` carrying the current and the other circuits open; ψ holds
     every circuit's flux linkage. `status` uses the STATUS_* codes; `filled` marks points replaced by
-    interpolation; unrun points (cancelled map) are STATUS_NOT_RUN with NaN data."""
+    interpolation; unrun points (cancelled map) are STATUS_NOT_RUN with NaN data. `design_hash` and `preset`
+    identify the design the map was solved for."""
     angles: np.ndarray                 # rad, θ = 0 aligned
     currents: np.ndarray               # A in the excited circuit
     circuits: tuple[str, ...]
@@ -49,6 +51,8 @@ class MapResult:
     status: np.ndarray
     filled: np.ndarray
     complete: bool
+    design_hash: str = ""              # maps.identity.design_hash of the design solved; "" when unknown
+    preset: str = ""                   # the design's mesh preset; "" when unknown
 
 
 def require_complete(result: MapResult) -> None:
@@ -145,7 +149,8 @@ def run_map(static, design: Design, angles: np.ndarray, currents: np.ndarray, so
     complete = all(row is not None for row in rows)
     result = MapResult(np.asarray(angles, float), np.asarray(currents, float), circuits, excited,
                        **data, iterations=iterations, status=status,
-                       filled=np.zeros((n_a, n_i), dtype=bool), complete=complete)
+                       filled=np.zeros((n_a, n_i), dtype=bool), complete=complete,
+                       design_hash=design_hash(design), preset=design.mesh.preset)
     if not complete:
         return result
     # A map angle is on the band grid, so the aligned angle counts within half a band pitch.

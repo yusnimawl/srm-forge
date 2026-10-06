@@ -1,3 +1,4 @@
+import dataclasses
 import math
 
 import numpy as np
@@ -60,6 +61,11 @@ def test_with_end_winding_shifts_excited_column(excited):
     assert np.isnan(c.l_inc[0, 1, k]) and c.l_inc[1, 1, k] == pytest.approx(1e-3 + l_end)
     assert np.array_equal(c.torque_arkkio, m.torque_arkkio)
     assert np.array_equal(m.psi[..., k], synthetic_map(excited=excited).psi[..., k])   # input untouched
+
+
+def test_with_end_winding_drops_the_design_identity():
+    m = dataclasses.replace(synthetic_map(), design_hash="abc123")
+    assert with_end_winding(m, 1e-4).design_hash == ""
 
 
 def test_with_end_winding_rejects_negative():

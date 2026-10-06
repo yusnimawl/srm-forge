@@ -73,4 +73,6 @@ def with_end_winding(result: MapResult, l_end: float) -> MapResult:
     l_inc = result.l_inc.copy()
     l_inc[..., k] += l_end
     w = 0.5 * l_end * i**2
-    return dataclasses.replace(result, psi=psi, l_inc=l_inc, energy=result.energy + w, coenergy=result.coenergy + w)
+    # The corrected map is no longer the 2D map of the design, so it carries no design identity.
+    return dataclasses.replace(result, psi=psi, l_inc=l_inc, energy=result.energy + w, coenergy=result.coenergy + w,
+                               design_hash="")
