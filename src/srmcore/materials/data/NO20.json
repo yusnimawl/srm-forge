@@ -1,0 +1,27 @@
+{
+  "kind": "soft_magnetic",
+  "name": "NO20",
+  "grade": "NO20",
+  "variant": "Cogent thin non-oriented, 0.20 mm, fully processed, as sheared",
+  "thickness": 0.0002,
+  "provenance": {
+    "source": "Cogent brochure 'Electrical Steel Thin Non Oriented' (NO12 / NO18 / NO20, Cogent Power, Corus/SSAB era), docs/sources/materials/cogent_thin_non_oriented_NO12_NO18_NO20.pdf, pp. 6-7 'Typical magnetization curve (D.C.)': H at J = 0.1 ... 1.8 T, one table for NO12/18/20. Stored as B = J + mu0 H. 25 cm Epstein frame, IEC 60404-4 DC permeameter, half the strips rolling direction and half transverse, as sheared, not aged or stress-relief annealed. Typical, not guaranteed. The current Tata Steel Hi-Lite NO20-1200H datasheet was not reachable for download.",
+    "page": "6-7",
+    "method": "Epstein, IEC 60404-4 DC",
+    "annealed": false,
+    "typical": true
+  },
+  "confidence": "B",
+  "bh": {
+    "h": [25.0, 32.0, 39.0, 44.0, 51.0, 57.0, 64.0, 73.0, 84.0, 99.0, 124.0, 160.0, 248.0, 470.0, 1290.0, 3550.0, 7070.0, 13000.0],
+    "b": [0.10003, 0.20004, 0.30005, 0.40006, 0.50006, 0.60007, 0.70008, 0.80009, 0.90011, 1.00012, 1.10016, 1.2002, 1.30031, 1.40059, 1.50162, 1.60446, 1.70888, 1.81634]
+  },
+  "stacking_factor": 0.95,
+  "stacking_factor_source": "PROVISIONAL: the Cogent brochure gives no stacking factor; 0.95 is a placeholder until the supplier states one",
+  "saturation_polarisation": 2.0,
+  "saturation_polarisation_source": "PROVISIONAL: typical value for Fe-3%Si-0.4%Al non-oriented steel (brochure composition Si 3.0 %, Al 0.4 %); the brochure states no Js",
+  "density": 7650.0,
+  "density_source": "Cogent brochure p. 3: density 7.65 g/cm3",
+  "digitisation_error": 0.005,
+  "provisional_fields": ["stacking_factor", "saturation_polarisation"]
+}

@@ -30,6 +30,9 @@
 | Hiperco50HS_760C | C | 2.4 T | 0.95 | — | stacking_factor | Carpenter Electrification datasheet Hiperco 50 HS (E198, v05-20) p. 4 typical DC |
 | M19 | C | 2.03 T | 0.98 | — | saturation_polarisation, density | FEMM 4.2 material library matlib.dat (github.com/cenit/FEMM, bin/matlib.dat), bl |
 | M43 | C | 2.03 T | 0.98 | — | saturation_polarisation, density | FEMM 4.2 material library matlib.dat, block "M-43 Steel" (47 BH points, 45 used; |
+| NO20 | B | 2 T | 0.95 | 0.50 % | stacking_factor, saturation_polarisation | Cogent brochure 'Electrical Steel Thin Non Oriented' (NO12 / NO18 / NO20, Cogent |
+| Vacoflux48 | B | 2.3 T | 0.95 | 1.00 % | stacking_factor | VAC 'Soft magnetic cobalt-iron alloys VACOFLUX and VACODUR' (edition 2021), docs |
+| Vacoflux50 | C | 2.3 T | 0.95 | — | stacking_factor | VAC 'Soft magnetic cobalt-iron alloys VACOFLUX and VACODUR' (edition 2021), docs |
 | steel_1010 | C | 2.1 T | 1 | — | saturation_polarisation, density | FEMM 4.2 material library matlib.dat (github.com/cenit/FEMM, bin/matlib.dat), bl |
 
 ## M5a mesh convergence

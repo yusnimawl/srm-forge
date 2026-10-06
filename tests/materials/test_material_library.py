@@ -117,3 +117,13 @@ def test_digitisation_error_is_optional_and_bounded():
     for bad in (-0.01, 0.5):
         with pytest.raises(ValidationError):
             SoftMagneticMaterial.model_validate({**data, "digitisation_error": bad})
+
+
+def test_no20_and_vacoflux_records():
+    no20 = load_material("NO20")
+    assert (no20.confidence, no20.thickness, len(no20.bh.h)) == ("B", 0.0002, 18)
+    assert no20.bh.h[-1] == 13000.0 and no20.bh.b[-1] == pytest.approx(1.8 + 4e-7 * np.pi * 13000.0, abs=1e-5)
+    v48, v50 = load_material("Vacoflux48"), load_material("Vacoflux50")
+    assert (v48.confidence, v48.digitisation_error, v48.bh.h[-1]) == ("B", 0.01, 8000.0)
+    assert (v50.confidence, v50.bh.h) == ("C", (300.0, 800.0, 1600.0, 4000.0, 8000.0, 16000.0))
+    assert v48.saturation_polarisation == v50.saturation_polarisation == 2.30

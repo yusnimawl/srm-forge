@@ -1,0 +1,27 @@
+{
+  "kind": "soft_magnetic",
+  "name": "Vacoflux50",
+  "grade": "VACOFLUX 50",
+  "variant": "0.35 mm strip, magnetic final anneal (820 C, 4 h, hydrogen)",
+  "thickness": 0.00035,
+  "provenance": {
+    "source": "VAC 'Soft magnetic cobalt-iron alloys VACOFLUX and VACODUR' (edition 2021), docs/sources/materials/vac_cobalt_iron_alloys_vacoflux_vacodur_2021.pdf, p. 8: DC table for 0.35 mm strip after magnetic final annealing, 300-16000 A/m. Grade C: no data below 300 A/m (the brochure plots no VACOFLUX 50 curve), so the curve below 300 A/m is the B-H pipeline's interpolation from the origin.",
+    "page": "8",
+    "method": "IEC 60404-4/-6, DC",
+    "annealed": true,
+    "anneal_recipe": "820 C, 4 h, hydrogen, cooling 100-200 K/h (VAC brochure p. 15)",
+    "typical": true
+  },
+  "confidence": "C",
+  "bh": {
+    "h": [300.0, 800.0, 1600.0, 4000.0, 8000.0, 16000.0],
+    "b": [1.90, 2.10, 2.20, 2.255, 2.28, 2.30]
+  },
+  "stacking_factor": 0.95,
+  "stacking_factor_source": "PROVISIONAL: the VAC brochure gives no stacking factor; 0.95 is a placeholder until the supplier states one",
+  "saturation_polarisation": 2.30,
+  "saturation_polarisation_source": "VAC brochure p. 5/8: VACOFLUX 48/50 Js 2.30 T",
+  "density": 8120.0,
+  "density_source": "VAC brochure p. 12: 8.12 g/cm3",
+  "provisional_fields": ["stacking_factor"]
+}

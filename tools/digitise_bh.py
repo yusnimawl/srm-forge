@@ -2,6 +2,7 @@ r"""Reproduce the traced B-H points of the library records that come from publis
 
   10JNEX900  : dashed curve of JFE Technical Report 21 p. 46 Fig. 1, traced from an 800 dpi render
   Hiperco50A : low-field nodes of the H50A curve on p. 4 of Carpenter E199, read from the PDF vector path
+  Vacoflux48 : low-field nodes of the VACOFLUX 48 curve on p. 8 of the VAC CoFe brochure, read from the vector path
 
 Usage: python tools\digitise_bh.py   (needs the dev extra: PyMuPDF)
 """
@@ -67,5 +68,20 @@ def hiperco_50a_low_field() -> tuple[list[float], list[float]]:
     raise RuntimeError("H50A curve not found on p. 4")
 
 
+def vacoflux_48_low_field() -> tuple[list[float], list[float]]:
+    """Nodes of the VACOFLUX 48 curve (purple) in Figure 1, p. 8 of the VAC CoFe brochure, between 9 and 300 A/m.
+    Axis from the tick-label centres: 0-1600 A/m at x = 86.6-405.3 pt, 0-2.5 T at y = 579.9-383.0 pt."""
+    page = pymupdf.open(SOURCES / "vac_cobalt_iron_alloys_vacoflux_vacodur_2021.pdf")[7]
+    for d in page.get_drawings():
+        c = d.get("color")
+        if c and len(d["items"]) > 5 and abs(c[0] - 0.549) < 0.01 and abs(c[1] - 0.478) < 0.01:
+            nodes = sorted({(p.x, p.y) for it in d["items"] for p in (it[1], it[-1])})
+            pts = [((x - 86.6) / (405.3 - 86.6) * 1600, (579.9 - y) / (579.9 - 383.0) * 2.5) for x, y in nodes]
+            pts = [(h, b) for h, b in pts if 9 <= h < 300]
+            return [round(h, 1) for h, _ in pts], [round(b, 3) for _, b in pts]
+    raise RuntimeError("VACOFLUX 48 curve not found on p. 8")
+
+
 if __name__ == "__main__":
-    print(json.dumps({"10JNEX900": jnex_dc_curve(), "Hiperco50A_low_field": hiperco_50a_low_field()}, indent=1))
+    print(json.dumps({"10JNEX900": jnex_dc_curve(), "Hiperco50A_low_field": hiperco_50a_low_field(),
+                      "Vacoflux48_low_field": vacoflux_48_low_field()}, indent=1))
