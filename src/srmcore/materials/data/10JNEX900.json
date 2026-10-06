@@ -1,0 +1,27 @@
+{
+  "kind": "soft_magnetic",
+  "name": "10JNEX900",
+  "grade": "10JNEX900",
+  "variant": "JFE Super Core JNEX, 6.5 % Si, as-sheared",
+  "thickness": 0.0001,
+  "provenance": {
+    "source": "JFE Technical Report No. 21 (Mar. 2016) p. 46, Fig. 1 'Direct current magnetization curve', dashed 10JNEX900 curve, pixel-traced with tools/digitise_bh.py from docs/sources/materials/jfe_technical_report_21_p46_jnsf.pdf; 32 points log-spaced from 8 A/m to 20 kA/m (the traced curve above 20 kA/m is flatter than mu0 and is left to the saturation tail). Reads 2 % below the JFE catalogue table (B8 1.261 vs 1.29 T, B25 1.375 vs 1.40 T; f1e-002 p. 4); the 50 Hz catalogue curve (f2e-001 p. 9, 0.5-1.4 T) agrees to 0.0007 T on average.",
+    "page": "46",
+    "date": "2016-03",
+    "method": "DC magnetization curve (published figure)",
+    "typical": true
+  },
+  "confidence": "B",
+  "bh": {
+    "h": [8.0, 10.3, 13.25, 17.06, 21.96, 28.26, 36.37, 46.81, 60.25, 77.55, 99.82, 128.47, 165.36, 212.83, 273.93, 352.58, 453.8, 584.09, 751.77, 967.61, 1245.4, 1602.95, 2063.15, 2655.48, 3417.85, 4399.1, 5662.07, 7287.63, 9379.88, 12072.8, 15538.86, 20000.0],
+    "b": [0.0506, 0.0837, 0.1516, 0.2919, 0.5077, 0.7685, 0.9027, 0.9995, 1.0572, 1.0964, 1.1258, 1.1458, 1.1652, 1.1822, 1.1961, 1.2102, 1.2245, 1.2389, 1.2565, 1.2749, 1.2941, 1.3181, 1.3457, 1.3847, 1.4222, 1.4696, 1.5228, 1.5777, 1.6383, 1.6896, 1.7392, 1.7664]
+  },
+  "stacking_factor": 0.90,
+  "stacking_factor_source": "JFE catalogue f1e-002, product dimensions table: space factor 90 % or more (guaranteed minimum used)",
+  "saturation_polarisation": 1.80,
+  "saturation_polarisation_source": "JFE catalogue f1e-002 p. 4, sample characteristics table, saturation magnetization 1.80 T",
+  "density": 7490.0,
+  "density_source": "JFE catalogue f1e-002, product dimensions table, 7.49 g/cm3",
+  "digitisation_error": 0.025,
+  "provisional_fields": []
+}

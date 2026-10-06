@@ -1,0 +1,27 @@
+{
+  "kind": "soft_magnetic",
+  "name": "Hiperco50A",
+  "grade": "Hiperco 50A",
+  "variant": "0.014 in (0.355 mm) strip, standard magnetic anneal",
+  "thickness": 0.000355,
+  "provenance": {
+    "source": "Carpenter Electrification datasheet Hiperco 50A (E199, v05-20), docs/sources/materials/carpenter_hiperco_50a_E199.pdf: p. 3 DC properties table, 0.014 in strip, standard magnetic anneal (400-16000 A/m); below 400 A/m the four nodes of the p. 4 'Low field DC B v H' H50A curve, read exactly from the PDF vector path with tools/digitise_bh.py (the chart's axis says kA/m but the table shows it is A/m). Chart and table agree within 1.5 %.",
+    "method": "ASTM A596 ring, DC",
+    "annealed": true,
+    "anneal_recipe": "Carpenter standard magnetic anneal",
+    "typical": true
+  },
+  "confidence": "B",
+  "bh": {
+    "h": [20.72, 36.52, 51.85, 99.85, 400.0, 800.0, 1600.0, 4000.0, 8000.0, 16000.0],
+    "b": [0.128, 0.766, 1.418, 1.768, 2.12, 2.19, 2.23, 2.27, 2.28, 2.30]
+  },
+  "stacking_factor": 0.95,
+  "stacking_factor_source": "PROVISIONAL: the Carpenter datasheet gives no stacking factor; 0.95 is a placeholder until the lamination supplier states one",
+  "saturation_polarisation": 2.40,
+  "saturation_polarisation_source": "Carpenter E199 p. 1: magnetic saturation 24 kilogauss",
+  "density": 8110.0,
+  "density_source": "Carpenter E199 p. 2: 8.11 g/cm3",
+  "digitisation_error": 0.015,
+  "provisional_fields": ["stacking_factor"]
+}

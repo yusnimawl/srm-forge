@@ -1,0 +1,26 @@
+{
+  "kind": "soft_magnetic",
+  "name": "Hiperco50HS_760C",
+  "grade": "Hiperco 50HS",
+  "variant": "annealed 760 C / 4 h, yield 73 ksi (503 MPa)",
+  "thickness": 0.000152,
+  "provenance": {
+    "source": "Carpenter Electrification datasheet Hiperco 50 HS (E198, v05-20) p. 4 typical DC table, docs/sources/materials/carpenter_hiperco_50hs_E198.pdf. Grade C: no data below 800 A/m, so the curve below 800 A/m is the B-H pipeline's interpolation from the origin; no unannealed state (cold-rolled 50HS must be annealed, Carpenter: 704-760 C, before it is magnetically usable).",
+    "method": "ASTM A596 ring, DC",
+    "annealed": true,
+    "anneal_recipe": "760 C (1400 F) 4 h, dry hydrogen, cool 100 C/h",
+    "typical": true
+  },
+  "confidence": "C",
+  "bh": {
+    "h": [800.0, 1600.0, 4000.0, 8000.0, 16000.0],
+    "b": [1.93, 2.07, 2.19, 2.23, 2.30]
+  },
+  "stacking_factor": 0.95,
+  "stacking_factor_source": "PROVISIONAL: the Carpenter datasheet gives no stacking factor; 0.95 is a placeholder until the lamination supplier states one",
+  "saturation_polarisation": 2.40,
+  "saturation_polarisation_source": "Carpenter E198 p. 1: magnetic saturation 24 kilogauss",
+  "density": 8110.0,
+  "density_source": "Carpenter E198 p. 2: 8.11 g/cm3",
+  "provisional_fields": ["stacking_factor"]
+}

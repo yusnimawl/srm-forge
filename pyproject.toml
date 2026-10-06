@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "hypothesis>=6.100"]
+dev = ["pytest>=8.0", "hypothesis>=6.100", "pymupdf>=1.24"]
 ngsolve = ["ngsolve>=6.2.2601"]
 
 [tool.hatch.build.targets.wheel]
