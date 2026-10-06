@@ -1,0 +1,62 @@
+{
+  "kind": "soft_magnetic",
+  "name": "NO20_1200H",
+  "grade": "NO20-1200H",
+  "variant": "Tata Steel / Surahammars Hi-Lite NO20-1200H, 0.2 mm, fully processed",
+  "thickness": 0.0002,
+  "provenance": {
+    "source": "Tata Steel Hi-Lite datasheet NO20-1200H (Mar 2019), docs/sources/materials/tata_hi-lite_no20-1200h.pdf, p. 2 'Typical peak magnetic polarisation (magnetisation curve)', 50 Hz column (the 50, 100 and 200 Hz columns agree to 0.01-0.02 T at these thicknesses, so 50 Hz stands in for DC). Stored as B = J + mu0 H. Typical, not guaranteed; guaranteed minima on p. 1 (J at 2500/5000/10000 A/m).",
+    "page": "2",
+    "method": "Epstein, 50 Hz peak magnetisation curve",
+    "annealed": false,
+    "typical": true
+  },
+  "confidence": "B",
+  "bh": {
+    "h": [
+      20.0,
+      30.0,
+      50.0,
+      70.0,
+      100.0,
+      150.0,
+      200.0,
+      400.0,
+      800.0,
+      1500.0,
+      2500.0,
+      5000.0,
+      7500.0,
+      10000.0,
+      20000.0
+    ],
+    "b": [
+      0.07603,
+      0.19004,
+      0.59006,
+      0.84009,
+      1.04013,
+      1.19019,
+      1.26025,
+      1.3605,
+      1.43101,
+      1.49188,
+      1.55314,
+      1.64628,
+      1.71942,
+      1.77257,
+      1.90513
+    ]
+  },
+  "stacking_factor": 0.95,
+  "stacking_factor_source": "PROVISIONAL: the Hi-Lite datasheet gives no stacking factor; 0.95 is a placeholder until the supplier states one",
+  "saturation_polarisation": 2.0,
+  "saturation_polarisation_source": "PROVISIONAL: typical value for high-silicon non-oriented steel (resistivity 59 uOhm cm); the datasheet states no Js",
+  "density": 7600.0,
+  "density_source": "Hi-Lite datasheet NO20-1200H p. 1: density (assumed) 7.60 kg/dm3",
+  "digitisation_error": 0.005,
+  "provisional_fields": [
+    "stacking_factor",
+    "saturation_polarisation"
+  ]
+}
