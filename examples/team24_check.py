@@ -7,6 +7,7 @@ Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--jso
 """
 import json
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -103,6 +104,7 @@ for label, scale, js in [("Js 1.98", 1.0, 1.98), ("Js 2.05", 1.0, 2.05), ("mesh 
 if JSON_PATH:
     JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
     JSON_PATH.write_text(json.dumps({
+        "srmcore": version("srmcore"),
         "static_torque": {"model": float(t_ark), "measured": T_MEASURED, "error_pct": float(pct(t_ark, T_MEASURED))},
         "rotor_flux": {"model": float(flux), "measured": float(t24.TABLE_ROTOR_FLUX[-1]),
                        "error_pct": float(pct(flux, t24.TABLE_ROTOR_FLUX[-1]))},

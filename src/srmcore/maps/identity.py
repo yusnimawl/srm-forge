@@ -9,10 +9,15 @@ from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 
 
+def material_digest(raw: bytes) -> str:
+    """Digest of a material record's content; line endings and key order do not matter."""
+    return hashlib.sha256(json.dumps(json.loads(raw), sort_keys=True).encode()).hexdigest()
+
+
 def design_parts(design: Design) -> dict:
     mesh_resolved = json.loads(json.dumps(dataclasses.asdict(resolve_mesh_settings(design.machine, design.mesh))))
     names = sorted(set(design.machine.materials.model_dump().values()))
-    materials = {n: hashlib.sha256((library._data_dir() / f"{n}.json").read_bytes()).hexdigest() for n in names}
+    materials = {n: material_digest((library._data_dir() / f"{n}.json").read_bytes()) for n in names}
     return {"design": json.loads(design.to_json()), "mesh_resolved": mesh_resolved, "materials": materials}
 
 

@@ -1,8 +1,14 @@
 from conftest import make_8_6
-from srmcore.maps.identity import design_hash
+from srmcore.maps.identity import design_hash, material_digest
 from srmcore.model.design import Design, MeshSettings, RegionMaterials
 
 D = Design(machine=make_8_6(), mesh=MeshSettings(preset="full"))
+
+
+def test_material_digest_ignores_line_endings():
+    lf = b'{\n  "a": 1,\n  "b": [1, 2]\n}\n'
+    assert material_digest(lf) == material_digest(lf.replace(b"\n", b"\r\n"))
+    assert material_digest(lf) != material_digest(b'{"a": 2, "b": [1, 2]}')
 
 
 def test_design_hash_is_stable_and_short():

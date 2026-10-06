@@ -5,6 +5,7 @@ Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python -u exam
 """
 import json
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -74,7 +75,7 @@ def main():
           f"La {100 * l_mid / after['La'][1]:.1f} %, Lu {100 * l_mid / after['Lu'][1]:.1f} %")
     if out_path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps({"rows": rows}, indent=1))
+        out_path.write_text(json.dumps({"srmcore": version("srmcore"), "rows": rows}, indent=1))
 
 
 if __name__ == "__main__":

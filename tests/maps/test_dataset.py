@@ -109,7 +109,7 @@ def test_material_file_change_changes_hash(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "_data_dir", lambda: tmp_path)
     assert dataset.provenance_hash(_prov()) == base
     m19 = tmp_path / "M19.json"
-    m19.write_bytes(m19.read_bytes() + b" ")
+    m19.write_bytes(m19.read_bytes().replace(b'"name"', b'"nome"', 1))
     assert dataset.provenance_hash(_prov()) != base
 
 

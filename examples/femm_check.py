@@ -5,6 +5,7 @@ Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python example
 import json
 import math
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import femm_machines as fm
@@ -62,4 +63,4 @@ if __name__ == "__main__":
                          "worst_t_peak": float(worst["t_peak"]), "ratio": float(worst["ratio"])}
     if out_path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(summary, indent=1))
+        out_path.write_text(json.dumps({"srmcore": version("srmcore"), **summary}, indent=1))

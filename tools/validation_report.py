@@ -20,7 +20,8 @@ from srmcore.materials.schema import SoftMagneticMaterial  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 DEPENDENCIES = ("numpy", "scipy", "gmsh", "scikit-fem", "ngsolve", "netgen-mesher", "h5py", "pydantic", "matplotlib")
 STATUS_CELL = {"pass": "pass", "fail": "**FAIL**", "missing": "**missing**", "pending": "pending"}
-NOT_RUN = "not run (input file missing)\n"
+SPEED_ITEMS = ("screening", "full", "full_extras")
+NOT_RUN ="not run (input file missing)\n"
 
 
 def _load(path: Path):
@@ -45,13 +46,31 @@ def _pct(x: float) -> str:
     return f"{100 * x:.2f} %"
 
 
+def _is_stale(found) -> bool:
+    """True when the evidence was produced by another srmcore than the installed one."""
+    return found != version("srmcore")
+
+
+def _stale_cell(found) -> str:
+    return f"**stale ({found})**"
+
+
+def licence(md) -> str:
+    """The licence of a package from its metadata: expression, else classifiers, else a short License line."""
+    if md.get("License-Expression"):
+        return md["License-Expression"]
+    classifiers = [c.split("::")[-1].strip() for c in (md.get_all("Classifier") or []) if c.startswith("License ::")]
+    if classifiers:
+        return " / ".join(classifiers)
+    text = (md.get("License") or "").strip()
+    return text if text and "\n" not in text and len(text) <= 40 else "not stated"
+
+
 def engine_section():
     rows = []
     for dist in ("srmcore", *DEPENDENCIES):
         try:
-            md = metadata(dist)
-            lic = md.get("License-Expression") or md.get("License") or "see package"
-            rows.append(f"| {dist} | {version(dist)} | {lic.splitlines()[0][:60]} |")
+            rows.append(f"| {dist} | {version(dist)} | {licence(metadata(dist))} |")
         except PackageNotFoundError:
             rows.append(f"| {dist} | not installed | |")
     return "## Engine\n\n| Package | Version | Licence |\n|---|---|---|\n" + "\n".join(rows) + "\n", []
@@ -71,7 +90,7 @@ def material_section():
     return "## Material library\n\n" + head + "\n".join(rows) + "\n", []
 
 
-def m5a_section(m5a_dir: Path):
+def m5a_section(m5a_dir: Path, out_md: Path):
     path = m5a_dir / "heldout.jsonl"
     rows = []
     if path.is_file():
@@ -79,6 +98,8 @@ def m5a_section(m5a_dir: Path):
         rows = [r for r in map(json.loads, lines) if r["n_samples"] == 64]
     if not rows:
         return "## M5a mesh convergence\n\nheld-out limits: **missing** (no 64-sample rows)\n", ["missing"]
+    plots = [f"![{p.stem}]({m5a_dir.relative_to(out_md.parent, walk_up=True).as_posix()}/{p.name})"
+             for p in (m5a_dir / f"convergence_{d}.png" for d in ("8_6", "12_8", "24_16")) if p.is_file()]
     out = [f"Limits: psi {_pct(PSI_TOLERANCE)}, torque {_pct(TORQUE_TOLERANCE)}, band radius {_pct(BAND_RADIUS_TOLERANCE)}.\n",
            "| Design | psi | torque | band radius | Status |\n|---|---|---|---|---|"]
     statuses = []
@@ -89,13 +110,14 @@ def m5a_section(m5a_dir: Path):
         statuses.append(s)
         out.append(f"| {r['design']} | {_pct(r['held_out_psi'])} | {_pct(r['held_out_torque'])} | "
                    f"{_pct(r['band_radius'])} | {STATUS_CELL[s]} |")
-    return "## M5a mesh convergence\n\n" + "\n".join(out) + "\n", statuses
+    return "## M5a mesh convergence\n\n" + "\n".join(out) + "\n\n" + "\n\n".join(plots) + "\n", statuses
 
 
 def team24_section(data):
     head = "## M5b TEAM 24\n\nReport only (not gated).\n\n"
     if data is None:
         return head + NOT_RUN, []
+    head += f"srmcore {data.get('srmcore', 'unknown')}.\n\n"
     rows = ["| Quantity | Model | Measured | Error |\n|---|---|---|---|"]
     for key in ("static_torque", "rotor_flux"):
         d = data[key]
@@ -109,6 +131,7 @@ def krishnan_section(data, plot_dir: Path):
     head = "## M5d Krishnan 6/4\n\nReport only (not gated).\n\n"
     if data is None:
         return head + NOT_RUN, []
+    head += f"srmcore {data.get('srmcore', 'unknown')}.\n\n"
     rows = ["| Quantity | Current | Measured | 2D model | With end winding | Error 2D | Error corrected | "
             "Uncertainty |\n|---|---|---|---|---|---|---|---|"]
     labels = []
@@ -132,15 +155,21 @@ def femm_section(data, plot_dir: Path):
     head = "## M5c FEMM\n\nGate: ratio of the worst error to its limit is at most 1.\n\n"
     if data is None:
         return head + "**missing**\n", ["missing"]
-    rows = ["| Machine | worst psi | worst torque (rel) | worst torque (of peak) | Ratio | Status |\n|---|---|---|---|---|---|"]
-    statuses = []
-    for name, d in data.items():
+    found = data.get("srmcore")
+    machines = {k: v for k, v in data.items() if k != "srmcore"}
+    if not machines:
+        return head + "**missing** (no machines)\n", ["missing"]
+    stale = _is_stale(found)
+    rows = [f"srmcore {found}.\n",
+            "| Machine | worst psi | worst torque (rel) | worst torque (of peak) | Ratio | Status |\n|---|---|---|---|---|---|"]
+    statuses = ["stale"] if stale else []
+    for name, d in machines.items():
         s = "pass" if d["ratio"] <= 1 else "fail"
         statuses.append(s)
         rows.append(f"| {name} | {_pct(d['worst_psi'])} | {_pct(d['worst_t_rel'])} | {_pct(d['worst_t_peak'])} | "
-                    f"{d['ratio']:.3f} | {STATUS_CELL[s]} |")
+                    f"{d['ratio']:.3f} | {_stale_cell(found) if stale else STATUS_CELL[s]} |")
     fig, ax = plt.subplots(figsize=(5, 3))
-    ax.bar(list(data), [d["ratio"] for d in data.values()])
+    ax.bar(list(machines), [d["ratio"] for d in machines.values()])
     ax.axhline(1.0, color="k", linestyle="--")
     ax.set_ylabel("worst error / limit")
     _save_plot(fig, plot_dir / "femm.png")
@@ -158,6 +187,10 @@ def em_section(data, plot_dir: Path):
     for c in data["checks"]:
         if c["name"] != "engine_version":
             statuses.append(c["status"] if c["status"] == "pass" else "fail")
+    statuses = statuses or ["missing"]
+    if _is_stale(data["engine_version"]):
+        statuses.append("stale")
+        out.insert(0, f"**stale ({data['engine_version']})**: the installed srmcore is {version('srmcore')}.\n")
         out.append(f"| {c['name']} | {c['status']} | {_num(c['value'])} | {_num(c['limit'])} | {c['detail']} |")
     b = data["budget"]
     keys = b["keys"]
@@ -182,12 +215,20 @@ def speed_section(data, budgets):
     out = [f"srmcore {data['srmcore']}, {data['cpu']}, {data['logical_cpus']} logical CPUs, {data['workers']} workers, "
            f"{data['date']}.\n", "| Design | Item | Seconds | Budget | Status |\n|---|---|---|---|---|"]
     statuses = []
+    stale = _is_stale(data["srmcore"])
     for r in data["runs"]:
         budget = budgets.get(r["item"])
         s = "missing" if budget is None else ("pass" if r["seconds"] <= budget else "fail")
         statuses.append(s)
         out.append(f"| {r['design']} | {r['item']} | {r['seconds']:.1f} | {budget if budget is not None else 'unset'} | "
                    f"{STATUS_CELL[s]} |")
+    for item in SPEED_ITEMS:
+        if not any(r["item"] == item for r in data["runs"]):
+            statuses.append("missing")
+            out.append(f"| — | {item} | — | {budgets.get(item, 'unset')} | **missing** |")
+    if stale:
+        statuses.append("stale")
+        out.insert(0, f"**stale ({data['srmcore']})**: the installed srmcore is {version('srmcore')}.\n")
     return head + "\n".join(out) + "\n", statuses
 
 
@@ -204,7 +245,7 @@ def generate(data_dir: Path, m5a_dir: Path, out_md: Path) -> str:
     sections = [
         ("Engine", engine_section()),
         ("Material library", material_section()),
-        ("M5a mesh convergence", m5a_section(m5a_dir)),
+        ("M5a mesh convergence", m5a_section(m5a_dir, out_md)),
         ("M5b TEAM 24", team24_section(_load(data_dir / "team24.json"))),
         ("M5c FEMM", femm_section(_load(data_dir / "femm.json"), plot_dir)),
         ("M5d Krishnan 6/4", krishnan_section(_load(data_dir / "krishnan_6_4.json"), plot_dir)),
@@ -213,7 +254,7 @@ def generate(data_dir: Path, m5a_dir: Path, out_md: Path) -> str:
         ("CI", ci_section(_load(data_dir / "ci.json"))),
     ]
     statuses = [s for _, (_, ss) in sections for s in ss]
-    verdict = ("FAIL" if "fail" in statuses or "missing" in statuses
+    verdict = ("FAIL" if {"fail", "missing", "stale"} & set(statuses)
                else "PENDING" if "pending" in statuses else "PASS")
     flagged = [f"- {name}: {'/'.join(sorted(set(ss) - {'pass'}))}" for name, (_, ss) in sections if set(ss) - {"pass"}]
     text = f"# srmcore validation report\n\n**Verdict: {verdict}**\n\n" + "\n".join(flagged) + "\n\n"
