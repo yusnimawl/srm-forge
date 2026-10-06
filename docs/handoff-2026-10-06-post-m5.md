@@ -1,6 +1,6 @@
 # Session handoff: after M5 (2026-10-06)
 
-For the next session. M5 is complete on branch `m5e2-validated-release`: srmcore 0.4.0 is in `VALIDATED_VERSIONS`, and the 8/6 `full` map earns "EM-validated". Read `CLAUDE.md`, then `docs/validation-report.md`, then this file.
+For the next session. M5 is complete and merged to `main` (tag `v0.4.0`): srmcore 0.4.0 is in `VALIDATED_VERSIONS`, and the 8/6 `full` map earns "EM-validated". Read `CLAUDE.md`, then `docs/validation-report.md`, then this file.
 
 ## Start prompt
 
