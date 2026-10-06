@@ -21,11 +21,11 @@ For the next session. M5 is complete and merged to `main` (tag `v0.4.0`): srmcor
 
 ## Results
 
-- Report: `docs/validation-report.md` (PENDING until the tag's slow run is recorded). Evidence JSON in `docs/validation/`, each stamped with the srmcore version; the report marks evidence from another version as stale.
+- Report: `docs/validation-report.md` (verdict PASS; the tag's slow run is recorded). Evidence JSON in `docs/validation/`, each stamped with the srmcore version; the report marks evidence from another version as stale.
 - 8/6 `full` em_validate: every check passes; budget about ±10 % (M19 grade C allowance).
 - FEMM: worst error / limit 0.11 (8/6), 0.20 (12/8), 0.09 (24/16).
 - Speed budgets (worst case × 1.25): `screening` < 430 s, `full` < 44 min, `full` extras < 31 min. `screening` is now about 5× the old 90 s target because of the 40-angle grid; the optimizer (#6) will feel it.
-- Fast suite 658 passed in 9:26 on an idle machine (budget 10 min; little headroom).
+- Fast suite 658 passed in 9:26 on an idle machine (budget now 30 min).
 
 ## After the release (same day)
 
