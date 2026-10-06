@@ -24,7 +24,16 @@ def _result(complete=True):
         ANGLES, CURRENTS, ("A", "B", "C", "D"), "A", rng.random((3, 2, 4)), rng.random((3, 2)),
         rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2)), rng.random((3, 2, 4)),
         rng.random((3, 2, 8, 2)), rng.random((3, 2)), np.full((3, 2), 7, dtype=np.int32),
-        np.full((3, 2), STATUS_OK, dtype=np.int8), np.zeros((3, 2), dtype=bool), complete)
+        np.full((3, 2), STATUS_OK, dtype=np.int8), np.zeros((3, 2), dtype=bool), complete,
+        design_hash="0123456789abcdef", preset="screening")
+
+
+def test_map_file_without_identity_attrs_is_a_cache_miss(tmp_path):
+    r, prov = _result(), _prov()
+    path = dataset.store_map(tmp_path, r, prov)
+    with h5py.File(path, "a") as f:          # a 0.3.0 file has neither attribute
+        del f.attrs["design_hash"], f.attrs["preset"]
+    assert dataset.cached_map(tmp_path, prov) is None
 
 
 def _prov(design=DESIGN, angles=ANGLES, currents=CURRENTS, excited="A", solver=SOLVER):

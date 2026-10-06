@@ -8,6 +8,7 @@ from conftest import make_8_6
 from srmcore.fields.solution import SolveStatus
 from srmcore.maps import run
 from srmcore.maps.grids import LA_CURRENT_FRACTION, current_grid
+from srmcore.maps.identity import design_hash
 from srmcore.maps.point import PointResult, solve_point
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings
@@ -67,6 +68,12 @@ def test_layout_and_no_failures(monkeypatch):
     assert r.circuits == CIRCUITS and r.excited == "A" and r.complete
     assert np.all(r.status == run.STATUS_OK) and not r.filled.any()
     assert np.allclose(r.psi[3, 5, 0], 0.01 * (1 + ANGLES[3]) * CURRENTS[5])
+
+
+def test_run_map_stamps_the_design_identity(monkeypatch):
+    _fake(monkeypatch)
+    r = _run()
+    assert r.design_hash == design_hash(DESIGN) and r.preset == DESIGN.mesh.preset
 
 
 def test_one_interior_failure_is_interpolated_and_flagged(monkeypatch):

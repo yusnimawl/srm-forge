@@ -11,6 +11,7 @@ from map_fixtures import synthetic_map
 from srmcore.maps import validation as V
 from srmcore.maps.checks import Check
 from srmcore.maps.end_winding import end_winding_inductance
+from srmcore.maps.identity import design_hash
 from srmcore.maps.results import key_numbers
 from srmcore.maps.validation import KEYS, KeyPoint, js_laws, key_points
 from srmcore.materials.laws import library_law
@@ -49,7 +50,7 @@ def test_js_minus_two_percent_is_forbidden_by_the_m19_data():
 
 
 def _map():
-    return synthetic_map(n_angles=16)
+    return dataclasses.replace(synthetic_map(n_angles=16), design_hash=design_hash(DESIGN), preset="full")
 
 
 # The fake solves return the map's own peak torque, as a solve on the design's mesh would.
@@ -97,6 +98,30 @@ def test_screening_map_is_never_labelled(monkeypatch):
     v = V.em_validate(d, _map())
     failed = {c.name for c in v.checks if c.status != "pass"}
     assert v.label is None and {"preset", "fem_checks"} <= failed
+
+
+def test_map_of_another_design_fails_identity(monkeypatch):
+    _patch(monkeypatch, versions=(version("srmcore"),))
+    v = V.em_validate(DESIGN, dataclasses.replace(_map(), design_hash="ffffffffffffffff"))
+    c = {c.name: c for c in v.checks}["map_identity"]
+    assert v.label is None and c.status == "fail" and "ffffffffffffffff" in c.detail
+
+
+def test_screening_map_with_full_design_fails_preset_and_identity(monkeypatch):
+    _patch(monkeypatch, versions=(version("srmcore"),))
+    screening = DESIGN.model_copy(update={"mesh": MeshSettings(preset="screening")})
+    r = dataclasses.replace(_map(), design_hash=design_hash(screening), preset="screening")
+    status = {c.name: c.status for c in V.em_validate(DESIGN, r).checks}
+    assert status["preset"] == "fail" and status["map_identity"] == "fail"
+
+
+def test_zero_torque_map_fails_map_match_without_raising(monkeypatch):
+    _patch(monkeypatch)
+    r = _map()
+    zero = dataclasses.replace(r, torque_arkkio=np.zeros_like(r.torque_arkkio))
+    with np.errstate(all="raise"):
+        c = {c.name: c for c in V.em_validate(DESIGN, zero).checks}["map_matches_design"]
+    assert c.status == "fail" and "zero peak torque" in c.detail
 
 
 def test_filled_point_blocks_the_label(monkeypatch):
@@ -231,7 +256,7 @@ def test_em_validate_end_to_end_on_the_8_6_full_mesh(tmp_path):
     assert v.label is None and status["engine_version"] == "fail"
     # held_out_* and band_radius are not asserted: the 16 x 6 grid is too coarse for the held-out limits; the
     # example runs the default grid.
-    for name in ("preset", "no_filled_points", "map_matches_design", "point_convergence_psi",
+    for name in ("preset", "map_identity", "no_filled_points", "map_matches_design", "point_convergence_psi",
                  "point_convergence_torque", "material_grade", "budget_finite"):
         assert status[name] == "pass", name
     assert {"held_out_psi", "held_out_torque", "band_radius"} <= set(status)

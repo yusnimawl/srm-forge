@@ -1,5 +1,4 @@
 """Map dataset: provenance hash, HDF5 file with labelled axes, and the complete-maps-only cache (spec §7.2)."""
-import dataclasses
 import hashlib
 import json
 import os
@@ -9,10 +8,9 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from ..materials import library
-from ..mesh.settings import resolve_mesh_settings
 from ..model.design import Design
 from ..solvers.settings import SolverAdapter
+from .identity import design_parts
 from .overlap import OverlapResult
 from .run import MapResult
 from .tables import dpsi_dtheta
@@ -32,11 +30,8 @@ def provenance(design: Design, angles: np.ndarray, currents: np.ndarray, excited
     refinement, band divisions and the quality limits), so a change to a preset or to that resolution invalidates
     cached maps, while a change to the size field or meshing code is covered only by the srmcore version; the
     material files' hashes cover their data, and the versions of the numerical libraries cover the rest."""
-    mesh_resolved = json.loads(json.dumps(dataclasses.asdict(resolve_mesh_settings(design.machine, design.mesh))))
-    names = sorted(set(design.machine.materials.model_dump().values()))
-    materials = {n: hashlib.sha256((library._data_dir() / f"{n}.json").read_bytes()).hexdigest() for n in names}
     libraries = {d: version(d) for d in ("gmsh", "numpy", "scipy", "h5py")}
-    return {"srmcore": version("srmcore"), "libraries": libraries, "design": json.loads(design.to_json()), "mesh_resolved": mesh_resolved, "materials": materials,
+    return {"srmcore": version("srmcore"), "libraries": libraries, **design_parts(design),
             "angles": np.asarray(angles, float).tolist(), "currents": np.asarray(currents, float).tolist(),
             "excited": excited, "solver": solver.name, "solver_version": solver.version}
 
@@ -58,6 +53,7 @@ def write_map(path, result: MapResult, prov: dict) -> None:
             f.create_dataset("dpsi_dtheta", data=dpsi_dtheta(result, period)).attrs["dims"] = list(_DIMS["psi"])
         f.create_dataset("circuits", data=np.array(result.circuits, dtype="S"))
         f.attrs.update(excited=result.excited, complete=result.complete,
+                       design_hash=result.design_hash, preset=result.preset,
                        provenance=json.dumps(prov, sort_keys=True), hash=provenance_hash(prov))
     os.replace(tmp, path)
 
@@ -67,7 +63,8 @@ def read_map(path) -> tuple[MapResult, dict]:
         arrays = {name: f[name][()] for name in _DIMS}
         circuits = tuple(c.decode() for c in f["circuits"][()])
         result = MapResult(**arrays, circuits=circuits, excited=str(f.attrs["excited"]),
-                           complete=bool(f.attrs["complete"]))
+                           complete=bool(f.attrs["complete"]), design_hash=str(f.attrs["design_hash"]),
+                           preset=str(f.attrs["preset"]))
         return result, json.loads(f.attrs["provenance"])
 
 
