@@ -28,8 +28,9 @@ from .run import MapResult, require_complete
 
 KEYS = ("la", "lu", "peak_torque", "psi_max")
 
-# srmcore versions whose results the validation campaign has covered; the label needs the running one in here.
-VALIDATED_VERSIONS: tuple[str, ...] = ()
+# srmcore versions whose results the validation campaign has covered (docs/validation-report.md); the label needs
+# the running one in here.
+VALIDATED_VERSIONS: tuple[str, ...] = ("0.4.0",)
 LABEL = "EM-validated"
 PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
 TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point

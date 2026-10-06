@@ -253,8 +253,8 @@ def test_em_validate_end_to_end_on_the_8_6_full_mesh(tmp_path):
     r = build_map(DESIGN, 20.0, n_angles=16, n_currents=6, cache_dir=tmp_path)
     v = em_validate(DESIGN, r)
     status = {c.name: c.status for c in v.checks}
-    assert v.label is None and status["engine_version"] == "fail"
-    # held_out_* and band_radius are not asserted: the 16 x 6 grid is too coarse for the held-out limits; the
+    assert status["engine_version"] == "pass"
+    # the label, held_out_* and band_radius are not asserted: the 16 x 6 grid is too coarse for the held-out limits; the
     # example runs the default grid.
     for name in ("preset", "map_identity", "no_filled_points", "map_matches_design", "point_convergence_psi",
                  "point_convergence_torque", "material_grade", "budget_finite"):

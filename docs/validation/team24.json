@@ -1,0 +1,16 @@
+{
+ "static_torque": {
+  "model": 2.7996351975089975,
+  "measured": 3.22,
+  "error_pct": -13.05480753077648
+ },
+ "rotor_flux": {
+  "model": 0.00039068781669633265,
+  "measured": 0.000472,
+  "error_pct": -17.227157479590538
+ },
+ "current_rise_max_dev_pct": {
+  "before": 18.56473476134583,
+  "after": 8.093091387797719
+ }
+}

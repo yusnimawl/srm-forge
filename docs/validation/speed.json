@@ -1,0 +1,39 @@
+{
+ "srmcore": "0.4.0",
+ "cpu": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+ "logical_cpus": 16,
+ "workers": 8,
+ "date": "2026-10-06",
+ "runs": [
+  {
+   "design": "8_6",
+   "item": "screening",
+   "seconds": 228.40016820002347
+  },
+  {
+   "design": "8_6",
+   "item": "full",
+   "seconds": 1549.6394678999204
+  },
+  {
+   "design": "8_6",
+   "item": "full_extras",
+   "seconds": 1462.8200186998583
+  },
+  {
+   "design": "12_8",
+   "item": "screening",
+   "seconds": 342.05740610021167
+  },
+  {
+   "design": "12_8",
+   "item": "full",
+   "seconds": 2094.1432928000577
+  },
+  {
+   "design": "12_8",
+   "item": "full_extras",
+   "seconds": 979.8532893999945
+  }
+ ]
+}
