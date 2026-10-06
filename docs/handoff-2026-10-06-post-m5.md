@@ -27,9 +27,16 @@ For the next session. M5 is complete and merged to `main` (tag `v0.4.0`): srmcor
 - Speed budgets (worst case × 1.25): `screening` < 430 s, `full` < 44 min, `full` extras < 31 min. `screening` is now about 5× the old 90 s target because of the 40-angle grid; the optimizer (#6) will feel it.
 - Fast suite 658 passed in 9:26 on an idle machine (budget 10 min; little headroom).
 
+## After the release (same day)
+
+- Fast-suite budget raised to 30 min (CI job timeout 40 min); the suite is not split.
+- Library adds (sources in `docs/sources/materials/`, curves reproducible with `tools/digitise_bh.py`): NO20 (B, old Cogent table), Vacoflux 48 (B), Vacoflux 50 (C), NO10-1270N and NO20-1200H (B, Tata Hi-Lite 2019), 10JNHF600 and 20JNHF1300 (B, JFE catalogue). Pyleecan materials not used (no provenance).
+- JYStator laminations are JFE Super Core. **Owner choice: 10JNEX900 (0.10 mm)** for the machine. Its library entry is grade B (JFE Tech. Report DC curve, digitisation 0.025, Js 1.80 T, stacking 0.90).
+- Still open: JYStator's 0.35 mm steel (not Super Core) if ever used; provisional Js/stacking of the Tata, Cogent and VAC entries; supplier-measured data for grade A.
+
 ## Next after the release
 
-- Revisit the search margin 1.05 (handoff 2026-10-02), then v0b.
+- Revisit the search margin 1.05 (handoff 2026-10-02), then v0b. Designs for the owner's machine should use `RegionMaterials(stator="10JNEX900", rotor="10JNEX900")`.
 - Library: Hiperco stacking factors (0.95) and M43/M19 Js and density are provisional; replace with supplier values.
 - gmsh is GPLv2+ and PyMuPDF (dev tool) is AGPL: fine in-house, matters if the tool is ever distributed.
 
