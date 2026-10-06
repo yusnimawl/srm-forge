@@ -1,4 +1,5 @@
 {
+ "srmcore": "0.4.0",
  "static_torque": {
   "model": 2.7996351975089975,
   "measured": 3.22,

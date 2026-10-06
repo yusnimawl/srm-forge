@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEPENDENCIES = ("numpy", "scipy", "gmsh", "scikit-fem", "ngsolve", "netgen-mesher", "h5py", "pydantic", "matplotlib")
 STATUS_CELL = {"pass": "pass", "fail": "**FAIL**", "missing": "**missing**", "pending": "pending"}
 SPEED_ITEMS = ("screening", "full", "full_extras")
-NOT_RUN ="not run (input file missing)\n"
+NOT_RUN = "not run (input file missing)\n"
 
 
 def _load(path: Path):
@@ -180,18 +180,19 @@ def em_section(data, plot_dir: Path):
     head = "## EM validation (8/6 full)\n\n"
     if data is None:
         return head + "**missing**\n", ["missing"]
-    out = [f"Engine {data['engine_version']}, label: {data['label'] or 'none'}, grades {data['material_grades']}, "
+    out = [f"Engine {data.get('engine_version')}, label: {data['label'] or 'none'}, grades {data['material_grades']}, "
            f"map {data['map_s']:.0f} s, validation {data['validate_s']:.0f} s.\n",
            "| Check | Status | Value | Limit | Detail |\n|---|---|---|---|---|"]
     statuses = []
     for c in data["checks"]:
         if c["name"] != "engine_version":
             statuses.append(c["status"] if c["status"] == "pass" else "fail")
-    statuses = statuses or ["missing"]
-    if _is_stale(data["engine_version"]):
-        statuses.append("stale")
-        out.insert(0, f"**stale ({data['engine_version']})**: the installed srmcore is {version('srmcore')}.\n")
         out.append(f"| {c['name']} | {c['status']} | {_num(c['value'])} | {_num(c['limit'])} | {c['detail']} |")
+    statuses = statuses or ["missing"]
+    found = data.get("engine_version")
+    if _is_stale(found):
+        statuses.append("stale")
+        out.insert(0, f"**stale ({found})**: the installed srmcore is {version('srmcore')}.\n")
     b = data["budget"]
     keys = b["keys"]
     out += ["", "Uncertainty budget (worst case, % of the corrected value):\n",
@@ -212,10 +213,11 @@ def speed_section(data, budgets):
     head = "## Speed\n\n"
     if data is None or budgets is None:
         return head + "**missing**\n", ["missing"]
-    out = [f"srmcore {data['srmcore']}, {data['cpu']}, {data['logical_cpus']} logical CPUs, {data['workers']} workers, "
+    out = [f"srmcore {data.get('srmcore')}, {data['cpu']}, {data['logical_cpus']} logical CPUs, {data['workers']} workers, "
            f"{data['date']}.\n", "| Design | Item | Seconds | Budget | Status |\n|---|---|---|---|---|"]
     statuses = []
-    stale = _is_stale(data["srmcore"])
+    found = data.get("srmcore")
+    stale = _is_stale(found)
     for r in data["runs"]:
         budget = budgets.get(r["item"])
         s = "missing" if budget is None else ("pass" if r["seconds"] <= budget else "fail")
@@ -225,10 +227,10 @@ def speed_section(data, budgets):
     for item in SPEED_ITEMS:
         if not any(r["item"] == item for r in data["runs"]):
             statuses.append("missing")
-            out.append(f"| — | {item} | — | {budgets.get(item, 'unset')} | **missing** |")
+            out.append(f"| — | {item} | — | {budgets.get(item) if budgets.get(item) is not None else 'unset'} | **missing** |")
     if stale:
         statuses.append("stale")
-        out.insert(0, f"**stale ({data['srmcore']})**: the installed srmcore is {version('srmcore')}.\n")
+        out.insert(0, f"**stale ({found})**: the installed srmcore is {version('srmcore')}.\n")
     return head + "\n".join(out) + "\n", statuses
 
 

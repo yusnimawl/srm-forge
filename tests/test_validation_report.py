@@ -99,6 +99,21 @@ def test_stale_gated_input_fails(tmp_path, name, change):
     assert "stale" in (tmp_path / "report.md").read_text(encoding="utf-8")
 
 
+def test_fresh_em_input_renders_every_check_row(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md")
+    text = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "| preset | pass" in text and "| engine_version | fail" in text
+
+
+@pytest.mark.parametrize("name, key", [("em_validate_8_6.json", "engine_version"), ("speed.json", "srmcore")])
+def test_missing_version_key_is_stale(tmp_path, name, key):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    _rewrite(tmp_path, name, lambda d: d.pop(key))
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+    assert "stale" in (tmp_path / "report.md").read_text(encoding="utf-8")
+
+
 def test_report_only_version_never_gates(tmp_path):
     _write_inputs(tmp_path / "v", tmp_path / "m")
     _rewrite(tmp_path, "team24.json", lambda d: d.update(srmcore="0.0.1"))
