@@ -5,8 +5,8 @@
   "stator": "C",
   "rotor": "C"
  },
- "map_s": 1530.499420600012,
- "validate_s": 395.1115828000475,
+ "map_s": 1888.1058455000166,
+ "validate_s": 600.400872200029,
  "checks": [
   {
    "name": "engine_version",
@@ -27,7 +27,7 @@
    "status": "pass",
    "value": null,
    "limit": null,
-   "detail": "map design hash ffc5f6f8cf4b03f2, this design ffc5f6f8cf4b03f2"
+   "detail": "map design hash 3e236049813f230f, this design 3e236049813f230f"
   },
   {
    "name": "no_filled_points",
