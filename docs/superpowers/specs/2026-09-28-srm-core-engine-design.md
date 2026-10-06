@@ -170,7 +170,7 @@ Stator iron, rotor iron, shaft, one region per coil side (`coil_A1+`, `coil_A1-`
 
 ### 5.3 Initial library
 1. **M19** (validation; same curve exported to FEMM fixtures).
-2. Added in M5e2 (2026-10-05): 10JNEX900 (B), Hiperco 50A (B), Hiperco 50HS at 720/740/760 °C (C), M43 (C); sources in `docs/sources/materials/`. Added 2026-10-06: NO20 (B, Cogent thin-NO DC table, Js and stacking provisional), Vacoflux 48 (B, VAC table plus the vector curve below 300 A/m), Vacoflux 50 (C, VAC table only, no data below 300 A/m). Added 2026-10-06: NO10-1270N and NO20-1200H (B, Tata Hi-Lite datasheets Mar 2019, 50 Hz magnetisation table 20-20000 A/m; Js and stacking provisional).
+2. Added in M5e2 (2026-10-05): 10JNEX900 (B), Hiperco 50A (B), Hiperco 50HS at 720/740/760 °C (C), M43 (C); sources in `docs/sources/materials/`. Added 2026-10-06: NO20 (B, Cogent thin-NO DC table, Js and stacking provisional), Vacoflux 48 (B, VAC table plus the vector curve below 300 A/m), Vacoflux 50 (C, VAC table only, no data below 300 A/m). Added 2026-10-06: NO10-1270N and NO20-1200H (B, Tata Hi-Lite datasheets Mar 2019, 50 Hz magnetisation table 20-20000 A/m; Js and stacking provisional). Added 2026-10-06: 10JNHF600 and 20JNHF1300 (B, JFE catalogue f2e-001 50 Hz curves traced to 20 kA/m; JYStator laminations are JFE Super Core, grade per thickness still to be confirmed).
 3. Other candidates (Permendur/Supermendur/Vacoflux, 1J22) added when supplier data is obtained. M270-35A is deprioritised (0.35 mm unsuitable at 1.6–5.3 kHz).
 
 ---

@@ -3,6 +3,7 @@ r"""Reproduce the traced B-H points of the library records that come from publis
   10JNEX900  : dashed curve of JFE Technical Report 21 p. 46 Fig. 1, traced from an 800 dpi render
   Hiperco50A : low-field nodes of the H50A curve on p. 4 of Carpenter E199, read from the PDF vector path
   Vacoflux48 : low-field nodes of the VACOFLUX 48 curve on p. 8 of the VAC CoFe brochure, read from the vector path
+  10JNHF600, 20JNHF1300 : 50 Hz magnetization curves of JFE catalogue f2e-001 pp. 19 and 29, traced at 400 dpi
 
 Usage: python tools\digitise_bh.py   (needs the dev extra: PyMuPDF)
 """
@@ -82,6 +83,36 @@ def vacoflux_48_low_field() -> tuple[list[float], list[float]]:
     raise RuntimeError("VACOFLUX 48 curve not found on p. 8")
 
 
+def jnhf_catalogue_curve(page: int) -> tuple[list[float], list[float]]:
+    """32 points, log-spaced 15 A/m to 20 kA/m (the curve end above it flattens below mu0), of the 50 Hz magnetization curve on a JNHF page of JFE catalogue
+    f2e-001 (index 18: 10JNHF600, index 28: 20JNHF1300), traced from a 400 dpi render. The plot is rotated: B runs
+    2.0 -> 0 T left to right over the outermost grid columns, H runs 10^5 -> 10 A/m top to bottom over the outermost
+    grid rows. The legend box (B < 1.25 T, H > 2 kA/m) is masked."""
+    pix = pymupdf.open(SOURCES / "jfe_f2e-001_magnetic_property_curves.pdf")[page].get_pixmap(dpi=400)
+    a = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w, pix.n)[:, :, :3].astype(int)
+    grid = (a[..., 2] - a[..., 0] > 40) & (a[..., 2] > 150)
+    cols = np.flatnonzero(grid.sum(0) > 0.9 * grid.sum(0).max())
+    rows = np.flatnonzero(grid.sum(1) > 0.9 * grid.sum(1).max())
+    c0, c1, r0, r1 = cols[0] + 1, cols[-1] - 1, rows[0] + 1, rows[-1]
+    b_of = lambda x: 2.0 * (c1 - x) / (c1 - c0)
+    h_of = lambda y: 10 ** (1 + 4 * (r1 - y) / (r1 - r0))
+    dark = a.max(axis=2) < 110
+    dark[:, :c0 + 3] = dark[:, c1 - 2:] = False
+    dark[:r0 + 3] = dark[r1 - 2:] = False
+    dark[:int(r1 - (np.log10(2000) - 1) / 4 * (r1 - r0)), int(c1 - 1.25 / 2.0 * (c1 - c0)):] = False
+    pts = []
+    for y in range(r0 + 3, r1 - 2):
+        xs = np.flatnonzero(dark[y])
+        if len(xs) and xs.max() - xs.min() <= 40:
+            pts.append((h_of(y), b_of(xs.mean())))
+    hh, bb = np.array(pts[::-1]).T
+    ok = np.abs(bb - medfilt(bb, 31)) < 0.02
+    grid_h = np.logspace(np.log10(15), np.log10(20000), 32)
+    b = np.interp(np.log10(grid_h), np.log10(hh[ok]), bb[ok])
+    return [round(float(v), 2) for v in grid_h], [round(float(v), 4) for v in b]
+
+
 if __name__ == "__main__":
     print(json.dumps({"10JNEX900": jnex_dc_curve(), "Hiperco50A_low_field": hiperco_50a_low_field(),
-                      "Vacoflux48_low_field": vacoflux_48_low_field()}, indent=1))
+                      "Vacoflux48_low_field": vacoflux_48_low_field(),
+                      "10JNHF600": jnhf_catalogue_curve(18), "20JNHF1300": jnhf_catalogue_curve(28)}, indent=1))

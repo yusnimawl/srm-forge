@@ -24,6 +24,8 @@
 | Material | Grade | Js | Stacking | Digitisation error | Provisional | Source |
 |---|---|---|---|---|---|---|
 | 10JNEX900 | B | 1.8 T | 0.9 | 2.50 % | — | JFE Technical Report No. 21 (Mar. 2016) p. 46, Fig. 1 'Direct current magnetizat |
+| 10JNHF600 | B | 1.88 T | 0.9 | 1.00 % | — | JFE catalogue f2e-001 'Magnetic Property Curves', docs/sources/materials/jfe_f2e |
+| 20JNHF1300 | B | 1.94 T | 0.92 | 1.00 % | — | JFE catalogue f2e-001 'Magnetic Property Curves', docs/sources/materials/jfe_f2e |
 | Hiperco50A | B | 2.4 T | 0.95 | 1.50 % | stacking_factor | Carpenter Electrification datasheet Hiperco 50A (E199, v05-20), docs/sources/mat |
 | Hiperco50HS_720C | C | 2.4 T | 0.95 | — | stacking_factor | Carpenter Electrification datasheet Hiperco 50 HS (E198, v05-20) p. 4 typical DC |
 | Hiperco50HS_740C | C | 2.4 T | 0.95 | — | stacking_factor | Carpenter Electrification datasheet Hiperco 50 HS (E198, v05-20) p. 4 typical DC |
