@@ -1,8 +1,12 @@
 """Krishnan/Materu 6/4: srmcore 2D and 2D + end winding against the measured La, Lu and stroke-averaged
 torque, with the uncertainty budget. The output is the source of docs/m5d-krishnan-results.md.
 
-Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python -u examples\\krishnan_6_4_check.py
+Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python -u examples\\krishnan_6_4_check.py [--json PATH]
 """
+import json
+import sys
+from pathlib import Path
+
 import numpy as np
 
 import krishnan_6_4 as k64
@@ -14,6 +18,13 @@ MEASUREMENT = {"La": None, "Lu": k64.LU_MEASUREMENT_SCATTER, "T_avg": None}   # 
 
 
 def main():
+    args = sys.argv[1:]
+    out_path = None
+    if "--json" in args:
+        i = args.index("--json")
+        out_path = Path(args[i + 1])
+        del args[i:i + 2]
+    rows = []
     p = k64.machine()
     g = coil_geometry(p)
     print(f"machine: clearance {p.coil_inner_clearance * 1e3:.2f} mm, coil {g.area * 1e6:.0f} mm² "
@@ -37,12 +48,19 @@ def main():
         for n, i in enumerate(k64.CURRENTS):
             meas = k64.MEASURED[q][n]
             unc = []
+            unc_pct = []
             for budget in (s["budget_before"], s["budget_after"]):
                 model = sum(row[q][n] for row in budget.values())
                 rel = model / meas + (MEASUREMENT[q] or 0.0)
                 unc.append(f"{100 * rel:.1f} %" + ("" if MEASUREMENT[q] else " + meas. n/s"))
+                unc_pct.append(100 * rel)
             e0 = 100 * (two_d[q][n] - meas) / meas
             e1 = 100 * (after[q][n] - meas) / meas
+            rows.append({"quantity": q, "unit": unit, "current": float(i), "measured": float(f * meas),
+                         "model_2d": float(f * two_d[q][n]), "model_after": float(f * after[q][n]),
+                         "error_before_pct": float(e0), "unc_before_pct": float(unc_pct[0]),
+                         "error_after_pct": float(e1), "unc_after_pct": float(unc_pct[1]),
+                         "measurement_stated": MEASUREMENT[q] is not None})
             print(f"| {q} ({unit}) | {i:g} | {f * meas:.4g} | {f * k64.MATERU_FEA[q][n]:.4g} | {f * two_d[q][n]:.4g} | "
                   f"{f * after[q][n]:.4g} | {e0:+.1f} % | {unc[0]} | {e1:+.1f} % | {unc[1]} |")
     print("\nbudget rows (% of measured), before / after:")
@@ -54,6 +72,9 @@ def main():
           + ", ".join(f"{q} {100 * v:.1f} %" for q, v in k64.SEWARD_END_LEAKAGE.items()))
     print("our end-winding share of the corrected inductance at 10 A: "
           f"La {100 * l_mid / after['La'][1]:.1f} %, Lu {100 * l_mid / after['Lu'][1]:.1f} %")
+    if out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({"rows": rows}, indent=1))
 
 
 if __name__ == "__main__":

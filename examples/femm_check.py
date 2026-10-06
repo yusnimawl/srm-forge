@@ -1,6 +1,6 @@
 """Print the FEMM 4.2 cross-tool comparison tables (source of docs/m5c-femm-results.md).
 
-Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python examples\\femm_check.py [machine ...]
+Run from the repo root:  $env:PYTHONPATH="tests"; .venv\\Scripts\\python examples\\femm_check.py [machine ...] [--json PATH]
 """
 import json
 import math
@@ -15,8 +15,15 @@ from srmcore.solvers.ngsolve_adapter import NgsolveAdapter
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "validation" / "fixtures"
 
 if __name__ == "__main__":
-    names = sys.argv[1:] or list(fm.MACHINES)
+    args = sys.argv[1:]
+    out_path = None
+    if "--json" in args:
+        i = args.index("--json")
+        out_path = Path(args[i + 1])
+        del args[i:i + 2]
+    names = args or list(fm.MACHINES)
     solver = NgsolveAdapter()
+    summary = {}
     for name in names:
         fixture = json.loads((FIXTURES / f"femm_{name}.json").read_text())
         pts = fixture["points"]
@@ -51,3 +58,8 @@ if __name__ == "__main__":
                       f"{abs(q['torque_age'] - q['torque_wst']) / pk:.3%} |")
         print(f"\nworst: psi {worst['psi']:.3%}, torque {worst['t_rel']:.2%} relative (|T| >= 5 % of peak), "
               f"{worst['t_peak']:.3%} of peak; largest error / limit {worst['ratio']:.2f}")
+        summary[name] = {"worst_psi": float(worst["psi"]), "worst_t_rel": float(worst["t_rel"]),
+                         "worst_t_peak": float(worst["t_peak"]), "ratio": float(worst["ratio"])}
+    if out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(summary, indent=1))
