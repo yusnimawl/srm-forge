@@ -1,8 +1,8 @@
 # srmcore validation report
 
-**Verdict: PENDING**
+**Verdict: PASS**
 
-- CI: pending
+
 
 ## Engine
 
@@ -144,4 +144,4 @@ srmcore 0.4.0, Intel64 Family 6 Model 186 Stepping 2, GenuineIntel, 16 logical C
 
 ## CI
 
-Tag v0.4.0, run , result pending: pending
+Tag v0.4.0, run https://github.com/yusnimawl/srm-forge/actions/runs/37461180818, result success: pass

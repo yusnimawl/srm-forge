@@ -63,7 +63,7 @@ Order: **M5b → M5c → M5d → M5e.** M5b and M5c are independent (either can 
 
 ## M5e2: library, report, validated version, CI, speed
 
-**Done 2026-10-06 (CI slow run on the `v0.4.0` tag pending):** spec `docs/superpowers/specs/2026-10-05-m5e2-validated-release-design.md`, report `docs/validation-report.md`. srmcore 0.4.0 is in `VALIDATED_VERSIONS`; the 8/6 `full` map earns "EM-validated". Library adds 10JNEX900 (B), Hiperco 50A (B), Hiperco 50HS 720/740/760 °C (C), M43 (C). Speed budgets re-baselined: `screening` < 430 s, `full` < 44 min, `full` extras < 31 min. Slow suite locally 52 passed in 38 min (peak 5.1 GB per process).
+**Done 2026-10-06 (slow suite green on CI for the `v0.4.0` tag, Linux 59 min, Windows 91 min; report verdict PASS):** spec `docs/superpowers/specs/2026-10-05-m5e2-validated-release-design.md`, report `docs/validation-report.md`. srmcore 0.4.0 is in `VALIDATED_VERSIONS`; the 8/6 `full` map earns "EM-validated". Library adds 10JNEX900 (B), Hiperco 50A (B), Hiperco 50HS 720/740/760 °C (C), M43 (C). Speed budgets re-baselined: `screening` < 430 s, `full` < 44 min, `full` extras < 31 min. Slow suite locally 52 passed in 38 min (peak 5.1 GB per process).
 
 - **Goal:** close M5: the engine version is "EM-validated".
 - **Scope (spec §8.4–8.6, §9):**

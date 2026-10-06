@@ -4,15 +4,13 @@ For the next session. M5 is complete on branch `m5e2-validated-release`: srmcore
 
 ## Start prompt
 
-- `read docs/handoff-2026-10-06-post-m5.md and finish the v0.4.0 release`
+- `read docs/handoff-2026-10-06-post-m5.md and start the next milestone`
 
-## Open steps of the release
+## Release (done 2026-10-06)
 
-1. Merge `m5e2-validated-release` into `main` (owner yes), then push `main`.
-2. Tag `v0.4.0` and push the tag. That starts `ci.yml` (full 2 × 2 fast matrix) and `slow.yml` (slow suite on Windows and Linux, Python 3.12, timeout 360 min).
-3. Record the slow run: set `docs/validation/ci.json` to `{"tag": "v0.4.0", "run_url": "<url>", "result": "success" | "failure"}`, then run `python tools\validation_report.py` (verdict must be PASS) and commit to `main`, docs only.
-4. On a red slow run, the owner decides: remove "0.4.0" from `VALIDATED_VERSIONS` in 0.4.1, or fix forward.
-5. Check that the first branch push after the merge runs only two fast jobs (Linux and Windows 3.12).
+- Merged to `main`, tagged `v0.4.0`. The tag's slow suite passed on CI (Linux 59 min, Windows 91 min): https://github.com/yusnimawl/srm-forge/actions/runs/37461180818. Report verdict PASS.
+- The `main` push ran two fast jobs (Linux and Windows 3.12), the tag four, as designed.
+- For the next release: run the validation campaign on the new version, add it to `VALIDATED_VERSIONS`, regenerate the report (gated evidence from another version reads as stale), tag, record the slow run in `docs/validation/ci.json`.
 
 ## Slow suite, measured locally (2026-10-06)
 
