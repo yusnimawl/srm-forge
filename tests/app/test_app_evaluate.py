@@ -96,9 +96,9 @@ def test_stage_two_scans_within_the_stage_one_cap_by_default():
 def test_scan_limit_note_follows_the_equivalent_turns():
     e, _ = _evaluate(_req())
     assert e.winding.turns == 30 and e.winding.paths == 1 and "limit" in e.error
-    e, _ = _evaluate(_req(), margin=3.47)        # feasible up to 22 turns in series; 30 turns on 2 paths is only 15
+    e, _ = _evaluate(_req(), margin=3.47)        # feasible up to 21 turns in series; 30 turns on 2 paths is only 15
     assert next(s for s in e.scan if (s.winding.turns, s.winding.paths) == (30, 2)).feasible
-    assert (e.winding.turns, e.winding.paths) == (22, 1) and "limit" not in e.error
+    assert (e.winding.turns, e.winding.paths) == (21, 1) and "limit" not in e.error
 
 
 def test_no_winding_reasons_name_the_cap_in_wire_mode():
@@ -183,3 +183,25 @@ def test_any_exception_from_build_map_becomes_a_failed_evaluation(exc):
 def test_keyboard_interrupt_is_not_swallowed():
     with mock.patch("srmapp.evaluate.build_map", side_effect=KeyboardInterrupt), pytest.raises(KeyboardInterrupt):
         evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+
+
+def test_turns_are_chosen_on_the_end_winding_corrected_map():
+    from srmapp import evaluate as ev
+    from srmcore.maps.end_winding import end_winding_inductance
+    req = _req()
+    stage = stage1(req, make_8_6())
+    raw = _map(stage)
+    seen = []
+    real = ev.choose_turns
+
+    def spy(result, *a, **kw):
+        seen.append(result)
+        return real(result, *a, **kw)
+    with mock.patch("srmapp.evaluate.build_map", return_value=raw), \
+            mock.patch("srmapp.evaluate.key_numbers", return_value=None), \
+            mock.patch("srmapp.evaluate.choose_turns", side_effect=spy):
+        evaluate_stage2(_cand(), req, stage, max_turns=30)
+    l_end = end_winding_inductance(make_8_6(), image_factor=1.5)
+    k = raw.circuits.index(raw.excited)
+    assert l_end > 0
+    np.testing.assert_allclose(seen[0].psi[..., k], raw.psi[..., k] + l_end * raw.currents[None, :])

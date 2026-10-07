@@ -33,6 +33,7 @@ Four changes that alter which designs count as feasible, done before M5:
 
 `SearchSettings`:
 
+- Superseded 2026-10-08 (core spec §11): the default margin follows the material grade (`SearchSettings.resolved_margin`: A 1.02, B 1.05, C 1.12); an explicit `margin` overrides it.
 - `margin: float = 1.05` (was 1.0). Stage 1 already uses it on the torque bound. Stage 2: a scan point is feasible when min(torque ratio, power ratio) ≥ `margin`. `choose_turns` takes `margin`; `ScanPoint.feasible` becomes a field set by the scan.
 - `j_peak_max: float | None = None` — peak conductor current density cap in wire mode, A/m²; None means 2 · `j_limit`. It bounds the windings scanned and thus the map current range (`max_mmf`). Stage 1 and stage 2 receive the resolved value.
 

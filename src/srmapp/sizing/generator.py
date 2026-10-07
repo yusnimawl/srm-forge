@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.stats import qmc
 
-from srmcore.model.design import Design, MeshSettings, RadialSRMParams
+from srmcore.materials.library import load_material
+from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
 from srmcore.model.validator import require_valid
 from srmcore.topology.radial import build_outline
@@ -19,6 +20,7 @@ MIN_OD = 0.08              # m
 _DIMS = 8
 _TRIES_PER_DESIGN = 20     # sample budget per requested design before giving up on a pole set
 REFERENCE_TURNS = 20      # every map is built at these turns; stage 2 chooses the winding
+DEFAULT_LAMINATION = 0.35e-3   # m, when the stator material records no thickness
 
 
 @dataclass(frozen=True)
@@ -27,7 +29,8 @@ class Candidate:
     design: Design
 
 
-def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, max_speed_rpm: float) -> RadialSRMParams:
+def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, max_speed_rpm: float,
+             materials: RegionMaterials, lamination: float) -> RadialSRMParams:
     d_o = d_lo + u[0] * (d_hi - d_lo)
     stack = d_o * (0.25 + 0.95 * u[1])
     d_r = d_o * (0.50 + 0.15 * u[2])
@@ -43,15 +46,17 @@ def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, 
         stator_pole_arc=beta_s, rotor_pole_arc=beta_r,
         stator_yoke_thickness=w_s * (0.5 + 0.4 * u[5]), rotor_yoke_thickness=w_r * (0.5 + 0.5 * u[6]),
         turns_per_pole=REFERENCE_TURNS, fill_factor=0.5, slot_liner_thickness=4e-4, coil_inner_clearance=1e-3,
-        lamination_thickness=0.35e-3, max_speed_rpm=max_speed_rpm)
+        lamination_thickness=lamination, max_speed_rpm=max_speed_rpm, materials=materials)
 
 
-def sample_candidates(req: Requirements, n: int, *, seed: int = 0,
-                      pole_sets=POLE_SETS) -> tuple[list[Candidate], dict[str, int]]:
-    """About `n` valid designs, split evenly over `pole_sets`. Designs the validator or the topology fit
+def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POLE_SETS,
+                      materials: RegionMaterials = RegionMaterials()) -> tuple[list[Candidate], dict[str, int]]:
+    """About `n` valid designs, split evenly over `pole_sets`, built from `materials` with the stator
+    material's lamination thickness. Designs the validator or the topology fit
     check rejects are dropped and counted; a pole set that cannot yield its share simply contributes fewer,
     so the result may hold fewer than `n` designs."""
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
+    lamination = load_material(materials.stator).thickness or DEFAULT_LAMINATION
     d_lo = min(MIN_OD, d_hi / 2)
     base, extra = divmod(n, len(pole_sets))
     children = np.random.SeedSequence(seed).spawn(len(pole_sets))
@@ -66,7 +71,7 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0,
             if taken == per_set:
                 break
             try:
-                machine = _machine(u, ns, nr, m, d_lo, d_hi, req.max_speed_rpm)
+                machine = _machine(u, ns, nr, m, d_lo, d_hi, req.max_speed_rpm, materials, lamination)
                 design = Design(machine=machine, mesh=MeshSettings(preset="full"))
                 require_valid(design)
             except InputError:

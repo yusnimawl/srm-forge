@@ -1,5 +1,6 @@
 from srmapp.requirements import Requirements
 from srmapp.sizing.generator import POLE_SETS, REFERENCE_TURNS, sample_candidates
+from srmcore.model.design import RegionMaterials
 from srmcore.model.validator import require_valid
 from srmcore.topology.radial import build_outline
 
@@ -65,3 +66,10 @@ def test_split_is_even_over_pole_sets():
 def test_small_n_uses_first_pole_sets():
     cands, _ = sample_candidates(_req(), 3, seed=0)
     assert [c.design.machine.n_stator_poles for c in cands] == [s for s, _, _ in POLE_SETS[:3]]
+
+
+def test_materials_and_their_lamination_thickness_are_set():
+    mats = RegionMaterials(stator="10JNEX900", rotor="10JNEX900")
+    cands, _ = sample_candidates(_req(), 8, seed=0, materials=mats)
+    assert all(c.design.machine.materials == mats for c in cands)
+    assert all(c.design.machine.lamination_thickness == 1e-4 for c in cands)
