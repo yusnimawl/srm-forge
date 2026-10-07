@@ -34,11 +34,11 @@ S = SearchSettings()
 if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 4
     n_currents = int(sys.argv[2]) if len(sys.argv) > 2 else 20
-    candidates, _ = sample_candidates(REQ, n, seed=0)
+    candidates, _ = sample_candidates(REQ, n, seed=0, materials=S.materials)
     for c in candidates:
         m = c.design.machine
         t0 = time.perf_counter()
-        stage = stage1(REQ, m, S.margin, S.j_peak, S.peak_cap)
+        stage = stage1(REQ, m, S.resolved_margin, S.j_peak, S.peak_cap)
         label = f"{c.id} {m.n_stator_poles}/{m.n_rotor_poles} OD {m.stator_outer_diameter * 1e3:.0f} mm"
         if stage.mmf == 0.0:
             print(f"\n{label}\n  no winding meets the limits; skipped")
@@ -47,7 +47,7 @@ if __name__ == "__main__":
                                                cache_dir=CACHE)
                 for a, k in sorted({v[:2] for v in VARIANTS.values()})}
         choice = choose_turns(maps[(30, n_currents)], m, REQ, j_peak=S.j_peak, j_limit=S.j_limit,
-                              j_peak_max=S.peak_cap, margin=S.margin)
+                              j_peak_max=S.peak_cap, margin=S.resolved_margin)
         print(f"\n{label} ({time.perf_counter() - t0:.0f} s)")
         if choice.point is None:
             print("  no winding meets the limits; skipped")

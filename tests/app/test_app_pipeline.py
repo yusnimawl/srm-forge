@@ -1,5 +1,7 @@
 from unittest import mock
 
+import pytest
+
 import numpy as np
 
 from srmapp.drive.envelope import Envelope
@@ -7,6 +9,7 @@ from srmapp.evaluate import Evaluation
 from srmapp.pipeline import SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
 from srmapp.sizing.generator import sample_candidates
+from srmcore.model.design import RegionMaterials
 
 
 def _req(**kw):
@@ -64,7 +67,7 @@ def test_settings_reach_stage_one():
     with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
-    assert seen and set(seen) == {(1.05, 25e6, 60e6)}
+    assert seen and set(seen) == {(SearchSettings().resolved_margin, 25e6, 60e6)}
 
 
 def test_settings_reach_stage_two():
@@ -72,7 +75,7 @@ def test_settings_reach_stage_two():
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
     kw = ev.call_args.kwargs
-    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, 60e6, 1.05)
+    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, 60e6, SearchSettings().resolved_margin)
 
 
 def test_explicit_peak_cap_is_used():
@@ -101,3 +104,22 @@ def test_pareto_uses_feasible_designs_only():
     res = SearchResult(_req(), 4, {}, 0, evals, False)
     ids = {e.id for e in res.pareto()}
     assert ids == {evals[0].id, evals[3].id}
+
+
+def test_margin_follows_the_worst_material_grade():
+    assert SearchSettings().resolved_margin == pytest.approx(1.05)                       # 10JNEX900, grade B
+    assert SearchSettings(materials=RegionMaterials()).resolved_margin == pytest.approx(1.12)   # M19, grade C
+    mixed = RegionMaterials(stator="10JNEX900", rotor="M19")
+    assert SearchSettings(materials=mixed).resolved_margin == pytest.approx(1.12)
+
+
+def test_explicit_margin_overrides_the_grade_rule():
+    assert SearchSettings(margin=1.0).resolved_margin == 1.0
+
+
+def test_search_candidates_use_the_settings_materials():
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, materials=RegionMaterials()))
+    assert ev.call_args.args[0].design.machine.materials == RegionMaterials()
+    assert ev.call_args.kwargs["margin"] == pytest.approx(1.12)

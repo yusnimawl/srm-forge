@@ -1,12 +1,13 @@
 """Stage 2: FEM map of one candidate at its reference turns, then the winding chosen on the rescaled map and its
 drive envelope and scores (v0 spec §4.4-4.6, v0a-2 spec §3). Peak-only and unvalidated: no losses beyond copper,
-no thermal limit. Parallel paths and the RMS current-density limit: small-cycle spec."""
+no thermal limit. ψ includes the analytic end-winding inductance. Parallel paths and the RMS current-density limit: small-cycle spec."""
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 
 from srmcore.maps import build_map
+from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
@@ -19,6 +20,7 @@ from .sizing.winding import DENSITY_MAX_TURNS, Winding
 from .turns import ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
 
 _NAN = float("nan")
+END_IMAGE_FACTOR = 1.5    # midpoint of the free-air (1) and iron-image (2) end-winding bounds
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         return _failed(candidate, stage, type(exc).__name__, str(exc))
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")
+    # L_end scales with turns², so the correction at the reference turns stays exact under rescale_turns.
+    result = with_end_winding(result, end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR))
     cap = stage.j_peak_max if j_peak_max is None else j_peak_max
     choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
                           margin=margin, max_turns=max_turns)
