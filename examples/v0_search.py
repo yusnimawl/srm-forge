@@ -21,8 +21,13 @@ if __name__ == "__main__":
     req = Requirements(peak_power_w=10_000.0, peak_torque_nm=32.0, base_speed_rpm=3000.0, max_speed_rpm=9000.0,
                        wires=WIRES, phase_current_a=150.0)
     t0 = time.perf_counter()
-    res = run_search(req, SearchSettings(n_candidates=n, shortlist=shortlist),
-                     progress=lambda d, t: print(f"  {d}/{t} designs", flush=True))
+
+    def on_point(design: int, designs: int, done: int, points: int) -> None:
+        m, sec = divmod(int(time.perf_counter() - t0), 60)
+        print(f"\r  design {design}/{designs}  map {done}/{points} points  (elapsed {m}:{sec:02d})",
+              end="\n" if done == points else "", flush=True)
+
+    res = run_search(req, SearchSettings(n_candidates=n, shortlist=shortlist), point_progress=on_point)
     print(f"sampled {res.sampled}, dropped {res.dropped}, stage 1 rejected {res.stage1_rejected}, "
           f"evaluated {len(res.evaluations)} in {time.perf_counter() - t0:.0f} s")
     front = {e.id for e in res.pareto()}

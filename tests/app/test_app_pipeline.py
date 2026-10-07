@@ -123,3 +123,21 @@ def test_search_candidates_use_the_settings_materials():
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, materials=RegionMaterials()))
     assert ev.call_args.args[0].design.machine.materials == RegionMaterials()
     assert ev.call_args.kwargs["margin"] == pytest.approx(1.12)
+
+
+def test_point_progress_reaches_each_stage_two_map():
+    seen = []
+
+    def fake(candidate, req, stage, **kw):
+        kw["progress"](5, 10)
+        return _fake(candidate, req, stage, **kw)
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=fake):
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0), SearchSettings(n_candidates=12, shortlist=2, seed=1),
+                   point_progress=lambda *a: seen.append(a))
+    assert seen == [(1, 2, 5, 10), (2, 2, 5, 10)]
+
+
+def test_no_point_progress_passes_none():
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0), SearchSettings(n_candidates=4, shortlist=1, seed=1))
+    assert ev.call_args.kwargs["progress"] is None

@@ -63,7 +63,10 @@ class SearchResult:
 def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *, solver: str = "ngsolve",
                workers: int | None = None, cache_dir=None,
                progress: Callable[[int, int], None] | None = None,
+               point_progress: Callable[[int, int, int, int], None] | None = None,
                cancel: Callable[[], bool] | None = None) -> SearchResult:
+    """`progress(done, total)` after each stage-2 design; `point_progress(design, designs, points_done, points)`
+    while each design's map is built."""
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed,
                                            materials=settings.materials)
     margin = settings.resolved_margin
@@ -78,10 +81,12 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
         if cancel is not None and cancel():
             cancelled = True
             break
+        on_point = None if point_progress is None else (
+            lambda d, t, i=done, n=len(shortlist): point_progress(i, n, d, t))
         evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, j_peak=settings.j_peak,
                                      j_limit=settings.j_limit, j_peak_max=settings.peak_cap,
                                      margin=margin, solver=solver, workers=workers,
-                                     cache_dir=cache_dir, cancel=cancel)
+                                     cache_dir=cache_dir, progress=on_point, cancel=cancel)
         if evaluation.status == "cancelled":
             cancelled = True
             break
