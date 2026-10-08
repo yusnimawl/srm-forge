@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/sonner"
 import { LoginPage } from "@/pages/LoginPage"
 import { NewSearchPage } from "@/pages/NewSearchPage"
 import { Placeholder } from "@/pages/Placeholder"
+import { RunPage } from "@/pages/RunPage"
+import { RunsPage } from "@/pages/RunsPage"
 
 const queryClient = new QueryClient()
 
@@ -16,8 +18,8 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <Navigate to="/search" replace /> },
       { path: "/search", element: <NewSearchPage /> },
-      { path: "/runs", element: <Placeholder title="Runs" /> },
-      { path: "/runs/:jobId", element: <Placeholder title="Run" /> },
+      { path: "/runs", element: <RunsPage /> },
+      { path: "/runs/:jobId", element: <RunPage /> },
       { path: "/runs/:jobId/candidates/:candidateId", element: <Placeholder title="Candidate" /> },
       { path: "/settings", element: <Placeholder title="Settings" /> },
     ],
