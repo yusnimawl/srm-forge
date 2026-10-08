@@ -87,12 +87,13 @@ class IssueOut(BaseModel):
 class IssuesOut(BaseModel):
     errors: list[IssueOut]
     warnings: list[IssueOut]
+    margin: float | None = None   # the feasibility margin the inputs imply, when they parse
 
 
 class EstimateOut(BaseModel):
     new_map: bool
-    seconds: float | None = None
-    basis: Literal["history", "budget"] | None = None
+    seconds: float      # a new map (when new_map) plus the winding choice
+    basis: Literal["history", "budget"]
 
 
 class JobCreated(BaseModel):

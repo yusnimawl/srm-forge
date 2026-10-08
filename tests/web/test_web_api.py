@@ -237,8 +237,8 @@ def test_evaluate_payload_is_validated_first(make):
 def test_resume_keeps_kind_and_request(make):
     c = make()
     store = c.app.state.store
-    old = store.create_job("evaluate", {"case_id": "abc", "inputs": {}})
+    old = store.create_job("search", {"requirements": REQ})
     store.set_status(old, "failed")
     new = c.post(f"/api/jobs/{old}/resume").json()["id"]
     got = store.get_job(new)
-    assert got["kind"] == "evaluate" and got["request"] == store.get_job(old)["request"]
+    assert got["kind"] == "search" and got["request"] == store.get_job(old)["request"]

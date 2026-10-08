@@ -673,12 +673,15 @@ export interface components {
         };
         /** EstimateOut */
         EstimateOut: {
-            /** Basis */
-            basis?: ("history" | "budget") | null;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "history" | "budget";
             /** New Map */
             new_map: boolean;
             /** Seconds */
-            seconds?: number | null;
+            seconds: number;
         };
         /** EvaluateBody */
         EvaluateBody: {
@@ -798,6 +801,8 @@ export interface components {
         IssuesOut: {
             /** Errors */
             errors: components["schemas"]["IssueOut"][];
+            /** Margin */
+            margin?: number | null;
             /** Warnings */
             warnings: components["schemas"]["IssueOut"][];
         };
@@ -1082,8 +1087,11 @@ export interface components {
         /** ReferenceOut */
         ReferenceOut: {
             machine: components["schemas"]["RadialSRMParams"];
-            /** Name */
-            name: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "8/6" | "12/8" | "24/16";
         };
         /** RegionMaterials */
         RegionMaterials: {
@@ -1318,6 +1326,11 @@ export interface components {
             material_grades: {
                 [key: string]: string;
             };
+            /**
+             * Reference Turns
+             * @default 20
+             */
+            reference_turns: number;
         };
         /** WindingOut */
         WindingOut: {

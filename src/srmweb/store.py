@@ -40,10 +40,12 @@ _SCHEMA = (
         body TEXT NOT NULL)""",
     "CREATE TABLE map_times (preset TEXT NOT NULL, seconds REAL NOT NULL,"
     " finished TEXT NOT NULL)",
+    "CREATE TABLE scan_times (mode TEXT NOT NULL, seconds REAL NOT NULL, finished TEXT NOT NULL)",
     "CREATE INDEX results_job ON results (job_id)",
     "CREATE INDEX results_case ON results (case_id)",
     "CREATE INDEX cases_job ON cases (job_id)",
     "CREATE INDEX map_times_preset ON map_times (preset)",
+    "CREATE INDEX scan_times_mode ON scan_times (mode)",
 )
 
 # v1 -> v2: cases and results change shape; search results are kept.
@@ -164,14 +166,24 @@ class Store:
                    case_id: str | None = None):
         if kind not in RESULT_KINDS:
             raise ValueError(f"unknown result kind {kind!r}")
-        text = _dumps(body)
+        if kind == "evaluate" and case_id is not None:
+            raise ValueError("an evaluation is attached to a case with attach_evaluation")
         with self._db() as con:
             con.execute(
                 "INSERT INTO results (job_id, case_id, kind, body) VALUES (?, ?, ?, ?)",
-                (job_id, case_id, kind, text))
-            if kind == "evaluate" and case_id is not None:
-                con.execute("UPDATE cases SET stale = 0, job_id = ? WHERE id = ?",
-                            (job_id, case_id))
+                (job_id, case_id, kind, _dumps(body)))
+
+    def attach_evaluation(self, case_id: str, job_id: str | None, body: dict) -> bool:
+        """Store an evaluation as the case's and mark the case evaluated, but only while the case is stale: an
+        evaluated case never changes. Otherwise (case evaluated or gone) the body is stored as the job's own
+        result and False is returned."""
+        text = _dumps(body)
+        with self._db() as con:
+            attached = con.execute("UPDATE cases SET stale = 0, job_id = ? WHERE id = ? AND stale = 1",
+                                   (job_id, case_id)).rowcount > 0
+            con.execute("INSERT INTO results (job_id, case_id, kind, body) VALUES (?, ?, 'evaluate', ?)",
+                        (job_id, case_id if attached else None, text))
+        return attached
 
     def get_result(self, job_id: str) -> dict | None:
         """The job's own result; case results are read with `case_result`."""
@@ -261,6 +273,19 @@ class Store:
             rows = con.execute(
                 "SELECT seconds FROM map_times WHERE preset = ?"
                 " ORDER BY finished DESC, rowid DESC LIMIT ?", (preset, n)).fetchall()
+        return [r["seconds"] for r in rows]
+
+    def add_scan_time(self, mode: str, seconds: float):
+        with self._db() as con:
+            con.execute("INSERT INTO scan_times (mode, seconds, finished) VALUES (?, ?, ?)",
+                        (mode, seconds, _now()))
+
+    def recent_scan_times(self, mode: str, n: int = 5) -> list[float]:
+        """Seconds the winding choice took after a map, per winding mode ("auto" or "fixed"); newest first."""
+        with self._db() as con:
+            rows = con.execute(
+                "SELECT seconds FROM scan_times WHERE mode = ?"
+                " ORDER BY finished DESC, rowid DESC LIMIT ?", (mode, n)).fetchall()
         return [r["seconds"] for r in rows]
 
     def mark_running_interrupted(self) -> int:

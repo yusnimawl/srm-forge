@@ -18,37 +18,35 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import Field, ValidationError
+from pydantic import Field
 from scipy.io import savemat
 
 import srmcore
 import srmweb
-from srmapp.case import LIMIT_FIELDS, CaseInputs, map_cache_hit, map_request
+from srmapp.case import LIMIT_FIELDS, CaseInputs
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
 from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
-from srmcore.model.validator import validate_params
 from srmweb.auth import Sessions, auth_router, require_auth
+from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
 from srmweb.config import Settings
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
 from srmweb.schemas import (CandidateCase, CasePatch, EditCase, EstimateOut,
                             EvaluateBody, EvaluateRequest, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
-                            ValidateIn, ValidateRequest, soft_magnetic)
+                            ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
-                          setup_from_case)
+                          setup_from_case, setup_loc)
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
 _KEEPALIVE_S = 15.0
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 MAX_SHOWN_CASES = 6
-BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
 CaseCreate = Annotated[CandidateCase | ReferenceCase | EditCase | ImportCase, Field(discriminator="origin")]
-_WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 _EVALUATED = ("status", "torque_ratio", "power_ratio", "peak_power_w", "mass_kg",
               "power_density_kw_per_kg", "efficiency_base", "feasible")
 
@@ -68,50 +66,6 @@ def _summary(case: dict, evaluation: dict | None, validation: dict | None) -> di
         "poles": f"{ns}/{nr}" if isinstance(ns, int) and isinstance(nr, int) else None,
         **{k: (evaluation or {}).get(k) for k in _EVALUATED},
         "validated": bool(validation and validation.get("label"))}
-
-
-def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
-    """Validate a case's raw inputs: the parsed inputs (None when there are errors), the errors and the
-    warnings, each `{"loc", "msg"}` with `loc` relative to the inputs."""
-    try:
-        inputs = CaseInputs.model_validate(raw)
-    except ValidationError as exc:
-        return None, [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()], []
-    errors, warnings = [], []
-    for issue in validate_params(inputs.design.machine):
-        out = {"loc": ["design", "machine", issue.parameter], "msg": f"[{issue.rule}] {issue.message}"}
-        (errors if issue.severity == "error" else warnings).append(out)
-    if errors:
-        return None, errors, warnings
-    materials = inputs.design.machine.materials
-    for region in ("stator", "rotor"):
-        try:
-            soft_magnetic(getattr(materials, region))
-        except ValueError as exc:
-            errors.append({"loc": ["design", "machine", "materials", region], "msg": str(exc)})
-    if errors:
-        return None, errors, warnings
-    try:
-        _, _, stage = map_request(inputs)
-    except ValueError as exc:
-        field = _WINDING_FIELD.match(str(exc)) if inputs.winding != "auto" else None
-        return None, [{"loc": ["winding", field[1]] if field else [], "msg": str(exc)}], warnings
-    except Exception as exc:   # the check must always answer; the job would fail with the same message
-        return None, [{"loc": [], "msg": f"{type(exc).__name__}: {exc}"}], warnings
-    if not stage.passes:
-        warnings.append({"loc": [], "msg": f"stage 1: {stage.reason}"})
-    return inputs, errors, warnings
-
-
-def _setup_loc(loc: list) -> list:
-    """A `check_case` loc (relative to the case inputs) as the path of the same value in a setup file."""
-    if loc[:3] == ["design", "machine", "materials"]:
-        return ["materials", *loc[3:]]
-    if loc[:2] == ["design", "machine"]:
-        return ["geometry", "machine", *loc[2:]]
-    if len(loc) == 2 and loc[0] == "winding":
-        return ["winding", "fixed", loc[1]]
-    return loc
 
 
 def _file_name(label: str) -> str:
@@ -154,7 +108,7 @@ def create_app(settings: Settings,
         yield
         runner.stop()
 
-    app = FastAPI(title="srmweb", lifespan=lifespan, docs_url=None, redoc_url=None,
+    app = FastAPI(title="srmweb", version=srmweb.__version__, lifespan=lifespan, docs_url=None, redoc_url=None,
                   openapi_url=None)
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -247,6 +201,15 @@ def create_app(settings: Settings,
         job = job_or_404(job_id)
         if job["status"] not in RESUMABLE:
             raise HTTPException(409, f"cannot resume a {job['status']} job")
+        if job["kind"] != "search":
+            case = store.get_case(job["request"]["case_id"])
+            if case is None:
+                raise HTTPException(409, "the job's case was deleted")
+            if job["kind"] == "evaluate":
+                inputs = check_case(case["inputs"])[0]
+                if (not case["stale"] or inputs is None
+                        or inputs.model_dump(mode="json") != job["request"]["inputs"]):
+                    raise HTTPException(409, "evaluate the case again")
         return _submit(runner, job["kind"], job["request"])
 
     @router.delete("/jobs/{job_id}", status_code=204)
@@ -315,7 +278,7 @@ def create_app(settings: Settings,
         case_id = store.create_case(
             origin="candidate", inputs=inputs.model_dump(mode="json"), job_id=body.job_id, stale=True,
             label=f"{machine.n_stator_poles}/{machine.n_rotor_poles} {body.candidate_id}")
-        store.put_result(body.job_id, ev, kind="evaluate", case_id=case_id)   # also clears stale
+        store.attach_evaluation(case_id, body.job_id, ev)
         return case_id
 
     def reference_case(body: ReferenceCase) -> str:
@@ -339,7 +302,7 @@ def create_app(settings: Settings,
             return _invalid([{"loc": [], "msg": str(exc)}], [])
         inputs, errors, warnings = check_case(raw.model_dump(mode="json"))
         if inputs is None:
-            return _invalid([{**e, "loc": _setup_loc(e["loc"])} for e in errors], warnings)
+            return _invalid([{**e, "loc": setup_loc(e["loc"])} for e in errors], warnings)
         return store.create_case(origin="import", inputs=inputs.model_dump(mode="json"),
                                  label="imported setup", stale=True)
 
@@ -377,7 +340,7 @@ def create_app(settings: Settings,
     @router.post("/validate", response_model=IssuesOut)
     def validate_inputs(body: ValidateIn):
         _, errors, warnings = check_case(body.inputs)
-        return {"errors": errors, "warnings": warnings}
+        return {"errors": errors, "warnings": warnings, "margin": resolved_margin(body.inputs)}
 
     @router.post("/cases/{case_id}/evaluate", status_code=201, response_model=JobCreated)
     def evaluate_case(case_id: str, body: EvaluateBody | None = None):
@@ -410,13 +373,7 @@ def create_app(settings: Settings,
         inputs, errors, warnings = check_case(case_or_404(case_id)["inputs"])
         if inputs is None:
             return _invalid(errors, warnings)
-        if map_cache_hit(inputs, settings.cache_dir):
-            return {"new_map": False}
-        preset = inputs.design.mesh.preset
-        times = store.recent_map_times(preset)
-        if times:
-            return {"new_map": True, "seconds": sum(times) / len(times), "basis": "history"}
-        return {"new_map": True, "seconds": BUDGET_S[preset], "basis": "budget"}
+        return estimate_case(inputs, store, settings.cache_dir)
 
     @router.get("/cases/{case_id}/setup", response_model=SetupFile,
                 response_model_exclude=NO_MACHINE_MATERIALS | {"search": True})

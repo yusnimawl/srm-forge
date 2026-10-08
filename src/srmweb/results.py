@@ -1,11 +1,13 @@
 """Response models of the web API. Every float is `float | None` because NaN and inf arrive as null."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from srmapp.references import REFERENCES
 from srmapp.requirements import Requirements
+from srmapp.sizing.generator import REFERENCE_TURNS
 from srmcore.model.design import Design, RadialSRMParams
 from srmweb.schemas import JobOut
 
@@ -141,6 +143,7 @@ class ValidationOut(_Out):
     budget: BudgetOut
     engine_version: str
     material_grades: dict[str, str]
+    reference_turns: int = REFERENCE_TURNS   # the turns per pole its absolute key numbers refer to
 
 
 class MaterialOut(_Out):
@@ -151,7 +154,7 @@ class MaterialOut(_Out):
 
 
 class ReferenceOut(_Out):
-    name: str
+    name: Literal[tuple(REFERENCES)]    # type: ignore[valid-type]
     machine: RadialSRMParams
 
 

@@ -105,6 +105,7 @@ def test_v1_database_migrates_and_keeps_runs(tmp_path):
     c = s.create_case(origin="reference", inputs={}, label="r", stale=True)
     assert s.get_case(c)["show_in_graphs"] is False
     s.add_map_time("full", 1.0)
+    s.add_scan_time("auto", 1.0)
     Store(p)  # reopening a v2 file is a no-op
     assert s.get_result("j1") == {"x": 1}
 
@@ -143,26 +144,43 @@ def test_case_roundtrip_and_update(tmp_path):
     assert s.update_case("nope", label="x") is False
 
 
-def test_evaluate_result_clears_stale_and_sets_job(tmp_path):
+def test_attach_evaluation_marks_a_stale_case_evaluated_once(tmp_path):
     s = Store(tmp_path / "a.db")
     c = s.create_case(origin="edit", inputs={}, label="e", stale=True)
     j = s.create_job("evaluate", {"case_id": c})
-    s.put_result(j, {"v": 1}, kind="evaluate", case_id=c)
+    assert s.attach_evaluation(c, j, {"v": 1}) is True
     got = s.get_case(c)
     assert got["stale"] is False and got["job_id"] == j
     assert s.case_result(c, "evaluate") == {"v": 1}
     assert s.case_result(c, "validate") is None
     s.put_result(None, {"v": 2}, kind="validate", case_id=c)
-    s.put_result(j, {"v": 3}, kind="evaluate", case_id=c)
-    assert s.case_result(c, "evaluate") == {"v": 3}
+    j2 = s.create_job("evaluate", {"case_id": c})
+    assert s.attach_evaluation(c, j2, {"v": 3}) is False      # an evaluated case never changes
+    assert s.case_result(c, "evaluate") == {"v": 1} and s.get_case(c)["job_id"] == j
+    assert s.get_result(j2) == {"v": 3}                       # the body stays the job's own result
     assert s.case_result(c, "validate") == {"v": 2}
+
+
+def test_attach_evaluation_to_a_deleted_case_leaves_no_orphan(tmp_path):
+    s = Store(tmp_path / "a.db")
+    c = s.create_case(origin="edit", inputs={}, label="e", stale=True)
+    s.delete_case(c)
+    j = s.create_job("evaluate", {"case_id": c})
+    assert s.attach_evaluation(c, j, {"v": 1}) is False
+    assert s.case_result(c, "evaluate") is None and s.get_result(j) == {"v": 1}
+
+
+def test_put_result_does_not_attach_evaluations(tmp_path):
+    s = Store(tmp_path / "a.db")
+    with pytest.raises(ValueError):
+        s.put_result("j", {}, kind="evaluate", case_id="c")
 
 
 def test_get_result_ignores_case_results(tmp_path):
     s = Store(tmp_path / "a.db")
     c = s.create_case(origin="edit", inputs={}, label="e", stale=True)
     j = s.create_job("evaluate", {})
-    s.put_result(j, {"case": 1}, kind="evaluate", case_id=c)
+    s.attach_evaluation(c, j, {"case": 1})
     assert s.get_result(j) is None
     s.put_result(j, {"run": 1}, kind="search")
     assert s.get_result(j) == {"run": 1}
@@ -171,8 +189,8 @@ def test_get_result_ignores_case_results(tmp_path):
 def test_delete_job_keeps_cases(tmp_path):
     s = Store(tmp_path / "a.db")
     j = s.create_job("evaluate", {})
-    c = s.create_case(origin="edit", inputs={}, label="e", job_id=j, stale=False)
-    s.put_result(j, {"case": 1}, kind="evaluate", case_id=c)
+    c = s.create_case(origin="edit", inputs={}, label="e", job_id=j, stale=True)
+    s.attach_evaluation(c, j, {"case": 1})
     s.put_result(j, {"run": 1}, kind="search")
     assert s.delete_job(j) is True
     assert s.get_result(j) is None
@@ -196,6 +214,16 @@ def test_case_jobs(tmp_path):
     s.create_job("search", {})
     b = s.create_job("validate", {"case_id": c})
     assert [j["id"] for j in s.case_jobs(c)] == [b, a]
+
+
+def test_recent_scan_times(tmp_path):
+    s = Store(tmp_path / "a.db")
+    for i in range(7):
+        s.add_scan_time("auto", float(i))
+    s.add_scan_time("fixed", 99.0)
+    assert s.recent_scan_times("auto") == [6.0, 5.0, 4.0, 3.0, 2.0]
+    assert s.recent_scan_times("fixed", 3) == [99.0]
+    assert s.recent_scan_times("other") == []
 
 
 def test_recent_map_times(tmp_path):

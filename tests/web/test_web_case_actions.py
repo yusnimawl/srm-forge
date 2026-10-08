@@ -15,7 +15,7 @@ from conftest import make_8_6
 from srmapp.case import CaseInputs
 from srmapp.requirements import Requirements
 from srmcore.model.design import Design, MeshSettings
-from srmweb import api
+from srmweb import api, cases
 from srmweb.api import create_app
 from srmweb.config import Settings
 from srmweb.jobs import JobRunner
@@ -96,7 +96,14 @@ def _validate(client, inputs):
 
 
 def test_validate_valid_design(client):
-    assert _validate(client, _inputs()) == {"errors": [], "warnings": []}
+    out = _validate(client, _inputs())
+    margin = CaseInputs.model_validate(_inputs()).search_settings().resolved_margin
+    assert out == {"errors": [], "warnings": [], "margin": pytest.approx(margin)}
+    assert _validate(client, _inputs() | {"margin": 1.3})["margin"] == 1.3
+
+
+def test_validate_margin_is_null_when_the_inputs_do_not_parse(client):
+    assert _validate(client, {"design": {}})["margin"] is None
 
 
 def test_validate_extra_key_and_non_object(client):
@@ -119,6 +126,14 @@ def test_validate_fixed_winding(client):
     out = _validate(client, _inputs() | {"winding": {"turns": 10, "paths": 3}})
     assert [e["loc"] for e in out["errors"]] == [["winding", "paths"]]
     assert _validate(client, _inputs() | {"winding": {"turns": 10}})["errors"] == []
+
+
+@pytest.mark.parametrize("winding, field", [({}, "turns"), ({"turns": 0}, "turns"),
+                                            ({"turns": 10, "strands": 0}, "strands")])
+def test_validate_fixed_winding_field_errors_sit_at_the_field(client, winding, field):
+    errors = _validate(client, _inputs() | {"winding": winding})["errors"]
+    assert [e["loc"] for e in errors] == [["winding", field]]
+    assert "'auto'" not in errors[0]["msg"]
 
 
 def test_validate_stage1_reason_is_a_warning(client):
@@ -210,27 +225,39 @@ def test_running_validate_cannot_be_cancelled_but_queued_one_can(client):
 def test_estimate_without_history_uses_the_budget(client):
     pytest.importorskip("ngsolve")
     case_id = _draft(client, _inputs("full"))
-    assert client.get(f"/api/cases/{case_id}/estimate").json() == {"new_map": True, "seconds": 1560.0, "basis": "budget"}
+    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+        "new_map": True, "seconds": 1560.0 + 450.0, "basis": "budget"}
     case_id = _draft(client, _inputs("screening"))
-    assert client.get(f"/api/cases/{case_id}/estimate").json()["seconds"] == 228.0
+    assert client.get(f"/api/cases/{case_id}/estimate").json()["seconds"] == 228.0 + 450.0
+    fixed = _inputs("screening") | {"winding": {"turns": 10}}
+    assert client.get(f"/api/cases/{_draft(client, fixed)}/estimate").json()["seconds"] == 228.0 + 15.0
 
 
-def test_estimate_uses_recent_map_times(client):
+def test_estimate_uses_recent_map_and_scan_times(client):
     pytest.importorskip("ngsolve")
     store = client.app.state.store
     store.add_map_time("full", 100.0)
     store.add_map_time("full", 200.0)
     store.add_map_time("screening", 5.0)
-    out = client.get(f"/api/cases/{_draft(client, _inputs('full'))}/estimate").json()
-    assert out == {"new_map": True, "seconds": 150.0, "basis": "history"}
+    case_id = _draft(client, _inputs("full"))
+    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+        "new_map": True, "seconds": 150.0 + 450.0, "basis": "budget"}     # no scan history yet
+    store.add_scan_time("auto", 60.0)
+    store.add_scan_time("auto", 80.0)
+    store.add_scan_time("fixed", 1.0)
+    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+        "new_map": True, "seconds": 150.0 + 70.0, "basis": "history"}
 
 
 def test_estimate_of_a_cached_map(client, monkeypatch):
     seen = []
-    monkeypatch.setattr(api, "map_cache_hit", lambda inputs, cache_dir: seen.append(cache_dir) or True)
-    out = client.get(f"/api/cases/{_draft(client, _inputs())}/estimate").json()
-    assert out == {"new_map": False, "seconds": None, "basis": None}
+    monkeypatch.setattr(cases, "map_cache_hit", lambda inputs, cache_dir: seen.append(cache_dir) or True)
+    case_id = _draft(client, _inputs())
+    out = client.get(f"/api/cases/{case_id}/estimate").json()
+    assert out == {"new_map": False, "seconds": 450.0, "basis": "budget"}     # only the winding choice remains
     assert seen == [client.app.state.settings.cache_dir]
+    client.app.state.store.add_scan_time("auto", 30.0)
+    assert client.get(f"/api/cases/{case_id}/estimate").json() == {"new_map": False, "seconds": 30.0, "basis": "history"}
 
 
 def test_estimate_of_invalid_inputs_422(client):
@@ -287,6 +314,43 @@ def test_unexpected_map_request_failure_is_an_error(client, monkeypatch):
     def boom(inputs):
         raise RuntimeError("kaboom")
 
-    monkeypatch.setattr(api, "map_request", boom)
+    monkeypatch.setattr(cases, "map_request", boom)
     out = _validate(client, _inputs())
     assert out["errors"] == [{"loc": [], "msg": "RuntimeError: kaboom"}]
+
+
+def _job_for(client, case_id, kind, status="cancelled"):
+    store = client.app.state.store
+    case = store.get_case(case_id)
+    inputs = CaseInputs.model_validate(case["inputs"]).model_dump(mode="json")
+    job_id = store.create_job(kind, {"case_id": case_id, "inputs": inputs})
+    store.set_status(job_id, status)
+    return job_id
+
+
+def test_resume_of_an_evaluate_job_needs_the_same_stale_case(client):
+    case_id = _draft(client)
+    job_id = _job_for(client, case_id, "evaluate")
+    client.patch(f"/api/cases/{case_id}", json={"inputs": _inputs("full")})              # (b) the draft was edited
+    r = client.post(f"/api/jobs/{job_id}/resume")
+    assert r.status_code == 409 and r.json()["detail"] == "evaluate the case again"
+    current = _job_for(client, case_id, "evaluate")
+    assert client.post(f"/api/jobs/{current}/resume").status_code == 201                  # unchanged draft resumes
+    evaluated = _evaluated(client)
+    old = _job_for(client, evaluated, "evaluate")                                         # (a) already evaluated
+    r = client.post(f"/api/jobs/{old}/resume")
+    assert r.status_code == 409 and r.json()["detail"] == "evaluate the case again"
+
+
+@pytest.mark.parametrize("kind", ["evaluate", "validate"])
+def test_resume_of_a_job_whose_case_was_deleted_409(client, kind):
+    case_id = _draft(client)
+    job_id = _job_for(client, case_id, kind)
+    assert client.delete(f"/api/cases/{case_id}").status_code == 204
+    assert client.post(f"/api/jobs/{job_id}/resume").status_code == 409
+    assert client.app.state.store.case_result(case_id, "evaluate") is None
+
+
+def test_resume_of_a_validate_job_of_an_existing_case(client):
+    job_id = _job_for(client, _evaluated(client, "full"), "validate")
+    assert client.post(f"/api/jobs/{job_id}/resume").status_code == 201

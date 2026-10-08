@@ -156,9 +156,12 @@ class JobRunner:
         try:
             result = self._run_fn(job["kind"], job["request"], reporter)
             cancelled = bool(result.get("cancelled"))
-            # A cancelled evaluation must not mark its case as evaluated.
-            self._store.put_result(job_id, result, kind=job["kind"],
-                                   case_id=None if cancelled else job["request"].get("case_id"))
+            if cancelled:   # a cancelled evaluation must not mark its case as evaluated
+                self._store.put_result(job_id, result, kind=job["kind"])
+            elif job["kind"] == "evaluate":
+                self._store.attach_evaluation(job["request"]["case_id"], job_id, result)
+            else:
+                self._store.put_result(job_id, result, kind=job["kind"], case_id=job["request"].get("case_id"))
             if cancelled:
                 status = "interrupted" if self._stopping else "cancelled"
         except Exception as exc:
@@ -197,24 +200,32 @@ def run_search_job(req: SearchRequest, reporter: Reporter, settings: Settings) -
 
 
 def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, settings: Settings) -> dict:
-    first = last = None
+    t0 = time.monotonic()
+    last = scan_start = None
     counts = (0, 0)
 
     def on_point(done: int, total: int) -> None:
-        nonlocal first, last, counts
-        last = time.monotonic()
-        first = last if first is None else first
-        counts = (done, total)
-        reporter.progress(points_done=done, points_total=total, message="mapping")
+        nonlocal last, counts
+        last, counts = time.monotonic(), (done, total)
+        reporter.progress(points_done=done, points_total=total,
+                          message="mapping" if done < total else "choosing the winding")
+
+    def on_scan() -> None:   # the map is complete, built or cached
+        nonlocal scan_start
+        scan_start = time.monotonic()
+        reporter.progress(message="choosing the winding")
 
     reporter.progress(message="mapping")
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
-    ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers,
-                         cache_dir=settings.cache_dir, progress=on_point, cancel=reporter.cancelled, **grid)
+    ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
+                         progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
-    if first is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
-        reporter.store.add_map_time(req.inputs.design.mesh.preset, last - first)
+    if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
+        reporter.store.add_map_time(req.inputs.design.mesh.preset, last - t0)
+    if scan_start is not None:
+        mode = "auto" if req.inputs.winding == "auto" else "fixed"
+        reporter.store.add_scan_time(mode, time.monotonic() - scan_start)
     return evaluation_json(ev)
 
 

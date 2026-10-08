@@ -38,6 +38,14 @@ def test_fixed_winding_density_mode():
     assert (w.turns, w.strands, w.paths, w.wire) == (10, 1, 2, None)
 
 
+def test_fixed_winding_density_mode_respects_the_phase_current_limit():
+    carried = fixed_winding(P, _req(), turns=10, strands=1, paths=1, wire=None, j_peak=8e6).current
+    ok = fixed_winding(P, _req(phase_current_a=carried), turns=10, strands=1, paths=1, wire=None, j_peak=8e6)
+    assert ok.current == pytest.approx(carried)
+    with pytest.raises(ValueError, match="^turns .*phase current limit"):
+        fixed_winding(P, _req(phase_current_a=carried * 0.9), turns=10, strands=1, paths=1, wire=None, j_peak=8e6)
+
+
 def test_fixed_winding_wire_mode():
     req = _req(wires=[THICK], phase_current_a=40.0)
     w = fixed_winding(P, req, turns=2, strands=2, paths=1, wire=0, j_peak=0.0)

@@ -1054,38 +1054,26 @@
       "EstimateOut": {
         "properties": {
           "basis": {
-            "anyOf": [
-              {
-                "enum": [
-                  "history",
-                  "budget"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "history",
+              "budget"
             ],
-            "title": "Basis"
+            "title": "Basis",
+            "type": "string"
           },
           "new_map": {
             "title": "New Map",
             "type": "boolean"
           },
           "seconds": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Seconds"
+            "title": "Seconds",
+            "type": "number"
           }
         },
         "required": [
-          "new_map"
+          "new_map",
+          "seconds",
+          "basis"
         ],
         "title": "EstimateOut",
         "type": "object"
@@ -1502,6 +1490,17 @@
             },
             "title": "Errors",
             "type": "array"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
           },
           "warnings": {
             "items": {
@@ -2351,6 +2350,11 @@
             "$ref": "#/components/schemas/RadialSRMParams"
           },
           "name": {
+            "enum": [
+              "8/6",
+              "12/8",
+              "24/16"
+            ],
             "title": "Name",
             "type": "string"
           }
@@ -2994,6 +2998,11 @@
             },
             "title": "Material Grades",
             "type": "object"
+          },
+          "reference_turns": {
+            "default": 20,
+            "title": "Reference Turns",
+            "type": "integer"
           }
         },
         "required": [
@@ -3168,7 +3177,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {

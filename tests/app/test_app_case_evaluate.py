@@ -57,6 +57,15 @@ def test_fixed_density_winding_is_evaluated_alone():
     assert i_map == pytest.approx(stage.i_map)      # a density winding carries exactly the stage-1 ampere-turns
 
 
+def test_on_scan_is_called_once_when_the_map_is_complete():
+    from srmapp.evaluate import choose_turns
+    calls = []
+    with mock.patch("srmapp.evaluate.build_map", side_effect=lambda *a, **kw: calls.append("map") or _fake_map(*a, **kw)),             mock.patch("srmapp.evaluate.choose_turns",
+                       side_effect=lambda *a, **kw: calls.append("scan") or choose_turns(*a, **kw)):
+        e = evaluate_design(_inputs(winding=FixedWinding(turns=10)), on_scan=lambda: calls.append("on_scan"))
+    assert calls == ["map", "on_scan", "scan"] and e.status == "ok"
+
+
 def test_fixed_beyond_the_search_range_extends_the_map():
     # a 1 A/mm2 peak cap limits the search to 150 A-turns; the user's 600 A-turns winding still gets its map
     req = _req(wires=[THICK], phase_current_a=100.0)

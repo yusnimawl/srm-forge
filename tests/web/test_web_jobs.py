@@ -261,6 +261,46 @@ def test_evaluate_job_records_map_time(make, monkeypatch):
     assert got["case_id"] == "c1"
 
 
+def test_evaluate_job_records_the_scan_per_winding_mode(make, monkeypatch):
+    def fake(inputs, *, progress, on_scan, **kw):
+        progress(3, 3)
+        on_scan()
+        time.sleep(0.05)
+        return _Ev()
+
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
+    got = _wait(store, j, {"done", "failed"})
+    assert got["status"] == "done" and got["progress"]["message"] == "choosing the winding"
+    (seconds,) = store.recent_scan_times("auto")
+    assert 0.04 < seconds < 5 and store.recent_scan_times("fixed") == []
+    fixed = _inputs() | {"winding": {"turns": 10}}
+    j = runner.submit("evaluate", {"case_id": "c1", "inputs": fixed})
+    _wait(store, j, {"done", "failed"})
+    assert len(store.recent_scan_times("fixed")) == 1
+
+
+def test_cached_map_records_a_scan_but_no_map_time(make, monkeypatch):
+    def fake(inputs, *, on_scan, **kw):
+        on_scan()
+        return _Ev()
+
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
+    assert _wait(store, j, {"done", "failed"})["status"] == "done"
+    assert len(store.recent_scan_times("auto")) == 1 and store.recent_map_times("screening") == []
+
+
+def test_evaluation_of_a_deleted_case_is_not_attached(make, monkeypatch):
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=lambda inputs, **kw: _Ev())
+    j = runner.submit("evaluate", {"case_id": "gone", "inputs": _inputs()})
+    assert _wait(store, j, {"done", "failed"})["status"] == "done"
+    assert store.case_result("gone", "evaluate") is None and store.get_result(j) == {"status": "ok"}
+
+
 def test_partial_map_records_no_time(make, monkeypatch):
     def fake(inputs, *, progress, **kw):
         progress(1, 3)

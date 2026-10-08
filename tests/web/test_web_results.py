@@ -4,6 +4,17 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
+import dataclasses
+
+from srmapp.curves import MapCurves
+from srmapp.drive.envelope import Envelope
+from srmapp.evaluate import Evaluation, MapArrays
+from srmapp.sizing.winding import Winding
+from srmapp.turns import ScanPoint
+from srmcore.maps.checks import Check
+from srmcore.maps.results import KeyNumbers
+from srmcore.maps.validation import BudgetRow, EmValidation, UncertaintyBudget
+from srmweb import results
 from srmweb.serialize import evaluation_json
 from web_support import evaluation, make_client, store_search
 
@@ -12,6 +23,17 @@ from web_support import evaluation, make_client, store_search
 def client(tmp_path):
     with make_client(tmp_path) as c:
         yield c
+
+
+@pytest.mark.parametrize("engine, out", [
+    (Evaluation, results.EvaluationOut), (Winding, results.WindingOut), (KeyNumbers, results.KeyNumbersOut),
+    (Envelope, results.EnvelopeOut), (MapArrays, results.MapArraysOut), (MapCurves, results.MapCurvesOut),
+    (ScanPoint, results.ScanPointOut), (EmValidation, results.ValidationOut), (Check, results.CheckOut),
+    (UncertaintyBudget, results.BudgetOut), (BudgetRow, results.BudgetRowOut)])
+def test_response_models_keep_every_engine_field(engine, out):
+    """A field added to an engine result must be added to its response model, which drops unknown keys."""
+    missing = {f.name for f in dataclasses.fields(engine)} - out.model_fields.keys()
+    assert not missing, f"{out.__name__} lacks {sorted(missing)}"
 
 
 def test_curves_reach_the_evaluation_json():

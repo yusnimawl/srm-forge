@@ -75,8 +75,9 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
                     progress: Callable[[int, int], None] | None = None,
                     cancel: Callable[[], bool] | None = None, only: Winding | None = None,
-                    i_map: float | None = None) -> Evaluation:
-    """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max."""
+                    i_map: float | None = None, on_scan: Callable[[], None] | None = None) -> Evaluation:
+    """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max;
+    `on_scan` is called once the map is complete (built or cached), before the winding is chosen."""
     design = candidate.design
     machine = design.machine
     try:
@@ -86,6 +87,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         return _failed(candidate, stage, type(exc).__name__, str(exc))
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")
+    if on_scan is not None:
+        on_scan()
     # L_end scales with turns², so the correction at the reference turns stays exact under rescale_turns.
     l_end = end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR)
     result = with_end_winding(result, l_end)

@@ -97,3 +97,14 @@ def case_inputs_from_setup(s: SetupFile) -> CaseInputs:
     return CaseInputs(
         requirements=req, design=Design(machine=machine, mesh=MeshSettings(preset=s.geometry.preset)),
         winding=w.fixed if w.mode == "fixed" else "auto", **{k: getattr(w, k) for k in LIMIT_FIELDS})
+
+
+def setup_loc(loc: list) -> list:
+    """A `check_case` loc (relative to the case inputs) as the path of the same value in a setup file."""
+    if loc[:3] == ["design", "machine", "materials"]:
+        return ["materials", *loc[3:]]
+    if loc[:2] == ["design", "machine"]:
+        return ["geometry", "machine", *loc[2:]]
+    if len(loc) == 2 and loc[0] == "winding":
+        return ["winding", "fixed", loc[1]]
+    return loc
