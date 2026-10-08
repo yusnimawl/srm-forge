@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 export type CasePatch = components["schemas"]["CasePatch"]
 export type CaseCreate =
+  | components["schemas"]["CandidateCase"]
   | components["schemas"]["ReferenceCase"]
   | components["schemas"]["ImportCase"]
   | components["schemas"]["EditCase"]

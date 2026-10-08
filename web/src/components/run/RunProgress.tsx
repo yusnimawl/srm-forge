@@ -35,7 +35,7 @@ export function JobStatusBadge({ status }: { status: string }) {
   )
 }
 
-function Bar({ label, done, total }: { label: string; done: number; total: number }) {
+export function Bar({ label, done, total }: { label: string; done: number; total: number }) {
   return (
     <Progress value={total > 0 ? done : null} max={Math.max(total, 1)}>
       <ProgressLabel>{label}</ProgressLabel>

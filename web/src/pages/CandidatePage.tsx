@@ -1,9 +1,13 @@
 import { lazy, Suspense } from "react"
-import { Link, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
+import { toast } from "sonner"
+import { useCreateCase } from "@/api/cases"
 import { useRunResult } from "@/api/useRunResult"
 import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { WindingScan } from "@/components/candidate/WindingScan"
+import { Button } from "@/components/ui/button"
+import { errorMessage } from "@/lib/errorMessage"
 import { fmt, fmtSI } from "@/lib/format"
 import { UNIT_LABEL } from "@/lib/units"
 
@@ -25,6 +29,8 @@ function Item({ label, value, unit }: { label: string; value: string; unit?: str
 export function CandidatePage() {
   const { jobId = "", candidateId = "" } = useParams()
   const result = useRunResult(jobId)
+  const navigate = useNavigate()
+  const create = useCreateCase()
   const back = (
     <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2">
       Back to the run
@@ -57,6 +63,15 @@ export function CandidatePage() {
         <span className="text-sm">
           {ev.design.machine.n_stator_poles}/{ev.design.machine.n_rotor_poles} · {ev.status}
         </span>
+        <Button className="ml-auto min-h-11" disabled={ev.status !== "ok" || create.isPending}
+          onClick={() =>
+            create.mutate(
+              { origin: "candidate", job_id: jobId, candidate_id: ev.id },
+              { onSuccess: (made) => navigate(`/cases/${made.id}`), onError: (e) => toast.error(errorMessage(e)) },
+            )
+          }>
+          {create.isPending ? "Opening…" : "Open as case"}
+        </Button>
       </div>
       <Banner />
       {ev.error &&

@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from "react"
+import { useRef, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { importIssues, type SetupFile } from "@/api/cases"
 import { api, ApiError, submitSearch } from "@/api/client"
 import type { Material } from "@/api/types"
 import { Field, SELECT_CLASS } from "@/components/case/fields"
@@ -10,6 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { defaultSearchForm, fieldErrors, toSearchRequest, validateForm, type SearchFormValues } from "@/lib/searchForm"
+import { errorMessage } from "@/lib/errorMessage"
+import { applySearchSetup, download, searchSetup } from "@/lib/exports"
 import { cn } from "@/lib/utils"
 
 const QUEUE_FULL = "Queue full — wait for a run to finish"
@@ -29,6 +33,7 @@ export function NewSearchPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
+  const fileInput = useRef<HTMLInputElement>(null)
   const materials = useQuery({ queryKey: ["materials"], queryFn: () => api<Material[]>("/api/materials") })
 
   const set = <K extends keyof SearchFormValues>(key: K, value: SearchFormValues[K]) =>
@@ -61,6 +66,25 @@ export function NewSearchPage() {
     }
   }
 
+  // A setup file fills the requirements and search sections; any other section is ignored.
+  async function importSetup(file: File) {
+    try {
+      let json: unknown
+      try {
+        json = JSON.parse(await file.text())
+      } catch {
+        throw new Error(`${file.name} is not a JSON file`)
+      }
+      const checked = await api<SetupFile>("/api/setup/check", { method: "POST", body: JSON.stringify(json) })
+      if (!checked.requirements && !checked.search) throw new Error(`${file.name} has no requirements or search section`)
+      setV((old) => applySearchSetup(checked, old))
+      setErrors({})
+    } catch (e) {
+      const issues = importIssues(e)
+      toast.error(issues ? `${file.name}: ${issues.errors.map((i) => `${i.loc.filter((p) => p !== "body").join(".")} ${i.msg}`).join("; ")}` : errorMessage(e))
+    }
+  }
+
   const summary = Object.entries(errors).filter(([k]) => !FIELD_KEYS.has(k) && !/^requirements\.wires\.\d/.test(k))
 
   const materialSelect = (key: "stator" | "rotor", label: string) => {
@@ -83,7 +107,24 @@ export function NewSearchPage() {
 
   return (
     <form onSubmit={submit} noValidate className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-2xl font-semibold text-primary">New search</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold text-primary">New search</h1>
+        <div className="ml-auto flex gap-2">
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => fileInput.current?.click()}>
+            Import setup
+          </Button>
+          <Button type="button" variant="outline" className="min-h-11"
+            onClick={() => download("search.srm-setup.json", JSON.stringify(searchSetup(v), null, 2))}>
+            Export setup
+          </Button>
+        </div>
+        <input ref={fileInput} type="file" accept=".json,application/json" className="hidden" aria-label="Setup file"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ""
+            if (f) void importSetup(f)
+          }} />
+      </div>
 
       {summary.length > 0 && (
         <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

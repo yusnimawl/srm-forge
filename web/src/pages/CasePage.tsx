@@ -7,7 +7,9 @@ import { api } from "@/api/client"
 import type { Case, CaseInputs } from "@/api/types"
 import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
+import { CaseActions } from "@/components/case/CaseActions"
 import { InputTabs } from "@/components/case/InputTabs"
+import { ValidationPanel } from "@/components/case/ValidationPanel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { issueKey, tabOfKey, toForm, toInputs, useDebounced, validationByField, type CaseForm, type IssuesResponse } from "@/lib/caseForm"
@@ -53,24 +55,30 @@ function CaseEditor({ data }: { data: Case }) {
   const errors = useMemo(() => validationByField(issues ?? { errors: [] }), [issues])
   const unplaced = (issues?.errors ?? []).filter((e) => tabOfKey(issueKey(e.loc)) === null)
 
-  // Every edit is saved, valid or not. `flush` saves the newest inputs now and resolves when they are stored (or
-  // the save failed, which toasts and leaves them to be retried); saves run one after another.
+  // Every edit is saved, valid or not. `flush` saves the newest inputs now and resolves true once the stored inputs
+  // are the newest ones, false when the save failed (it toasts and the inputs are retried) or the form changed while
+  // saving; saves run one after another.
   const latest = useRef(now)
   latest.current = now
   const saved = useRef(now)
-  const queue = useRef(Promise.resolve())
-  const flush = (): Promise<void> => {
-    if (!editable) return queue.current
+  const [savedText, setSavedText] = useState(now)
+  const queue = useRef(Promise.resolve(true))
+  const flush = (): Promise<boolean> => {
+    if (!editable) return Promise.resolve(true)
     queue.current = queue.current.then(async () => {
       const body = latest.current
-      if (body === saved.current) return
-      const before = saved.current
-      saved.current = body
-      try {
-        await patch.mutateAsync({ id: data.id, patch: { inputs: JSON.parse(body) } })
-      } catch {
-        saved.current = before
+      if (body !== saved.current) {
+        const before = saved.current
+        saved.current = body
+        try {
+          await patch.mutateAsync({ id: data.id, patch: { inputs: JSON.parse(body) } })
+          setSavedText(body)
+        } catch {
+          saved.current = before
+          return false
+        }
       }
+      return latest.current === saved.current
     })
     return queue.current
   }
@@ -80,6 +88,11 @@ function CaseEditor({ data }: { data: Case }) {
     void flushRef.current()
   }, [text])
   useEffect(() => () => void flushRef.current(), [])
+
+  // Evaluate needs a draft with no errors, checked against the text now in the form. While a job runs the inputs are locked.
+  const ready = editable && text === now && check.data !== undefined && !check.isPlaceholderData && !check.isError &&
+    check.data.errors.length === 0
+  const running = data.jobs.some((j) => j.active)
 
   // The diagram keeps the last machine that passed validation; only errors under "design" hold it back.
   const machine = useMemo(() => JSON.parse(text).design?.machine as object | undefined, [text])
@@ -113,13 +126,8 @@ function CaseEditor({ data }: { data: Case }) {
             </Button>
           )}
         </div>
-        {data.validation?.label ? (
-          <div role="note" className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium">
-            {data.validation.label} (engine {data.validation.engine_version})
-          </div>
-        ) : (
-          <Banner />
-        )}
+        <Banner engineVersion={data.validation?.label ? data.validation.engine_version : null} />
+        <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>
 
@@ -153,7 +161,7 @@ function CaseEditor({ data }: { data: Case }) {
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}
-          <InputTabs form={form} update={update} errors={errors} readOnly={!editable} evaluation={evaluation} />
+          <InputTabs form={form} update={update} errors={errors} readOnly={!editable || running} evaluation={evaluation} />
         </section>
         <div className="min-w-0 space-y-6">
           <section aria-label="Motor diagram" className={pane("diagram")}>
@@ -163,9 +171,12 @@ function CaseEditor({ data }: { data: Case }) {
           <section aria-label="Results" className={pane("results", "min-w-0")}>
             {evaluation ? (
               evaluation.status === "ok" ? (
-                <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
-                  <AnalysisTabs evaluation={evaluation} label={data.label || data.id} />
-                </Suspense>
+                <div className="space-y-6">
+                  <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
+                    <AnalysisTabs evaluation={evaluation} label={data.label || data.id} />
+                  </Suspense>
+                  {data.validation && <ValidationPanel validation={data.validation} />}
+                </div>
               ) : (
                 <p className="text-sm text-destructive">{evaluation.error || "The evaluation failed."}</p>
               )

@@ -9,6 +9,7 @@ import { CandidateTable } from "@/components/run/CandidateTable"
 import { JobStatusBadge, RunProgress } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { toRows } from "@/lib/candidates"
+import { candidatesCsv, download } from "@/lib/exports"
 import { fmt } from "@/lib/format"
 
 const ParetoPlot = lazy(() => import("@/components/run/ParetoPlot"))
@@ -84,6 +85,9 @@ export function RunPage() {
               <Suspense fallback={<div className="h-[460px]" aria-busy="true" />}>
                 <ParetoPlot rows={rows} />
               </Suspense>
+              <Button variant="outline" className="min-h-11" onClick={() => download(`candidates_${jobId}.csv`, candidatesCsv(rows))}>
+                Export candidates (CSV)
+              </Button>
               <CandidateTable rows={rows} jobId={jobId} />
             </>
           ) : (

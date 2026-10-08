@@ -34,5 +34,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T)
 }
 
+/** A binary download; errors are `ApiError`s like `api`'s. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await fetch(path, { credentials: "same-origin" })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(res.status, body?.detail ?? res.statusText, body)
+  }
+  return res.blob()
+}
+
 export const submitSearch = (payload: SearchRequest) =>
   api<{ id: string }>("/api/jobs", { method: "POST", body: JSON.stringify({ kind: "search", payload }) })
