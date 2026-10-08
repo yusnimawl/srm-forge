@@ -1,16 +1,15 @@
 import type { ComponentType } from "react"
 import { NavLink, Outlet } from "react-router"
 import { Layers, List, Search, Settings } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "./ThemeToggle"
 
-type Item = { label: string; to: string | null; icon: ComponentType<{ className?: string }> }
+type Item = { label: string; to: string; icon: ComponentType<{ className?: string }> }
 
 const ITEMS: Item[] = [
   { label: "New search", to: "/search", icon: Search },
   { label: "Runs", to: "/runs", icon: List },
-  { label: "Cases", to: null, icon: Layers },
+  { label: "Cases", to: "/cases", icon: Layers },
   { label: "Settings", to: "/settings", icon: Settings },
 ]
 
@@ -26,25 +25,6 @@ function NavItem({ item, bar }: { item: Item; bar: boolean }) {
       <span>{item.label}</span>
     </>
   )
-  if (item.to === null) {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <span
-              role="link"
-              aria-disabled="true"
-              tabIndex={0}
-              className={cn(base, layout, "cursor-not-allowed text-muted-foreground opacity-60")}
-            />
-          }
-        >
-          {content}
-        </TooltipTrigger>
-        <TooltipContent>Comes in v0b-2</TooltipContent>
-      </Tooltip>
-    )
-  }
   return (
     <NavLink
       to={item.to}

@@ -59,7 +59,7 @@ export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], main
     const line = caseLine(n)
     // The envelope's switching angles are already electrical degrees from the unaligned position.
     const text = e.speeds_rpm.map((_, k) => `turn-on ${fmt(e.theta_on_el[k])}° el, turn-off ${fmt(e.theta_off_el[k])}° el`)
-    const hover = { mode: "lines+markers" as const, marker: { symbol: "circle", size: 5 }, text, hovertemplate: `%{x:.0f} rpm, ${label} %{y:.4g}<br>%{text}<extra></extra>` }
+    const hover = { mode: "lines+markers" as const, marker: { symbol: "circle", size: 5 }, text, hovertemplate: "%{x:.0f} rpm, %{fullData.name} %{y:.4g}<br>%{text}<extra></extra>" }
     out.torque.push(trace(label, e.speeds_rpm, e.torque, line, hover))
     out.power.push(trace(label, e.speeds_rpm, conv(e.power, "kW"), line, hover))
     out.efficiency.push(trace(label, e.speeds_rpm, conv(e.efficiency, "%"), line, hover))

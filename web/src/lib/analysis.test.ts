@@ -42,6 +42,15 @@ describe("performanceSeries", () => {
     }
     expect(s.torque[0].name).toBe("mine")
   })
+  it("keeps the label out of the hover template, which reads it from the trace name", () => {
+    const label = "x %{y} %{text}"
+    const s = performanceSeries(ev(), [{ label, evaluation: ev() }], label)
+    for (const t of [s.torque, s.power, s.efficiency, s.current]) {
+      expect(t[1].name).toBe(label)
+      expect(t[1].hovertemplate).not.toContain("%{y} %{text}")
+      expect(t[1].hovertemplate).toContain("%{fullData.name}")
+    }
+  })
   it("keeps nulls as null (gaps)", () => {
     const s = performanceSeries(ev())
     expect(s.torque[0].y[1]).toBeNull()

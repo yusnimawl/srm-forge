@@ -5,8 +5,20 @@ import DesignFactorsTab from "./DesignFactorsTab"
 import MapTab from "./MapTab"
 import PerformanceTab from "./PerformanceTab"
 
-/** Overlays (at most 6 cases) draw on the Performance and Design factors charts; `label` names the main case in their legends. */
-export default function AnalysisTabs({ evaluation, overlays = [], label }: { evaluation: Evaluation; overlays?: Overlay[]; label?: string }) {
+/** Overlays (at most 6 cases) draw on the Performance and Design factors charts; `label` names the main case in their legends.
+ *  `performanceOnly` drops the tab bar and the other tabs. */
+export default function AnalysisTabs({
+  evaluation,
+  overlays = [],
+  label,
+  performanceOnly = false,
+}: {
+  evaluation: Evaluation
+  overlays?: Overlay[]
+  label?: string
+  performanceOnly?: boolean
+}) {
+  if (performanceOnly) return <PerformanceTab evaluation={evaluation} overlays={overlays} label={label} />
   return (
     <Tabs defaultValue="performance">
       <TabsList>
