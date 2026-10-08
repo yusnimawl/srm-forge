@@ -25,22 +25,20 @@ export function torqueGrid(map: FluxMap) {
   }
 }
 
-/** Up to `max` evenly spaced angle indices, always the first (aligned) and the one nearest `unaligned`. */
+/**
+ * Up to `max` evenly spaced indices over the aligned -> unaligned half of the pitch, both ends included.
+ * The second half mirrors the first for a symmetric machine, so it adds no new curves.
+ */
 export function pickAngles(angles: number[], unaligned: number | null, max = 6): number[] {
   const n = angles.length
-  if (n <= max) return angles.map((_, k) => k)
-  const idx = new Set(Array.from({ length: max }, (_, k) => Math.round((k * (n - 1)) / (max - 1))))
+  let u = Math.floor((n - 1) / 2)
   if (unaligned != null) {
-    let u = 0
+    u = 0
     angles.forEach((a, k) => {
       if (Math.abs(a - unaligned) < Math.abs(angles[u] - unaligned)) u = k
     })
-    if (!idx.has(u)) {
-      let drop = -1
-      for (const k of idx) if (k !== 0 && (drop < 0 || Math.abs(k - u) < Math.abs(drop - u))) drop = k
-      idx.delete(drop)
-      idx.add(u)
-    }
   }
-  return [...idx].sort((a, b) => a - b)
+  const count = Math.min(max, u + 1)
+  if (count < 2) return [0]
+  return [...new Set(Array.from({ length: count }, (_, k) => Math.round((k * u) / (count - 1))))]
 }
