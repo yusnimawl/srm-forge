@@ -2,6 +2,9 @@ import threading
 import time
 
 import pytest
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
+
 from fastapi.testclient import TestClient
 
 import srmcore
@@ -185,3 +188,8 @@ def test_missing_job_404(make):
                  c.post("/api/jobs/x/cancel"), c.post("/api/jobs/x/resume"),
                  c.delete("/api/jobs/x")):
         assert call.status_code == 404
+
+
+@pytest.mark.parametrize("grid", [[10**6, 10**6], [1, 4], [4, 201]])
+def test_grid_out_of_bounds_422(make, grid):
+    assert make().post("/api/jobs", json=_body(grid=grid)).status_code == 422

@@ -3,6 +3,9 @@ import sys
 
 import pytest
 from conftest import make_8_6
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
+
 from fastapi.testclient import TestClient
 
 from srmweb.api import create_app

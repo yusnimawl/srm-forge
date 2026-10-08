@@ -17,7 +17,8 @@ def main(argv: list[str] | None = None) -> None:
 
     from srmweb.api import create_app
 
-    uvicorn.run(create_app(s), host=s.host, port=s.port)
+    # An open event stream must not hold shutdown (and the runner stop) forever.
+    uvicorn.run(create_app(s), host=s.host, port=s.port, timeout_graceful_shutdown=5)
 
 
 if __name__ == "__main__":

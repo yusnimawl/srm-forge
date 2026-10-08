@@ -26,7 +26,7 @@ Linux needs `libglu1-mesa` for the gmsh wheel.
 ## Web UI
 
 ```
-python -m pip install -e ".[dev,ngsolve]"
+python -m pip install -e ".[dev,ngsolve,web]"
 cd web && npm ci && npm run build && cd ..
 srmweb          # http://127.0.0.1:8000
 ```

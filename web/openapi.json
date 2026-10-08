@@ -506,9 +506,13 @@
                 "minItems": 2,
                 "prefixItems": [
                   {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
                     "type": "integer"
                   },
                   {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
                     "type": "integer"
                   }
                 ],

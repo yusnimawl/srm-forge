@@ -1,4 +1,7 @@
 import pytest
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
+
 from fastapi.testclient import TestClient
 
 from srmweb.api import create_app

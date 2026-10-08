@@ -1,7 +1,7 @@
 """Request models of the web API."""
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -38,7 +38,7 @@ class SearchRequest(BaseModel):
 
     requirements: Requirements
     settings: SearchSettingsIn = SearchSettingsIn()
-    grid: tuple[int, int] | None = None   # (angles, currents); overrides the preset grid, for tests
+    grid: tuple[Annotated[int, Field(ge=2, le=200)], Annotated[int, Field(ge=2, le=200)]] | None = None   # (angles, currents); overrides the preset grid, for tests
 
 
 class JobIn(BaseModel):

@@ -20,7 +20,7 @@ The project needs Python 3.12 or newer. CI tests on 3.12 and 3.14, on both Windo
 
 ```powershell
 .venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev,ngsolve]"
+python -m pip install -e ".[dev,ngsolve,web]"
 python -m pytest -m "not slow"                       # fast suite (what CI runs)
 python -m pytest                                     # include slow property/quality tests
 python -m pytest tests/mesh/test_band.py::test_name  # single test

@@ -1,5 +1,3 @@
-import math
-
 from conftest import make_8_6
 from srmweb.geometry import outline_svg
 
@@ -24,4 +22,3 @@ def test_arc_flags_and_flip():
     # counter-clockwise quarter arc in maths coordinates becomes sweep 0 after the y flip
     assert _arc(Arc((1e-3, 0), (0, 1e-3), (0, 0))) == "A 1 1 0 0 0 0 -1"
     assert _arc(Arc((0, 1e-3), (1e-3, 0), (0, 0))) == "A 1 1 0 0 1 1 0"
-    assert math.isclose(1, 1)
