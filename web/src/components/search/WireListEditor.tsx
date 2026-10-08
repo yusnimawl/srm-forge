@@ -36,6 +36,9 @@ export function WireListEditor({ wires, onChange, errors }: Props) {
       {wires.map((w, i) => (
         <fieldset key={i} className="rounded-lg border p-3">
           <legend className="px-1 text-sm font-medium">{KIND_LABEL[w.kind]} wire {i + 1}</legend>
+          {errors[`requirements.wires.${i}`] && (
+            <p role="alert" className="mb-2 text-sm text-destructive">{errors[`requirements.wires.${i}`]}</p>
+          )}
           <div className="grid gap-3 sm:grid-cols-3">
             {FIELDS[w.kind].map((f) => {
               const id = `wire-${i}-${f.key}`

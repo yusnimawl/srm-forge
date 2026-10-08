@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { defaultSearchForm, fieldErrors, toSearchRequest } from "./searchForm"
+import { defaultSearchForm, fieldErrors, parseNum, toSearchRequest, validateForm } from "./searchForm"
 
 describe("toSearchRequest", () => {
   it("converts the defaults to SI", () => {
@@ -58,5 +58,54 @@ describe("fieldErrors", () => {
   })
   it("handles a string detail", () => {
     expect(fieldErrors("queue full")).toEqual({ "": "queue full" })
+  })
+})
+
+describe("fieldErrors with wires", () => {
+  it("drops the union tag from field and wire-level errors", () => {
+    expect(fieldErrors([
+      { loc: ["body", "payload", "requirements", "wires", 0, "round", "diameter"], msg: "gt 0" },
+      { loc: ["body", "payload", "requirements", "wires", 1, "round"], msg: "outer below bare" },
+    ])).toEqual({ "requirements.wires.0.diameter": "gt 0", "requirements.wires.1": "outer below bare" })
+  })
+})
+
+describe("parseNum", () => {
+  it("accepts plain numbers and one decimal comma", () => {
+    expect(parseNum("0.6")).toBe(0.6)
+    expect(parseNum("0,6")).toBe(0.6)
+    expect(parseNum(" 1e3 ")).toBe(1000)
+    expect(parseNum("")).toBe("empty")
+  })
+  it("rejects partial or ambiguous text", () => {
+    for (const t of ["25o", "9,000", "1,2,3", "1.2.3", "0x10", "1,5.2", "abc"]) expect(parseNum(t)).toBe("invalid")
+  })
+})
+
+describe("validateForm", () => {
+  it("passes the defaults", () => expect(validateForm(defaultSearchForm())).toEqual({}))
+  it("flags empty required and unparsable fields, allows empty limits", () => {
+    const v = defaultSearchForm()
+    v.busVoltageV = ""
+    v.maxOuterDiameterMm = "25o"
+    v.maxMassKg = ""
+    v.nCandidates = "1.5"
+    expect(validateForm(v)).toEqual({
+      "requirements.bus_voltage_v": "Required",
+      "requirements.max_outer_diameter_m": "Enter a number",
+      "settings.n_candidates": "Enter a whole number",
+    })
+  })
+  it("needs a wire and a current in wire mode, and checks wire fields", () => {
+    const v = defaultSearchForm()
+    v.windingMode = "wires"
+    expect(validateForm(v)).toEqual({
+      "requirements.phase_current_a": "Required", "requirements.wires": "Add at least one wire",
+    })
+    v.phaseCurrentA = "100"
+    v.wires = [{ kind: "litz", strand_diameter: "0.1", strands: "", outer_diameter: "x" }]
+    expect(validateForm(v)).toEqual({
+      "requirements.wires.0.strands": "Required", "requirements.wires.0.outer_diameter": "Enter a number",
+    })
   })
 })

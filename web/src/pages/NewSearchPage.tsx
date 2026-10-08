@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { defaultSearchForm, fieldErrors, toSearchRequest, type SearchFormValues } from "@/lib/searchForm"
+import { defaultSearchForm, fieldErrors, toSearchRequest, validateForm, type SearchFormValues } from "@/lib/searchForm"
 import { UNIT_LABEL, type Unit } from "@/lib/units"
 import { cn } from "@/lib/utils"
 
@@ -69,8 +69,10 @@ export function NewSearchPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const invalid = validateForm(v)
+    setErrors(invalid)
+    if (Object.keys(invalid).length > 0) return
     setBusy(true)
-    setErrors({})
     try {
       const { id } = await submitSearch(toSearchRequest(v))
       navigate(`/runs/${id}`)
@@ -83,7 +85,7 @@ export function NewSearchPage() {
     }
   }
 
-  const summary = Object.entries(errors).filter(([k]) => !FIELD_KEYS.has(k) && !k.startsWith("requirements.wires."))
+  const summary = Object.entries(errors).filter(([k]) => !FIELD_KEYS.has(k) && !/^requirements\.wires\.\d/.test(k))
 
   const materialSelect = (key: "stator" | "rotor", label: string) => {
     const m = materials.data?.find((x) => x.name === v[key])
