@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import createPlotlyComponent from "react-plotly.js/factory"
-import Plotly from "plotly.js-dist-min"
+import type { Data, Layout } from "plotly.js-dist-min"
+import { Plot, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
-
-const Plot = createPlotlyComponent(Plotly)
 
 const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 // scatter3d has no triangle marker
@@ -22,23 +20,6 @@ function useMedia(query: string) {
     return () => m.removeEventListener("change", on)
   }, [query])
   return match
-}
-
-const readColors = () => {
-  const s = getComputedStyle(document.documentElement)
-  const v = (n: string) => s.getPropertyValue(n).trim()
-  return { primary: v("--primary"), fg: v("--foreground"), muted: v("--muted-foreground"), grid: v("--border") }
-}
-
-/** Theme tokens are read from the document so the plot follows light and dark. */
-function useColors() {
-  const [colors, setColors] = useState(readColors)
-  useEffect(() => {
-    const obs = new MutationObserver(() => setColors(readColors()))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] })
-    return () => obs.disconnect()
-  }, [])
-  return colors
 }
 
 function AxisSelect({ label, value, onChange }: { label: string; value: AxisKey; onChange: (k: AxisKey) => void }) {
@@ -152,8 +133,8 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
         )}
       </div>
       <Plot
-        data={data as Plotly.Data[]}
-        layout={layout as Partial<Plotly.Layout>}
+        data={data as Data[]}
+        layout={layout as Partial<Layout>}
         config={{ responsive: true, displaylogo: false }}
         useResizeHandler
         style={{ width: "100%" }}

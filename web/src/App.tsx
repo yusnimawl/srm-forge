@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { LoginPage } from "@/pages/LoginPage"
 import { NewSearchPage } from "@/pages/NewSearchPage"
+import { CandidatePage } from "@/pages/CandidatePage"
 import { Placeholder } from "@/pages/Placeholder"
 import { RunPage } from "@/pages/RunPage"
 import { RunsPage } from "@/pages/RunsPage"
@@ -20,7 +21,7 @@ const router = createBrowserRouter([
       { path: "/search", element: <NewSearchPage /> },
       { path: "/runs", element: <RunsPage /> },
       { path: "/runs/:jobId", element: <RunPage /> },
-      { path: "/runs/:jobId/candidates/:candidateId", element: <Placeholder title="Candidate" /> },
+      { path: "/runs/:jobId/candidates/:candidateId", element: <CandidatePage /> },
       { path: "/settings", element: <Placeholder title="Settings" /> },
     ],
   },
