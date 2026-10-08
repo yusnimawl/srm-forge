@@ -11,6 +11,7 @@ from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
+from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .requirements import Requirements
 from .sizing.estimates import J_LIMIT, J_PEAK, coil_side_area
@@ -60,6 +61,7 @@ class Evaluation:
     i_rms_a: float = _NAN       # A, worst phase RMS current over the speed grid, chosen winding
     j_rms: float = _NAN         # A/m², conductor RMS current density at i_rms_a
     map: MapArrays | None = None  # set with status "ok"
+    curves: MapCurves | None = None  # set with status "ok"
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str) -> Evaluation:
@@ -116,4 +118,4 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
                       float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan,
-                      i_rms, i_rms / (w.paths * w.copper_area), arrays)
+                      i_rms, i_rms / (w.paths * w.copper_area), arrays, map_curves(arrays, chosen, w, key))

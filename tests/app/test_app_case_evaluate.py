@@ -30,8 +30,7 @@ def _fake_map(design, i_max, **kw):
 
 
 def _evaluate(inputs, **kw):
-    with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map) as bm, \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+    with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map) as bm:
         return evaluate_design(inputs, **kw), bm
 
 
