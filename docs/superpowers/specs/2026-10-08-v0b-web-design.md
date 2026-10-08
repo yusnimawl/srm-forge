@@ -15,10 +15,10 @@ One spec, built and merged in three steps. Each step is usable on its own.
 | Step | Adds |
 |---|---|
 | **v0b-1** | server, job runner, store, security, search form, live progress, runs list, run results (Pareto + candidate table), read-only candidate detail, Swagger, generated TS types |
-| **v0b-2** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays; Field tab: interactive mesh, \|B\| and flux-line view, and a rotor animation (§7.9) |
-| **v0b-3** | one-parameter sweep (Range or Table) with a cost estimate |
+| **v0b-2** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays; Field tab: interactive mesh, \|B\| and flux-line view, and a rotor animation (§7.9); analysis plots and drive waveforms (§6.7, §7.10) |
+| **v0b-3** | one-parameter sweep (Range or Table) with a cost estimate; two-parameter design study with families of curves (§6.8, §7.7) |
 
-Out of scope: an optimiser (NSGA, Bayesian or other; §13), fixed conduction angles, custom B-H upload, PDF reports, accounts, HTTPS, N-T efficiency maps and thermal (no loss or thermal models exist).
+Out of scope: an optimiser (NSGA, Bayesian or other; §13), fixed conduction angles, custom B-H upload, PDF reports, accounts, HTTPS, N-T efficiency maps, iron loss and thermal (no loss or thermal models exist; iron loss and iron-loss efficiency wait for sub-project #2).
 
 Every result shows the banner **"unvalidated, peak-only"** unless the case carries an EM-validated label (§7.4).
 
@@ -72,7 +72,7 @@ All under `/api`, all behind auth (§8).
 
 | Route | Purpose |
 |---|---|
-| `POST /jobs` | submit a job: `kind` ∈ {`search`, `evaluate`, `sweep`, `validate`, `animate`} plus its payload |
+| `POST /jobs` | submit a job: `kind` ∈ {`search`, `evaluate`, `sweep`, `validate`, `animate`, `study`} plus its payload |
 | `GET /jobs` | list jobs (kind, status, created, finished, summary) |
 | `GET /jobs/{id}` | one job with its latest progress |
 | `GET /jobs/{id}/events` | SSE stream of progress (§4.2) |
@@ -159,6 +159,26 @@ The `make_8_6`, `make_12_8`, `make_24_16` factories move from `tests/conftest.py
 
 Frames are cached on disk under `<cache_dir>/fields/` as compressed `.npz`, keyed by the map provenance (§6.5) plus angle and coil current, so a repeated view is instant. The binary wire format is a small JSON header (array names, dtypes, shapes, offsets) followed by the raw little-endian arrays.
 
+### 6.7 Drive waveforms and derived curves (v0b-2)
+
+`Evaluation` gains `waveforms`: for each speed of the envelope grid, the chosen stroke resampled on 180 points of one rotor pole pitch: rotor angle, phase current i(θ), phase flux linkage ψ(θ), phase voltage v(θ) and phase torque T(θ). `srmapp.drive.envelope` already integrates these to pick the stroke; it keeps them instead of discarding them. From them, per speed:
+
+- **line current**: the dc-link current, the sum over phases of each phase's converter input current (+i while the phase is energised from the bus, −i while it returns energy, 0 while freewheeling), with its mean and RMS;
+- **power factor**: output power / (q · V_rms · I_rms), phase quantities, copper loss only until iron loss exists (labelled so).
+
+Derived from the map, computed in `srmapp` and stored with the evaluation (`map_curves`):
+
+- **L(θ)** secant inductance ψ/i per map current;
+- **k2(i) = 1 − 1/(σs·σu) = 1 − Lu(i)/La_sat(i)**, with σs = La_sat(i)/La_unsat and σu = La_unsat/Lu(i), La_unsat the aligned secant inductance at 5 % of I_max (Krishnan ch. 3);
+- **B_sp(i)**, the aligned stator-pole flux density: aligned ψ / (series turns per phase × stator pole face area), the face area being (bore diameter / 2) × stator pole arc × stack length;
+- **B_sp·k2** against stator current and against La_sat/Lu (the output-equation factor; Krishnan's design curves).
+
+All at the chosen winding (the turns rescale is exact); currents in A of that winding.
+
+### 6.8 Design study (v0b-3)
+
+`design_study(inputs, x, y, x_values, y_values, ...)`: a two-parameter grid (each axis at most 12 values, at most 100 designs) over dotted case-input paths, for example `design.machine.stator_pole_arc` × `design.machine.rotor_pole_arc`. Enclosure inputs (pole arc / pole pitch) are accepted and converted to arcs. Each design gets a cheap two-position evaluation instead of a full map and drive: aligned and unaligned ψ-i curves on 10 currents (20 solves; about 1–2 min on `screening`, a 6 × 5 grid about an hour), giving La, Lu, La/Lu, k2, B_sp·k2, the co-energy per stroke δW and the average torque q·P_r·δW / (2π) at the peak current. Designs the validator rejects (self-starting, fit) are reported per point and drawn as gaps. A study is one `study` job with SSE progress; its result is one table (x, y, every quantity) and no cases.
+
 ### 6.5 What triggers a new map
 
 A map is a cache hit when its provenance is unchanged: geometry, materials, mesh preset, grids, solver, srmcore version and `i_map`. `i_map` comes from the largest ampere-turns any allowed winding carries, so it depends on geometry, wires, `phase_current_a`, `j_peak` and `j_peak_max`.
@@ -233,6 +253,8 @@ JSON with `schema` (`"srm-setup"`), `version` and one or more sections: `require
 
 One parameter, as **Range** (start, end, divisions) or **Table** (values). Any numeric input of the case may be swept, plus materials by table. At most 20 values. Before running, the page shows the number of new maps and the estimated time (§6.5). Each value becomes a case with origin `sweep`; the sweep result plots the key numbers against the swept value and overlays the cases' torque-speed curves.
 
+**Design study** (§6.8): two parameters, Range or Table each. The result draws families of curves: a quantity against x with one line per y (for example average torque against stator pole enclosure for several rotor enclosures; La against the rotor-to-stator pole arc ratio for several stator enclosures), plus a heatmap of the same table. Axes can show arcs, enclosures or the arc ratio βr/βs.
+
 ### 7.8 UX rules
 
 - Touch targets at least 44 px; contrast at least 4.5:1; visible focus; keyboard reachable; `prefers-reduced-motion` respected.
@@ -250,6 +272,18 @@ On every evaluated case. Phase A only, as in the map.
 - **Rendering**: WebGL2 (one small module, no new chart library): one draw call for the triangles with a per-element colour, lines for the wireframe and flux contours. Phones with no WebGL2 get the snapshot as a static image drawn on a 2D canvas, without the animation.
 
 Later, not in v0b-2: a drive animation with the commutated phase currents from the envelope at a chosen speed (needs current waveforms from `srmapp.drive`), and all phases excited together.
+
+### 7.10 Analysis plots (v0b-2)
+
+On the candidate page and every evaluated case, grouped in tabs. All vs rpm plots share the envelope's speed grid.
+
+| Tab | Plots |
+|---|---|
+| Performance | torque, power, efficiency (copper only, labelled), phase RMS current, line current (mean and RMS), power factor (copper only) — all against rpm |
+| Waveforms | at a chosen speed: phase current, flux linkage, voltage and torque against rotor angle (electrical degrees), the line current, and the ψ-i loop on top of the map's aligned and unaligned curves |
+| Map | ψ against current per angle, torque against rotor angle per current, the torque heatmap, L(θ) per current |
+| Design factors | La, Lu, La/Lu, k2 against current, B_sp against current, B_sp·k2 against current and against La_sat/Lu |
+| Field | §7.9: flux plot with Aligned and Unaligned buttons, \|B\| distribution, flux lines, B(θ) waveform in the stator pole, stator yoke and rotor pole at the chosen current |
 
 ## 8. Security
 
@@ -282,6 +316,7 @@ FastAPI's built-in Swagger UI at `/api/docs` (behind auth), from the OpenAPI sch
 
 ## 11. Testing
 
+- `srmapp`: waveforms integrate back to the envelope's torque and power at each speed (work per stroke); the line current's mean times the bus voltage equals the input power; power factor is 1 for a synthetic sinusoidal case; k2 equals 1 − Lu/La on a linear synthetic map; `design_study` reproduces La and Lu of `key_numbers` on the 8/6 and reports a self-starting violation as a gap.
 - `srmapp`: `field_frames` on the 8/6 `screening` mesh: ψ and torque of a frame equal `solve_point` at the same angle and current; the band triangles plus the static triangles cover the mesh exactly; rotating the rotor nodes by the frame angle reproduces `mesh_at_angle`'s nodes; frame cache hit on a repeat.
 - `srmapp`: `evaluate_design` Auto and Fixed on the existing small fixtures; Fixed with the Auto winding reproduces the Auto result; `sweep` validation per value; `MapArrays` matches the rescaled map; reference designs unchanged for tests.
 - `srmweb` (pytest, FastAPI `TestClient`, fast suite): job lifecycle with a fake runner (submit, progress, SSE events, cancel, resume after `interrupted`, delete); store round trip; `to_json` for NaN, inf, ndarray and nested dataclasses; electrical-angle conversion on 6/4, 8/6, 12/8; auth (no token on loopback is open, non-loopback without token refuses to start, wrong token rejected, cookie flags); bounded inputs; setup-file import errors.
