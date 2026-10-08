@@ -2,7 +2,7 @@ import { useRef, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { importIssues, type SetupFile } from "@/api/cases"
+import { checkSetupFile, requestMessage } from "@/api/cases"
 import { api, ApiError, submitSearch } from "@/api/client"
 import type { Material } from "@/api/types"
 import { Field, SELECT_CLASS } from "@/components/case/fields"
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { defaultSearchForm, fieldErrors, toSearchRequest, validateForm, type SearchFormValues } from "@/lib/searchForm"
-import { errorMessage } from "@/lib/errorMessage"
 import { applySearchSetup, download, searchSetup } from "@/lib/exports"
 import { cn } from "@/lib/utils"
 
@@ -69,19 +68,12 @@ export function NewSearchPage() {
   // A setup file fills the requirements and search sections; any other section is ignored.
   async function importSetup(file: File) {
     try {
-      let json: unknown
-      try {
-        json = JSON.parse(await file.text())
-      } catch {
-        throw new Error(`${file.name} is not a JSON file`)
-      }
-      const checked = await api<SetupFile>("/api/setup/check", { method: "POST", body: JSON.stringify(json) })
+      const checked = await checkSetupFile(file)
       if (!checked.requirements && !checked.search) throw new Error(`${file.name} has no requirements or search section`)
       setV((old) => applySearchSetup(checked, old))
       setErrors({})
     } catch (e) {
-      const issues = importIssues(e)
-      toast.error(issues ? `${file.name}: ${issues.errors.map((i) => `${i.loc.filter((p) => p !== "body").join(".")} ${i.msg}`).join("; ")}` : errorMessage(e))
+      toast.error(`${file.name}: ${requestMessage(e)}`)
     }
   }
 

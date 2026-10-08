@@ -37,7 +37,7 @@ const inputs = {
 
 describe("mapCsv", () => {
   it("writes one row per grid point with mechanical degrees first", () => {
-    const lines = mapCsv(map).split("\n")
+    const lines = mapCsv(map).split("\r\n")
     expect(lines).toHaveLength(5)
     expect(lines[0]).toBe("angle_deg,current_a,psi_wb,torque_nm")
     expect(lines[1]).toBe("0,1,0.001,0")
@@ -47,7 +47,7 @@ describe("mapCsv", () => {
 
   it("writes a missing value as an empty cell", () => {
     const m = { ...map, psi: [[null, 0.002], [0.003, 0.004]] } as MapArrays
-    expect(mapCsv(m).split("\n")[1]).toBe("0,1,,0")
+    expect(mapCsv(m).split("\r\n")[1]).toBe("0,1,,0")
   })
 })
 
@@ -60,11 +60,23 @@ describe("candidatesCsv", () => {
 
   it("uses kW and mm and quotes text fields", () => {
     const rows = toRows({ evaluations: [ev("a", 'bad, "very"')], pareto_ids: ["a"] })
-    const [head, row] = candidatesCsv(rows).split("\n")
+    const [head, row] = candidatesCsv(rows).split("\r\n")
     expect(head.split(",").slice(0, 3)).toEqual(["id", "poles", "od_mm"])
     expect(head).toContain("peak_power_kw")
-    expect(row.startsWith("a,8/6,120,3,1.2,1.1,2.5,0.8,0.9,")).toBe(true)
+    expect(row.startsWith(`a,8/6,${rows[0].od_mm},3,1.2,1.1,2.5,0.8,0.9,`)).toBe(true)
+    expect(rows[0].od_mm).toBeCloseTo(120, 9)
     expect(row.endsWith(',"bad, ""very"""')).toBe(true)
+  })
+
+  it("writes numbers losslessly and defuses formula text but not negative numbers", () => {
+    const rows = toRows({ evaluations: [ev("=1+1", "-note"), ev("b", null)], pareto_ids: [] })
+    rows[1].mass_kg = -0.1 + 0.2
+    const lines = candidatesCsv(rows).split("\r\n")
+    expect(lines[1].startsWith("'=1+1,")).toBe(true)
+    expect(lines[1].endsWith(",'-note")).toBe(true)
+    expect(lines[2]).toContain(`,${-0.1 + 0.2},`)
+    const negative = mapCsv({ ...map, torque: [[-1.5, 0], [0, 0]] } as MapArrays).split("\r\n")[1]
+    expect(negative.endsWith(",-1.5")).toBe(true)
   })
 })
 

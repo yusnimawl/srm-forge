@@ -1,4 +1,4 @@
-import type { CaseSummary } from "@/api/types"
+import type { CaseSummary, Estimate } from "@/api/types"
 import { fromSI } from "./units"
 
 export const MAX_SHOWN = 6
@@ -58,3 +58,9 @@ export const filterByFlag = (rows: CaseRow[], flag: string | null): CaseRow[] =>
   flag === null ? rows : rows.filter((r) => r.flag === flag)
 
 export const canShowMore = (rows: CaseRow[]): boolean => rows.filter((r) => r.show_in_graphs).length < MAX_SHOWN
+
+/** "No new map — about a minute" or "1 new map, about 26 min". */
+export function estimateText(e: Estimate): string {
+  if (!e.new_map) return "No new map — about a minute"
+  return e.seconds == null ? "1 new map" : `1 new map, about ${Math.max(1, Math.round(e.seconds / 60))} min`
+}

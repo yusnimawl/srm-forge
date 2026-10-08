@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { importIssues } from "@/api/cases"
+import { requestMessage } from "@/api/cases"
 import { api, apiBlob, type JobOut } from "@/api/client"
 import type { Case, Estimate } from "@/api/types"
 import { useJobActions } from "@/api/useJobActions"
@@ -10,23 +10,16 @@ import { Bar, fmtElapsed, progressOf } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { issueKey } from "@/lib/caseForm"
-import { errorMessage } from "@/lib/errorMessage"
+import { estimateText } from "@/lib/cases"
 import { download, mapCsv } from "@/lib/exports"
 
 const stem = (c: Case) => (c.label || c.id).replace(/[^\w.-]+/g, "_").slice(0, 60)
 
-/** "No new map — about a minute" or "1 new map, about 26 min". */
-export function estimateText(e: Estimate): string {
-  if (!e.new_map) return "No new map — about a minute"
-  return e.seconds == null ? "1 new map" : `1 new map, about ${Math.max(1, Math.round(e.seconds / 60))} min`
-}
+/** Thrown when the inputs were not saved; `usePatchCase` has already shown why. */
+class NotSaved extends Error {}
 
-/** The text of a rejected request: its listed issues, else the API's message. */
-function rejection(e: unknown): string {
-  const issues = importIssues(e)
-  if (!issues || issues.errors.length === 0) return errorMessage(e)
-  return issues.errors.map((i) => (i.loc.length > 0 ? `${issueKey(i.loc)}: ${i.msg}` : i.msg)).join("; ")
+const report = (e: unknown) => {
+  if (!(e instanceof NotSaved)) toast.error(requestMessage(e))
 }
 
 /** Live state of the case's running job: the map-points bar while evaluating, the message while validating. The page
@@ -96,42 +89,44 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
 
   const evaluate = useMutation({
     mutationFn: async () => {
-      if (!(await flush())) throw new Error("The latest inputs could not be saved, so the case was not evaluated.")
+      if (!(await flush())) throw new NotSaved()
       return api<{ job_id: string }>(`/api/cases/${data.id}/evaluate`, { method: "POST" })
     },
     onSuccess: refresh,
-    onError: (e) => toast.error(rejection(e)),
+    onError: report,
   })
   const validate = useMutation({
     mutationFn: () => api<{ job_id: string }>(`/api/cases/${data.id}/validate`, { method: "POST" }),
     onSuccess: refresh,
-    onError: (e) => toast.error(rejection(e)),
+    onError: report,
   })
 
-  const canValidate = !editable && data.preset === "full" && evaluation?.status === "ok" && !job && !validate.isPending
+  const canValidate = !editable && !data.validation?.label && data.preset === "full" && evaluation?.status === "ok" && !job && !validate.isPending
   const validateWhy = job
     ? "A job is running"
-    : editable
-      ? "Evaluate this case first"
-      : data.preset !== "full"
-        ? "EM validation needs a full map"
-        : evaluation?.status !== "ok"
-          ? "The evaluation failed"
-          : undefined
+    : data.validation?.label
+      ? "Already EM-validated"
+      : editable
+        ? "Evaluate this case first"
+        : data.preset !== "full"
+          ? "EM validation needs a full map"
+          : evaluation?.status !== "ok"
+            ? "The evaluation failed"
+            : undefined
 
   const exportSetup = async () => {
     try {
-      if (!(await flush())) throw new Error("The latest inputs could not be saved.")
+      if (!(await flush())) throw new NotSaved()
       const file = await api<unknown>(`/api/cases/${data.id}/setup`)
       download(`${stem(data)}.srm-setup.json`, JSON.stringify(file, null, 2))
     } catch (e) {
-      toast.error(rejection(e))
+      report(e)
     }
   }
   const exportMat = () =>
     apiBlob(`/api/cases/${data.id}/map.mat`).then(
       (b) => download(`${stem(data)}_map.mat`, b),
-      (e) => toast.error(rejection(e)),
+      report,
     )
   const map = evaluation?.map
 

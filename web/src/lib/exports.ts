@@ -5,14 +5,16 @@ import type { CandidateRow } from "./candidates"
 import { toSearchRequest, type SearchFormValues } from "./searchForm"
 import { fromSI } from "./units"
 
-/** RFC 4180: a field with a comma, quote or line break is quoted and its quotes doubled. */
+/** RFC 4180: a field with a comma, quote or line break is quoted and its quotes doubled. A text field that a
+ *  spreadsheet would read as a formula (it starts with = + - @) gets a leading quote; numbers are written as they are. */
 const field = (v: string | number | boolean | null | undefined): string => {
   if (v == null || (typeof v === "number" && !Number.isFinite(v))) return ""
-  const s = typeof v === "number" ? String(Number(v.toPrecision(12))) : String(v)
+  let s = String(v)
+  if (typeof v === "string" && /^[=+@-]/.test(s)) s = `'${s}`
   return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s
 }
 
-const csv = (rows: (string | number | boolean | null | undefined)[][]) => rows.map((r) => r.map(field).join(",")).join("\n")
+const csv = (rows: (string | number | boolean | null | undefined)[][]) => rows.map((r) => r.map(field).join(",")).join("\r\n")
 
 /** One row per (angle, current) grid point; angles in mechanical degrees, a missing value is an empty cell. */
 export function mapCsv(map: MapArrays): string {
@@ -41,7 +43,7 @@ export function download(name: string, data: string | Blob): void {
   document.body.append(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 const HEADER = { schema: "srm-setup", version: 1 } as const

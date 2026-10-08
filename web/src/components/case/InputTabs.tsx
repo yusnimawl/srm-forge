@@ -1,12 +1,10 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { importIssues, type SetupFile } from "@/api/cases"
-import { api } from "@/api/client"
+import { checkSetupFile, requestMessage } from "@/api/cases"
 import type { Evaluation } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CASE_TABS, issueKey, tabOfKey, type CaseTab } from "@/lib/caseForm"
-import { errorMessage } from "@/lib/errorMessage"
+import { CASE_TABS, tabOfKey, type CaseTab } from "@/lib/caseForm"
 import { applySection, download, sectionSetup } from "@/lib/exports"
 import { DimensionTab } from "./DimensionTab"
 import { DriveTab } from "./DriveTab"
@@ -22,18 +20,14 @@ function SectionIo({ tab, form, update, canImport }: TabProps & { tab: CaseTab; 
 
   const importFile = async (file: File) => {
     try {
-      let json: unknown
-      try {
-        json = JSON.parse(await file.text())
-      } catch {
-        throw new Error(`${file.name} is not a JSON file`)
-      }
-      const checked = await api<SetupFile>("/api/setup/check", { method: "POST", body: JSON.stringify(json) })
-      if (!applySection(form, tab, checked)) throw new Error(`${file.name} has no ${label.toLowerCase()} section`)
+      const checked = await checkSetupFile(file)
+      const next = applySection(form, tab, checked)
+      if (!next) throw new Error(`${file.name} has no ${label.toLowerCase()} section`)
       update((f) => applySection(f, tab, checked) ?? f)
+      // The winding section carries the margin, which the Material tab shows.
+      if (tab === "winding" && next.margin !== form.margin) toast.message("Margin (Material tab) also set from the file")
     } catch (e) {
-      const issues = importIssues(e)
-      toast.error(issues ? `${file.name}: ${issues.errors.map((i) => `${issueKey(i.loc.filter((p) => p !== "body"))} ${i.msg}`).join("; ")}` : errorMessage(e))
+      toast.error(`${file.name}: ${requestMessage(e)}`)
     }
   }
 

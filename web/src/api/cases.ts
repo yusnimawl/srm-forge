@@ -2,6 +2,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import type { components } from "./schema"
 import { api, ApiError, type ValidationIssue } from "./client"
 import type { Case, CaseSummary } from "./types"
+import { issueKey } from "@/lib/caseForm"
 import { errorMessage } from "@/lib/errorMessage"
 import { toast } from "sonner"
 
@@ -79,4 +80,31 @@ export function importIssues(e: unknown): { errors: ValidationIssue[]; warnings:
   const body = e.body as { errors?: ValidationIssue[]; warnings?: ValidationIssue[] } | null
   if (body?.errors) return { errors: body.errors, warnings: body.warnings ?? [] }
   return Array.isArray(e.detail) ? { errors: e.detail, warnings: [] } : null
+}
+
+/** Issues as one line: "field: message" joined by "; " (the request's "body" prefix and union tags are dropped). */
+export function formatIssues(items: ValidationIssue[]): string {
+  return items
+    .map((i) => {
+      const key = issueKey(i.loc.filter((p) => p !== "body"))
+      return key ? `${key}: ${i.msg}` : i.msg
+    })
+    .join("; ")
+}
+
+/** The text of a failed request: its listed errors when it was rejected as invalid, else the API's message. */
+export function requestMessage(e: unknown): string {
+  const issues = importIssues(e)
+  return issues && issues.errors.length > 0 ? formatIssues(issues.errors) : errorMessage(e)
+}
+
+/** Reads a setup file and has the server check and normalize it (absent sections come back null). */
+export async function checkSetupFile(file: File): Promise<SetupFile> {
+  let json: unknown
+  try {
+    json = JSON.parse(await file.text())
+  } catch {
+    throw new Error(`${file.name} is not a JSON file`)
+  }
+  return api<SetupFile>("/api/setup/check", { method: "POST", body: JSON.stringify(json) })
 }

@@ -56,7 +56,7 @@ function CaseEditor({ data }: { data: Case }) {
   const unplaced = (issues?.errors ?? []).filter((e) => tabOfKey(issueKey(e.loc)) === null)
 
   // Every edit is saved, valid or not. `flush` saves the newest inputs now and resolves true once the stored inputs
-  // are the newest ones, false when the save failed (it toasts and the inputs are retried) or the form changed while
+  // are the newest ones, false when the save failed (already toasted; the inputs are retried) or the form changed while
   // saving; saves run one after another.
   const latest = useRef(now)
   latest.current = now

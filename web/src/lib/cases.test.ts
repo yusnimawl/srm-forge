@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CaseSummary } from "@/api/types"
-import { canShowMore, caseStatus, filterByFlag, MAX_SHOWN, toCaseRows } from "./cases"
+import { canShowMore, caseStatus, estimateText, filterByFlag, MAX_SHOWN, toCaseRows } from "./cases"
 import { fmt } from "./format"
 
 const summary = (id: string, extra: Partial<CaseSummary> = {}): CaseSummary => ({
@@ -75,5 +75,14 @@ describe("canShowMore", () => {
   })
   it("counts only shown rows", () => {
     expect(canShowMore(toCaseRows([...Array.from({ length: 8 }, (_, k) => summary(String(k)))]))).toBe(true)
+  })
+})
+
+describe("estimateText", () => {
+  it("reads the estimate", () => {
+    expect(estimateText({ new_map: false })).toBe("No new map — about a minute")
+    expect(estimateText({ new_map: true, seconds: 1560, basis: "budget" })).toBe("1 new map, about 26 min")
+    expect(estimateText({ new_map: true, seconds: 20 })).toBe("1 new map, about 1 min")
+    expect(estimateText({ new_map: true, seconds: null })).toBe("1 new map")
   })
 })
