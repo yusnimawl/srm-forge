@@ -1,8 +1,19 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentProps } from "react"
 import createPlotlyComponent from "react-plotly.js/factory"
 import Plotly from "plotly.js-dist-min"
 
-export const Plot = createPlotlyComponent(Plotly)
+const PlotBase = createPlotlyComponent(Plotly)
+
+type PlotProps = ComponentProps<typeof PlotBase>
+
+/** Fills its container and follows resizes; the clipping wrapper keeps a stale wide svg from holding the page wide. */
+export function Plot({ layout, style, ...rest }: PlotProps) {
+  return (
+    <div className="w-full min-w-0 overflow-hidden">
+      <PlotBase {...rest} layout={{ ...(layout as object), autosize: true }} useResizeHandler style={{ width: "100%", ...style }} />
+    </div>
+  )
+}
 
 const readColors = () => {
   const s = getComputedStyle(document.documentElement)

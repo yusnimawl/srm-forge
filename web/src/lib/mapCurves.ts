@@ -1,3 +1,5 @@
+import { fromSI } from "./units"
+
 export type FluxMap = {
   angles: number[] // rad
   currents: number[] // A
@@ -5,14 +7,14 @@ export type FluxMap = {
   torque: (number | null)[][] // [angle][current], N·m
 }
 
-const deg = (rad: number) => (rad * 180) / Math.PI
+const deg = (rad: number) => fromSI(rad, "deg")
 
 /** One ψ(i) curve per map angle: mechanical degrees, ψ in mWb. */
 export function psiCurves(map: FluxMap) {
   return map.angles.map((a, k) => ({
     angleDeg: deg(a),
     i: map.currents,
-    psi_mWb: map.psi[k].map((p) => (p == null ? NaN : p * 1000)),
+    psi_mWb: map.psi[k].map((p) => (p == null ? NaN : fromSI(p, "mWb"))),
   }))
 }
 

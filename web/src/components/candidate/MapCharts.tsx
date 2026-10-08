@@ -44,7 +44,6 @@ export default function MapCharts({ map, unaligned }: { map: FluxMap; unaligned:
     },
   ]
   const cfg = { responsive: true, displaylogo: false }
-  const style = { width: "100%" }
   return (
     <>
       <section className="space-y-2">
@@ -53,8 +52,6 @@ export default function MapCharts({ map, unaligned }: { map: FluxMap; unaligned:
           data={lines as Data[]}
           layout={{ ...base, xaxis: axis("Current (A)"), yaxis: axis("ψ (mWb)"), legend: { title: { text: "Rotor angle" } } } as Partial<Layout>}
           config={cfg}
-          useResizeHandler
-          style={style}
         />
       </section>
       <section className="space-y-2">
@@ -63,8 +60,6 @@ export default function MapCharts({ map, unaligned }: { map: FluxMap; unaligned:
           data={heat as Data[]}
           layout={{ ...base, xaxis: axis("Current (A)"), yaxis: axis("Rotor angle (° mechanical)") } as Partial<Layout>}
           config={cfg}
-          useResizeHandler
-          style={style}
         />
       </section>
     </>

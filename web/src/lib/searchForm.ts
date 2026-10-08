@@ -150,7 +150,8 @@ export function validateForm(v: SearchFormValues): Record<string, string> {
 }
 
 /** Field name -> message from a 422 detail. The name is the `loc` without the leading "body"/"payload";
- *  a plain-string detail is filed under "". The first message per field wins. */
+ *  a plain-string detail is filed under "". The first message per field wins; "Value error, " is dropped, and a model-level
+ *  power/torque error is copied to the peak power and peak torque fields. */
 export function fieldErrors(detail: ValidationIssue[] | string): Record<string, string> {
   if (typeof detail === "string") return { "": detail }
   const out: Record<string, string> = {}
@@ -162,7 +163,14 @@ export function fieldErrors(detail: ValidationIssue[] | string): Record<string, 
     const w = loc.indexOf("wires")
     if (w >= 0 && typeof loc[w + 1] === "number" && typeof loc[w + 2] === "string" && loc[w + 2] in WIRE_FIELDS) loc.splice(w + 2, 1)
     const key = loc.join(".")
-    if (!(key in out)) out[key] = issue.msg
+    // Pydantic prefixes validator messages with "Value error, ".
+    if (!(key in out)) out[key] = issue.msg.replace(/^Value error, /, "")
+  }
+  // A cross-field requirements error about power or torque is also shown under those two fields.
+  const joint = out.requirements
+  if (joint && /power|torque/i.test(joint)) {
+    out["requirements.peak_power_w"] ??= joint
+    out["requirements.peak_torque_nm"] ??= joint
   }
   return out
 }

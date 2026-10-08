@@ -34,7 +34,7 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <Link to={href(row.original)} className="num text-secondary underline-offset-2 hover:underline">
+        <Link to={href(row.original)} className="num text-primary underline underline-offset-2">
           {row.original.id}
         </Link>
       ),
@@ -110,7 +110,7 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
           return (
             <li key={c.id} title={tip(c)} className="rounded-lg border border-border p-3 text-sm">
               <div className="flex items-center justify-between">
-                <Link to={href(c)} className="num inline-flex min-h-11 items-center text-secondary">
+                <Link to={href(c)} className="num inline-flex min-h-11 items-center text-primary underline underline-offset-2">
                   {c.id}
                 </Link>
                 <span className={cn(c.status !== "ok" && "text-destructive")}>

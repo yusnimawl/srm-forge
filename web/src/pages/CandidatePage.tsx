@@ -5,6 +5,7 @@ import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { WindingScan } from "@/components/candidate/WindingScan"
 import { fmt, fmtSI } from "@/lib/format"
+import { UNIT_LABEL } from "@/lib/units"
 
 const MapCharts = lazy(() => import("@/components/candidate/MapCharts"))
 const EnvelopeChart = lazy(() => import("@/components/candidate/EnvelopeChart"))
@@ -26,7 +27,7 @@ export function CandidatePage() {
   const { jobId = "", candidateId = "" } = useParams()
   const result = useRunResult(jobId)
   const back = (
-    <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-sm text-secondary">
+    <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2">
       Back to the run
     </Link>
   )
@@ -35,7 +36,13 @@ export function CandidatePage() {
     return (
       <div className="space-y-4">
         {back}
-        <p>{result.isPending ? "Loading…" : result.isError ? "Could not load the result." : "Candidate not found."}</p>
+        <p>{result.isPending
+            ? "Loading…"
+            : result.isError
+              ? "Could not load the result."
+              : result.data === null
+                ? "No result for this run."
+                : "Candidate not found."}</p>
       </div>
     )
   }
@@ -53,7 +60,12 @@ export function CandidatePage() {
         </span>
       </div>
       <Banner />
-      {ev.error && <p className="text-sm text-destructive">{ev.error}</p>}
+      {ev.error &&
+        (ev.status === "ok" ? (
+          <p className="text-sm text-muted-foreground">Notes: {ev.error}</p>
+        ) : (
+          <p className="text-sm text-destructive">{ev.error}</p>
+        ))}
       {k && (
         <section aria-label="Key numbers" className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <Item label="La" value={fmtSI(k.la, "mH")} unit="mH" />
@@ -77,8 +89,8 @@ export function CandidatePage() {
               <Item label="Strands" value={fmt(w.strands)} />
               <Item label="Parallel paths" value={fmt(w.paths)} />
               <Item label="Wire" value={wire ?? "density mode"} />
-              <Item label="Resistance" value={fmt(w.resistance == null ? null : w.resistance * 1000)} unit="mΩ" />
-              <Item label="J rms" value={fmt(ev.j_rms == null ? null : ev.j_rms / 1e6)} unit="A/mm²" />
+              <Item label="Resistance" value={fmtSI(w.resistance, "mOhm")} unit={UNIT_LABEL.mOhm} />
+              <Item label="J rms" value={fmtSI(ev.j_rms, "A/mm2")} unit={UNIT_LABEL["A/mm2"]} />
               <Item label="I rms" value={fmt(ev.i_rms_a)} unit="A" />
             </div>
           </section>
@@ -100,7 +112,7 @@ export function CandidatePage() {
       {ev.scan && ev.scan.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Winding scan</h2>
-          <WindingScan scan={ev.scan} />
+          <WindingScan scan={ev.scan} chosen={ev.winding} />
         </section>
       )}
     </div>

@@ -136,8 +136,6 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
         data={data as Data[]}
         layout={layout as Partial<Layout>}
         config={{ responsive: true, displaylogo: false }}
-        useResizeHandler
-        style={{ width: "100%" }}
         onClick={(e) => {
           const id = e.points[0]?.customdata
           if (typeof id === "string") navigate(`${location.pathname}/candidates/${encodeURIComponent(id)}`)

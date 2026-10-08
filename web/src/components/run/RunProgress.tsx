@@ -55,7 +55,9 @@ export function RunProgress({ job }: { job: JobOut }) {
   const line =
     job.status === "queued"
       ? "Queued"
-      : `Design ${Math.min(dd + 1, Math.max(dt, 1))} of ${dt}, map ${pd} of ${pt} points`
+      : dt === 0
+        ? (p.message ?? "Sampling candidates…")
+        : `Design ${Math.min(dd + 1, Math.max(dt, 1))} of ${dt}, map ${pd} of ${pt} points`
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <Bar label="Designs" done={dd} total={dt} />

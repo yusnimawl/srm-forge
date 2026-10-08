@@ -45,9 +45,14 @@ describe("fieldErrors", () => {
     expect(fieldErrors([{ loc: ["body", "payload", "requirements", "peak_power_w"], msg: "x", type: "t" }]))
       .toEqual({ "requirements.peak_power_w": "x" })
   })
-  it("maps a model-level requirements error to requirements", () => {
-    expect(fieldErrors([{ loc: ["body", "payload", "requirements"], msg: "power disagrees", type: "t" }]))
-      .toEqual({ requirements: "power disagrees" })
+  it("strips pydantic's prefix and copies a power error under power and torque", () => {
+    const msg = "power 10000 W disagrees with torque"
+    expect(fieldErrors([{ loc: ["body", "payload", "requirements"], msg: `Value error, ${msg}`, type: "t" }]))
+      .toEqual({ requirements: msg, "requirements.peak_power_w": msg, "requirements.peak_torque_nm": msg })
+  })
+  it("keeps other model-level requirements errors as one entry", () => {
+    expect(fieldErrors([{ loc: ["body", "payload", "requirements"], msg: "Value error, max speed below base", type: "t" }]))
+      .toEqual({ requirements: "max speed below base" })
   })
   it("keeps settings and indexed paths, first message wins", () => {
     expect(fieldErrors([

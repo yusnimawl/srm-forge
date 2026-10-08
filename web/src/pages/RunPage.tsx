@@ -37,7 +37,7 @@ export function RunPage() {
     if (terminal) qc.invalidateQueries({ queryKey: ["result", jobId] })
   }, [terminal, jobId, qc])
 
-  const result = useRunResult(jobId, status === "done" || status === "cancelled")
+  const result = useRunResult(jobId, terminal)
   const rows = useMemo(() => (result.data ? toRows(result.data) : []), [result.data])
   const cancel = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${jobId}/cancel`, { method: "POST" }) })
   const resume = useMutation({
@@ -69,12 +69,17 @@ export function RunPage() {
       {job && isActive(job.status) && <RunProgress job={job} />}
       {job?.error && <p className="text-destructive">{job.error}</p>}
       {result.isError && <p className="text-destructive">Could not load the result.</p>}
+      {result.data === null && (
+        <p className="text-sm text-muted-foreground">No result: the run stopped before any design was evaluated.</p>
+      )}
       {r && (
         <>
-          {r.cancelled && <p className="text-sm text-muted-foreground">Cancelled: partial result.</p>}
-          <section aria-label="Counts" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {(r.cancelled || status === "cancelled") && <p className="text-sm text-muted-foreground">Cancelled: partial result.</p>}
+          {status === "interrupted" && (
+            <p className="text-sm text-muted-foreground">Interrupted: partial result. Resume to continue.</p>
+          )}
+          <section aria-label="Counts" className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Count label="Sampled" value={r.sampled ?? 0} />
-            <Count label="Dropped (validator, fit)" value={dropped.reduce((s, [, n]) => s + n, 0)} />
             <Count label="Stage-1 rejected" value={r.stage1_rejected ?? 0} />
             <Count label="Evaluated" value={r.evaluations.length} />
           </section>
@@ -95,7 +100,7 @@ export function RunPage() {
           )}
         </>
       )}
-      <Link to="/runs" className="inline-flex min-h-11 items-center text-sm text-secondary">
+      <Link to="/runs" className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2">
         All runs
       </Link>
     </div>

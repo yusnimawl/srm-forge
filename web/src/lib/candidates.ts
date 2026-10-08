@@ -1,3 +1,4 @@
+import { fromSI } from "./units"
 export const AXES = {
   mass_kg: "Mass (kg)",
   peak_power_kw: "Peak power (kW)",
@@ -93,11 +94,11 @@ export function toRows(result: SearchResult): CandidateRow[] {
     return {
       id: e.id,
       poles: `${m.n_stator_poles}/${m.n_rotor_poles}`,
-      od_mm: od == null ? null : od * 1000,
+      od_mm: od == null ? null : fromSI(od, "mm"),
       mass_kg: num(e.mass_kg),
       torque_ratio: num(e.torque_ratio),
       power_ratio: num(e.power_ratio),
-      peak_power_kw: power == null ? null : power / 1000,
+      peak_power_kw: power == null ? null : fromSI(power, "kW"),
       power_density: num(e.power_density_kw_per_kg),
       efficiency_base: num(e.efficiency_base),
       feasible: ok && e.feasible === true,

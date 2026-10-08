@@ -12,6 +12,8 @@ describe("units", () => {
   it("converts from SI", () => {
     expect(fromSI(2e7, "A/mm2")).toBe(20)
     expect(fromSI(0.001, "mH")).toBeCloseTo(1, 12)
+    expect(fromSI(0.0123, "mOhm")).toBeCloseTo(12.3, 12)
+    expect(fromSI(20000, "W") / fromSI(1000, "W")).toBe(20)
   })
   it("round-trips every unit", () => {
     for (const u of ALL) expect(fromSI(toSI(12.5, u), u)).toBeCloseTo(12.5, 9)
@@ -19,5 +21,6 @@ describe("units", () => {
   it("labels", () => {
     expect(UNIT_LABEL["A/mm2"]).toBe("A/mm²")
     expect(UNIT_LABEL.Nm).toBe("N·m")
+    expect(UNIT_LABEL.mOhm).toBe("mΩ")
   })
 })

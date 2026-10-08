@@ -1,6 +1,7 @@
 import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
+import { fromSI, UNIT_LABEL } from "@/lib/units"
 import type { Envelope } from "@/lib/candidates"
 
 export default function EnvelopeChart({ envelope }: { envelope: Envelope }) {
@@ -32,16 +33,14 @@ export default function EnvelopeChart({ envelope }: { envelope: Envelope }) {
     font: { family: "Fira Sans, sans-serif", color: c.fg },
     xaxis: axis("Speed (rpm)"),
     yaxis: axis("Torque (N·m)"),
-    yaxis2: axis("Power (W)", { overlaying: "y", side: "right", showgrid: false }),
+    yaxis2: axis(`Power (${UNIT_LABEL.kW})`, { overlaying: "y", side: "right", showgrid: false }),
     legend: { orientation: "h", y: -0.2 },
   }
   return (
     <Plot
-      data={[trace("torque", e.torque, "#0072b2", "y", "solid"), trace("power", e.power, "#d55e00", "y2", "dash")] as Data[]}
+      data={[trace("torque", e.torque, "#0072b2", "y", "solid"), trace("power", e.power.map((w) => (w == null ? null : fromSI(w, "kW"))), "#d55e00", "y2", "dash")] as Data[]}
       layout={layout as Partial<Layout>}
       config={{ responsive: true, displaylogo: false }}
-      useResizeHandler
-      style={{ width: "100%" }}
     />
   )
 }

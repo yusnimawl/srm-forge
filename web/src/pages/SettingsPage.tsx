@@ -83,7 +83,7 @@ export function SettingsPage() {
         <h2 className="font-medium">Units</h2>
         <p className="text-muted-foreground">
           Lengths in millimetres, current in amperes, torque in newton-metres; the engine works in SI internally.
-          Angles on plots are electrical degrees.
+          Map angles are mechanical degrees, 0° = phase A aligned; turn-on and turn-off angles are electrical degrees, 0° el = unaligned.
         </p>
       </section>
 

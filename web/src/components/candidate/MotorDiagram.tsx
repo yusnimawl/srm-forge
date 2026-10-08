@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import { errorMessage } from "@/lib/errorMessage"
@@ -6,26 +5,12 @@ import { errorMessage } from "@/lib/errorMessage"
 type Coil = { name: string; phase: string; sign: "+" | "-"; d: string }
 type Geometry = { view_box: [number, number, number, number]; stator: string; rotor: string; shaft: string; coils: Coil[] }
 
-// Colour-blind-safe set; the phase letter is also printed on every coil.
+// Colour-blind-safe set; the legend names the phases.
 const PHASE_COLOR: Record<string, string> = { A: "#0072b2", B: "#d55e00", C: "#009e73", D: "#cc79a7" }
 
 function CoilShape({ coil }: { coil: Coil }) {
-  const path = useRef<SVGPathElement>(null)
-  const [c, setC] = useState<[number, number] | null>(null)
-  useLayoutEffect(() => {
-    const b = path.current?.getBBox()
-    if (b) setC([b.x + b.width / 2, b.y + b.height / 2])
-  }, [coil.d])
   return (
-    <g>
-      <path ref={path} d={coil.d} fill={PHASE_COLOR[coil.phase] ?? "#888"} fillOpacity={coil.sign === "+" ? 0.9 : 0.5} stroke="var(--background)" strokeWidth={0.2} />
-      {c && (
-        <text x={c[0]} y={c[1]} textAnchor="middle" dominantBaseline="central" fontSize={3} fill="var(--background)" fontWeight={700}>
-          {coil.phase}
-          {coil.sign}
-        </text>
-      )}
-    </g>
+    <path d={coil.d} fill={PHASE_COLOR[coil.phase] ?? "#888"} fillOpacity={coil.sign === "+" ? 0.9 : 0.5} stroke="var(--background)" strokeWidth={0.2} />
   )
 }
 

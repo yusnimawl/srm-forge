@@ -23,6 +23,9 @@ const FIELD_KEYS = new Set([
   ...["n_candidates", "shortlist", "seed", "stator", "rotor", "preset"].map((k) => `settings.${k}`),
 ])
 
+// Summary entries that name their source; the rest read as plain messages.
+const SUMMARY_LABEL: Record<string, string> = { "requirements.wires": "Wire list" }
+
 type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }
 
 function Field({ id, label, unit, hint, error, children }: {
@@ -113,7 +116,7 @@ export function NewSearchPage() {
         <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           <p className="font-medium">Check the form:</p>
           <ul className="list-disc pl-5">
-            {summary.map(([k, msg]) => <li key={k}>{k ? `${k}: ${msg}` : msg}</li>)}
+            {summary.map(([k, msg]) => <li key={k}>{SUMMARY_LABEL[k] ? `${SUMMARY_LABEL[k]}: ${msg}` : msg}</li>)}
           </ul>
         </div>
       )}
