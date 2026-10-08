@@ -10,12 +10,13 @@ The engine (`srmcore`, M1–M5) is not changed. `srmapp` gets small additions (�
 
 ## 2. Scope and steps
 
-One spec, built and merged in three steps. Each step is usable on its own.
+One spec, built and merged in four steps (v0b-1, v0b-2a, v0b-2b, v0b-3). Each step is usable on its own.
 
 | Step | Adds |
 |---|---|
 | **v0b-1** | server, job runner, store, security, search form, live progress, runs list, run results (Pareto + candidate table), read-only candidate detail, Swagger, generated TS types |
-| **v0b-2** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays; Field tab: interactive mesh, \|B\| and flux-line view, and a rotor animation (§7.9); analysis plots and drive waveforms (§6.7, §7.10) |
+| **v0b-2a** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays; the review carry-overs (result response models, one Jobs module for the status rules, `get_result` filtered on `case_id`); the analysis plots that need no new engine output (Performance tab without line current and power factor, Map tab, Design factors tab; §6.7 `map_curves`, §7.10) |
+| **v0b-2b** | drive waveforms (§6.7 `waveforms`: Waveforms tab, line current, power factor) and the Field tab with the quick lane (§4.3, §6.6, §7.9) |
 | **v0b-3** | one-parameter sweep (Range or Table) with a cost estimate; two-parameter design study with families of curves (§6.8, §7.7) |
 
 Out of scope: an optimiser (NSGA, Bayesian or other; §13), fixed conduction angles, custom B-H upload, PDF reports, accounts, HTTPS, N-T efficiency maps, iron loss and thermal (no loss or thermal models exist; iron loss and iron-loss efficiency wait for sub-project #2).
