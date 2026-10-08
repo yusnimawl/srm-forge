@@ -47,7 +47,7 @@ def _eval(ok):
         return Evaluation("bad", design, "MapFailed", "boom", 1.0, None, NAN, NAN, NAN, NAN, NAN, False,
                           None, None)
     a = np.array([0.1, 0.2])
-    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a)
+    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a, None, a, a, a)
     m = MapArrays(a, a, np.zeros((2, 2)), np.full((2, 2), NAN))
     return Evaluation("good", design, "ok", "", 1.0, Winding(10, 1, 1e-6, 5.0, 0.1, 0.2, 0), 1.1, 1.1,
                       1000.0, 2.0, 0.9, True, env, None, map=m)

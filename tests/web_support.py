@@ -31,7 +31,7 @@ def evaluation(ident: str, ok: bool = True) -> Evaluation:
     if not ok:
         return Evaluation(ident, design, "MapFailed", "boom", 1.0, None, NAN, NAN, NAN, NAN, NAN, False, None, None)
     a = np.array([0.1, 0.2])
-    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a)
+    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a, None, a, a, a)
     m = MapArrays(a, a, np.zeros((2, 2)), np.full((2, 2), NAN))
     key = KeyNumbers(0.01, 0.002, 5.0, 30.0, 0.5, 20.0, 0.0, 0.5)
     curves = MapCurves(a, np.ones((2, 2)), a, a, 0.01, a, a, a, np.array([NAN, 1.0]))

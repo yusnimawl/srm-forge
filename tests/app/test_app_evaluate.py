@@ -48,7 +48,8 @@ def test_requirement_ratios():
     speeds = np.array([300.0, 3000.0, 4500.0, 6000.0])
     torque = np.array([10.0, 4.0, 2.0, 1.0])
     power = torque * speeds * 2 * math.pi / 60
-    env = Envelope(speeds, torque, power, np.zeros(4), np.zeros(4), np.ones(4), np.zeros(4), np.zeros(4), np.zeros(4))
+    env = Envelope(speeds, torque, power, np.zeros(4), np.zeros(4), np.ones(4), np.zeros(4), np.zeros(4), np.zeros(4),
+                   None, np.zeros(4), np.zeros(4), np.zeros(4))
     t_ratio, p_ratio = requirement_ratios(env, _req())
     assert t_ratio == pytest.approx(4.0 / 3.2)
     assert p_ratio == pytest.approx(min(power[1:]) / 1000.0)

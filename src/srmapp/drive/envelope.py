@@ -22,10 +22,27 @@ _EPS = 1e-9
 
 
 @dataclass(frozen=True)
+class Waveforms:
+    """Phase A over one rotor pole pitch at θ_k = k·τ/n (mechanical rad), shape (n_speeds, n) except `theta`.
+    Units: A, Wb-turns, V, N·m. `voltage` is the converter's average over interval k, ω·Δψ/Δθ + R·ī. `line` is the
+    dc-link current of all phases (each phase draws v·ī / V_bus)."""
+    theta: np.ndarray
+    current: np.ndarray
+    psi: np.ndarray
+    voltage: np.ndarray
+    torque: np.ndarray
+    line: np.ndarray
+
+
+@dataclass(frozen=True)
 class Envelope:
     """Per-speed best stroke. `torque` is the revolution average over all phases. `work_torque` is ∫T dθ and
     `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation. `i_rms` is the phase RMS current
-    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid)."""
+    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid).
+
+    `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
+    stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the
+    output power over q·V_rms·I_rms of one phase (copper loss only; NaN where there is no stroke)."""
     speeds_rpm: np.ndarray
     torque: np.ndarray
     power: np.ndarray
@@ -35,6 +52,10 @@ class Envelope:
     work_torque: np.ndarray
     work_loop: np.ndarray
     i_rms: np.ndarray
+    waveforms: "Waveforms"
+    line_mean: np.ndarray
+    line_rms: np.ndarray
+    power_factor: np.ndarray
 
     @property
     def efficiency(self) -> np.ndarray:
@@ -61,12 +82,34 @@ def _tables(result: MapResult, period: float, i_top: float, n_theta: int) -> _Ta
     return _Tables(theta, current, np.maximum.accumulate(np.maximum(psi_f, 0.0), axis=1), torque_f)
 
 
-def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray):
-    """One stroke for every (on, off) index pair. Returns (work_torque, work_loop, ∫i² dθ, valid)."""
+def line_current(per_phase: np.ndarray, n_phases: int) -> np.ndarray:
+    """Sum of `per_phase` (shape (..., n), one period) over the phases, phase j shifted by j·n/q samples (periodic
+    linear interpolation when n/q is not an integer)."""
+    n = per_phase.shape[-1]
+    out = np.zeros_like(per_phase, dtype=float)
+    for j in range(n_phases):
+        a, f = divmod(j * n / n_phases, 1.0)
+        a = int(a)
+        out += (1 - f) * np.roll(per_phase, a, axis=-1) + f * np.roll(per_phase, a + 1, axis=-1)
+    return out
+
+
+def power_factor(power: np.ndarray, voltage: np.ndarray, current: np.ndarray, n_phases: int) -> np.ndarray:
+    """power / (q · rms(v) · rms(i)) along the last axis; NaN where the denominator is 0."""
+    den = n_phases * np.sqrt((voltage**2).mean(axis=-1)) * np.sqrt((current**2).mean(axis=-1))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(den > 0, power / den, np.nan)
+
+
+def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray,
+              trace: bool = False):
+    """One stroke for every (on, off) index pair. Returns (work_torque, work_loop, ∫i² dθ, valid), and with `trace`
+    also ψ and i at every grid point, shape (n_theta, n_pairs)."""
     n = on.size
     psi, i = np.zeros(n), np.zeros(n)
     w_t, w_l, i2, peak = np.zeros(n), np.zeros(n), np.zeros(n), np.zeros(n)
     dth = t.theta[1] - t.theta[0]
+    psi_t, i_t = [psi], [i]
     for k in range(t.theta.size - 1):
         pulse = k < off
         started = k >= on
@@ -83,8 +126,12 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
         i2 += 0.5 * (i**2 + i_new**2) * dth * started
         psi, i = new, i_new
         peak = np.maximum(peak, psi)
+        psi_t.append(psi)
+        i_t.append(i)
     # the residual tail after alignment (up to 1 % of the peak flux) is not counted
     valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # flux must be gone by alignment
+    if trace:
+        return w_t, w_l, i2, valid, np.array(psi_t), np.array(i_t)
     return w_t, w_l, i2, valid
 
 
@@ -112,6 +159,10 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     on, off = on[keep], off[keep]
     speeds = np.asarray(speeds_rpm, float)
     rows = []
+    n = n_theta - 1
+    q = machine.n_phases
+    zero = np.zeros(n)
+    traces = []
     for rpm in speeds:
         omega = rpm * 2 * math.pi / 60
         w_t, w_l, i2, valid = _simulate(t, omega, bus_voltage, resistance, on, off)
@@ -120,12 +171,23 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
         best = int(np.argmax(np.where(valid, w_t, -np.inf))) if valid.any() else -1
         if best < 0 or w_t[best] <= 0:
             rows.append((0.0, 0.0, t.theta[on[0]], t.theta[off[0]], 0.0, 0.0, 0.0))
+            traces.append((zero,) * 5)
             continue
+        *_, psi_g, i_g = _simulate(t, omega, bus_voltage, resistance, on[[best]], off[[best]], trace=True)
+        psi_g, i_g = psi_g[:, 0], i_g[:, 0]
+        i_bar = 0.5 * (i_g[:-1] + i_g[1:])
+        v = omega * np.diff(psi_g) / (t.theta[1] - t.theta[0]) + resistance * i_bar
+        tq = np.array([np.interp(i_g[k], t.current, t.torque[k]) for k in range(n)])
+        traces.append((i_g[:-1], psi_g[:-1], v, tq, v * i_bar / bus_voltage))
         strokes_per_rev = machine.n_phases * machine.n_rotor_poles
         rows.append((strokes_per_rev * w_t[best] / (2 * math.pi),
                      machine.n_phases * resistance * i2[best] / period,
                      t.theta[on[best]], t.theta[off[best]], w_t[best], w_l[best],
                      math.sqrt(i2[best] / period)))
     torque, copper, th_on, th_off, work_t, work_l, i_rms = (np.array(c) for c in zip(*rows))
-    return Envelope(speeds, torque, torque * speeds * 2 * math.pi / 60, copper, th_on, th_off, work_t, work_l,
-                    i_rms)
+    cur, psi_w, volt, tq_w, bus = (np.array(c) for c in zip(*traces))
+    wave = Waveforms(t.theta[:n], cur, psi_w, volt, tq_w, line_current(bus, q))
+    power = torque * speeds * 2 * math.pi / 60
+    return Envelope(speeds, torque, power, copper, th_on, th_off, work_t, work_l, i_rms, wave,
+                    wave.line.mean(axis=1), np.sqrt((wave.line**2).mean(axis=1)),
+                    power_factor(power, volt, cur, q))
