@@ -149,7 +149,7 @@ class JobRunner:
         status, error = "done", None
         try:
             result = self._run_fn(job["kind"], job["request"], reporter)
-            self._store.put_result(job_id, result)
+            self._store.put_result(job_id, result, kind=job["kind"])
             if result.get("cancelled"):
                 status = "interrupted" if self._stopping else "cancelled"
         except Exception as exc:
