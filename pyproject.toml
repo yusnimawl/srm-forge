@@ -32,4 +32,5 @@ packages = ["src/srmcore", "src/srmapp", "src/srmweb"]
 testpaths = ["tests"]
 pythonpath = ["tests", "tests/maps"]
 addopts = "-ra"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`:starlette.exceptions.StarletteDeprecationWarning"]
 markers = ["slow: long-running validation tests (nightly or on demand)"]

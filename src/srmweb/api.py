@@ -5,14 +5,22 @@ import asyncio
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 import srmcore
 import srmweb
+from srmcore.materials.library import available_materials, load_material
+from srmcore.materials.schema import SoftMagneticMaterial
+from srmcore.model.design import RadialSRMParams
+from srmcore.model.errors import InputError
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.config import Settings
+from srmweb.geometry import outline_svg
 from srmweb.jobs import JobRunner, QueueFull
 from srmweb.schemas import JobIn, JobOut
 from srmweb.store import Store
@@ -53,7 +61,8 @@ def create_app(settings: Settings,
         yield
         runner.stop()
 
-    app = FastAPI(title="srmweb", lifespan=lifespan)
+    app = FastAPI(title="srmweb", lifespan=lifespan, docs_url=None, redoc_url=None,
+                  openapi_url=None)
     app.state.settings, app.state.store, app.state.runner = settings, store, runner
     app.state.sessions = Sessions()
     router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
@@ -137,6 +146,75 @@ def create_app(settings: Settings,
         store.delete_job(job_id)
         return Response(status_code=204)
 
+    @router.post("/geometry")
+    def geometry(machine: RadialSRMParams):
+        """Motor outline paths. A design that violates a rule gives 422 with FastAPI's
+        `{"detail": [{"loc": ["body", parameter], "msg": message, "type": rule}]}`."""
+        try:
+            return outline_svg(machine)
+        except InputError as exc:
+            raise HTTPException(422, [
+                {"loc": ["body", i.parameter], "msg": i.message, "type": i.rule}
+                for i in exc.issues if i.severity == "error"]) from exc
+
+    @router.get("/materials")
+    def materials():
+        out = []
+        for name in available_materials():
+            m = load_material(name)
+            if isinstance(m, SoftMagneticMaterial):
+                out.append({"name": m.name, "grade": m.confidence,
+                            "thickness_mm": None if m.thickness is None else m.thickness * 1000,
+                            "js": m.saturation_polarisation})
+        return out
+
+    def cache_files():
+        return list(settings.cache_dir.glob("*.h5")) if settings.cache_dir.is_dir() else []
+
+    @router.get("/settings/cache")
+    def cache_info():
+        files = cache_files()
+        return {"path": str(settings.cache_dir), "files": len(files),
+                "bytes": sum(f.stat().st_size for f in files)}
+
+    @router.delete("/settings/cache", status_code=204)
+    def clear_cache():
+        if runner.busy():
+            raise HTTPException(409, "a job is running; wait for it or cancel it")
+        for f in cache_files():
+            f.unlink(missing_ok=True)
+        return Response(status_code=204)
+
+    @router.get("/openapi.json", include_in_schema=False)
+    def openapi_json():
+        return app.openapi()
+
+    @router.get("/docs", include_in_schema=False)
+    def swagger():
+        return get_swagger_ui_html(openapi_url="/api/openapi.json", title="srmweb API")
+
     app.include_router(auth_router)
     app.include_router(router)
+    _mount_frontend(app, settings.static_dir)
     return app
+
+
+def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
+    index = static_dir / "index.html"
+    if not index.is_file():
+        @app.get("/", include_in_schema=False)
+        def not_built():
+            return PlainTextResponse("Frontend not built: cd web && npm ci && npm run build")
+        return
+    root = static_dir.resolve()
+    if (root / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404)
+        candidate = (root / path).resolve()
+        if candidate.is_relative_to(root) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index)

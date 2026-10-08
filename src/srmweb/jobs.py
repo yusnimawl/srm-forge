@@ -108,6 +108,10 @@ class JobRunner:
                 return True
         return False
 
+    def busy(self) -> bool:
+        with self._cond:
+            return self._running is not None
+
     def progress(self, job_id: str) -> tuple[int, Progress] | None:
         with self._cond:
             running = self._running
