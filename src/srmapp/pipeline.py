@@ -1,6 +1,7 @@
 """Requirements to scored candidates: generate, stage-1 filter, stage-2 evaluation, Pareto set (v0 spec §4)."""
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 import numpy as np
 
@@ -26,6 +27,7 @@ class SearchSettings:
     margin: float | None = None     # feasible when the worst of torque and power ratio is at least this; None: by grade
     j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max (density mode)
     j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor RMS current density
+    preset: Literal["screening", "full"] = "full"   # mesh and grid fidelity of every candidate
     j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is 2 x j_limit
 
     @property
@@ -68,7 +70,7 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
     """`progress(done, total)` after each stage-2 design; `point_progress(design, designs, points_done, points)`
     while each design's map is built."""
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed,
-                                           materials=settings.materials)
+                                           materials=settings.materials, preset=settings.preset)
     margin = settings.resolved_margin
     scored = [(c, stage1(req, c.design.machine, margin, settings.j_peak, settings.peak_cap))
               for c in candidates]

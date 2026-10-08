@@ -2,6 +2,7 @@
 import hashlib
 import math
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from scipy.stats import qmc
@@ -50,9 +51,10 @@ def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, 
 
 
 def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POLE_SETS,
-                      materials: RegionMaterials = RegionMaterials()) -> tuple[list[Candidate], dict[str, int]]:
+                      materials: RegionMaterials = RegionMaterials(),
+                      preset: Literal["screening", "full"] = "full") -> tuple[list[Candidate], dict[str, int]]:
     """About `n` valid designs, split evenly over `pole_sets`, built from `materials` with the stator
-    material's lamination thickness. Designs the validator or the topology fit
+    material's lamination thickness, meshed at `preset`. Designs the validator or the topology fit
     check rejects are dropped and counted; a pole set that cannot yield its share simply contributes fewer,
     so the result may hold fewer than `n` designs."""
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
@@ -72,7 +74,7 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
                 break
             try:
                 machine = _machine(u, ns, nr, m, d_lo, d_hi, req.max_speed_rpm, materials, lamination)
-                design = Design(machine=machine, mesh=MeshSettings(preset="full"))
+                design = Design(machine=machine, mesh=MeshSettings(preset=preset))
                 require_valid(design)
             except InputError:
                 dropped["validator"] += 1

@@ -2,7 +2,7 @@
 
     python examples/v0_search.py [n_candidates] [shortlist]
 
-Peak-only and unvalidated. Stage 2 builds a full-preset map (about 13 min) and scans the windings per design."""
+Peak-only and unvalidated. Stage 2 builds a full-preset map (about 26 min for an 8/6 at 8 workers) and scans the windings per design."""
 import sys
 import time
 

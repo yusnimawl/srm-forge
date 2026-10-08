@@ -73,3 +73,8 @@ def test_materials_and_their_lamination_thickness_are_set():
     cands, _ = sample_candidates(_req(), 8, seed=0, materials=mats)
     assert all(c.design.machine.materials == mats for c in cands)
     assert all(c.design.machine.lamination_thickness == 1e-4 for c in cands)
+
+
+def test_sample_candidates_preset():
+    kept, _ = sample_candidates(_req(), 4, seed=0, preset="screening")
+    assert kept and all(c.design.mesh.preset == "screening" for c in kept)

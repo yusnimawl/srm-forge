@@ -22,3 +22,13 @@ python -m pip install -e ".[dev]"
 python -m pytest -m "not slow"
 ```
 Linux needs `libglu1-mesa` for the gmsh wheel.
+
+## Web UI
+
+```
+python -m pip install -e ".[dev,ngsolve,web]"
+cd web && npm ci && npm run build && cd ..
+srmweb          # http://127.0.0.1:8000
+```
+
+Binding to a non-loopback host needs `SRMWEB_TOKEN`. Frontend development: `cd web && npm run dev`.

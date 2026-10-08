@@ -31,6 +31,16 @@ class StageTwoGrid:
 
 
 @dataclass(frozen=True)
+class MapArrays:
+    """The map at the chosen turns, end winding included: ψ of the excited circuit only (Wb-turns) and Arkkio
+    torque (N·m), both (n_angles, n_currents)."""
+    angles: np.ndarray
+    currents: np.ndarray
+    psi: np.ndarray
+    torque: np.ndarray
+
+
+@dataclass(frozen=True)
 class Evaluation:
     id: str
     design: Design              # with the chosen turns per pole and copper fill once a winding is chosen
@@ -49,6 +59,7 @@ class Evaluation:
     scan: tuple[ScanPoint, ...] = ()
     i_rms_a: float = _NAN       # A, worst phase RMS current over the speed grid, chosen winding
     j_rms: float = _NAN         # A/m², conductor RMS current density at i_rms_a
+    map: MapArrays | None = None  # set with status "ok"
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str) -> Evaluation:
@@ -86,7 +97,10 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     mass = stage.mass.iron + w.copper_mass
     peak_power = float(np.max(env.power))
     at_base = int(np.argmin(np.abs(env.speeds_rpm - req.base_speed_rpm)))
-    key = key_numbers(rescale_turns(result, turns_scale(machine, w)), chosen)
+    scaled = rescale_turns(result, turns_scale(machine, w))
+    key = key_numbers(scaled, chosen)
+    column = scaled.circuits.index(scaled.excited)
+    arrays = MapArrays(scaled.angles, scaled.currents, scaled.psi[..., column], scaled.torque_arkkio)
     i_rms = float(np.max(env.i_rms))
     notes = []
     if not req.wire_mode and w.turns / w.paths >= max_turns:
@@ -100,4 +114,4 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
                       float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan,
-                      i_rms, i_rms / (w.paths * w.copper_area))
+                      i_rms, i_rms / (w.paths * w.copper_area), arrays)
