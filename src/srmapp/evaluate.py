@@ -11,6 +11,7 @@ from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
+from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .requirements import Requirements
 from .sizing.estimates import J_LIMIT, J_PEAK, coil_side_area
@@ -60,6 +61,7 @@ class Evaluation:
     i_rms_a: float = _NAN       # A, worst phase RMS current over the speed grid, chosen winding
     j_rms: float = _NAN         # A/m², conductor RMS current density at i_rms_a
     map: MapArrays | None = None  # set with status "ok"
+    curves: MapCurves | None = None  # set with status "ok"
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str) -> Evaluation:
@@ -72,21 +74,27 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     j_peak_max: float | None = None, margin: float = 1.0, max_turns: int = DENSITY_MAX_TURNS,
                     solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
                     progress: Callable[[int, int], None] | None = None,
-                    cancel: Callable[[], bool] | None = None) -> Evaluation:
+                    cancel: Callable[[], bool] | None = None, only: Winding | None = None,
+                    i_map: float | None = None, on_scan: Callable[[], None] | None = None) -> Evaluation:
+    """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max;
+    `on_scan` is called once the map is complete (built or cached), before the winding is chosen."""
     design = candidate.design
     machine = design.machine
     try:
-        result = build_map(design, stage.i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
+        result = build_map(design, stage.i_map if i_map is None else i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
     except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
         return _failed(candidate, stage, type(exc).__name__, str(exc))
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")
+    if on_scan is not None:
+        on_scan()
     # L_end scales with turns², so the correction at the reference turns stays exact under rescale_turns.
-    result = with_end_winding(result, end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR))
+    l_end = end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR)
+    result = with_end_winding(result, l_end)
     cap = stage.j_peak_max if j_peak_max is None else j_peak_max
     choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
-                          margin=margin, max_turns=max_turns)
+                          margin=margin, max_turns=max_turns, only=only)
     if choice.point is None:
         cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
         return _failed(candidate, stage, "no_winding",
@@ -97,7 +105,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     mass = stage.mass.iron + w.copper_mass
     peak_power = float(np.max(env.power))
     at_base = int(np.argmin(np.abs(env.speeds_rpm - req.base_speed_rpm)))
-    scaled = rescale_turns(result, turns_scale(machine, w))
+    k = turns_scale(machine, w)
+    scaled = rescale_turns(result, k)
     key = key_numbers(scaled, chosen)
     column = scaled.circuits.index(scaled.excited)
     arrays = MapArrays(scaled.angles, scaled.currents, scaled.psi[..., column], scaled.torque_arkkio)
@@ -114,4 +123,5 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
                       float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan,
-                      i_rms, i_rms / (w.paths * w.copper_area), arrays)
+                      i_rms, i_rms / (w.paths * w.copper_area), arrays,
+                      map_curves(arrays, chosen, w, key, l_end * k * k))

@@ -4,6 +4,128 @@
  */
 
 export interface paths {
+    "/api/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cases */
+        get: operations["list_cases_api_cases_get"];
+        put?: never;
+        /** Create Case */
+        post: operations["create_case_api_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_api_cases__case_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Case */
+        delete: operations["delete_case_api_cases__case_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Case */
+        patch: operations["patch_case_api_cases__case_id__patch"];
+        trace?: never;
+    };
+    "/api/cases/{case_id}/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimate */
+        get: operations["estimate_api_cases__case_id__estimate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate Case */
+        post: operations["evaluate_case_api_cases__case_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/map.mat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Map Mat */
+        get: operations["map_mat_api_cases__case_id__map_mat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Setup */
+        get: operations["case_setup_api_cases__case_id__setup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Case Job */
+        post: operations["validate_case_job_api_cases__case_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/geometry": {
         parameters: {
             query?: never;
@@ -197,6 +319,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** References */
+        get: operations["references_api_references_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session": {
         parameters: {
             query?: never;
@@ -232,26 +371,452 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Setup */
+        post: operations["check_setup_api_setup_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Inputs */
+        post: operations["validate_inputs_api_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BudgetOut */
+        BudgetOut: {
+            /** Rows */
+            rows: components["schemas"]["BudgetRowOut"][];
+            /** Total */
+            total: {
+                [key: string]: number | null;
+            };
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
+            /** Values 2D */
+            values_2d: {
+                [key: string]: number | null;
+            };
+        };
+        /** BudgetRowOut */
+        BudgetRowOut: {
+            /** Note */
+            note: string;
+            /** Rel */
+            rel: {
+                [key: string]: number | null;
+            };
+            /** Source */
+            source: string;
+        };
+        /** CandidateCase */
+        CandidateCase: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Job Id */
+            job_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "candidate";
+        };
+        /** CaseInputs */
+        CaseInputs: {
+            design: components["schemas"]["Design"];
+            /** J Limit */
+            j_limit?: number | null;
+            /** J Peak */
+            j_peak?: number | null;
+            /** J Peak Max */
+            j_peak_max?: number | null;
+            /** Margin */
+            margin?: number | null;
+            requirements: components["schemas"]["Requirements"];
+            /**
+             * Winding
+             * @default auto
+             */
+            winding: "auto" | components["schemas"]["FixedWinding"];
+        };
+        /** CaseOut */
+        CaseOut: {
+            /** Comment */
+            comment: string | null;
+            /** Created */
+            created: string;
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            evaluation: components["schemas"]["EvaluationOut"] | null;
+            /** Feasible */
+            feasible: boolean | null;
+            /** Flag */
+            flag: string | null;
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: {
+                [key: string]: unknown;
+            };
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            /** Label */
+            label: string | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Origin */
+            origin: string;
+            /** Parent Case Id */
+            parent_case_id: string | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Poles */
+            poles: string | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Preset */
+            preset: string | null;
+            /** Show In Graphs */
+            show_in_graphs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Status */
+            status: string | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            /** Validated */
+            validated: boolean;
+            validation: components["schemas"]["ValidationOut"] | null;
+        };
+        /**
+         * CasePatch
+         * @description Fields left out (or null) stay as they are; `flag` is cleared with an empty string.
+         */
+        CasePatch: {
+            /** Comment */
+            comment?: string | null;
+            /** Flag */
+            flag?: string | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            } | null;
+            /** Label */
+            label?: string | null;
+            /** Show In Graphs */
+            show_in_graphs?: boolean | null;
+        };
+        /** CaseSummaryOut */
+        CaseSummaryOut: {
+            /** Comment */
+            comment: string | null;
+            /** Created */
+            created: string;
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            /** Feasible */
+            feasible: boolean | null;
+            /** Flag */
+            flag: string | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Origin */
+            origin: string;
+            /** Parent Case Id */
+            parent_case_id: string | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Poles */
+            poles: string | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Preset */
+            preset: string | null;
+            /** Show In Graphs */
+            show_in_graphs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Status */
+            status: string | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            /** Validated */
+            validated: boolean;
+        };
+        /** CheckOut */
+        CheckOut: {
+            /** Detail */
+            detail: string;
+            /** Limit */
+            limit: number | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value: number | null;
+        };
+        /** Design */
+        Design: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /**
+             * @default {
+             *       "airgap_radial_layers": 4,
+             *       "band_min_angle_deg": 5,
+             *       "max_aspect_ratio": 12,
+             *       "min_angle_deg": 10,
+             *       "outer_air_thickness": 0,
+             *       "preset": "full",
+             *       "refinement": {},
+             *       "region_sizes": {},
+             *       "scale": 1
+             *     }
+             */
+            mesh: components["schemas"]["MeshSettings"];
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
+        /** DriveSection */
+        DriveSection: {
+            /** Bus Voltage V */
+            bus_voltage_v: number;
+            /** Phase Current A */
+            phase_current_a?: number | null;
+        };
+        /** EdgeRefinement */
+        EdgeRefinement: {
+            /**
+             * Growth
+             * @default 1.3
+             */
+            growth: number;
+            /** Size */
+            size: number;
+        };
+        /** EditCase */
+        EditCase: {
+            inputs: components["schemas"]["CaseInputs"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "edit";
+            /** Parent Case Id */
+            parent_case_id: string;
+        };
+        /** EnvelopeOut */
+        EnvelopeOut: {
+            /** Copper Loss */
+            copper_loss: (number | null)[];
+            /** Efficiency */
+            efficiency: (number | null)[];
+            /** I Rms */
+            i_rms: (number | null)[];
+            /** Power */
+            power: (number | null)[];
+            /** Speeds Rpm */
+            speeds_rpm: (number | null)[];
+            /** Theta Off */
+            theta_off: (number | null)[];
+            /** Theta Off El */
+            theta_off_el: (number | null)[];
+            /** Theta On */
+            theta_on: (number | null)[];
+            /** Theta On El */
+            theta_on_el: (number | null)[];
+            /** Torque */
+            torque: (number | null)[];
+            /** Work Loop */
+            work_loop: (number | null)[];
+            /** Work Torque */
+            work_torque: (number | null)[];
+        };
+        /** EstimateOut */
+        EstimateOut: {
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "history" | "budget";
+            /** New Map */
+            new_map: boolean;
+            /** Seconds */
+            seconds: number;
+        };
+        /** EvaluateBody */
+        EvaluateBody: {
+            /** Grid */
+            grid?: [
+                number,
+                number
+            ] | null;
+        };
+        /** EvaluateJobIn */
+        EvaluateJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "evaluate";
+            payload: components["schemas"]["EvaluateRequest"];
+        };
+        /** EvaluateRequest */
+        EvaluateRequest: {
+            /** Case Id */
+            case_id: string;
+            /** Grid */
+            grid?: [
+                number,
+                number
+            ] | null;
+            inputs: components["schemas"]["CaseInputs"];
+        };
+        /** EvaluationOut */
+        EvaluationOut: {
+            curves?: components["schemas"]["MapCurvesOut"] | null;
+            design: components["schemas"]["Design"];
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            envelope: components["schemas"]["EnvelopeOut"] | null;
+            /** Error */
+            error: string;
+            /** Feasible */
+            feasible: boolean;
+            /** I Rms A */
+            i_rms_a?: number | null;
+            /** Id */
+            id: string;
+            /** J Rms */
+            j_rms?: number | null;
+            key: components["schemas"]["KeyNumbersOut"] | null;
+            map?: components["schemas"]["MapArraysOut"] | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /**
+             * Scan
+             * @default []
+             */
+            scan: components["schemas"]["ScanPointOut"][];
+            /** Status */
+            status: string;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            winding: components["schemas"]["WindingOut"] | null;
+        };
+        /** FixedWinding */
+        FixedWinding: {
+            /**
+             * Paths
+             * @default 1
+             */
+            paths: number;
+            /**
+             * Strands
+             * @default 1
+             */
+            strands: number;
+            /** Turns */
+            turns: number;
+            /** Wire */
+            wire?: number | null;
+        };
+        /** GeometrySection */
+        GeometrySection: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** JobIn */
-        JobIn: {
+        /** ImportCase */
+        ImportCase: {
             /**
-             * Kind
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
-            kind: "search";
-            payload: components["schemas"]["SearchRequest"];
+            origin: "import";
+            setup: components["schemas"]["SetupFile"];
+        };
+        /** IssueOut */
+        IssueOut: {
+            /** Loc */
+            loc: (string | number)[];
+            /** Msg */
+            msg: string;
+        };
+        /** IssuesOut */
+        IssuesOut: {
+            /** Errors */
+            errors: components["schemas"]["IssueOut"][];
+            /** Margin */
+            margin?: number | null;
+            /** Warnings */
+            warnings: components["schemas"]["IssueOut"][];
+        };
+        /** JobCreated */
+        JobCreated: {
+            /** Job Id */
+            job_id: string;
         };
         /** JobOut */
         JobOut: {
+            /** Active */
+            active: boolean;
+            /** Case Id */
+            case_id?: string | null;
             /** Created */
             created: string;
             /** Error */
@@ -266,10 +831,31 @@ export interface components {
             progress?: {
                 [key: string]: unknown;
             } | null;
+            /** Resumable */
+            resumable: boolean;
             /** Started */
             started?: string | null;
             /** Status */
             status: string;
+        };
+        /** KeyNumbersOut */
+        KeyNumbersOut: {
+            /** Aligned Angle */
+            aligned_angle: number | null;
+            /** I Max */
+            i_max: number | null;
+            /** La */
+            la: number | null;
+            /** La Lu */
+            la_lu: number | null;
+            /** Lu */
+            lu: number | null;
+            /** Peak Torque */
+            peak_torque: number | null;
+            /** Psi Max */
+            psi_max: number | null;
+            /** Unaligned Angle */
+            unaligned_angle: number | null;
         };
         /**
          * LitzWire
@@ -292,6 +878,100 @@ export interface components {
         LoginIn: {
             /** Token */
             token: string;
+        };
+        /** MapArraysOut */
+        MapArraysOut: {
+            /** Angles */
+            angles: (number | null)[];
+            /** Currents */
+            currents: (number | null)[];
+            /** Psi */
+            psi: (number | null)[][];
+            /** Torque */
+            torque: (number | null)[][];
+        };
+        /** MapCurvesOut */
+        MapCurvesOut: {
+            /** B Sp */
+            b_sp: (number | null)[];
+            /** B Sp K2 */
+            b_sp_k2: (number | null)[];
+            /** Currents */
+            currents: (number | null)[];
+            /** Inductance */
+            inductance: (number | null)[][];
+            /** K2 */
+            k2: (number | null)[];
+            /** La Lu */
+            la_lu: (number | null)[];
+            /** La Sat */
+            la_sat: (number | null)[];
+            /** La Unsat */
+            la_unsat: number | null;
+            /** Lu */
+            lu: (number | null)[];
+        };
+        /** MaterialOut */
+        MaterialOut: {
+            /** Grade */
+            grade: string;
+            /** Js */
+            js: number | null;
+            /** Name */
+            name: string;
+            /** Thickness Mm */
+            thickness_mm: number | null;
+        };
+        /** MeshSettings */
+        MeshSettings: {
+            /** Airgap Circumferential Divisions */
+            airgap_circumferential_divisions?: number | null;
+            /**
+             * Airgap Radial Layers
+             * @default 4
+             */
+            airgap_radial_layers: number;
+            /**
+             * Band Min Angle Deg
+             * @default 5
+             */
+            band_min_angle_deg: number;
+            /**
+             * Max Aspect Ratio
+             * @default 12
+             */
+            max_aspect_ratio: number;
+            /**
+             * Min Angle Deg
+             * @default 10
+             */
+            min_angle_deg: number;
+            /**
+             * Outer Air Thickness
+             * @default 0
+             */
+            outer_air_thickness: number;
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full" | "reference";
+            /** Refinement */
+            refinement?: {
+                [key: string]: components["schemas"]["EdgeRefinement"];
+            };
+            /** Region Sizes */
+            region_sizes?: {
+                [key: string]: number;
+            };
+            /**
+             * Scale
+             * @default 1
+             */
+            scale: number;
+            /** Skin Depth Layers */
+            skin_depth_layers?: number | null;
         };
         /** RadialSRMParams */
         RadialSRMParams: {
@@ -384,6 +1064,35 @@ export interface components {
             /** Width */
             width: number;
         };
+        /** ReferenceCase */
+        ReferenceCase: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "8/6" | "12/8" | "24/16";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "reference";
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full";
+            requirements: components["schemas"]["Requirements"];
+        };
+        /** ReferenceOut */
+        ReferenceOut: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "8/6" | "12/8" | "24/16";
+        };
         /** RegionMaterials */
         RegionMaterials: {
             /**
@@ -451,6 +1160,27 @@ export interface components {
             /** Outer Diameter */
             outer_diameter: number;
         };
+        /** ScanPointOut */
+        ScanPointOut: {
+            /** Feasible */
+            feasible: boolean;
+            /** I Rms */
+            i_rms: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            winding: components["schemas"]["WindingOut"];
+        };
+        /** SearchJobIn */
+        SearchJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search";
+            payload: components["schemas"]["SearchRequest"];
+        };
         /** SearchRequest */
         SearchRequest: {
             /** Grid */
@@ -470,6 +1200,24 @@ export interface components {
              *     }
              */
             settings: components["schemas"]["SearchSettingsIn"];
+        };
+        /** SearchResultOut */
+        SearchResultOut: {
+            /** Cancelled */
+            cancelled: boolean;
+            /** Dropped */
+            dropped: {
+                [key: string]: number;
+            };
+            /** Evaluations */
+            evaluations: components["schemas"]["EvaluationOut"][];
+            /** Pareto Ids */
+            pareto_ids: string[];
+            requirements: components["schemas"]["Requirements"];
+            /** Sampled */
+            sampled: number;
+            /** Stage1 Rejected */
+            stage1_rejected: number;
         };
         /** SearchSettingsIn */
         SearchSettingsIn: {
@@ -513,6 +1261,45 @@ export interface components {
              */
             stator: string;
         };
+        /** SetupFile */
+        SetupFile: {
+            drive?: components["schemas"]["DriveSection"] | null;
+            geometry?: components["schemas"]["GeometrySection"] | null;
+            materials?: components["schemas"]["RegionMaterials"] | null;
+            requirements?: components["schemas"]["Requirements"] | null;
+            /**
+             * Schema
+             * @constant
+             */
+            schema: "srm-setup";
+            search?: components["schemas"]["SearchSettingsIn"] | null;
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+            winding?: components["schemas"]["WindingSection"] | null;
+        };
+        /** ValidateIn */
+        ValidateIn: {
+            /** Inputs */
+            inputs: unknown;
+        };
+        /** ValidateJobIn */
+        ValidateJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "validate";
+            payload: components["schemas"]["ValidateRequest"];
+        };
+        /** ValidateRequest */
+        ValidateRequest: {
+            /** Case Id */
+            case_id: string;
+            inputs: components["schemas"]["CaseInputs"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -526,6 +1313,64 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** ValidationOut */
+        ValidationOut: {
+            budget: components["schemas"]["BudgetOut"];
+            /** Checks */
+            checks: components["schemas"]["CheckOut"][];
+            /** Engine Version */
+            engine_version: string;
+            /** Label */
+            label: string | null;
+            /** Material Grades */
+            material_grades: {
+                [key: string]: string;
+            };
+            /**
+             * Reference Turns
+             * @default 20
+             */
+            reference_turns: number;
+        };
+        /** WindingOut */
+        WindingOut: {
+            /** Copper Area */
+            copper_area: number | null;
+            /** Copper Mass */
+            copper_mass: number | null;
+            /** Current */
+            current: number | null;
+            /**
+             * Paths
+             * @default 1
+             */
+            paths: number;
+            /** Resistance */
+            resistance: number | null;
+            /** Strands */
+            strands: number;
+            /** Turns */
+            turns: number;
+            /** Wire */
+            wire?: number | null;
+        };
+        /** WindingSection */
+        WindingSection: {
+            fixed?: components["schemas"]["FixedWinding"] | null;
+            /** J Limit */
+            j_limit?: number | null;
+            /** J Peak */
+            j_peak?: number | null;
+            /** J Peak Max */
+            j_peak_max?: number | null;
+            /** Margin */
+            margin?: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "auto" | "fixed";
+        };
     };
     responses: never;
     parameters: never;
@@ -535,6 +1380,313 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_cases_api_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseSummaryOut"][];
+                };
+            };
+        };
+    };
+    create_case_api_cases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateCase"] | components["schemas"]["ReferenceCase"] | components["schemas"]["EditCase"] | components["schemas"]["ImportCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_api_cases__case_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_case_api_cases__case_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_case_api_cases__case_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CasePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_api_cases__case_id__estimate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_case_api_cases__case_id__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EvaluateBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_mat_api_cases__case_id__map_mat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_setup_api_cases__case_id__setup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_case_job_api_cases__case_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     geometry_api_geometry_post: {
         parameters: {
             query?: never;
@@ -617,7 +1769,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JobIn"];
+                "application/json": components["schemas"]["SearchJobIn"] | components["schemas"]["EvaluateJobIn"] | components["schemas"]["ValidateJobIn"];
             };
         };
         responses: {
@@ -780,7 +1932,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SearchResultOut"];
                 };
             };
             /** @description Validation Error */
@@ -889,7 +2041,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MaterialOut"][];
+                };
+            };
+        };
+    };
+    references_api_references_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceOut"][];
                 };
             };
         };
@@ -951,6 +2123,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    check_setup_api_setup_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupFile"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_inputs_api_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

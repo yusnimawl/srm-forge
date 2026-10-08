@@ -9,6 +9,8 @@ import { CandidatePage } from "@/pages/CandidatePage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { RunPage } from "@/pages/RunPage"
 import { RunsPage } from "@/pages/RunsPage"
+import { CasePage } from "@/pages/CasePage"
+import { CasesPage } from "@/pages/CasesPage"
 
 const queryClient = new QueryClient()
 
@@ -22,6 +24,8 @@ const router = createBrowserRouter([
       { path: "/runs", element: <RunsPage /> },
       { path: "/runs/:jobId", element: <RunPage /> },
       { path: "/runs/:jobId/candidates/:candidateId", element: <CandidatePage /> },
+      { path: "/cases", element: <CasesPage /> },
+      { path: "/cases/:caseId", element: <CasePage /> },
       { path: "/settings", element: <SettingsPage /> },
     ],
   },

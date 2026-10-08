@@ -13,6 +13,7 @@ describe("units", () => {
     expect(fromSI(2e7, "A/mm2")).toBe(20)
     expect(fromSI(0.001, "mH")).toBeCloseTo(1, 12)
     expect(fromSI(0.0123, "mOhm")).toBeCloseTo(12.3, 12)
+    expect(fromSI(0.9, "%")).toBeCloseTo(90, 12)
     expect(fromSI(20000, "W") / fromSI(1000, "W")).toBe(20)
   })
   it("round-trips every unit", () => {

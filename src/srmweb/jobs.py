@@ -7,13 +7,16 @@ import time
 from collections import deque
 from collections.abc import Callable
 
+from pydantic import BaseModel
+
+from srmapp.case import LIMIT_FIELDS, evaluate_design, validate_case
 from srmapp.evaluate import StageTwoGrid
 from srmapp.pipeline import SearchSettings, run_search
 from srmcore.model.design import RegionMaterials
 from srmweb.config import Settings
-from srmweb.schemas import SearchRequest
-from srmweb.serialize import search_result_json
-from srmweb.store import Store
+from srmweb.schemas import EvaluateRequest, SearchRequest, ValidateRequest
+from srmweb.serialize import evaluation_json, search_result_json, to_json
+from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
 
 Progress = dict
 
@@ -32,7 +35,7 @@ class Reporter:
     """Latest progress of one running job plus its cancel flag."""
 
     def __init__(self, store: Store, job_id: str):
-        self._store, self._job_id = store, job_id
+        self.store, self._job_id = store, job_id
         self._lock = threading.Lock()
         self._cancel = threading.Event()
         self._fields = dict(_INITIAL)
@@ -48,6 +51,9 @@ class Reporter:
         if due:
             self.flush()
 
+    def cancel(self) -> None:
+        self._cancel.set()
+
     def cancelled(self) -> bool:
         return self._cancel.is_set()
 
@@ -57,7 +63,7 @@ class Reporter:
 
     def flush(self) -> None:
         self._last_write = time.monotonic()
-        self._store.set_progress(self._job_id, self.snapshot()[1])
+        self.store.set_progress(self._job_id, self.snapshot()[1])
 
 
 class JobRunner:
@@ -83,7 +89,7 @@ class JobRunner:
         with self._cond:
             self._stopping = True
             if self._running:
-                self._running[1]._cancel.set()
+                self._running[1].cancel()
             self._cond.notify_all()
         if self._thread is not None:
             self._thread.join(timeout)
@@ -100,7 +106,7 @@ class JobRunner:
     def cancel(self, job_id: str) -> bool:
         with self._cond:
             if self._running and self._running[0] == job_id:
-                self._running[1]._cancel.set()
+                self._running[1].cancel()
                 return True
             if job_id in self._queue:
                 self._queue.remove(job_id)
@@ -149,8 +155,14 @@ class JobRunner:
         status, error = "done", None
         try:
             result = self._run_fn(job["kind"], job["request"], reporter)
-            self._store.put_result(job_id, result)
-            if result.get("cancelled"):
+            cancelled = bool(result.get("cancelled"))
+            if cancelled:   # a cancelled evaluation must not mark its case as evaluated
+                self._store.put_result(job_id, result, kind=job["kind"])
+            elif job["kind"] == "evaluate":
+                self._store.attach_evaluation(job["request"]["case_id"], job_id, result)
+            else:
+                self._store.put_result(job_id, result, kind=job["kind"], case_id=job["request"].get("case_id"))
+            if cancelled:
                 status = "interrupted" if self._stopping else "cancelled"
         except Exception as exc:
             status, error = "failed", f"{type(exc).__name__}: {exc}"
@@ -160,16 +172,15 @@ class JobRunner:
 
 
 def run_job(kind: str, request: dict, reporter: Reporter, settings: Settings) -> dict:
-    if kind == "search":
-        return run_search_job(request, reporter, settings)
-    raise ValueError(f"unknown job kind {kind!r}")
+    if kind not in KINDS:
+        raise ValueError(f"unknown job kind {kind!r}")
+    model, fn = KINDS[kind]
+    return fn(model.model_validate(request), reporter, settings)
 
 
-def run_search_job(request: dict, reporter: Reporter, settings: Settings) -> dict:
-    req = SearchRequest.model_validate(request)
+def run_search_job(req: SearchRequest, reporter: Reporter, settings: Settings) -> dict:
     s = req.settings
-    given = {k: getattr(s, k) for k in ("margin", "j_peak", "j_limit", "j_peak_max")
-             if getattr(s, k) is not None}
+    given = {k: getattr(s, k) for k in LIMIT_FIELDS if getattr(s, k) is not None}
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ss = SearchSettings(
         n_candidates=s.n_candidates, seed=s.seed, shortlist=s.shortlist, preset=s.preset,
@@ -186,3 +197,45 @@ def run_search_job(request: dict, reporter: Reporter, settings: Settings) -> dic
     result = run_search(req.requirements, ss, workers=settings.workers, cache_dir=settings.cache_dir,
                         progress=on_design, point_progress=on_point, cancel=reporter.cancelled)
     return search_result_json(result)
+
+
+def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, settings: Settings) -> dict:
+    t0 = time.monotonic()
+    last = scan_start = None
+    counts = (0, 0)
+
+    def on_point(done: int, total: int) -> None:
+        nonlocal last, counts
+        last, counts = time.monotonic(), (done, total)
+        reporter.progress(points_done=done, points_total=total,
+                          message="mapping" if done < total else "choosing the winding")
+
+    def on_scan() -> None:   # the map is complete, built or cached
+        nonlocal scan_start
+        scan_start = time.monotonic()
+        reporter.progress(message="choosing the winding")
+
+    reporter.progress(message="mapping")
+    grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
+    ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
+                         progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, **grid)
+    if ev.status == "cancelled":
+        return {"cancelled": True}
+    if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
+        reporter.store.add_map_time(req.inputs.design.mesh.preset, last - t0)
+    if scan_start is not None:
+        mode = "auto" if req.inputs.winding == "auto" else "fixed"
+        reporter.store.add_scan_time(mode, time.monotonic() - scan_start)
+    return evaluation_json(ev)
+
+
+def run_validate_job(req: ValidateRequest, reporter: Reporter, settings: Settings) -> dict:
+    reporter.progress(message="validating (about 1 h)")
+    return to_json(validate_case(req.inputs, workers=settings.workers, cache_dir=settings.cache_dir))
+
+
+KINDS: dict[str, tuple[type[BaseModel], Callable[[BaseModel, Reporter, Settings], dict]]] = {
+    "search": (SearchRequest, run_search_job),
+    "evaluate": (EvaluateRequest, run_evaluate_job),
+    "validate": (ValidateRequest, run_validate_job),
+}

@@ -79,6 +79,37 @@ def density_windings(p: RadialSRMParams, req: Requirements, j_peak: float,
     return out
 
 
+def fixed_winding(p: RadialSRMParams, req: Requirements, turns: int, strands: int, paths: int, wire: int | None,
+                  j_peak: float) -> Winding:
+    """The winding a user chose, built like the generated ones. Wire mode (`wire` set) carries `req.phase_current_a`
+    in `strands` strands of `req.wires[wire]`, which must fit `req.max_slot_fill`; density mode (`wire` None) has one
+    strand filling `p.fill_factor` of the coil side and carries the current `j_peak` gives, which may not exceed
+    `req.phase_current_a` when that is set. Raises ValueError naming the offending field."""
+    if paths not in path_counts(p):
+        raise ValueError(f"paths {paths} must divide the {p.n_stator_poles // p.n_phases} poles of a phase: "
+                         f"one of {path_counts(p)}")
+    if wire is None:
+        if req.wire_mode:
+            raise ValueError("wire must be set when the requirements give wires")
+        if strands != 1:
+            raise ValueError(f"strands must be 1 in density mode, got {strands}")
+        area = p.fill_factor * coil_side_area(p) / turns
+        current = j_peak * area * paths
+        if req.phase_current_a is not None and current > req.phase_current_a * (1 + _EPS):
+            raise ValueError(f"turns {turns} on {paths} paths carry {current:.1f} A at the peak current density, "
+                             f"above the phase current limit {req.phase_current_a:g} A")
+        return _winding(p, turns, 1, area, current, None, paths)
+    if not req.wire_mode:
+        raise ValueError("wire needs wires in the requirements")
+    if not 0 <= wire < len(req.wires):
+        raise ValueError(f"wire {wire} is outside the {len(req.wires)} wires given")
+    w = req.wires[wire]
+    if turns * strands * w.outer_area > req.max_slot_fill * coil_side_area(p) * (1 + _EPS):
+        raise ValueError(f"turns {turns} x strands {strands} of wire {wire} do not fit "
+                         f"max_slot_fill {req.max_slot_fill} of the coil side")
+    return _winding(p, turns, strands, strands * w.copper_area, req.phase_current_a, wire, paths)
+
+
 def max_mmf(p: RadialSRMParams, req: Requirements, j_peak: float, j_peak_max: float) -> float:
     """Largest peak ampere-turns per pole any allowed winding carries (v0a-2 spec §3.3); the map must cover it.
     0 when wire mode allows no winding."""

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
+import type { Evaluation } from "@/api/types"
 import { AXES, toRows } from "./candidates"
 import { fmt } from "./format"
 
+// Only the fields toRows reads are filled; the full generated design has many more.
 const ev = (id: string, status: string, extra = {}) => ({
   id,
   design: { machine: { n_stator_poles: 8, n_rotor_poles: 6, stator_outer_diameter: 0.12 } },
@@ -16,7 +18,7 @@ const ev = (id: string, status: string, extra = {}) => ({
   efficiency_base: 0.9,
   feasible: true,
   ...extra,
-})
+}) as unknown as Evaluation
 
 const result = {
   evaluations: [

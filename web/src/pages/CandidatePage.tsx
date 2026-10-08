@@ -1,14 +1,17 @@
 import { lazy, Suspense } from "react"
-import { Link, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
+import { toast } from "sonner"
+import { useCreateCase } from "@/api/cases"
 import { useRunResult } from "@/api/useRunResult"
 import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { WindingScan } from "@/components/candidate/WindingScan"
+import { Button } from "@/components/ui/button"
+import { errorMessage } from "@/lib/errorMessage"
 import { fmt, fmtSI } from "@/lib/format"
 import { UNIT_LABEL } from "@/lib/units"
 
-const MapCharts = lazy(() => import("@/components/candidate/MapCharts"))
-const EnvelopeChart = lazy(() => import("@/components/candidate/EnvelopeChart"))
+const AnalysisTabs = lazy(() => import("@/components/analysis/AnalysisTabs"))
 const fallback = <div className="h-[380px]" aria-busy="true" />
 
 function Item({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -26,6 +29,8 @@ function Item({ label, value, unit }: { label: string; value: string; unit?: str
 export function CandidatePage() {
   const { jobId = "", candidateId = "" } = useParams()
   const result = useRunResult(jobId)
+  const navigate = useNavigate()
+  const create = useCreateCase()
   const back = (
     <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2">
       Back to the run
@@ -48,7 +53,7 @@ export function CandidatePage() {
   }
   const w = ev.winding
   const k = ev.key
-  const wire = w?.wire != null ? result.data?.requirements?.wires?.[w.wire]?.kind : null
+  const wire = w?.wire != null ? result.data?.requirements.wires[w.wire]?.kind : null
   return (
     <div className="space-y-6">
       {back}
@@ -58,6 +63,15 @@ export function CandidatePage() {
         <span className="text-sm">
           {ev.design.machine.n_stator_poles}/{ev.design.machine.n_rotor_poles} · {ev.status}
         </span>
+        <Button className="ml-auto min-h-11" disabled={ev.status !== "ok" || create.isPending}
+          onClick={() =>
+            create.mutate(
+              { origin: "candidate", job_id: jobId, candidate_id: ev.id },
+              { onSuccess: (made) => navigate(`/cases/${made.id}`), onError: (e) => toast.error(errorMessage(e)) },
+            )
+          }>
+          {create.isPending ? "Opening…" : "Open as case"}
+        </Button>
       </div>
       <Banner />
       {ev.error &&
@@ -95,21 +109,16 @@ export function CandidatePage() {
             </div>
           </section>
         )}
-        {ev.map && (
-          <Suspense fallback={fallback}>
-            <MapCharts map={ev.map} unaligned={k?.unaligned_angle ?? null} />
-          </Suspense>
-        )}
-        {ev.envelope && (
-          <section className="space-y-2 lg:col-span-2">
-            <h2 className="text-lg font-semibold">Torque and power vs speed</h2>
-            <Suspense fallback={fallback}>
-              <EnvelopeChart envelope={ev.envelope} />
-            </Suspense>
-          </section>
-        )}
       </div>
-      {ev.scan && ev.scan.length > 0 && (
+      {(ev.map || ev.envelope) && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Analysis</h2>
+          <Suspense fallback={fallback}>
+            <AnalysisTabs evaluation={ev} />
+          </Suspense>
+        </section>
+      )}
+      {ev.scan.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Winding scan</h2>
           <WindingScan scan={ev.scan} chosen={ev.winding} />

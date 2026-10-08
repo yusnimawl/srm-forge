@@ -34,8 +34,7 @@ def _map(stage):
 
 def _evaluate(req, **kw):
     stage = stage1(req, make_8_6())
-    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
         return evaluate_stage2(_cand(), req, stage, max_turns=30, **kw), stage
 
 
@@ -77,8 +76,7 @@ def test_cancelled_map_is_reported():
 
 def test_map_is_built_over_the_stage_one_range():
     stage = stage1(_req(), make_8_6())
-    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)) as bm, \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)) as bm:
         evaluate_stage2(_cand(), _req(), stage, max_turns=5)
     assert bm.call_args.args[1] == stage.i_map
 
@@ -87,8 +85,7 @@ def test_stage_two_scans_within_the_stage_one_cap_by_default():
     req = _req(wires=[THICK], phase_current_a=100.0)
     stage = stage1(req, make_8_6())                    # cap 40 A/mm2
     assert stage.j_peak_max == 40e6
-    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
         e = evaluate_stage2(_cand(), req, stage, j_limit=25e6)     # its own 2x would be 50 A/mm2
     assert e.scan and all(s.winding.current_density <= 40e6 * (1 + 1e-9) for s in e.scan)
 
@@ -198,7 +195,6 @@ def test_turns_are_chosen_on_the_end_winding_corrected_map():
         seen.append(result)
         return real(result, *a, **kw)
     with mock.patch("srmapp.evaluate.build_map", return_value=raw), \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None), \
             mock.patch("srmapp.evaluate.choose_turns", side_effect=spy):
         evaluate_stage2(_cand(), req, stage, max_turns=30)
     l_end = end_winding_inductance(make_8_6(), image_factor=1.5)
@@ -212,8 +208,7 @@ def test_evaluation_carries_the_rescaled_map():
     req = _req()
     stage = stage1(req, make_8_6())
     raw = _map(stage)
-    with mock.patch("srmapp.evaluate.build_map", return_value=raw), \
-            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+    with mock.patch("srmapp.evaluate.build_map", return_value=raw):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30)
     assert e.status == "ok"
     expected = rescale_turns(with_end_winding(raw, end_winding_inductance(make_8_6(), image_factor=1.5)),

@@ -2,7 +2,6 @@ import type { components } from "./schema"
 
 export type SearchRequest = components["schemas"]["SearchRequest"]
 export type JobOut = components["schemas"]["JobOut"]
-export type Material = { name: string; grade: string; thickness_mm: number | null; js: number }
 
 export type ValidationIssue = { loc: (string | number)[]; msg: string; type?: string }
 
@@ -10,10 +9,13 @@ export type ValidationIssue = { loc: (string | number)[]; msg: string; type?: st
 export class ApiError extends Error {
   status: number
   detail: ValidationIssue[] | string
-  constructor(status: number, detail: ValidationIssue[] | string) {
+  /** The parsed response body, for errors whose body is not `{detail}` (a case import's `{errors, warnings}`). */
+  body: unknown
+  constructor(status: number, detail: ValidationIssue[] | string, body: unknown = null) {
     super(typeof detail === "string" ? detail : `request rejected (${status})`)
     this.status = status
     this.detail = detail
+    this.body = body
   }
 }
 
@@ -27,9 +29,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    throw new ApiError(res.status, body?.detail ?? res.statusText)
+    throw new ApiError(res.status, body?.detail ?? res.statusText, body)
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T)
+}
+
+/** A binary download; errors are `ApiError`s like `api`'s. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await fetch(path, { credentials: "same-origin" })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(res.status, body?.detail ?? res.statusText, body)
+  }
+  return res.blob()
 }
 
 export const submitSearch = (payload: SearchRequest) =>

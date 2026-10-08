@@ -1,6 +1,1427 @@
 {
   "components": {
     "schemas": {
+      "BudgetOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Total",
+            "type": "object"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          },
+          "values_2d": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values 2D",
+            "type": "object"
+          }
+        },
+        "required": [
+          "values_2d",
+          "values",
+          "rows",
+          "total"
+        ],
+        "title": "BudgetOut",
+        "type": "object"
+      },
+      "BudgetRowOut": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "rel": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Rel",
+            "type": "object"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "rel",
+          "note"
+        ],
+        "title": "BudgetRowOut",
+        "type": "object"
+      },
+      "CandidateCase": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "origin": {
+            "const": "candidate",
+            "title": "Origin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "job_id",
+          "candidate_id"
+        ],
+        "title": "CandidateCase",
+        "type": "object"
+      },
+      "CaseInputs": {
+        "additionalProperties": false,
+        "properties": {
+          "design": {
+            "$ref": "#/components/schemas/Design"
+          },
+          "j_limit": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Limit"
+          },
+          "j_peak": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak"
+          },
+          "j_peak_max": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak Max"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/Requirements"
+          },
+          "winding": {
+            "anyOf": [
+              {
+                "const": "auto",
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/FixedWinding"
+              }
+            ],
+            "default": "auto",
+            "title": "Winding"
+          }
+        },
+        "required": [
+          "requirements",
+          "design"
+        ],
+        "title": "CaseInputs",
+        "type": "object"
+      },
+      "CaseOut": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created": {
+            "title": "Created",
+            "type": "string"
+          },
+          "efficiency_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency Base"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feasible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feasible"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "mass_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mass Kg"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "parent_case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Case Id"
+          },
+          "peak_power_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Power W"
+          },
+          "poles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poles"
+          },
+          "power_density_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Density Kw Per Kg"
+          },
+          "power_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Ratio"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "show_in_graphs": {
+            "title": "Show In Graphs",
+            "type": "boolean"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "torque_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Ratio"
+          },
+          "validated": {
+            "title": "Validated",
+            "type": "boolean"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "origin",
+          "parent_case_id",
+          "flag",
+          "comment",
+          "show_in_graphs",
+          "stale",
+          "created",
+          "preset",
+          "poles",
+          "status",
+          "torque_ratio",
+          "power_ratio",
+          "peak_power_w",
+          "mass_kg",
+          "power_density_kw_per_kg",
+          "efficiency_base",
+          "feasible",
+          "validated",
+          "inputs",
+          "evaluation",
+          "validation",
+          "jobs"
+        ],
+        "title": "CaseOut",
+        "type": "object"
+      },
+      "CasePatch": {
+        "additionalProperties": false,
+        "description": "Fields left out (or null) stay as they are; `flag` is cleared with an empty string.",
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "show_in_graphs": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show In Graphs"
+          }
+        },
+        "title": "CasePatch",
+        "type": "object"
+      },
+      "CaseSummaryOut": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created": {
+            "title": "Created",
+            "type": "string"
+          },
+          "efficiency_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency Base"
+          },
+          "feasible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feasible"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "mass_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mass Kg"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "parent_case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Case Id"
+          },
+          "peak_power_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Power W"
+          },
+          "poles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poles"
+          },
+          "power_density_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Density Kw Per Kg"
+          },
+          "power_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Ratio"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "show_in_graphs": {
+            "title": "Show In Graphs",
+            "type": "boolean"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "torque_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Ratio"
+          },
+          "validated": {
+            "title": "Validated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "origin",
+          "parent_case_id",
+          "flag",
+          "comment",
+          "show_in_graphs",
+          "stale",
+          "created",
+          "preset",
+          "poles",
+          "status",
+          "torque_ratio",
+          "power_ratio",
+          "peak_power_w",
+          "mass_kg",
+          "power_density_kw_per_kg",
+          "efficiency_base",
+          "feasible",
+          "validated"
+        ],
+        "title": "CaseSummaryOut",
+        "type": "object"
+      },
+      "CheckOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "value",
+          "limit",
+          "detail"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "Design": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/RadialSRMParams"
+          },
+          "mesh": {
+            "$ref": "#/components/schemas/MeshSettings",
+            "default": {
+              "airgap_radial_layers": 4,
+              "band_min_angle_deg": 5.0,
+              "max_aspect_ratio": 12.0,
+              "min_angle_deg": 10.0,
+              "outer_air_thickness": 0.0,
+              "preset": "full",
+              "refinement": {},
+              "region_sizes": {},
+              "scale": 1.0
+            }
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "machine"
+        ],
+        "title": "Design",
+        "type": "object"
+      },
+      "DriveSection": {
+        "additionalProperties": false,
+        "properties": {
+          "bus_voltage_v": {
+            "exclusiveMinimum": 0.0,
+            "title": "Bus Voltage V",
+            "type": "number"
+          },
+          "phase_current_a": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Current A"
+          }
+        },
+        "required": [
+          "bus_voltage_v"
+        ],
+        "title": "DriveSection",
+        "type": "object"
+      },
+      "EdgeRefinement": {
+        "additionalProperties": false,
+        "properties": {
+          "growth": {
+            "default": 1.3,
+            "title": "Growth",
+            "type": "number"
+          },
+          "size": {
+            "title": "Size",
+            "type": "number"
+          }
+        },
+        "required": [
+          "size"
+        ],
+        "title": "EdgeRefinement",
+        "type": "object"
+      },
+      "EditCase": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "$ref": "#/components/schemas/CaseInputs"
+          },
+          "origin": {
+            "const": "edit",
+            "title": "Origin",
+            "type": "string"
+          },
+          "parent_case_id": {
+            "title": "Parent Case Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "parent_case_id",
+          "inputs"
+        ],
+        "title": "EditCase",
+        "type": "object"
+      },
+      "EnvelopeOut": {
+        "properties": {
+          "copper_loss": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Copper Loss",
+            "type": "array"
+          },
+          "efficiency": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Efficiency",
+            "type": "array"
+          },
+          "i_rms": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "I Rms",
+            "type": "array"
+          },
+          "power": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Power",
+            "type": "array"
+          },
+          "speeds_rpm": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Speeds Rpm",
+            "type": "array"
+          },
+          "theta_off": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta Off",
+            "type": "array"
+          },
+          "theta_off_el": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta Off El",
+            "type": "array"
+          },
+          "theta_on": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta On",
+            "type": "array"
+          },
+          "theta_on_el": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta On El",
+            "type": "array"
+          },
+          "torque": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Torque",
+            "type": "array"
+          },
+          "work_loop": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Work Loop",
+            "type": "array"
+          },
+          "work_torque": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Work Torque",
+            "type": "array"
+          }
+        },
+        "required": [
+          "speeds_rpm",
+          "torque",
+          "power",
+          "copper_loss",
+          "theta_on",
+          "theta_off",
+          "work_torque",
+          "work_loop",
+          "i_rms",
+          "theta_on_el",
+          "theta_off_el",
+          "efficiency"
+        ],
+        "title": "EnvelopeOut",
+        "type": "object"
+      },
+      "EstimateOut": {
+        "properties": {
+          "basis": {
+            "enum": [
+              "history",
+              "budget"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "new_map": {
+            "title": "New Map",
+            "type": "boolean"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "new_map",
+          "seconds",
+          "basis"
+        ],
+        "title": "EstimateOut",
+        "type": "object"
+      },
+      "EvaluateBody": {
+        "additionalProperties": false,
+        "properties": {
+          "grid": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grid"
+          }
+        },
+        "title": "EvaluateBody",
+        "type": "object"
+      },
+      "EvaluateJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "evaluate",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/EvaluateRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "EvaluateJobIn",
+        "type": "object"
+      },
+      "EvaluateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "grid": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grid"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CaseInputs"
+          }
+        },
+        "required": [
+          "case_id",
+          "inputs"
+        ],
+        "title": "EvaluateRequest",
+        "type": "object"
+      },
+      "EvaluationOut": {
+        "properties": {
+          "curves": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapCurvesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "design": {
+            "$ref": "#/components/schemas/Design"
+          },
+          "efficiency_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency Base"
+          },
+          "envelope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnvelopeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "feasible": {
+            "title": "Feasible",
+            "type": "boolean"
+          },
+          "i_rms_a": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "I Rms A"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "j_rms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Rms"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyNumbersOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "map": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapArraysOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mass_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mass Kg"
+          },
+          "peak_power_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Power W"
+          },
+          "power_density_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Density Kw Per Kg"
+          },
+          "power_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Ratio"
+          },
+          "scan": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ScanPointOut"
+            },
+            "title": "Scan",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "torque_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Ratio"
+          },
+          "winding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WindingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "design",
+          "status",
+          "error",
+          "mass_kg",
+          "winding",
+          "torque_ratio",
+          "power_ratio",
+          "peak_power_w",
+          "power_density_kw_per_kg",
+          "efficiency_base",
+          "feasible",
+          "envelope",
+          "key"
+        ],
+        "title": "EvaluationOut",
+        "type": "object"
+      },
+      "FixedWinding": {
+        "additionalProperties": false,
+        "properties": {
+          "paths": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Paths",
+            "type": "integer"
+          },
+          "strands": {
+            "default": 1,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Strands",
+            "type": "integer"
+          },
+          "turns": {
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Turns",
+            "type": "integer"
+          },
+          "wire": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wire"
+          }
+        },
+        "required": [
+          "turns"
+        ],
+        "title": "FixedWinding",
+        "type": "object"
+      },
+      "GeometrySection": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/RadialSRMParams"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "screening",
+              "full"
+            ],
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "machine"
+        ],
+        "title": "GeometrySection",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -14,27 +1435,118 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "JobIn": {
+      "ImportCase": {
         "additionalProperties": false,
         "properties": {
-          "kind": {
-            "const": "search",
-            "title": "Kind",
+          "origin": {
+            "const": "import",
+            "title": "Origin",
             "type": "string"
           },
-          "payload": {
-            "$ref": "#/components/schemas/SearchRequest"
+          "setup": {
+            "$ref": "#/components/schemas/SetupFile"
           }
         },
         "required": [
-          "kind",
-          "payload"
+          "origin",
+          "setup"
         ],
-        "title": "JobIn",
+        "title": "ImportCase",
+        "type": "object"
+      },
+      "IssueOut": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg"
+        ],
+        "title": "IssueOut",
+        "type": "object"
+      },
+      "IssuesOut": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "errors",
+          "warnings"
+        ],
+        "title": "IssuesOut",
+        "type": "object"
+      },
+      "JobCreated": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "JobCreated",
         "type": "object"
       },
       "JobOut": {
         "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
           "created": {
             "title": "Created",
             "type": "string"
@@ -81,6 +1593,10 @@
             ],
             "title": "Progress"
           },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
           "started": {
             "anyOf": [
               {
@@ -101,9 +1617,115 @@
           "id",
           "kind",
           "status",
+          "active",
+          "resumable",
           "created"
         ],
         "title": "JobOut",
+        "type": "object"
+      },
+      "KeyNumbersOut": {
+        "properties": {
+          "aligned_angle": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned Angle"
+          },
+          "i_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "I Max"
+          },
+          "la": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "La"
+          },
+          "la_lu": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "La Lu"
+          },
+          "lu": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lu"
+          },
+          "peak_torque": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Torque"
+          },
+          "psi_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Psi Max"
+          },
+          "unaligned_angle": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unaligned Angle"
+          }
+        },
+        "required": [
+          "la",
+          "lu",
+          "la_lu",
+          "peak_torque",
+          "psi_max",
+          "i_max",
+          "aligned_angle",
+          "unaligned_angle"
+        ],
+        "title": "KeyNumbersOut",
         "type": "object"
       },
       "LitzWire": {
@@ -152,6 +1774,356 @@
           "token"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "MapArraysOut": {
+        "properties": {
+          "angles": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Angles",
+            "type": "array"
+          },
+          "currents": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Currents",
+            "type": "array"
+          },
+          "psi": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Psi",
+            "type": "array"
+          },
+          "torque": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Torque",
+            "type": "array"
+          }
+        },
+        "required": [
+          "angles",
+          "currents",
+          "psi",
+          "torque"
+        ],
+        "title": "MapArraysOut",
+        "type": "object"
+      },
+      "MapCurvesOut": {
+        "properties": {
+          "b_sp": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "B Sp",
+            "type": "array"
+          },
+          "b_sp_k2": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "B Sp K2",
+            "type": "array"
+          },
+          "currents": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Currents",
+            "type": "array"
+          },
+          "inductance": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Inductance",
+            "type": "array"
+          },
+          "k2": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "K2",
+            "type": "array"
+          },
+          "la_lu": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "La Lu",
+            "type": "array"
+          },
+          "la_sat": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "La Sat",
+            "type": "array"
+          },
+          "la_unsat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "La Unsat"
+          },
+          "lu": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Lu",
+            "type": "array"
+          }
+        },
+        "required": [
+          "currents",
+          "inductance",
+          "la_sat",
+          "lu",
+          "la_unsat",
+          "k2",
+          "b_sp",
+          "b_sp_k2",
+          "la_lu"
+        ],
+        "title": "MapCurvesOut",
+        "type": "object"
+      },
+      "MaterialOut": {
+        "properties": {
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "js": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Js"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          }
+        },
+        "required": [
+          "name",
+          "grade",
+          "thickness_mm",
+          "js"
+        ],
+        "title": "MaterialOut",
+        "type": "object"
+      },
+      "MeshSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "airgap_circumferential_divisions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airgap Circumferential Divisions"
+          },
+          "airgap_radial_layers": {
+            "default": 4,
+            "title": "Airgap Radial Layers",
+            "type": "integer"
+          },
+          "band_min_angle_deg": {
+            "default": 5.0,
+            "title": "Band Min Angle Deg",
+            "type": "number"
+          },
+          "max_aspect_ratio": {
+            "default": 12.0,
+            "title": "Max Aspect Ratio",
+            "type": "number"
+          },
+          "min_angle_deg": {
+            "default": 10.0,
+            "title": "Min Angle Deg",
+            "type": "number"
+          },
+          "outer_air_thickness": {
+            "default": 0.0,
+            "title": "Outer Air Thickness",
+            "type": "number"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "screening",
+              "full",
+              "reference"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
+          "refinement": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EdgeRefinement"
+            },
+            "propertyNames": {
+              "enum": [
+                "pole_tip",
+                "pole_root"
+              ]
+            },
+            "title": "Refinement",
+            "type": "object"
+          },
+          "region_sizes": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Region Sizes",
+            "type": "object"
+          },
+          "scale": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Scale",
+            "type": "number"
+          },
+          "skin_depth_layers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skin Depth Layers"
+          }
+        },
+        "title": "MeshSettings",
         "type": "object"
       },
       "RadialSRMParams": {
@@ -334,6 +2306,66 @@
         "title": "RectangularWire",
         "type": "object"
       },
+      "ReferenceCase": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "enum": [
+              "8/6",
+              "12/8",
+              "24/16"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "const": "reference",
+            "title": "Origin",
+            "type": "string"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "screening",
+              "full"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/Requirements"
+          }
+        },
+        "required": [
+          "origin",
+          "name",
+          "requirements"
+        ],
+        "title": "ReferenceCase",
+        "type": "object"
+      },
+      "ReferenceOut": {
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/RadialSRMParams"
+          },
+          "name": {
+            "enum": [
+              "8/6",
+              "12/8",
+              "24/16"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "machine"
+        ],
+        "title": "ReferenceOut",
+        "type": "object"
+      },
       "RegionMaterials": {
         "additionalProperties": false,
         "properties": {
@@ -496,6 +2528,78 @@
         "title": "RoundWire",
         "type": "object"
       },
+      "ScanPointOut": {
+        "properties": {
+          "feasible": {
+            "title": "Feasible",
+            "type": "boolean"
+          },
+          "i_rms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "I Rms"
+          },
+          "power_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Ratio"
+          },
+          "torque_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Ratio"
+          },
+          "winding": {
+            "$ref": "#/components/schemas/WindingOut"
+          }
+        },
+        "required": [
+          "winding",
+          "torque_ratio",
+          "power_ratio",
+          "i_rms",
+          "feasible"
+        ],
+        "title": "ScanPointOut",
+        "type": "object"
+      },
+      "SearchJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "search",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SearchRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "SearchJobIn",
+        "type": "object"
+      },
       "SearchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -543,6 +2647,57 @@
           "requirements"
         ],
         "title": "SearchRequest",
+        "type": "object"
+      },
+      "SearchResultOut": {
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "dropped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Dropped",
+            "type": "object"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationOut"
+            },
+            "title": "Evaluations",
+            "type": "array"
+          },
+          "pareto_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pareto Ids",
+            "type": "array"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/Requirements"
+          },
+          "sampled": {
+            "title": "Sampled",
+            "type": "integer"
+          },
+          "stage1_rejected": {
+            "title": "Stage1 Rejected",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requirements",
+          "sampled",
+          "dropped",
+          "stage1_rejected",
+          "cancelled",
+          "evaluations",
+          "pareto_ids"
+        ],
+        "title": "SearchResultOut",
         "type": "object"
       },
       "SearchSettingsIn": {
@@ -639,6 +2794,137 @@
         "title": "SearchSettingsIn",
         "type": "object"
       },
+      "SetupFile": {
+        "additionalProperties": false,
+        "properties": {
+          "drive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriveSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeometrySection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "materials": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionMaterials"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Requirements"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema": {
+            "const": "srm-setup",
+            "title": "Schema",
+            "type": "string"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchSettingsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "winding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WindingSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "schema",
+          "version"
+        ],
+        "title": "SetupFile",
+        "type": "object"
+      },
+      "ValidateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "title": "Inputs"
+          }
+        },
+        "required": [
+          "inputs"
+        ],
+        "title": "ValidateIn",
+        "type": "object"
+      },
+      "ValidateJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "validate",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ValidateRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "ValidateJobIn",
+        "type": "object"
+      },
+      "ValidateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CaseInputs"
+          }
+        },
+        "required": [
+          "case_id",
+          "inputs"
+        ],
+        "title": "ValidateRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -678,15 +2964,630 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "ValidationOut": {
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/BudgetOut"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "material_grades": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Material Grades",
+            "type": "object"
+          },
+          "reference_turns": {
+            "default": 20,
+            "title": "Reference Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "checks",
+          "budget",
+          "engine_version",
+          "material_grades"
+        ],
+        "title": "ValidationOut",
+        "type": "object"
+      },
+      "WindingOut": {
+        "properties": {
+          "copper_area": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copper Area"
+          },
+          "copper_mass": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copper Mass"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "paths": {
+            "default": 1,
+            "title": "Paths",
+            "type": "integer"
+          },
+          "resistance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resistance"
+          },
+          "strands": {
+            "title": "Strands",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "wire": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wire"
+          }
+        },
+        "required": [
+          "turns",
+          "strands",
+          "copper_area",
+          "current",
+          "resistance",
+          "copper_mass"
+        ],
+        "title": "WindingOut",
+        "type": "object"
+      },
+      "WindingSection": {
+        "additionalProperties": false,
+        "properties": {
+          "fixed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FixedWinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "j_limit": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Limit"
+          },
+          "j_peak": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak"
+          },
+          "j_peak_max": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak Max"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "mode": {
+            "enum": [
+              "auto",
+              "fixed"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "WindingSection",
+        "type": "object"
       }
     }
   },
   "info": {
     "title": "srmweb",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/cases": {
+      "get": {
+        "operationId": "list_cases_api_cases_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseSummaryOut"
+                  },
+                  "title": "Response List Cases Api Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Cases"
+      },
+      "post": {
+        "operationId": "create_case_api_cases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "candidate": "#/components/schemas/CandidateCase",
+                    "edit": "#/components/schemas/EditCase",
+                    "import": "#/components/schemas/ImportCase",
+                    "reference": "#/components/schemas/ReferenceCase"
+                  },
+                  "propertyName": "origin"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CandidateCase"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReferenceCase"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EditCase"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ImportCase"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Case"
+      }
+    },
+    "/api/cases/{case_id}": {
+      "delete": {
+        "operationId": "delete_case_api_cases__case_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Case"
+      },
+      "get": {
+        "operationId": "get_case_api_cases__case_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case"
+      },
+      "patch": {
+        "operationId": "patch_case_api_cases__case_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CasePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Case"
+      }
+    },
+    "/api/cases/{case_id}/estimate": {
+      "get": {
+        "operationId": "estimate_api_cases__case_id__estimate_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estimate"
+      }
+    },
+    "/api/cases/{case_id}/evaluate": {
+      "post": {
+        "operationId": "evaluate_case_api_cases__case_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EvaluateBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Case"
+      }
+    },
+    "/api/cases/{case_id}/map.mat": {
+      "get": {
+        "operationId": "map_mat_api_cases__case_id__map_mat_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Map Mat"
+      }
+    },
+    "/api/cases/{case_id}/setup": {
+      "get": {
+        "operationId": "case_setup_api_cases__case_id__setup_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Case Setup"
+      }
+    },
+    "/api/cases/{case_id}/validate": {
+      "post": {
+        "operationId": "validate_case_job_api_cases__case_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Case Job"
+      }
+    },
     "/api/geometry": {
       "post": {
         "description": "Motor outline paths. A design that violates a rule gives 422 with FastAPI's\n`{\"detail\": [{\"loc\": [\"body\", parameter], \"msg\": message, \"type\": rule}]}`.",
@@ -767,7 +3668,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JobIn"
+                "discriminator": {
+                  "mapping": {
+                    "evaluate": "#/components/schemas/EvaluateJobIn",
+                    "search": "#/components/schemas/SearchJobIn",
+                    "validate": "#/components/schemas/ValidateJobIn"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SearchJobIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EvaluateJobIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ValidateJobIn"
+                  }
+                ],
+                "title": "Job"
               }
             }
           },
@@ -957,7 +3877,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResultOut"
+                }
               }
             },
             "description": "Successful Response"
@@ -1062,13 +3984,41 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MaterialOut"
+                  },
+                  "title": "Response Materials Api Materials Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Materials"
+      }
+    },
+    "/api/references": {
+      "get": {
+        "operationId": "references_api_references_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceOut"
+                  },
+                  "title": "Response References Api References Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "References"
       }
     },
     "/api/session": {
@@ -1114,6 +4064,82 @@
           }
         },
         "summary": "Cache Info"
+      }
+    },
+    "/api/setup/check": {
+      "post": {
+        "operationId": "check_setup_api_setup_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Setup"
+      }
+    },
+    "/api/validate": {
+      "post": {
+        "operationId": "validate_inputs_api_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Inputs"
       }
     }
   }

@@ -9,6 +9,12 @@ const map = {
 }
 
 describe("mapCurves", () => {
+  it("a null angle is a gap (NaN), not 0 degrees", () => {
+    const gap = { ...map, angles: [0, null, Math.PI / 90] }
+    expect(psiCurves(gap)[1].angleDeg).toBeNaN()
+    expect(torqueGrid(gap).angleDeg[1]).toBeNaN()
+    expect(psiCurves(gap)[2].angleDeg).toBeCloseTo(2)
+  })
   it("one curve per angle, degrees and mWb", () => {
     const c = psiCurves(map)
     expect(c).toHaveLength(3)

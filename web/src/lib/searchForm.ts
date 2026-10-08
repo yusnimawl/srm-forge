@@ -63,7 +63,7 @@ const num = (v: Num, scale = 1): number => {
 const optional = (v: Num, scale = 1): number | null => (String(v).trim() === "" ? null : num(v, scale))
 const mm = (v: Num) => num(v, toSI(1, "mm"))
 
-function wireToSI(w: WireForm): SearchRequest["requirements"]["wires"][number] {
+export function wireToSI(w: WireForm): SearchRequest["requirements"]["wires"][number] {
   switch (w.kind) {
     case "round":
       return { kind: "round", diameter: mm(w.diameter), outer_diameter: mm(w.outer_diameter) }
