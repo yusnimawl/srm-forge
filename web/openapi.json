@@ -713,53 +713,6 @@
         "title": "CaseSummaryOut",
         "type": "object"
       },
-      "CheckOut": {
-        "properties": {
-          "detail": {
-            "title": "Detail",
-            "type": "string"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "name",
-          "status",
-          "value",
-          "limit",
-          "detail"
-        ],
-        "title": "CheckOut",
-        "type": "object"
-      },
       "Design": {
         "additionalProperties": false,
         "properties": {
@@ -1022,6 +975,77 @@
           "efficiency"
         ],
         "title": "EnvelopeOut",
+        "type": "object"
+      },
+      "EstimateOut": {
+        "properties": {
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "history",
+                  "budget"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "new_map": {
+            "title": "New Map",
+            "type": "boolean"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          }
+        },
+        "required": [
+          "new_map"
+        ],
+        "title": "EstimateOut",
+        "type": "object"
+      },
+      "EvaluateBody": {
+        "additionalProperties": false,
+        "properties": {
+          "grid": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grid"
+          }
+        },
+        "title": "EvaluateBody",
         "type": "object"
       },
       "EvaluateJobIn": {
@@ -1325,6 +1349,47 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IssueOut": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg"
+        ],
+        "title": "IssueOut",
+        "type": "object"
+      },
+      "JobCreated": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "JobCreated",
         "type": "object"
       },
       "JobOut": {
@@ -2586,6 +2651,19 @@
         "title": "SearchSettingsIn",
         "type": "object"
       },
+      "ValidateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "title": "Inputs"
+          }
+        },
+        "required": [
+          "inputs"
+        ],
+        "title": "ValidateIn",
+        "type": "object"
+      },
       "ValidateJobIn": {
         "additionalProperties": false,
         "properties": {
@@ -2670,7 +2748,7 @@
           },
           "checks": {
             "items": {
-              "$ref": "#/components/schemas/CheckOut"
+              "$ref": "#/components/schemas/srmweb__results__CheckOut"
             },
             "title": "Checks",
             "type": "array"
@@ -2788,6 +2866,77 @@
           "copper_mass"
         ],
         "title": "WindingOut",
+        "type": "object"
+      },
+      "srmweb__results__CheckOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "value",
+          "limit",
+          "detail"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "srmweb__schemas__CheckOut": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "errors",
+          "warnings"
+        ],
+        "title": "CheckOut",
         "type": "object"
       }
     }
@@ -2989,6 +3138,177 @@
           }
         },
         "summary": "Patch Case"
+      }
+    },
+    "/api/cases/{case_id}/estimate": {
+      "get": {
+        "operationId": "estimate_api_cases__case_id__estimate_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estimate"
+      }
+    },
+    "/api/cases/{case_id}/evaluate": {
+      "post": {
+        "operationId": "evaluate_case_api_cases__case_id__evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EvaluateBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Case"
+      }
+    },
+    "/api/cases/{case_id}/map.mat": {
+      "get": {
+        "operationId": "map_mat_api_cases__case_id__map_mat_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Map Mat"
+      }
+    },
+    "/api/cases/{case_id}/validate": {
+      "post": {
+        "operationId": "validate_case_job_api_cases__case_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Case Job"
       }
     },
     "/api/geometry": {
@@ -3467,6 +3787,44 @@
           }
         },
         "summary": "Cache Info"
+      }
+    },
+    "/api/validate": {
+      "post": {
+        "operationId": "validate_inputs_api_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/srmweb__schemas__CheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Inputs"
       }
     }
   }

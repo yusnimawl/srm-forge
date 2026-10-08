@@ -2,40 +2,49 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import re
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import numpy as np
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
+from scipy.io import savemat
 
 import srmcore
 import srmweb
-from srmapp.case import CaseInputs
+from srmapp.case import LIMIT_FIELDS, CaseInputs, map_cache_hit, map_request
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
 from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
+from srmcore.model.validator import validate_params
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.config import Settings
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, EditCase, JobIn, JobOut,
-                            ReferenceCase)
+from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, CheckOut, EditCase, EstimateOut,
+                            EvaluateBody, EvaluateRequest, JobCreated, JobIn, JobOut, ReferenceCase,
+                            ValidateIn, ValidateRequest)
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
 _KEEPALIVE_S = 15.0
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 MAX_SHOWN_CASES = 6
-_LIMITS = ("margin", "j_peak", "j_limit", "j_peak_max")
+BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
+_WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 _EVALUATED = ("status", "torque_ratio", "power_ratio", "peak_power_w", "mass_kg",
               "power_density_kw_per_kg", "efficiency_base", "feasible")
 
@@ -55,6 +64,33 @@ def _summary(case: dict, evaluation: dict | None, validation: dict | None) -> di
         "poles": f"{ns}/{nr}" if isinstance(ns, int) and isinstance(nr, int) else None,
         **{k: (evaluation or {}).get(k) for k in _EVALUATED},
         "validated": bool(validation and validation.get("label"))}
+
+
+def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
+    """Validate a case's raw inputs: the parsed inputs (None when there are errors), the errors and the
+    warnings, each `{"loc", "msg"}` with `loc` relative to the inputs."""
+    try:
+        inputs = CaseInputs.model_validate(raw)
+    except ValidationError as exc:
+        return None, [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()], []
+    errors, warnings = [], []
+    for issue in validate_params(inputs.design.machine):
+        out = {"loc": ["design", "machine", issue.parameter], "msg": f"[{issue.rule}] {issue.message}"}
+        (errors if issue.severity == "error" else warnings).append(out)
+    if errors:
+        return None, errors, warnings
+    try:
+        _, _, stage = map_request(inputs)
+    except ValueError as exc:
+        field = _WINDING_FIELD.match(str(exc)) if inputs.winding != "auto" else None
+        return None, [{"loc": ["winding", field[1]] if field else [], "msg": str(exc)}], warnings
+    if not stage.passes:
+        warnings.append({"loc": [], "msg": f"stage 1: {stage.reason}"})
+    return inputs, errors, warnings
+
+
+def _invalid(errors: list[dict], warnings: list[dict]) -> JSONResponse:
+    return JSONResponse({"errors": errors, "warnings": warnings}, status_code=422)
 
 
 def _sse(event: str, out: JobOut) -> str:
@@ -92,8 +128,10 @@ def create_app(settings: Settings,
                   openapi_url=None)
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
-        """FastAPI's 422 body, without the job-kind tag that the `JobIn` union puts in `loc`:
-        `["body", "payload", ...]` stays the path of a field of a job request."""
+        """On `/api/jobs`, FastAPI's 422 body without the job-kind tag that the `JobIn` union puts in
+        `loc`: `["body", "payload", ...]` stays the path of a field of a job request."""
+        if request.url.path != "/api/jobs":
+            return await request_validation_exception_handler(request, exc)
         errors = jsonable_encoder(exc.errors())
         for e in errors:
             if e["loc"][:1] == ["body"] and e["loc"][2:3] == ["payload"] and e["loc"][1] in KINDS:
@@ -167,7 +205,9 @@ def create_app(settings: Settings,
 
     @router.post("/jobs/{job_id}/cancel", status_code=202)
     def cancel_job(job_id: str):
-        job_or_404(job_id)
+        job = job_or_404(job_id)
+        if job["kind"] == "validate" and job["status"] == "running":
+            raise HTTPException(409, "EM validation cannot be cancelled once started")
         if not runner.cancel(job_id):
             raise HTTPException(409, "job is not queued or running")
         return {}
@@ -218,6 +258,10 @@ def create_app(settings: Settings,
             raise HTTPException(404, f"no case {case_id}")
         return case
 
+    def idle_or_409(case_id: str) -> None:
+        if any(j["status"] in ACTIVE for j in store.case_jobs(case_id)):
+            raise HTTPException(409, "a job for this case is still running")
+
     def case_out(case: dict) -> CaseOut:
         evaluation, validation = (store.case_result(case["id"], k) for k in ("evaluate", "validate"))
         return CaseOut(**_summary(case, evaluation, validation), inputs=case["inputs"],
@@ -236,7 +280,7 @@ def create_app(settings: Settings,
         request = job["request"]
         inputs = CaseInputs(
             requirements=request["requirements"], design=ev["design"], winding="auto",
-            **{k: v for k in _LIMITS if (v := request["settings"].get(k)) is not None})
+            **{k: v for k in LIMIT_FIELDS if (v := request["settings"].get(k)) is not None})
         machine = inputs.design.machine
         case_id = store.create_case(
             origin="candidate", inputs=inputs.model_dump(mode="json"), job_id=body.job_id, stale=True,
@@ -278,12 +322,71 @@ def create_app(settings: Settings,
         fields = body.model_dump(exclude_none=True)
         if "inputs" in fields and not case["stale"]:
             raise HTTPException(409, "evaluated cases are read-only; edit creates a new case")
+        if "inputs" in fields:
+            idle_or_409(case_id)
         if fields.get("show_in_graphs") and not case["show_in_graphs"]:
             shown = sum(c["show_in_graphs"] for c in store.list_cases() if c["id"] != case_id)
             if shown >= MAX_SHOWN_CASES:
                 raise HTTPException(409, f"at most {MAX_SHOWN_CASES} cases can be shown in the graphs")
         store.update_case(case_id, **fields)
         return case_out(store.get_case(case_id))
+
+    @router.post("/validate", response_model=CheckOut)
+    def validate_inputs(body: ValidateIn):
+        _, errors, warnings = check_case(body.inputs)
+        return {"errors": errors, "warnings": warnings}
+
+    @router.post("/cases/{case_id}/evaluate", status_code=201, response_model=JobCreated)
+    def evaluate_case(case_id: str, body: EvaluateBody | None = None):
+        case = case_or_404(case_id)
+        if not case["stale"]:
+            raise HTTPException(409, "case is already evaluated; edit creates a new case")
+        idle_or_409(case_id)
+        inputs, errors, warnings = check_case(case["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        request = EvaluateRequest(case_id=case_id, inputs=inputs, grid=body.grid if body else None)
+        return {"job_id": _submit(runner, "evaluate", request.model_dump(mode="json"))["id"]}
+
+    @router.post("/cases/{case_id}/validate", status_code=201, response_model=JobCreated)
+    def validate_case_job(case_id: str):
+        case = case_or_404(case_id)
+        if case["stale"] or store.case_result(case_id, "evaluate") is None:
+            raise HTTPException(409, "evaluate this case first")
+        inputs, errors, warnings = check_case(case["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        if inputs.design.mesh.preset == "screening":
+            raise HTTPException(409, "EM validation needs a full map")
+        idle_or_409(case_id)
+        request = ValidateRequest(case_id=case_id, inputs=inputs)
+        return {"job_id": _submit(runner, "validate", request.model_dump(mode="json"))["id"]}
+
+    @router.get("/cases/{case_id}/estimate", response_model=EstimateOut)
+    def estimate(case_id: str):
+        inputs, errors, warnings = check_case(case_or_404(case_id)["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        if map_cache_hit(inputs, settings.cache_dir):
+            return {"new_map": False}
+        preset = inputs.design.mesh.preset
+        times = store.recent_map_times(preset)
+        if times:
+            return {"new_map": True, "seconds": sum(times) / len(times), "basis": "history"}
+        return {"new_map": True, "seconds": BUDGET_S[preset], "basis": "budget"}
+
+    @router.get("/cases/{case_id}/map.mat")
+    def map_mat(case_id: str):
+        case_or_404(case_id)
+        evaluation = store.case_result(case_id, "evaluate") or {}
+        grid, winding = evaluation.get("map"), evaluation.get("winding")
+        if grid is None or winding is None:
+            raise HTTPException(404, "this case has no map; evaluate it first")
+        data = {k: np.array(grid[k], dtype=float) for k in ("angles", "currents", "psi", "torque")}
+        buffer = io.BytesIO()
+        savemat(buffer, data | {"turns": winding["turns"], "paths": winding["paths"]})
+        return Response(buffer.getvalue(), media_type="application/octet-stream",
+                        headers={"Content-Disposition": f'attachment; filename="case_{case_id[:8]}_map.mat"'})
 
     @router.delete("/cases/{case_id}", status_code=204)
     def delete_case(case_id: str):

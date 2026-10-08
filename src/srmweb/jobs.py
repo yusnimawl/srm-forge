@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from srmapp.case import evaluate_design, validate_case
+from srmapp.case import LIMIT_FIELDS, evaluate_design, validate_case
 from srmapp.evaluate import StageTwoGrid
 from srmapp.pipeline import SearchSettings, run_search
 from srmcore.model.design import RegionMaterials
@@ -177,8 +177,7 @@ def run_job(kind: str, request: dict, reporter: Reporter, settings: Settings) ->
 
 def run_search_job(req: SearchRequest, reporter: Reporter, settings: Settings) -> dict:
     s = req.settings
-    given = {k: getattr(s, k) for k in ("margin", "j_peak", "j_limit", "j_peak_max")
-             if getattr(s, k) is not None}
+    given = {k: getattr(s, k) for k in LIMIT_FIELDS if getattr(s, k) is not None}
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ss = SearchSettings(
         n_candidates=s.n_candidates, seed=s.seed, shortlist=s.shortlist, preset=s.preset,
@@ -199,11 +198,13 @@ def run_search_job(req: SearchRequest, reporter: Reporter, settings: Settings) -
 
 def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, settings: Settings) -> dict:
     first = last = None
+    counts = (0, 0)
 
     def on_point(done: int, total: int) -> None:
-        nonlocal first, last
+        nonlocal first, last, counts
         last = time.monotonic()
         first = last if first is None else first
+        counts = (done, total)
         reporter.progress(points_done=done, points_total=total, message="mapping")
 
     reporter.progress(message="mapping")
@@ -212,7 +213,7 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, settings: Setting
                          cache_dir=settings.cache_dir, progress=on_point, cancel=reporter.cancelled, **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
-    if first is not None:  # a map served from the cache reports no points
+    if first is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
         reporter.store.add_map_time(req.inputs.design.mesh.preset, last - first)
     return evaluation_json(ev)
 

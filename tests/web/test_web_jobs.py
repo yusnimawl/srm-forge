@@ -261,6 +261,20 @@ def test_evaluate_job_records_map_time(make, monkeypatch):
     assert got["case_id"] == "c1"
 
 
+def test_partial_map_records_no_time(make, monkeypatch):
+    def fake(inputs, *, progress, **kw):
+        progress(1, 3)
+        time.sleep(0.02)
+        progress(2, 3)
+        return _Ev()
+
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
+    assert _wait(store, j, {"done", "failed"})["status"] == "done"
+    assert store.recent_map_times("screening") == []
+
+
 def test_evaluate_job_result_belongs_to_the_case(make, monkeypatch):
     monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=lambda inputs, **kw: _Ev())

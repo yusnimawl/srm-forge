@@ -20,6 +20,9 @@ from .sizing.stage1 import Stage1, stage1
 from .sizing.winding import Winding, fixed_winding
 
 
+LIMIT_FIELDS = ("margin", "j_peak", "j_limit", "j_peak_max")   # optional SearchSettings limits a case may set
+
+
 class _Frozen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -49,7 +52,7 @@ class CaseInputs(_Frozen):
 
     def search_settings(self) -> SearchSettings:
         """The search settings these inputs imply; unset limits keep the search defaults."""
-        optional = {k: v for k in ("margin", "j_peak", "j_limit", "j_peak_max") if (v := getattr(self, k)) is not None}
+        optional = {k: v for k in LIMIT_FIELDS if (v := getattr(self, k)) is not None}
         return SearchSettings(materials=self.design.machine.materials, preset=self.design.mesh.preset, **optional)
 
 

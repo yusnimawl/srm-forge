@@ -41,6 +41,74 @@ export interface paths {
         patch: operations["patch_case_api_cases__case_id__patch"];
         trace?: never;
     };
+    "/api/cases/{case_id}/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimate */
+        get: operations["estimate_api_cases__case_id__estimate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate Case */
+        post: operations["evaluate_case_api_cases__case_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/map.mat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Map Mat */
+        get: operations["map_mat_api_cases__case_id__map_mat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Case Job */
+        post: operations["validate_case_job_api_cases__case_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/geometry": {
         parameters: {
             query?: never;
@@ -286,6 +354,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Inputs */
+        post: operations["validate_inputs_api_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -460,19 +545,6 @@ export interface components {
             /** Validated */
             validated: boolean;
         };
-        /** CheckOut */
-        CheckOut: {
-            /** Detail */
-            detail: string;
-            /** Limit */
-            limit: number | null;
-            /** Name */
-            name: string;
-            /** Status */
-            status: string;
-            /** Value */
-            value: number | null;
-        };
         /** Design */
         Design: {
             machine: components["schemas"]["RadialSRMParams"];
@@ -544,6 +616,23 @@ export interface components {
             work_loop: (number | null)[];
             /** Work Torque */
             work_torque: (number | null)[];
+        };
+        /** EstimateOut */
+        EstimateOut: {
+            /** Basis */
+            basis?: ("history" | "budget") | null;
+            /** New Map */
+            new_map: boolean;
+            /** Seconds */
+            seconds?: number | null;
+        };
+        /** EvaluateBody */
+        EvaluateBody: {
+            /** Grid */
+            grid?: [
+                number,
+                number
+            ] | null;
         };
         /** EvaluateJobIn */
         EvaluateJobIn: {
@@ -624,6 +713,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IssueOut */
+        IssueOut: {
+            /** Loc */
+            loc: (string | number)[];
+            /** Msg */
+            msg: string;
+        };
+        /** JobCreated */
+        JobCreated: {
+            /** Job Id */
+            job_id: string;
         };
         /** JobOut */
         JobOut: {
@@ -1072,6 +1173,11 @@ export interface components {
              */
             stator: string;
         };
+        /** ValidateIn */
+        ValidateIn: {
+            /** Inputs */
+            inputs: unknown;
+        };
         /** ValidateJobIn */
         ValidateJobIn: {
             /**
@@ -1104,7 +1210,7 @@ export interface components {
         ValidationOut: {
             budget: components["schemas"]["BudgetOut"];
             /** Checks */
-            checks: components["schemas"]["CheckOut"][];
+            checks: components["schemas"]["srmweb__results__CheckOut"][];
             /** Engine Version */
             engine_version: string;
             /** Label */
@@ -1135,6 +1241,26 @@ export interface components {
             turns: number;
             /** Wire */
             wire?: number | null;
+        };
+        /** CheckOut */
+        srmweb__results__CheckOut: {
+            /** Detail */
+            detail: string;
+            /** Limit */
+            limit: number | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value: number | null;
+        };
+        /** CheckOut */
+        srmweb__schemas__CheckOut: {
+            /** Errors */
+            errors: components["schemas"]["IssueOut"][];
+            /** Warnings */
+            warnings: components["schemas"]["IssueOut"][];
         };
     };
     responses: never;
@@ -1280,6 +1406,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_api_cases__case_id__estimate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_case_api_cases__case_id__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EvaluateBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_mat_api_cases__case_id__map_mat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_case_job_api_cases__case_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
                 };
             };
             /** @description Validation Error */
@@ -1729,6 +1983,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    validate_inputs_api_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["srmweb__schemas__CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

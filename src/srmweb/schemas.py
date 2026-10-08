@@ -62,6 +62,38 @@ class ValidateRequest(BaseModel):
     inputs: CaseInputs
 
 
+class EvaluateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grid: Grid | None = None
+
+
+class ValidateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    inputs: Any
+
+
+class IssueOut(BaseModel):
+    loc: list[str | int]
+    msg: str
+
+
+class CheckOut(BaseModel):
+    errors: list[IssueOut]
+    warnings: list[IssueOut]
+
+
+class EstimateOut(BaseModel):
+    new_map: bool
+    seconds: float | None = None
+    basis: Literal["history", "budget"] | None = None
+
+
+class JobCreated(BaseModel):
+    job_id: str
+
+
 class SearchJobIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
