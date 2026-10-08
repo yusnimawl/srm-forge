@@ -117,3 +117,26 @@ def test_events_terminal_job_single_end(make):
 
 def test_events_404(make):
     assert make(lambda kind, req, rep: {}).get("/api/jobs/x/events").status_code == 404
+
+
+def test_events_queued_then_running_then_end(make):
+    gates = [threading.Event(), threading.Event()]
+    calls = []
+
+    def fn(kind, req, rep):
+        calls.append(1)
+        gates[len(calls) - 1].wait(10)
+        return {}
+
+    c = make(fn)
+    first = c.post("/api/jobs", json=BODY).json()["id"]
+    second = c.post("/api/jobs", json=BODY).json()["id"]
+    try:
+        threading.Timer(1.2, gates[0].set).start()
+        threading.Timer(2.4, gates[1].set).start()
+        ev = _events(c, second, lambda n, d: n == "end")
+    finally:
+        for g in gates:
+            g.set()
+    assert [(n, d["status"]) for n, d in ev] == [
+        ("progress", "queued"), ("progress", "running"), ("end", "done")]

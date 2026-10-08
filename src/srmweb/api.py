@@ -26,8 +26,9 @@ def _sse(event: str, out: JobOut) -> str:
     return f"event: {event}\ndata: {out.model_dump_json()}\n\n"
 
 
-def _job_out(job: dict, runner: JobRunner) -> JobOut:
-    live = runner.progress(job["id"])
+def _job_out(job: dict, runner: JobRunner, live=...) -> JobOut:
+    if live is ...:
+        live = runner.progress(job["id"])
     if live is not None:
         job = {**job, "progress": live[1]}
     return JobOut(**{k: job[k] for k in JobOut.model_fields})
@@ -82,19 +83,19 @@ def create_app(settings: Settings,
         job_or_404(job_id)
 
         async def stream():
-            seen, last_send = None, time.monotonic()
+            seen, last_send = object(), time.monotonic()
             while not await request.is_disconnected():
                 job = store.get_job(job_id)
                 if job is None:
                     return
-                out = _job_out(job, runner)
+                live = runner.progress(job_id)
+                out = _job_out(job, runner, live)
                 if job["status"] not in ("queued", "running"):
                     yield _sse("end", out)
                     return
-                live = runner.progress(job_id)
-                version = live[0] if live else None
-                if seen is None or version != seen:
-                    seen = version if live else 0
+                key = (job["status"], live[0] if live else None)
+                if key != seen:
+                    seen = key
                     yield _sse("progress", out)
                     last_send = time.monotonic()
                 elif time.monotonic() - last_send >= _KEEPALIVE_S:
