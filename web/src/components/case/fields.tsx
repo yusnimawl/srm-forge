@@ -12,6 +12,8 @@ export type TabProps = {
   form: CaseForm
   update: (fn: (f: CaseForm) => CaseForm) => void
   errors: Record<string, string>
+  /** The feasibility margin the server resolved for the inputs (null while unknown). */
+  margin?: number | null
 }
 
 export type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }

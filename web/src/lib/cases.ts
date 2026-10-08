@@ -1,6 +1,7 @@
 import type { CaseSummary, Estimate } from "@/api/types"
 import { fromSI } from "./units"
 
+/** Cases shown in the graphs at once; the server enforces the same limit. */
 export const MAX_SHOWN = 6
 
 export type CaseStatus = "Draft" | "Evaluated" | "EM-validated" | "Failed"
@@ -59,8 +60,9 @@ export const filterByFlag = (rows: CaseRow[], flag: string | null): CaseRow[] =>
 
 export const canShowMore = (rows: CaseRow[]): boolean => rows.filter((r) => r.show_in_graphs).length < MAX_SHOWN
 
-/** "No new map — about a minute" or "1 new map, about 26 min". */
+/** "No new map — about 8 min" or "1 new map, about 26 min"; the time includes choosing the winding. */
 export function estimateText(e: Estimate): string {
-  if (!e.new_map) return "No new map — about a minute"
-  return e.seconds == null ? "1 new map" : `1 new map, about ${Math.max(1, Math.round(e.seconds / 60))} min`
+  const minutes = Math.max(1, Math.round(e.seconds / 60))
+  const time = e.seconds < 90 ? "about a minute" : `about ${minutes} min`
+  return e.new_map ? `1 new map, ${time}` : `No new map — ${time}`
 }

@@ -3,11 +3,11 @@ import type { Evaluation, MapArrays, MapCurves } from "@/api/types"
 import {
   designFactorTraces,
   inductanceCurves,
-  MAX_OVERLAYS,
   performanceSeries,
   torqueCurves,
   type Overlay,
 } from "./analysis"
+import { MAX_SHOWN } from "./cases"
 
 const envelope = {
   speeds_rpm: [1000, 2000, 3000],
@@ -65,7 +65,7 @@ describe("performanceSeries", () => {
     expect(s[1].name).toBe("c0")
   })
   it("draws at most 6 overlays and skips a case without an envelope", () => {
-    expect(performanceSeries(ev(), overlays(9)).torque).toHaveLength(1 + MAX_OVERLAYS)
+    expect(performanceSeries(ev(), overlays(9)).torque).toHaveLength(1 + MAX_SHOWN)
     const o: Overlay[] = [{ label: "none", evaluation: ev(null) }]
     expect(performanceSeries(ev(), o).torque).toHaveLength(1)
     expect(performanceSeries(ev(null)).torque).toHaveLength(0)

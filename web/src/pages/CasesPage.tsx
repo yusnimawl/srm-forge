@@ -20,7 +20,7 @@ export function CasesPage() {
   const details = useCaseDetails(shown.map((r) => r.id))
   const evaluated = shown.flatMap((r, k) => {
     const evaluation = details[k]?.data?.evaluation
-    return evaluation ? [{ label: r.label, evaluation }] : []
+    return evaluation?.envelope ? [{ label: r.label, evaluation }] : []
   })
   const [main, ...others] = evaluated
   const overlays: Overlay[] = others
@@ -30,7 +30,7 @@ export function CasesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-primary">Cases</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -59,14 +59,14 @@ export function CasesPage() {
         </div>
       )}
       {shown.length > 0 && (
-        <section aria-label="Performance of the shown cases" className="space-y-2">
+        <section aria-label="Performance of the shown cases" className="order-1 space-y-2 md:order-none">
           {main ? (
             <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
               <AnalysisTabs performanceOnly evaluation={main.evaluation} label={main.label} overlays={overlays} />
             </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {details.some((d) => d.isPending) ? "Loading the shown cases…" : "None of the shown cases is evaluated yet, so there is nothing to plot."}
+              {details.some((d) => d.isPending) ? "Loading the shown cases…" : "None of the shown cases has an envelope to plot: they are drafts or their evaluation failed."}
             </p>
           )}
           <p className="text-xs text-muted-foreground">Unvalidated, peak-only, except cases whose status reads EM-validated.</p>

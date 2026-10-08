@@ -5,10 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { parseNum } from "@/lib/searchForm"
 import { Field, NumField, SELECT_CLASS, type TabProps } from "./fields"
 
-/** Design margin per B-H grade. */
-const GRADE_MARGIN: Record<string, number> = { A: 1.02, B: 1.05, C: 1.12 }
-
-export function MaterialTab({ form, update, errors }: TabProps) {
+export function MaterialTab({ form, update, errors, margin }: TabProps) {
   const materials = useQuery({ queryKey: ["materials"], queryFn: () => api<Material[]>("/api/materials") })
   const grade = (name: string) => materials.data?.find((x) => x.name === name)?.grade
 
@@ -32,11 +29,10 @@ export function MaterialTab({ form, update, errors }: TabProps) {
   }
 
   const explicit = parseNum(form.margin)
-  const margins = [form.stator, form.rotor].flatMap((n) => GRADE_MARGIN[grade(n) ?? ""] ?? [])
   const marginText = typeof explicit === "number"
     ? `Margin ${explicit} (explicit)`
-    : margins.length > 0
-      ? `Margin ${Math.max(...margins)} (worse of the stator and rotor grades)`
+    : margin != null
+      ? `Margin ${margin} (from the worse of the stator and rotor grades)`
       : "Margin follows the grade once the materials are known"
 
   return (
@@ -44,7 +40,7 @@ export function MaterialTab({ form, update, errors }: TabProps) {
       {select("stator", "Stator material")}
       {select("rotor", "Rotor material")}
       <NumField id="margin" label="Margin" value={form.margin} error={errors.margin}
-        hint="Empty takes the margin from the material grade: A 1.02, B 1.05, C 1.12."
+        hint="Empty takes the margin from the material grade."
         onChange={(v) => update((f) => ({ ...f, margin: v }))} />
       <p className="self-end pb-2 text-sm text-muted-foreground">{marginText}</p>
     </div>

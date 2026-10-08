@@ -80,9 +80,13 @@ describe("canShowMore", () => {
 
 describe("estimateText", () => {
   it("reads the estimate", () => {
-    expect(estimateText({ new_map: false })).toBe("No new map — about a minute")
-    expect(estimateText({ new_map: true, seconds: 1560, basis: "budget" })).toBe("1 new map, about 26 min")
-    expect(estimateText({ new_map: true, seconds: 20 })).toBe("1 new map, about 1 min")
-    expect(estimateText({ new_map: true, seconds: null })).toBe("1 new map")
+    expect(estimateText({ new_map: false, seconds: 30, basis: "history" })).toBe("No new map — about a minute")
+    expect(estimateText({ new_map: false, seconds: 450, basis: "budget" })).toBe("No new map — about 8 min")
+    expect(estimateText({ new_map: true, seconds: 2010, basis: "budget" })).toBe("1 new map, about 34 min")
+    expect(estimateText({ new_map: true, seconds: 20, basis: "history" })).toBe("1 new map, about a minute")
+  })
+  it("says a minute only below 90 s", () => {
+    expect(estimateText({ new_map: false, seconds: 89, basis: "history" })).toBe("No new map — about a minute")
+    expect(estimateText({ new_map: false, seconds: 91, basis: "history" })).toBe("No new map — about 2 min")
   })
 })

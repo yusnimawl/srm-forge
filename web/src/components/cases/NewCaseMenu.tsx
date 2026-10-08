@@ -1,16 +1,16 @@
 import { useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
 import { importIssues, useCreateCase, type CaseCreate, type SetupFile } from "@/api/cases"
-import type { ValidationIssue } from "@/api/client"
+import { api, type ValidationIssue } from "@/api/client"
+import type { Reference } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { errorMessage } from "@/lib/errorMessage"
 import { defaultSearchForm, toSearchRequest } from "@/lib/searchForm"
-
-const REFERENCES = ["8/6", "12/8", "24/16"] as const
 
 const where = (loc: ValidationIssue["loc"]) => loc.filter((p) => p !== "body").join(".")
 
@@ -37,6 +37,7 @@ export function NewCaseMenu() {
   const [open, setOpen] = useState(false)
   const [rejected, setRejected] = useState<{ file: string; errors: ValidationIssue[]; warnings: ValidationIssue[] } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const references = useQuery({ queryKey: ["references"], queryFn: () => api<Reference[]>("/api/references"), staleTime: Infinity })
 
   const submit = (body: CaseCreate, file = "") =>
     create.mutate(body, {
@@ -48,7 +49,7 @@ export function NewCaseMenu() {
       },
     })
 
-  const fromReference = (name: (typeof REFERENCES)[number]) => {
+  const fromReference = (name: Reference["name"]) => {
     setOpen(false)
     submit({ origin: "reference", name, requirements: toSearchRequest(defaultSearchForm()).requirements, preset: "full" })
   }
@@ -72,9 +73,9 @@ export function NewCaseMenu() {
         </PopoverTrigger>
         <PopoverContent className="w-56 space-y-1">
           <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">From reference</p>
-          {REFERENCES.map((r) => (
-            <Button key={r} variant="ghost" className="min-h-11 w-full justify-start" onClick={() => fromReference(r)}>
-              {r} machine
+          {references.data?.map(({ name }) => (
+            <Button key={name} variant="ghost" className="min-h-11 w-full justify-start" onClick={() => fromReference(name)}>
+              {name} machine
             </Button>
           ))}
           <Button

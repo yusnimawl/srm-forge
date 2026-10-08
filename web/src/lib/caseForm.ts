@@ -23,7 +23,7 @@ export const MACHINE_FIELDS: MachineField[] = [
   { key: "fill_factor", label: "Fill factor", hint: "Copper area over coil-side area." },
   { key: "slot_liner_thickness", label: "Slot liner thickness", unit: "mm" },
   { key: "coil_inner_clearance", label: "Coil inner clearance", unit: "mm" },
-  { key: "lamination_thickness", label: "Lamination thickness", unit: "mm", optional: true, hint: "Empty takes the stator material's." },
+  { key: "lamination_thickness", label: "Lamination thickness", unit: "mm", optional: true, hint: "Empty leaves the minimum web width at 1 mm; set, it is at least 2 laminations." },
 ]
 export const POLE_KEYS = ["n_stator_poles", "n_rotor_poles", "n_phases"] as const
 
@@ -54,9 +54,13 @@ export type CaseForm = {
 type Raw = Record<string, unknown>
 const obj = (x: unknown): Raw => (x && typeof x === "object" && !Array.isArray(x) ? (x as Raw) : {})
 
-/** A stored value as editable text; a value that is not a number (a draft may hold one) is shown as it is. */
+/** Significant digits a number field shows. */
+const DIGITS = 6
+
+/** A stored value as editable text (at most `DIGITS` significant digits); a value that is not a number (a draft may
+ *  hold one) is shown as it is. */
 const show = (v: unknown, unit?: Unit): string =>
-  typeof v === "number" ? String(Number((unit ? fromSI(v, unit) : v).toPrecision(14))) : typeof v === "string" ? v : ""
+  typeof v === "number" ? String(Number((unit ? fromSI(v, unit) : v).toPrecision(DIGITS))) : typeof v === "string" ? v : ""
 
 /** Text as a stored value: a number in SI, undefined when empty, the text itself when it is no number (so the
  *  server reports it under its field). */
@@ -195,7 +199,8 @@ export function toInputs(f: CaseForm): CaseInputs {
 }
 
 export type Issue = { loc: (string | number)[]; msg: string }
-export type IssuesResponse = { errors: Issue[]; warnings: Issue[] }
+/** `margin` is the feasibility margin the inputs imply, null when they do not parse. */
+export type IssuesResponse = { errors: Issue[]; warnings: Issue[]; margin?: number | null }
 
 const WIRE_TAGS = new Set(["round", "rectangular", "litz"])
 

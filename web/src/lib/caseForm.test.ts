@@ -93,6 +93,9 @@ describe("caseForm", () => {
     awkward.j_peak = 12e6 * 1.0000000000001
     expect(toInputs(toForm(awkward))).toEqual(awkward)
     const f = toForm(awkward)
+    expect(f.machine.air_gap).toBe("300")                     // shown with 6 significant digits at most
+    expect(f.machine.stator_pole_arc).toBe("20.1243")
+    expect((f.requirements.wires[0] as { diameter: string }).diameter).toBe("1.32")
     const edited = toInputs({ ...f, machine: { ...f.machine, air_gap: "0.5" } }) as unknown as typeof awkward
     expect(edited.design.machine.air_gap).toBeCloseTo(0.0005, 15)
     expect(edited.design.machine.stator_outer_diameter).toBe(0.16 * 0.42)

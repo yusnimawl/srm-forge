@@ -48,7 +48,6 @@ function CaseEditor({ data }: { data: Case }) {
   const check = useQuery({
     queryKey: ["validate", text],
     queryFn: () => api<IssuesResponse>("/api/validate", { method: "POST", body: `{"inputs":${text}}` }),
-    enabled: editable,
     placeholderData: keepPreviousData,
   })
   const issues = editable ? check.data : undefined
@@ -161,7 +160,7 @@ function CaseEditor({ data }: { data: Case }) {
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}
-          <InputTabs form={form} update={update} errors={errors} readOnly={!editable || running} evaluation={evaluation} />
+          <InputTabs form={form} update={update} errors={errors} margin={check.data?.margin} readOnly={!editable || running} evaluation={evaluation} />
         </section>
         <div className="min-w-0 space-y-6">
           <section aria-label="Motor diagram" className={pane("diagram")}>
@@ -175,7 +174,7 @@ function CaseEditor({ data }: { data: Case }) {
                   <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
                     <AnalysisTabs evaluation={evaluation} label={data.label || data.id} />
                   </Suspense>
-                  {data.validation && <ValidationPanel validation={data.validation} />}
+                  {data.validation && <ValidationPanel validation={data.validation} winding={evaluation.winding} />}
                 </div>
               ) : (
                 <p className="text-sm text-destructive">{evaluation.error || "The evaluation failed."}</p>

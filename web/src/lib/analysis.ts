@@ -1,4 +1,5 @@
 import type { Evaluation, MapArrays, MapCurves } from "@/api/types"
+import { MAX_SHOWN } from "./cases"
 import { fmt } from "./format"
 import { fromSI } from "./units"
 
@@ -25,7 +26,6 @@ export interface Overlay {
   evaluation: Evaluation
 }
 
-export const MAX_OVERLAYS = 6
 /** Okabe-Ito colours, colour-blind safe. */
 export const LINE_COLORS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9", "#8c8c8c"]
 export const LINE_DASHES = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
@@ -49,10 +49,10 @@ export interface PerformanceSeries {
   current: Trace[]
 }
 
-/** Envelope traces against speed in UI units; the main case first, then up to `MAX_OVERLAYS` overlays. */
+/** Envelope traces against speed in UI units; the main case first, then up to `MAX_SHOWN` overlays. */
 export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], mainLabel = MAIN_LABEL): PerformanceSeries {
   const out: PerformanceSeries = { torque: [], power: [], efficiency: [], current: [] }
-  const cases = [{ label: mainLabel, evaluation: ev }, ...overlays.slice(0, MAX_OVERLAYS)]
+  const cases = [{ label: mainLabel, evaluation: ev }, ...overlays.slice(0, MAX_SHOWN)]
   cases.forEach(({ label, evaluation }, n) => {
     const e = evaluation.envelope
     if (!e) return
@@ -107,7 +107,7 @@ export interface DesignFactorTraces {
 export function designFactorTraces(cases: { label: string; curves: MapCurves | null | undefined }[]): DesignFactorTraces {
   const out: DesignFactorTraces = { inductance: [], factors: [], bspK2VsRatio: [] }
   const multi = cases.length > 1
-  cases.slice(0, 1 + MAX_OVERLAYS).forEach(({ label, curves: c }, n) => {
+  cases.slice(0, 1 + MAX_SHOWN).forEach(({ label, curves: c }, n) => {
     if (!c) return
     const line = caseLine(n)
     const name = (q: string) => (multi ? `${label} ${q}` : q)
