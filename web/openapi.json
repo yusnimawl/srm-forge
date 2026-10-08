@@ -713,6 +713,53 @@
         "title": "CaseSummaryOut",
         "type": "object"
       },
+      "CheckOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "value",
+          "limit",
+          "detail"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
       "Design": {
         "additionalProperties": false,
         "properties": {
@@ -1377,6 +1424,30 @@
           "msg"
         ],
         "title": "IssueOut",
+        "type": "object"
+      },
+      "IssuesOut": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "errors",
+          "warnings"
+        ],
+        "title": "IssuesOut",
         "type": "object"
       },
       "JobCreated": {
@@ -2748,7 +2819,7 @@
           },
           "checks": {
             "items": {
-              "$ref": "#/components/schemas/srmweb__results__CheckOut"
+              "$ref": "#/components/schemas/CheckOut"
             },
             "title": "Checks",
             "type": "array"
@@ -2866,77 +2937,6 @@
           "copper_mass"
         ],
         "title": "WindingOut",
-        "type": "object"
-      },
-      "srmweb__results__CheckOut": {
-        "properties": {
-          "detail": {
-            "title": "Detail",
-            "type": "string"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "name",
-          "status",
-          "value",
-          "limit",
-          "detail"
-        ],
-        "title": "CheckOut",
-        "type": "object"
-      },
-      "srmweb__schemas__CheckOut": {
-        "properties": {
-          "errors": {
-            "items": {
-              "$ref": "#/components/schemas/IssueOut"
-            },
-            "title": "Errors",
-            "type": "array"
-          },
-          "warnings": {
-            "items": {
-              "$ref": "#/components/schemas/IssueOut"
-            },
-            "title": "Warnings",
-            "type": "array"
-          }
-        },
-        "required": [
-          "errors",
-          "warnings"
-        ],
-        "title": "CheckOut",
         "type": "object"
       }
     }
@@ -3807,7 +3807,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/srmweb__schemas__CheckOut"
+                  "$ref": "#/components/schemas/IssuesOut"
                 }
               }
             },

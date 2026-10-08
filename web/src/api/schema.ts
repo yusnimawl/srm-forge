@@ -545,6 +545,19 @@ export interface components {
             /** Validated */
             validated: boolean;
         };
+        /** CheckOut */
+        CheckOut: {
+            /** Detail */
+            detail: string;
+            /** Limit */
+            limit: number | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value: number | null;
+        };
         /** Design */
         Design: {
             machine: components["schemas"]["RadialSRMParams"];
@@ -720,6 +733,13 @@ export interface components {
             loc: (string | number)[];
             /** Msg */
             msg: string;
+        };
+        /** IssuesOut */
+        IssuesOut: {
+            /** Errors */
+            errors: components["schemas"]["IssueOut"][];
+            /** Warnings */
+            warnings: components["schemas"]["IssueOut"][];
         };
         /** JobCreated */
         JobCreated: {
@@ -1210,7 +1230,7 @@ export interface components {
         ValidationOut: {
             budget: components["schemas"]["BudgetOut"];
             /** Checks */
-            checks: components["schemas"]["srmweb__results__CheckOut"][];
+            checks: components["schemas"]["CheckOut"][];
             /** Engine Version */
             engine_version: string;
             /** Label */
@@ -1241,26 +1261,6 @@ export interface components {
             turns: number;
             /** Wire */
             wire?: number | null;
-        };
-        /** CheckOut */
-        srmweb__results__CheckOut: {
-            /** Detail */
-            detail: string;
-            /** Limit */
-            limit: number | null;
-            /** Name */
-            name: string;
-            /** Status */
-            status: string;
-            /** Value */
-            value: number | null;
-        };
-        /** CheckOut */
-        srmweb__schemas__CheckOut: {
-            /** Errors */
-            errors: components["schemas"]["IssueOut"][];
-            /** Warnings */
-            warnings: components["schemas"]["IssueOut"][];
         };
     };
     responses: never;
@@ -2005,7 +2005,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["srmweb__schemas__CheckOut"];
+                    "application/json": components["schemas"]["IssuesOut"];
                 };
             };
             /** @description Validation Error */

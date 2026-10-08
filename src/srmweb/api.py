@@ -34,9 +34,9 @@ from srmweb.config import Settings
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, CheckOut, EditCase, EstimateOut,
-                            EvaluateBody, EvaluateRequest, JobCreated, JobIn, JobOut, ReferenceCase,
-                            ValidateIn, ValidateRequest)
+from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, EditCase, EstimateOut,
+                            EvaluateBody, EvaluateRequest, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
+                            ValidateIn, ValidateRequest, soft_magnetic)
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
@@ -79,11 +79,21 @@ def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
         (errors if issue.severity == "error" else warnings).append(out)
     if errors:
         return None, errors, warnings
+    materials = inputs.design.machine.materials
+    for region in ("stator", "rotor"):
+        try:
+            soft_magnetic(getattr(materials, region))
+        except ValueError as exc:
+            errors.append({"loc": ["design", "machine", "materials", region], "msg": str(exc)})
+    if errors:
+        return None, errors, warnings
     try:
         _, _, stage = map_request(inputs)
     except ValueError as exc:
         field = _WINDING_FIELD.match(str(exc)) if inputs.winding != "auto" else None
         return None, [{"loc": ["winding", field[1]] if field else [], "msg": str(exc)}], warnings
+    except Exception as exc:   # the check must always answer; the job would fail with the same message
+        return None, [{"loc": [], "msg": f"{type(exc).__name__}: {exc}"}], warnings
     if not stage.passes:
         warnings.append({"loc": [], "msg": f"stage 1: {stage.reason}"})
     return inputs, errors, warnings
@@ -331,7 +341,7 @@ def create_app(settings: Settings,
         store.update_case(case_id, **fields)
         return case_out(store.get_case(case_id))
 
-    @router.post("/validate", response_model=CheckOut)
+    @router.post("/validate", response_model=IssuesOut)
     def validate_inputs(body: ValidateIn):
         _, errors, warnings = check_case(body.inputs)
         return {"errors": errors, "warnings": warnings}

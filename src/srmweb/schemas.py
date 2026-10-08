@@ -12,6 +12,15 @@ from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
 
 
+def soft_magnetic(name: str) -> str:
+    """`name` when it is a soft-magnetic library material; ValueError otherwise."""
+    if name not in available_materials():
+        raise ValueError(f"unknown material {name!r}; available: {', '.join(available_materials())}")
+    if load_material(name).kind != "soft_magnetic":
+        raise ValueError(f"{name!r} is not a soft-magnetic material")
+    return name
+
+
 class SearchSettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,11 +38,7 @@ class SearchSettingsIn(BaseModel):
     @field_validator("stator", "rotor")
     @classmethod
     def _soft_magnetic(cls, name: str) -> str:
-        if name not in available_materials():
-            raise ValueError(f"unknown material {name!r}; available: {', '.join(available_materials())}")
-        if load_material(name).kind != "soft_magnetic":
-            raise ValueError(f"{name!r} is not a soft-magnetic material")
-        return name
+        return soft_magnetic(name)
 
 
 Grid = tuple[Annotated[int, Field(ge=2, le=200)], Annotated[int, Field(ge=2, le=200)]]   # (angles, currents)
@@ -79,7 +84,7 @@ class IssueOut(BaseModel):
     msg: str
 
 
-class CheckOut(BaseModel):
+class IssuesOut(BaseModel):
     errors: list[IssueOut]
     warnings: list[IssueOut]
 

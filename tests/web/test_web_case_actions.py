@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
-pytest.importorskip("ngsolve")
 
 from scipy.io import loadmat
 from fastapi.testclient import TestClient
@@ -209,6 +208,7 @@ def test_running_validate_cannot_be_cancelled_but_queued_one_can(client):
 
 
 def test_estimate_without_history_uses_the_budget(client):
+    pytest.importorskip("ngsolve")
     case_id = _draft(client, _inputs("full"))
     assert client.get(f"/api/cases/{case_id}/estimate").json() == {"new_map": True, "seconds": 1560.0, "basis": "budget"}
     case_id = _draft(client, _inputs("screening"))
@@ -216,6 +216,7 @@ def test_estimate_without_history_uses_the_budget(client):
 
 
 def test_estimate_uses_recent_map_times(client):
+    pytest.importorskip("ngsolve")
     store = client.app.state.store
     store.add_map_time("full", 100.0)
     store.add_map_time("full", 200.0)
@@ -267,3 +268,25 @@ def test_cancelled_search_result_is_still_served(client):
     store.set_status(job_id, "cancelled")
     r = client.get(f"/api/jobs/{job_id}/result")
     assert r.status_code == 200 and r.json()["cancelled"] is True
+
+
+@pytest.mark.parametrize("name, message", [("nosuch", "unknown material 'nosuch'"), ("copper", "not a soft-magnetic")])
+def test_bad_material_is_an_error_not_a_500(client, name, message):
+    inputs = _inputs()
+    inputs["design"]["machine"]["materials"]["stator"] = name
+    out = _validate(client, inputs)
+    assert [e["loc"] for e in out["errors"]] == [["design", "machine", "materials", "stator"]]
+    assert message in out["errors"][0]["msg"]
+    case_id = _draft(client, inputs)
+    r = client.post(f"/api/cases/{case_id}/evaluate")
+    assert r.status_code == 422 and r.json()["errors"][0]["loc"][-2:] == ["materials", "stator"]
+    assert client.get(f"/api/cases/{case_id}/estimate").status_code == 422
+
+
+def test_unexpected_map_request_failure_is_an_error(client, monkeypatch):
+    def boom(inputs):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(api, "map_request", boom)
+    out = _validate(client, _inputs())
+    assert out["errors"] == [{"loc": [], "msg": "RuntimeError: kaboom"}]
