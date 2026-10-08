@@ -87,7 +87,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled")
     # L_end scales with turns², so the correction at the reference turns stays exact under rescale_turns.
-    result = with_end_winding(result, end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR))
+    l_end = end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR)
+    result = with_end_winding(result, l_end)
     cap = stage.j_peak_max if j_peak_max is None else j_peak_max
     choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
                           margin=margin, max_turns=max_turns, only=only)
@@ -101,7 +102,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     mass = stage.mass.iron + w.copper_mass
     peak_power = float(np.max(env.power))
     at_base = int(np.argmin(np.abs(env.speeds_rpm - req.base_speed_rpm)))
-    scaled = rescale_turns(result, turns_scale(machine, w))
+    k = turns_scale(machine, w)
+    scaled = rescale_turns(result, k)
     key = key_numbers(scaled, chosen)
     column = scaled.circuits.index(scaled.excited)
     arrays = MapArrays(scaled.angles, scaled.currents, scaled.psi[..., column], scaled.torque_arkkio)
@@ -118,4 +120,5 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
                       float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan,
-                      i_rms, i_rms / (w.paths * w.copper_area), arrays, map_curves(arrays, chosen, w, key))
+                      i_rms, i_rms / (w.paths * w.copper_area), arrays,
+                      map_curves(arrays, chosen, w, key, l_end * k * k))
