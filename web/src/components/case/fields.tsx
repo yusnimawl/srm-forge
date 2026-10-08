@@ -14,23 +14,24 @@ export type TabProps = {
   errors: Record<string, string>
 }
 
-type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }
+export type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }
 
 export function Field({ id, label, unit, hint, error, children }: {
   id: string
   label: string
-  unit?: Unit
+  unit?: string
   hint?: string
   error?: string
   children: (aria: Aria) => ReactNode
 }) {
   const described = [hint && `${id}-hint`, error && `${id}-err`].filter(Boolean).join(" ") || undefined
+  const unitText = unit && (unit in UNIT_LABEL ? UNIT_LABEL[unit as Unit] : unit)
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
       <div className="flex items-center gap-2">
         {children({ id, "aria-invalid": !!error, "aria-describedby": described })}
-        {unit && <span className="w-12 shrink-0 text-sm text-muted-foreground">{UNIT_LABEL[unit]}</span>}
+        {unitText && <span className="w-12 shrink-0 text-sm text-muted-foreground">{unitText}</span>}
       </div>
       {hint && <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p id={`${id}-err`} className="text-sm text-destructive">{error}</p>}
@@ -41,7 +42,7 @@ export function Field({ id, label, unit, hint, error, children }: {
 export function NumField({ id, label, unit, hint, error, value, onChange, disabled }: {
   id: string
   label: string
-  unit?: Unit
+  unit?: string
   hint?: string
   error?: string
   value: string | number

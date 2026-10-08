@@ -1,21 +1,18 @@
-import { useState, type FormEvent, type ReactNode } from "react"
+import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import { useQuery } from "@tanstack/react-query"
 import { api, ApiError, submitSearch } from "@/api/client"
 import type { Material } from "@/api/types"
+import { Field, SELECT_CLASS } from "@/components/case/fields"
 import { WireListEditor } from "@/components/search/WireListEditor"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { defaultSearchForm, fieldErrors, toSearchRequest, validateForm, type SearchFormValues } from "@/lib/searchForm"
-import { UNIT_LABEL, type Unit } from "@/lib/units"
 import { cn } from "@/lib/utils"
 
 const QUEUE_FULL = "Queue full — wait for a run to finish"
-const SELECT_CLASS =
-  "min-h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
 
 // Errors shown under a field; every other key goes to the summary.
 const FIELD_KEYS = new Set([
@@ -26,31 +23,6 @@ const FIELD_KEYS = new Set([
 
 // Summary entries that name their source; the rest read as plain messages.
 const SUMMARY_LABEL: Record<string, string> = { "requirements.wires": "Wire list" }
-
-type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }
-
-function Field({ id, label, unit, hint, error, children }: {
-  id: string
-  label: string
-  unit?: string
-  hint?: string
-  error?: string
-  children: (aria: Aria) => ReactNode
-}) {
-  const described = [hint && `${id}-hint`, error && `${id}-err`].filter(Boolean).join(" ") || undefined
-  const unitText = unit && (unit in UNIT_LABEL ? UNIT_LABEL[unit as Unit] : unit)
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="flex items-center gap-2">
-        {children({ id, "aria-invalid": !!error, "aria-describedby": described })}
-        {unitText && <span className="w-12 shrink-0 text-sm text-muted-foreground">{unitText}</span>}
-      </div>
-      {hint && <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p>}
-      {error && <p id={`${id}-err`} className="text-sm text-destructive">{error}</p>}
-    </div>
-  )
-}
 
 export function NewSearchPage() {
   const [v, setV] = useState<SearchFormValues>(defaultSearchForm)

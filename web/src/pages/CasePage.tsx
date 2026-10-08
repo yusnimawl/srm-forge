@@ -40,7 +40,8 @@ function CaseEditor({ data }: { data: Case }) {
   const [draft, setDraft] = useState<CaseForm>(stored)
   const form = editable ? draft : stored
   const update = (fn: (f: CaseForm) => CaseForm) => setDraft(fn)
-  const text = useDebounced(useMemo(() => JSON.stringify(toInputs(form)), [form]))
+  const now = useMemo(() => JSON.stringify(toInputs(form)), [form])
+  const text = useDebounced(now)
 
   const check = useQuery({
     queryKey: ["validate", text],
@@ -52,17 +53,38 @@ function CaseEditor({ data }: { data: Case }) {
   const errors = useMemo(() => validationByField(issues ?? { errors: [] }), [issues])
   const unplaced = (issues?.errors ?? []).filter((e) => tabOfKey(issueKey(e.loc)) === null)
 
-  // Every edit is saved, valid or not.
-  const saved = useRef(text)
+  // Every edit is saved, valid or not. `flush` saves the newest inputs now and resolves when they are stored (or
+  // the save failed, which toasts and leaves them to be retried); saves run one after another.
+  const latest = useRef(now)
+  latest.current = now
+  const saved = useRef(now)
+  const queue = useRef(Promise.resolve())
+  const flush = (): Promise<void> => {
+    if (!editable) return queue.current
+    queue.current = queue.current.then(async () => {
+      const body = latest.current
+      if (body === saved.current) return
+      const before = saved.current
+      saved.current = body
+      try {
+        await patch.mutateAsync({ id: data.id, patch: { inputs: JSON.parse(body) } })
+      } catch {
+        saved.current = before
+      }
+    })
+    return queue.current
+  }
+  const flushRef = useRef(flush)
+  flushRef.current = flush
   useEffect(() => {
-    if (!editable || text === saved.current) return
-    saved.current = text
-    patch.mutate({ id: data.id, patch: { inputs: JSON.parse(text) } })
+    void flushRef.current()
   }, [text])
+  useEffect(() => () => void flushRef.current(), [])
 
-  // The diagram keeps the last machine that passed validation.
+  // The diagram keeps the last machine that passed validation; only errors under "design" hold it back.
   const machine = useMemo(() => JSON.parse(text).design?.machine as object | undefined, [text])
-  const valid = !editable || (check.data !== undefined && !check.isPlaceholderData && check.data.errors.length === 0)
+  const valid = !editable || (check.data !== undefined && !check.isPlaceholderData &&
+    !check.data.errors.some((e) => issueKey(e.loc).startsWith("design.")))
   const [good, setGood] = useState<object | null>(null)
   useEffect(() => {
     if (machine && valid) setGood(machine)
@@ -113,6 +135,11 @@ function CaseEditor({ data }: { data: Case }) {
 
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <section aria-label="Inputs" className={cn("min-w-0 space-y-3", pane("input"))}>
+          {check.isError && (
+            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              Validation unavailable: {errorMessage(check.error)}
+            </p>
+          )}
           {unplaced.length > 0 && (
             <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <p className="font-medium">Check the inputs:</p>
@@ -126,7 +153,7 @@ function CaseEditor({ data }: { data: Case }) {
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}
-          <InputTabs form={form} update={update} errors={errors} readOnly={!editable} evaluation={data.evaluation} />
+          <InputTabs form={form} update={update} errors={errors} readOnly={!editable} evaluation={evaluation} />
         </section>
         <div className="min-w-0 space-y-6">
           <section aria-label="Motor diagram" className={pane("diagram")}>

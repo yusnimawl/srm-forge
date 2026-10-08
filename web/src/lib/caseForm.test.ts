@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CaseInputs } from "@/api/types"
-import { toForm, toInputs, validationByField } from "./caseForm"
+import { toForm, toInputs, validationByField, withWires } from "./caseForm"
 
 const inputs = {
   requirements: {
@@ -77,10 +77,43 @@ describe("caseForm", () => {
       warnings: [],
     }
     expect(validationByField(resp)).toEqual({
-      "design.machine.stator_pole_arc": "too wide",
+      "design.machine.stator_pole_arc": "too wide; second",
       "winding.paths": "bad paths",
       "": "whole input",
       "requirements.wires.0.diameter": "wire",
     })
+  })
+
+  it("keeps stored values bit for bit until their field is edited", () => {
+    const awkward = structuredClone(inputs) as unknown as Record<string, any>
+    awkward.design.machine.stator_outer_diameter = 0.16 * 0.42
+    awkward.design.machine.stator_pole_arc = 0.35123456789012345
+    awkward.design.machine.air_gap = 0.1 + 0.2
+    awkward.requirements.wires[0].diameter = 0.0012 * 1.1
+    awkward.j_peak = 12e6 * 1.0000000000001
+    expect(toInputs(toForm(awkward))).toEqual(awkward)
+    const f = toForm(awkward)
+    const edited = toInputs({ ...f, machine: { ...f.machine, air_gap: "0.5" } }) as unknown as typeof awkward
+    expect(edited.design.machine.air_gap).toBeCloseTo(0.0005, 15)
+    expect(edited.design.machine.stator_outer_diameter).toBe(0.16 * 0.42)
+  })
+
+  it("sends one strand in density mode", () => {
+    const f = toForm(inputs)
+    const out = toInputs({ ...f, winding: { ...f.winding, wire: "" } }).winding
+    expect(out).toEqual({ turns: 24, strands: 1, paths: 2, wire: null })
+  })
+
+  it("keeps a fixed winding on the same wire when an earlier wire is removed", () => {
+    const wire = (d: string) => ({ kind: "round" as const, diameter: d, outer_diameter: "1.3" })
+    const f0 = toForm(inputs)
+    const f = { ...f0, requirements: { ...f0.requirements, wires: [wire("1"), wire("2"), wire("3")] }, winding: { ...f0.winding, wire: "1" } }
+    const [w0, w1, w2] = f.requirements.wires
+    expect(withWires(f, [w1, w2]).winding.wire).toBe("0")
+    expect(withWires(f, [w0, w2]).winding.wire).toBe("2") // its wire is gone: the index is past the list
+    expect(withWires(f, [w0, w1]).winding.wire).toBe("1")
+    expect(withWires({ ...f, winding: { ...f.winding, wire: "2" } }, [w1, w2]).winding.wire).toBe("1")
+    expect(withWires({ ...f, winding: { ...f.winding, wire: "" } }, [w1, w2]).winding.wire).toBe("")
+    expect(withWires(f, [w1, w2]).requirements.wires).toEqual([w1, w2])
   })
 })

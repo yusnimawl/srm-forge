@@ -1,5 +1,5 @@
 import { WireListEditor } from "@/components/search/WireListEditor"
-import type { CaseForm } from "@/lib/caseForm"
+import { withWires, type CaseForm } from "@/lib/caseForm"
 import { NumField, type TabProps } from "./fields"
 
 type Req = CaseForm["requirements"]
@@ -25,7 +25,7 @@ export function RequirementTab({ form, update, errors }: TabProps) {
       </div>
       <div className="space-y-2">
         <h3 className="text-sm font-medium">Wires</h3>
-        <WireListEditor wires={r.wires} onChange={(w) => set("wires", w)} errors={errors} />
+        <WireListEditor wires={r.wires} onChange={(w) => update((f) => withWires(f, w))} errors={errors} />
       </div>
     </div>
   )

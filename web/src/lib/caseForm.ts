@@ -128,38 +128,69 @@ export function toForm(inputs: Raw): CaseForm {
   }
 }
 
-/** Stored inputs (SI, radians) for the form; the fixed-winding fields are present only in Fixed mode. */
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+/** The form after its wire list changes to `wires`: a Fixed winding keeps pointing at the same wire. When that wire was
+ *  removed the index moves past the list, which validation reports. */
+export function withWires(f: CaseForm, wires: WireForm[]): CaseForm {
+  const old = f.requirements.wires
+  let winding = f.winding
+  const idx = Number(f.winding.wire)
+  if (wires.length < old.length && String(f.winding.wire) !== "" && Number.isInteger(idx)) {
+    const removed = old.findIndex((w, j) => w !== wires[j])
+    const gone = removed < 0 ? old.length - 1 : removed
+    winding = { ...winding, wire: String(idx > gone ? idx - 1 : idx === gone ? wires.length : idx) }
+  }
+  return { ...f, requirements: { ...f.requirements, wires }, winding }
+}
+
+/** Stored inputs (SI, radians) for the form. A field whose text still reads as its stored value keeps that stored
+ *  value as it was (the text is rounded, and rounding would change the design's hash and miss the map cache). The
+ *  fixed-winding fields are present only in Fixed mode. */
 export function toInputs(f: CaseForm): CaseInputs {
   const r = f.requirements
-  const restDesign = obj(f.rest.design)
+  const rest = obj(f.rest)
+  const restReq = obj(rest.requirements)
+  const restDesign = obj(rest.design)
   const restMachine = obj(restDesign.machine)
+  const restWinding = obj(rest.winding)
+  const conv = (text: Num, raw: unknown, unit?: Unit, optional = false) =>
+    raw !== undefined && String(text) === show(raw, unit) ? raw : optional ? readOpt(text, unit) : read(text, unit)
   const machine: Raw = { ...restMachine }
-  for (const k of POLE_KEYS) machine[k] = read(f.machine[k])
-  for (const m of MACHINE_FIELDS) machine[m.key] = m.optional ? readOpt(f.machine[m.key], m.unit) : read(f.machine[m.key], m.unit)
+  for (const k of POLE_KEYS) machine[k] = conv(f.machine[k], restMachine[k])
+  for (const m of MACHINE_FIELDS) machine[m.key] = conv(f.machine[m.key], restMachine[m.key], m.unit, m.optional)
   machine.materials = { ...obj(restMachine.materials), stator: f.stator, rotor: f.rotor }
+  const rawWires = Array.isArray(restReq.wires) ? restReq.wires : []
+  const wire = (w: WireForm) => rawWires.find((rw) => same(wireToForm(rw)[0], w)) ?? wireToSI(w)
   const wd = f.winding
   return {
-    ...f.rest,
+    ...rest,
     requirements: {
-      peak_power_w: read(r.peakPowerKw, "kW"),
-      peak_torque_nm: read(r.peakTorqueNm),
-      base_speed_rpm: read(r.baseSpeedRpm),
-      max_speed_rpm: read(r.maxSpeedRpm),
-      bus_voltage_v: read(r.busVoltageV),
-      max_outer_diameter_m: readOpt(r.maxOuterDiameterMm, "mm"),
-      max_mass_kg: readOpt(r.maxMassKg),
-      max_slot_fill: read(r.maxSlotFill),
-      phase_current_a: readOpt(r.phaseCurrentA),
-      wires: r.wires.map(wireToSI),
+      peak_power_w: conv(r.peakPowerKw, restReq.peak_power_w, "kW"),
+      peak_torque_nm: conv(r.peakTorqueNm, restReq.peak_torque_nm),
+      base_speed_rpm: conv(r.baseSpeedRpm, restReq.base_speed_rpm),
+      max_speed_rpm: conv(r.maxSpeedRpm, restReq.max_speed_rpm),
+      bus_voltage_v: conv(r.busVoltageV, restReq.bus_voltage_v),
+      max_outer_diameter_m: conv(r.maxOuterDiameterMm, restReq.max_outer_diameter_m, "mm", true),
+      max_mass_kg: conv(r.maxMassKg, restReq.max_mass_kg, undefined, true),
+      max_slot_fill: conv(r.maxSlotFill, restReq.max_slot_fill),
+      phase_current_a: conv(r.phaseCurrentA, restReq.phase_current_a, undefined, true),
+      wires: r.wires.map(wire),
     },
     design: { ...restDesign, machine, mesh: { ...obj(restDesign.mesh), preset: f.preset } },
     winding: wd.mode === "auto"
       ? "auto"
-      : { turns: read(wd.turns), strands: read(wd.strands), paths: read(wd.paths), wire: readOpt(wd.wire) },
-    margin: readOpt(f.margin),
-    j_peak: readOpt(f.jPeak, "A/mm2"),
-    j_limit: readOpt(f.jLimit, "A/mm2"),
-    j_peak_max: readOpt(f.jPeakMax, "A/mm2"),
+      : {
+        turns: conv(wd.turns, restWinding.turns),
+        // Density mode (no wire) has one strand.
+        strands: String(wd.wire) === "" ? 1 : conv(wd.strands, restWinding.strands),
+        paths: conv(wd.paths, restWinding.paths),
+        wire: conv(wd.wire, restWinding.wire, undefined, true),
+      },
+    margin: conv(f.margin, rest.margin, undefined, true),
+    j_peak: conv(f.jPeak, rest.j_peak, "A/mm2", true),
+    j_limit: conv(f.jLimit, rest.j_limit, "A/mm2", true),
+    j_peak_max: conv(f.jPeakMax, rest.j_peak_max, "A/mm2", true),
   } as unknown as CaseInputs
 }
 
@@ -176,12 +207,13 @@ export function issueKey(loc: Issue["loc"]): string {
   return l.join(".")
 }
 
-/** Field name -> first error message; whole-input messages are under "". */
+/** Field name -> its error messages joined; whole-input messages are under "". */
 export function validationByField(resp: Pick<IssuesResponse, "errors">): Record<string, string> {
   const out: Record<string, string> = {}
   for (const e of resp.errors) {
     const key = issueKey(e.loc)
-    if (!(key in out)) out[key] = e.msg.replace(/^Value error, /, "")
+    const msg = e.msg.replace(/^Value error, /, "")
+    out[key] = key in out ? `${out[key]}; ${msg}` : msg
   }
   return out
 }
