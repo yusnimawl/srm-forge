@@ -7,7 +7,7 @@ from conftest import make_8_6
 from map_fixtures import synthetic_map
 
 from srmapp.drive.envelope import Envelope
-from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, speed_grid
+from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, rescale_turns, speed_grid, turns_scale
 from srmapp.requirements import Requirements
 from srmapp.sizing import estimates as est
 from srmapp.sizing.generator import Candidate
@@ -205,3 +205,27 @@ def test_turns_are_chosen_on_the_end_winding_corrected_map():
     k = raw.circuits.index(raw.excited)
     assert l_end > 0
     np.testing.assert_allclose(seen[0].psi[..., k], raw.psi[..., k] + l_end * raw.currents[None, :])
+
+
+def test_evaluation_carries_the_rescaled_map():
+    from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
+    req = _req()
+    stage = stage1(req, make_8_6())
+    raw = _map(stage)
+    with mock.patch("srmapp.evaluate.build_map", return_value=raw), \
+            mock.patch("srmapp.evaluate.key_numbers", return_value=None):
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30)
+    assert e.status == "ok"
+    expected = rescale_turns(with_end_winding(raw, end_winding_inductance(make_8_6(), image_factor=1.5)),
+                             turns_scale(make_8_6(), e.winding))
+    k = expected.circuits.index(expected.excited)
+    np.testing.assert_allclose(e.map.psi, expected.psi[..., k])
+    np.testing.assert_allclose(e.map.currents, expected.currents)
+    np.testing.assert_allclose(e.map.angles, expected.angles)
+    np.testing.assert_allclose(e.map.torque, expected.torque_arkkio)
+
+
+def test_failed_evaluation_has_no_map():
+    with mock.patch("srmapp.evaluate.build_map", side_effect=RuntimeError("boom")):
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+    assert e.map is None
