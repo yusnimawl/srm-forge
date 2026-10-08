@@ -2,14 +2,14 @@ import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
 import { fromSI, UNIT_LABEL } from "@/lib/units"
-import type { Envelope } from "@/lib/candidates"
+import type { Envelope } from "@/api/types"
 
 export default function EnvelopeChart({ envelope }: { envelope: Envelope }) {
   const c = useColors()
   const e = envelope
   // θ = 0° electrical is the unaligned position.
   const hover = e.speeds_rpm.map(
-    (_, k) => `turn-on ${fmt(e.theta_on_el?.[k])}° el, turn-off ${fmt(e.theta_off_el?.[k])}° el`,
+    (_, k) => `turn-on ${fmt(e.theta_on_el[k])}° el, turn-off ${fmt(e.theta_off_el[k])}° el`,
   )
   const trace = (name: string, y: (number | null)[], color: string, yaxis: string, dash: string) => ({
     type: "scatter",

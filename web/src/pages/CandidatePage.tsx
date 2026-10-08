@@ -48,7 +48,7 @@ export function CandidatePage() {
   }
   const w = ev.winding
   const k = ev.key
-  const wire = w?.wire != null ? result.data?.requirements?.wires?.[w.wire]?.kind : null
+  const wire = w?.wire != null ? result.data?.requirements.wires[w.wire]?.kind : null
   return (
     <div className="space-y-6">
       {back}
@@ -109,7 +109,7 @@ export function CandidatePage() {
           </section>
         )}
       </div>
-      {ev.scan && ev.scan.length > 0 && (
+      {ev.scan.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Winding scan</h2>
           <WindingScan scan={ev.scan} chosen={ev.winding} />

@@ -1,11 +1,11 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { fmt } from "@/lib/format"
-import type { Evaluation } from "@/lib/candidates"
+import type { Evaluation } from "@/api/types"
 
 const head = "sticky top-0 bg-background"
 
 /** The chosen winding's row is highlighted; the list scrolls inside a fixed height. */
-export function WindingScan({ scan, chosen }: { scan: NonNullable<Evaluation["scan"]>; chosen?: Evaluation["winding"] }) {
+export function WindingScan({ scan, chosen }: { scan: Evaluation["scan"]; chosen?: Evaluation["winding"] }) {
   const isChosen = (w: { turns: number; paths?: number | null }) =>
     chosen != null && w.turns === chosen.turns && (w.paths ?? 1) === (chosen.paths ?? 1)
   return (

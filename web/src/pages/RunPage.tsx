@@ -1,14 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo } from "react"
-import { Link, useNavigate, useParams } from "react-router"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "@/api/client"
+import { Link, useParams } from "react-router"
+import { useQueryClient } from "@tanstack/react-query"
+import { useJobActions } from "@/api/useJobActions"
 import { useRunResult } from "@/api/useRunResult"
-import { toast } from "sonner"
-import { errorMessage } from "@/lib/errorMessage"
 import { useJobEvents } from "@/api/useJobEvents"
 import { Banner } from "@/components/Banner"
 import { CandidateTable } from "@/components/run/CandidateTable"
-import { isActive, JobStatusBadge, RunProgress } from "@/components/run/RunProgress"
+import { JobStatusBadge, RunProgress } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { toRows } from "@/lib/candidates"
 import { fmt } from "@/lib/format"
@@ -27,10 +25,10 @@ function Count({ label, value }: { label: string; value: number }) {
 export function RunPage() {
   const { jobId = "" } = useParams()
   const qc = useQueryClient()
-  const navigate = useNavigate()
+  const actions = useJobActions()
   const { job } = useJobEvents(jobId)
   const status = job?.status
-  const terminal = status != null && !isActive(status)
+  const terminal = job != null && !job.active
 
   // The SSE end event delivers the terminal status; refetch so results appear without a reload.
   useEffect(() => {
@@ -39,13 +37,6 @@ export function RunPage() {
 
   const result = useRunResult(jobId, terminal)
   const rows = useMemo(() => (result.data ? toRows(result.data) : []), [result.data])
-  const cancel = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${jobId}/cancel`, { method: "POST" }) })
-  const resume = useMutation({
-    onError: (e) => toast.error(errorMessage(e)),
-    mutationFn: () => api<{ id: string }>(`/api/jobs/${jobId}/resume`, { method: "POST" }),
-    onSuccess: ({ id }) => navigate(`/runs/${id}`),
-  })
-
   const r = result.data
   const dropped = Object.entries(r?.dropped ?? {})
   return (
@@ -54,19 +45,19 @@ export function RunPage() {
         <h1 className="text-2xl font-semibold text-primary">Run</h1>
         <span className="num text-sm text-muted-foreground">{jobId}</span>
         {status && <JobStatusBadge status={status} />}
-        {status && isActive(status) && (
-          <Button variant="outline" className="min-h-11" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+        {job?.active && (
+          <Button variant="outline" className="min-h-11" onClick={() => actions.cancel(jobId)} disabled={actions.busy}>
             Cancel
           </Button>
         )}
-        {(status === "cancelled" || status === "failed" || status === "interrupted") && (
-          <Button className="min-h-11" onClick={() => resume.mutate()} disabled={resume.isPending}>
+        {job?.resumable && (
+          <Button className="min-h-11" onClick={() => actions.resume(jobId)} disabled={actions.busy}>
             Resume
           </Button>
         )}
       </div>
       <Banner />
-      {job && isActive(job.status) && <RunProgress job={job} />}
+      {job?.active && <RunProgress job={job} />}
       {job?.error && <p className="text-destructive">{job.error}</p>}
       {result.isError && <p className="text-destructive">Could not load the result.</p>}
       {result.data === null && (

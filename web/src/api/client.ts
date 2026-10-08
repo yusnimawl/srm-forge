@@ -2,7 +2,6 @@ import type { components } from "./schema"
 
 export type SearchRequest = components["schemas"]["SearchRequest"]
 export type JobOut = components["schemas"]["JobOut"]
-export type Material = { name: string; grade: string; thickness_mm: number | null; js: number }
 
 export type ValidationIssue = { loc: (string | number)[]; msg: string; type?: string }
 

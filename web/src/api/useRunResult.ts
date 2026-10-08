@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { api, ApiError } from "@/api/client"
-import type { SearchResult } from "@/lib/candidates"
+import type { SearchResult } from "@/api/types"
 
 /** A run that stopped before any design was evaluated has no stored result (404): that is `null`, not an error. */
 export async function resultOrNull<T>(load: () => Promise<T>): Promise<T | null> {

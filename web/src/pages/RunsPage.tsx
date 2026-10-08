@@ -1,53 +1,42 @@
-import { Link, useNavigate } from "react-router"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "react-router"
+import { useQuery } from "@tanstack/react-query"
 import { api, type JobOut } from "@/api/client"
-import { toast } from "sonner"
-import { errorMessage } from "@/lib/errorMessage"
-import { fmtElapsed, isActive, JobStatusBadge, progressOf } from "@/components/run/RunProgress"
+import { searchJobs } from "@/api/jobs"
+import { actionsFor, useJobActions } from "@/api/useJobActions"
+import { fmtElapsed, JobStatusBadge, progressOf } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-const RESUMABLE = new Set(["interrupted", "cancelled", "failed"])
-
 function Actions({ job }: { job: JobOut }) {
-  const qc = useQueryClient()
-  const navigate = useNavigate()
-  const refresh = () => qc.invalidateQueries({ queryKey: ["jobs"] })
-  const cancel = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${job.id}/cancel`, { method: "POST" }), onSuccess: refresh })
-  const resume = useMutation({
-    onError: (e) => toast.error(errorMessage(e)),
-    mutationFn: () => api<{ id: string }>(`/api/jobs/${job.id}/resume`, { method: "POST" }),
-    onSuccess: ({ id }) => {
-      refresh()
-      navigate(`/runs/${id}`)
-    },
-  })
-  const del = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${job.id}`, { method: "DELETE" }), onSuccess: refresh })
+  const { cancel, resume, remove, busy } = useJobActions()
+  const outline = "min-h-11"
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" className="min-h-11" render={<Link to={`/runs/${job.id}`} />}>
-        Open
-      </Button>
-      {isActive(job.status) && (
-        <Button variant="outline" className="min-h-11" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-          Cancel
-        </Button>
-      )}
-      {RESUMABLE.has(job.status) && (
-        <Button variant="outline" className="min-h-11" onClick={() => resume.mutate()} disabled={resume.isPending}>
-          Resume
-        </Button>
-      )}
-      {!isActive(job.status) && (
-        <Button
-          variant="outline"
-          className="min-h-11 text-destructive"
-          onClick={() => window.confirm(`Delete run ${job.id}? This cannot be undone.`) && del.mutate()}
-          disabled={del.isPending}
-        >
-          Delete
-        </Button>
+      {actionsFor(job).map((a) =>
+        a === "open" ? (
+          <Button key={a} variant="outline" className={outline} render={<Link to={`/runs/${job.id}`} />}>
+            Open
+          </Button>
+        ) : a === "cancel" ? (
+          <Button key={a} variant="outline" className={outline} onClick={() => cancel(job.id)} disabled={busy}>
+            Cancel
+          </Button>
+        ) : a === "resume" ? (
+          <Button key={a} variant="outline" className={outline} onClick={() => resume(job.id)} disabled={busy}>
+            Resume
+          </Button>
+        ) : (
+          <Button
+            key={a}
+            variant="outline"
+            className={`${outline} text-destructive`}
+            onClick={() => window.confirm(`Delete run ${job.id}? This cannot be undone.`) && remove(job.id)}
+            disabled={busy}
+          >
+            Delete
+          </Button>
+        ),
       )}
     </div>
   )
@@ -73,9 +62,9 @@ export function RunsPage() {
   const jobs = useQuery({
     queryKey: ["jobs"],
     queryFn: () => api<JobOut[]>("/api/jobs"),
-    refetchInterval: (q) => (q.state.data?.some((j) => isActive(j.status)) ? 5000 : false),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.active) ? 5000 : false),
   })
-  const list = jobs.data ?? []
+  const list = searchJobs(jobs.data ?? [])
 
   return (
     <div className="space-y-4">

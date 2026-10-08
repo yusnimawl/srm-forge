@@ -1,3 +1,4 @@
+import type { SearchResult } from "@/api/types"
 import { fromSI } from "./units"
 export const AXES = {
   mass_kg: "Mass (kg)",
@@ -24,67 +25,9 @@ export type CandidateRow = {
   pareto: boolean
 }
 
-export type Winding = {
-  turns: number
-  strands?: number | null
-  paths?: number | null
-  copper_area?: number | null
-  current?: number | null
-  resistance?: number | null
-  wire?: number | null
-}
-export type Envelope = {
-  speeds_rpm: number[]
-  torque: (number | null)[]
-  power: (number | null)[]
-  theta_on_el?: (number | null)[]
-  theta_off_el?: (number | null)[]
-}
-export type Evaluation = {
-  id: string
-  design: {
-    machine: { n_stator_poles: number; n_rotor_poles: number; stator_outer_diameter: number }
-  }
-  status: string
-  error?: string | null
-  mass_kg?: number | null
-  winding?: Winding | null
-  torque_ratio?: number | null
-  power_ratio?: number | null
-  peak_power_w?: number | null
-  power_density_kw_per_kg?: number | null
-  efficiency_base?: number | null
-  feasible?: boolean | null
-  envelope?: Envelope | null
-  key?: {
-    la: number | null
-    lu: number | null
-    la_lu: number | null
-    peak_torque: number | null
-    psi_max: number | null
-    i_max: number | null
-    unaligned_angle: number | null
-  } | null
-  scan?: { winding: Winding; torque_ratio: number | null; power_ratio: number | null; i_rms: number | null; feasible: boolean | null }[] | null
-  i_rms_a?: number | null
-  j_rms?: number | null
-  map?: { angles: number[]; currents: number[]; psi: (number | null)[][]; torque: (number | null)[][] } | null
-}
-
-/** The parts of `search_result_json` the run pages read. */
-export type SearchResult = {
-  sampled?: number
-  dropped?: Record<string, number>
-  stage1_rejected?: number
-  cancelled?: boolean
-  pareto_ids: string[]
-  requirements?: { wires?: { kind: string }[] | null }
-  evaluations: Evaluation[]
-}
-
 const num = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : v)
 
-export function toRows(result: SearchResult): CandidateRow[] {
+export function toRows(result: Pick<SearchResult, "evaluations" | "pareto_ids">): CandidateRow[] {
   const front = new Set(result.pareto_ids)
   return result.evaluations.map((e) => {
     const m = e.design.machine

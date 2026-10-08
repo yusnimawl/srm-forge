@@ -14,8 +14,6 @@ export type JobProgress = {
 
 export const progressOf = (job: JobOut): JobProgress => (job.progress ?? {}) as JobProgress
 
-export const isActive = (status: string) => status === "queued" || status === "running"
-
 /** h:mm:ss */
 export function fmtElapsed(seconds: number | null | undefined): string {
   const s = Math.max(0, Math.floor(seconds ?? 0))

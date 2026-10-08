@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { api, type JobOut } from "@/api/client"
-import { isActive } from "@/components/run/RunProgress"
 import { errorMessage } from "@/lib/errorMessage"
 import { setThemePreference, useTheme, type ThemePreference } from "@/lib/theme"
 
@@ -20,7 +19,7 @@ export function SettingsPage() {
   const cache = useQuery({ queryKey: ["cache"], queryFn: () => api<Cache>("/api/settings/cache") })
   const session = useQuery({ queryKey: ["session"], queryFn: () => api<Session>("/api/session") })
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api<JobOut[]>("/api/jobs") })
-  const running = jobs.data?.some((j) => isActive(j.status)) ?? false
+  const running = jobs.data?.some((j) => j.active) ?? false
 
   const clear = useMutation({
     mutationFn: () => api<void>("/api/settings/cache", { method: "DELETE" }),
