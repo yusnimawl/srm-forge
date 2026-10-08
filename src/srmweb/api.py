@@ -1,10 +1,13 @@
 """FastAPI app factory and job routes."""
 from __future__ import annotations
 
+import asyncio
+import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, HTTPException, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 
 import srmcore
 import srmweb
@@ -14,6 +17,13 @@ from srmweb.schemas import JobIn, JobOut
 from srmweb.store import Store
 
 _RESUMABLE = ("interrupted", "cancelled", "failed")
+_POLL_S = 0.5
+_KEEPALIVE_S = 15.0
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+def _sse(event: str, out: JobOut) -> str:
+    return f"event: {event}\ndata: {out.model_dump_json()}\n\n"
 
 
 def _job_out(job: dict, runner: JobRunner) -> JobOut:
@@ -66,6 +76,34 @@ def create_app(settings: Settings,
     @router.get("/jobs/{job_id}", response_model=JobOut)
     def get_job(job_id: str):
         return _job_out(job_or_404(job_id), runner)
+
+    @router.get("/jobs/{job_id}/events")
+    async def job_events(job_id: str, request: Request):
+        job_or_404(job_id)
+
+        async def stream():
+            seen, last_send = None, time.monotonic()
+            while not await request.is_disconnected():
+                job = store.get_job(job_id)
+                if job is None:
+                    return
+                out = _job_out(job, runner)
+                if job["status"] not in ("queued", "running"):
+                    yield _sse("end", out)
+                    return
+                live = runner.progress(job_id)
+                version = live[0] if live else None
+                if seen is None or version != seen:
+                    seen = version if live else 0
+                    yield _sse("progress", out)
+                    last_send = time.monotonic()
+                elif time.monotonic() - last_send >= _KEEPALIVE_S:
+                    yield ": keep-alive\n\n"
+                    last_send = time.monotonic()
+                await asyncio.sleep(_POLL_S)
+
+        return StreamingResponse(stream(), media_type="text/event-stream",
+                                 headers=_SSE_HEADERS)
 
     @router.get("/jobs/{job_id}/result")
     def get_result(job_id: str):
