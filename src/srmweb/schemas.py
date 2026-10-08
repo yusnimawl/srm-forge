@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from srmapp.case import CaseInputs
 from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
 
@@ -33,25 +34,63 @@ class SearchSettingsIn(BaseModel):
         return name
 
 
+Grid = tuple[Annotated[int, Field(ge=2, le=200)], Annotated[int, Field(ge=2, le=200)]]   # (angles, currents)
+
+
 class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requirements: Requirements
     settings: SearchSettingsIn = SearchSettingsIn()
-    grid: tuple[Annotated[int, Field(ge=2, le=200)], Annotated[int, Field(ge=2, le=200)]] | None = None   # (angles, currents); overrides the preset grid, for tests
+    grid: Grid | None = None   # overrides the preset grid, for tests
 
 
-class JobIn(BaseModel):
+class EvaluateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    inputs: CaseInputs
+    grid: Grid | None = None
+
+
+class ValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    inputs: CaseInputs
+
+
+class SearchJobIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["search"]
     payload: SearchRequest
 
 
+class EvaluateJobIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["evaluate"]
+    payload: EvaluateRequest
+
+
+class ValidateJobIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["validate"]
+    payload: ValidateRequest
+
+
+JobIn = Annotated[SearchJobIn | EvaluateJobIn | ValidateJobIn, Field(discriminator="kind")]
+
+
 class JobOut(BaseModel):
     id: str
     kind: str
     status: str
+    active: bool
+    resumable: bool
+    case_id: str | None = None
     progress: dict | None = None
     error: str | None = None
     created: str

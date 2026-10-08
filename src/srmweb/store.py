@@ -17,6 +17,11 @@ SCHEMA_VERSION = 2
 CASE_ORIGINS = ("candidate", "reference", "import", "edit")
 RESULT_KINDS = ("search", "evaluate", "validate")
 
+# Job status groups; the runner, the store and the routes all read these.
+ACTIVE = ("queued", "running")
+FINAL = ("done", "failed", "cancelled", "interrupted")
+RESUMABLE = ("interrupted", "cancelled", "failed")
+
 # Statements run one by one so that a whole (re)creation is a single transaction.
 _SCHEMA = (
     """CREATE TABLE IF NOT EXISTS jobs (
@@ -25,13 +30,13 @@ _SCHEMA = (
         created TEXT NOT NULL, started TEXT, finished TEXT)""",
     """CREATE TABLE cases (
         id TEXT PRIMARY KEY, job_id TEXT, parent_case_id TEXT,
-        origin TEXT NOT NULL CHECK (origin IN ('candidate', 'reference', 'import', 'edit')),
+        origin TEXT NOT NULL,
         label TEXT, inputs TEXT NOT NULL, flag TEXT, comment TEXT,
         show_in_graphs INTEGER NOT NULL DEFAULT 0,
         stale INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL)""",
     """CREATE TABLE results (
         job_id TEXT, case_id TEXT,
-        kind TEXT NOT NULL CHECK (kind IN ('search', 'evaluate', 'validate')),
+        kind TEXT NOT NULL,
         body TEXT NOT NULL)""",
     "CREATE TABLE map_times (preset TEXT NOT NULL, seconds REAL NOT NULL,"
     " finished TEXT NOT NULL)",
@@ -57,8 +62,8 @@ _CASE_FIELDS = ("label", "flag", "comment", "show_in_graphs", "inputs", "stale")
 _CASE_COLUMNS = ("id, job_id, parent_case_id, origin, label, inputs, flag, comment,"
                  " show_in_graphs, stale, created")
 
-_FINAL = ("done", "failed", "cancelled", "interrupted")
-_COLUMNS = "id, kind, request, status, progress, error, created, started, finished"
+_COLUMNS = ("id, kind, request, status, progress, error, created, started, finished,"
+            " json_extract(request, '$.case_id') AS case_id")
 
 
 def _now() -> str:
@@ -143,7 +148,7 @@ class Store:
         if status == "running":
             sets.append("started = ?")
             args.append(_now())
-        elif status in _FINAL:
+        elif status in FINAL:
             sets.append("finished = ?")
             args.append(_now())
         with self._db() as con:
@@ -157,6 +162,8 @@ class Store:
 
     def put_result(self, job_id: str | None, body: dict, *, kind: str,
                    case_id: str | None = None):
+        if kind not in RESULT_KINDS:
+            raise ValueError(f"unknown result kind {kind!r}")
         text = _dumps(body)
         with self._db() as con:
             con.execute(
@@ -191,6 +198,8 @@ class Store:
     def create_case(self, *, origin: str, inputs: dict, label: str,
                     parent_case_id: str | None = None, job_id: str | None = None,
                     stale: bool) -> str:
+        if origin not in CASE_ORIGINS:
+            raise ValueError(f"unknown case origin {origin!r}")
         case_id = str(uuid.uuid4())
         with self._db() as con:
             con.execute(

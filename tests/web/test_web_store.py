@@ -100,6 +100,8 @@ def test_v1_database_migrates_and_keeps_runs(tmp_path):
     assert _version(p) == 2
     assert s.get_job("j1")["request"] == {"n": 1}
     assert s.get_result("j1") == {"x": 1}
+    with closing(sqlite3.connect(p)) as con:
+        assert con.execute("SELECT kind FROM results WHERE job_id = 'j1'").fetchone()[0] == "search"
     c = s.create_case(origin="reference", inputs={}, label="r", stale=True)
     assert s.get_case(c)["show_in_graphs"] is False
     s.add_map_time("full", 1.0)
@@ -205,3 +207,11 @@ def test_recent_map_times(tmp_path):
     assert s.recent_map_times("full", 2) == [6.0, 5.0]
     assert s.recent_map_times("screening") == [99.0]
     assert s.recent_map_times("reference") == []
+
+
+def test_unknown_origin_and_kind_rejected(tmp_path):
+    s = Store(tmp_path / "a.db")
+    with pytest.raises(ValueError, match="origin"):
+        s.create_case(origin="bogus", inputs={}, label="x", stale=True)
+    with pytest.raises(ValueError, match="result kind"):
+        s.put_result("j", {}, kind="bogus")

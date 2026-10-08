@@ -1,6 +1,239 @@
 {
   "components": {
     "schemas": {
+      "CaseInputs": {
+        "additionalProperties": false,
+        "properties": {
+          "design": {
+            "$ref": "#/components/schemas/Design"
+          },
+          "j_limit": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Limit"
+          },
+          "j_peak": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak"
+          },
+          "j_peak_max": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak Max"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/Requirements"
+          },
+          "winding": {
+            "anyOf": [
+              {
+                "const": "auto",
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/FixedWinding"
+              }
+            ],
+            "default": "auto",
+            "title": "Winding"
+          }
+        },
+        "required": [
+          "requirements",
+          "design"
+        ],
+        "title": "CaseInputs",
+        "type": "object"
+      },
+      "Design": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/RadialSRMParams"
+          },
+          "mesh": {
+            "$ref": "#/components/schemas/MeshSettings",
+            "default": {
+              "airgap_radial_layers": 4,
+              "band_min_angle_deg": 5.0,
+              "max_aspect_ratio": 12.0,
+              "min_angle_deg": 10.0,
+              "outer_air_thickness": 0.0,
+              "preset": "full",
+              "refinement": {},
+              "region_sizes": {},
+              "scale": 1.0
+            }
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "machine"
+        ],
+        "title": "Design",
+        "type": "object"
+      },
+      "EdgeRefinement": {
+        "additionalProperties": false,
+        "properties": {
+          "growth": {
+            "default": 1.3,
+            "title": "Growth",
+            "type": "number"
+          },
+          "size": {
+            "title": "Size",
+            "type": "number"
+          }
+        },
+        "required": [
+          "size"
+        ],
+        "title": "EdgeRefinement",
+        "type": "object"
+      },
+      "EvaluateJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "evaluate",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/EvaluateRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "EvaluateJobIn",
+        "type": "object"
+      },
+      "EvaluateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "grid": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 200.0,
+                    "minimum": 2.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grid"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CaseInputs"
+          }
+        },
+        "required": [
+          "case_id",
+          "inputs"
+        ],
+        "title": "EvaluateRequest",
+        "type": "object"
+      },
+      "FixedWinding": {
+        "additionalProperties": false,
+        "properties": {
+          "paths": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Paths",
+            "type": "integer"
+          },
+          "strands": {
+            "default": 1,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Strands",
+            "type": "integer"
+          },
+          "turns": {
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Turns",
+            "type": "integer"
+          },
+          "wire": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wire"
+          }
+        },
+        "required": [
+          "turns"
+        ],
+        "title": "FixedWinding",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -14,27 +247,23 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "JobIn": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "search",
-            "title": "Kind",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/SearchRequest"
-          }
-        },
-        "required": [
-          "kind",
-          "payload"
-        ],
-        "title": "JobIn",
-        "type": "object"
-      },
       "JobOut": {
         "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
           "created": {
             "title": "Created",
             "type": "string"
@@ -81,6 +310,10 @@
             ],
             "title": "Progress"
           },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
           "started": {
             "anyOf": [
               {
@@ -101,6 +334,8 @@
           "id",
           "kind",
           "status",
+          "active",
+          "resumable",
           "created"
         ],
         "title": "JobOut",
@@ -152,6 +387,97 @@
           "token"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "MeshSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "airgap_circumferential_divisions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airgap Circumferential Divisions"
+          },
+          "airgap_radial_layers": {
+            "default": 4,
+            "title": "Airgap Radial Layers",
+            "type": "integer"
+          },
+          "band_min_angle_deg": {
+            "default": 5.0,
+            "title": "Band Min Angle Deg",
+            "type": "number"
+          },
+          "max_aspect_ratio": {
+            "default": 12.0,
+            "title": "Max Aspect Ratio",
+            "type": "number"
+          },
+          "min_angle_deg": {
+            "default": 10.0,
+            "title": "Min Angle Deg",
+            "type": "number"
+          },
+          "outer_air_thickness": {
+            "default": 0.0,
+            "title": "Outer Air Thickness",
+            "type": "number"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "screening",
+              "full",
+              "reference"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
+          "refinement": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EdgeRefinement"
+            },
+            "propertyNames": {
+              "enum": [
+                "pole_tip",
+                "pole_root"
+              ]
+            },
+            "title": "Refinement",
+            "type": "object"
+          },
+          "region_sizes": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Region Sizes",
+            "type": "object"
+          },
+          "scale": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Scale",
+            "type": "number"
+          },
+          "skin_depth_layers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skin Depth Layers"
+          }
+        },
+        "title": "MeshSettings",
         "type": "object"
       },
       "RadialSRMParams": {
@@ -496,6 +822,25 @@
         "title": "RoundWire",
         "type": "object"
       },
+      "SearchJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "search",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SearchRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "SearchJobIn",
+        "type": "object"
+      },
       "SearchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -639,6 +984,43 @@
         "title": "SearchSettingsIn",
         "type": "object"
       },
+      "ValidateJobIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "validate",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ValidateRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "ValidateJobIn",
+        "type": "object"
+      },
+      "ValidateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CaseInputs"
+          }
+        },
+        "required": [
+          "case_id",
+          "inputs"
+        ],
+        "title": "ValidateRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -767,7 +1149,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JobIn"
+                "discriminator": {
+                  "mapping": {
+                    "evaluate": "#/components/schemas/EvaluateJobIn",
+                    "search": "#/components/schemas/SearchJobIn",
+                    "validate": "#/components/schemas/ValidateJobIn"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SearchJobIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EvaluateJobIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ValidateJobIn"
+                  }
+                ],
+                "title": "Job"
               }
             }
           },

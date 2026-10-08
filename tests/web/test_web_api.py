@@ -7,6 +7,8 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
+from conftest import make_8_6
+
 import srmcore
 import srmweb
 from srmweb.api import create_app
@@ -193,3 +195,48 @@ def test_missing_job_404(make):
 @pytest.mark.parametrize("grid", [[10**6, 10**6], [1, 4], [4, 201]])
 def test_grid_out_of_bounds_422(make, grid):
     assert make().post("/api/jobs", json=_body(grid=grid)).status_code == 422
+
+
+def test_job_out_flags(make, gate):
+    c = make(lambda kind, req, rep: gate.wait(10) and {}, queue_max=3)
+    j = c.post("/api/jobs", json=_body()).json()["id"]
+    _wait(c, j, {"running"})
+    out = c.get(f"/api/jobs/{j}").json()
+    assert (out["active"], out["resumable"], out["case_id"]) == (True, False, None)
+    c.app.state.store.set_status(j, "failed")
+    out = c.get(f"/api/jobs/{j}").json()
+    assert (out["active"], out["resumable"]) == (False, True)
+    assert c.get("/api/jobs").json()[0]["resumable"] is True
+
+
+def test_list_route_fills_case_id(make):
+    c = make()
+    store = c.app.state.store
+    j = store.create_job("evaluate", {"case_id": "abc"})
+    store.set_status(j, "failed")
+    (out,) = c.get("/api/jobs").json()
+    assert out["case_id"] == "abc" and out["kind"] == "evaluate"
+
+
+@pytest.mark.parametrize("kind", ["evaluate", "validate"])
+def test_case_kinds_not_submittable_here(make, kind):
+    inputs = {"requirements": REQ, "design": {"machine": make_8_6().model_dump(mode="json")}}
+    r = make().post("/api/jobs", json={"kind": kind, "payload": {"case_id": "c", "inputs": inputs}})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "submit through /api/cases/{id}/evaluate or /validate"
+
+
+def test_evaluate_payload_is_validated_first(make):
+    r = make().post("/api/jobs", json={"kind": "evaluate", "payload": {"case_id": "c"}})
+    assert r.status_code == 422
+    assert isinstance(r.json()["detail"], list)
+
+
+def test_resume_keeps_kind_and_request(make):
+    c = make()
+    store = c.app.state.store
+    old = store.create_job("evaluate", {"case_id": "abc", "inputs": {}})
+    store.set_status(old, "failed")
+    new = c.post(f"/api/jobs/{old}/resume").json()["id"]
+    got = store.get_job(new)
+    assert got["kind"] == "evaluate" and got["request"] == store.get_job(old)["request"]

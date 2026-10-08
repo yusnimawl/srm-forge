@@ -236,22 +236,106 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CaseInputs */
+        CaseInputs: {
+            design: components["schemas"]["Design"];
+            /** J Limit */
+            j_limit?: number | null;
+            /** J Peak */
+            j_peak?: number | null;
+            /** J Peak Max */
+            j_peak_max?: number | null;
+            /** Margin */
+            margin?: number | null;
+            requirements: components["schemas"]["Requirements"];
+            /**
+             * Winding
+             * @default auto
+             */
+            winding: "auto" | components["schemas"]["FixedWinding"];
+        };
+        /** Design */
+        Design: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /**
+             * @default {
+             *       "airgap_radial_layers": 4,
+             *       "band_min_angle_deg": 5,
+             *       "max_aspect_ratio": 12,
+             *       "min_angle_deg": 10,
+             *       "outer_air_thickness": 0,
+             *       "preset": "full",
+             *       "refinement": {},
+             *       "region_sizes": {},
+             *       "scale": 1
+             *     }
+             */
+            mesh: components["schemas"]["MeshSettings"];
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
+        /** EdgeRefinement */
+        EdgeRefinement: {
+            /**
+             * Growth
+             * @default 1.3
+             */
+            growth: number;
+            /** Size */
+            size: number;
+        };
+        /** EvaluateJobIn */
+        EvaluateJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "evaluate";
+            payload: components["schemas"]["EvaluateRequest"];
+        };
+        /** EvaluateRequest */
+        EvaluateRequest: {
+            /** Case Id */
+            case_id: string;
+            /** Grid */
+            grid?: [
+                number,
+                number
+            ] | null;
+            inputs: components["schemas"]["CaseInputs"];
+        };
+        /** FixedWinding */
+        FixedWinding: {
+            /**
+             * Paths
+             * @default 1
+             */
+            paths: number;
+            /**
+             * Strands
+             * @default 1
+             */
+            strands: number;
+            /** Turns */
+            turns: number;
+            /** Wire */
+            wire?: number | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** JobIn */
-        JobIn: {
-            /**
-             * Kind
-             * @constant
-             */
-            kind: "search";
-            payload: components["schemas"]["SearchRequest"];
-        };
         /** JobOut */
         JobOut: {
+            /** Active */
+            active: boolean;
+            /** Case Id */
+            case_id?: string | null;
             /** Created */
             created: string;
             /** Error */
@@ -266,6 +350,8 @@ export interface components {
             progress?: {
                 [key: string]: unknown;
             } | null;
+            /** Resumable */
+            resumable: boolean;
             /** Started */
             started?: string | null;
             /** Status */
@@ -292,6 +378,57 @@ export interface components {
         LoginIn: {
             /** Token */
             token: string;
+        };
+        /** MeshSettings */
+        MeshSettings: {
+            /** Airgap Circumferential Divisions */
+            airgap_circumferential_divisions?: number | null;
+            /**
+             * Airgap Radial Layers
+             * @default 4
+             */
+            airgap_radial_layers: number;
+            /**
+             * Band Min Angle Deg
+             * @default 5
+             */
+            band_min_angle_deg: number;
+            /**
+             * Max Aspect Ratio
+             * @default 12
+             */
+            max_aspect_ratio: number;
+            /**
+             * Min Angle Deg
+             * @default 10
+             */
+            min_angle_deg: number;
+            /**
+             * Outer Air Thickness
+             * @default 0
+             */
+            outer_air_thickness: number;
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full" | "reference";
+            /** Refinement */
+            refinement?: {
+                [key: string]: components["schemas"]["EdgeRefinement"];
+            };
+            /** Region Sizes */
+            region_sizes?: {
+                [key: string]: number;
+            };
+            /**
+             * Scale
+             * @default 1
+             */
+            scale: number;
+            /** Skin Depth Layers */
+            skin_depth_layers?: number | null;
         };
         /** RadialSRMParams */
         RadialSRMParams: {
@@ -451,6 +588,15 @@ export interface components {
             /** Outer Diameter */
             outer_diameter: number;
         };
+        /** SearchJobIn */
+        SearchJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search";
+            payload: components["schemas"]["SearchRequest"];
+        };
         /** SearchRequest */
         SearchRequest: {
             /** Grid */
@@ -512,6 +658,21 @@ export interface components {
              * @default 10JNEX900
              */
             stator: string;
+        };
+        /** ValidateJobIn */
+        ValidateJobIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "validate";
+            payload: components["schemas"]["ValidateRequest"];
+        };
+        /** ValidateRequest */
+        ValidateRequest: {
+            /** Case Id */
+            case_id: string;
+            inputs: components["schemas"]["CaseInputs"];
         };
         /** ValidationError */
         ValidationError: {
@@ -617,7 +778,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JobIn"];
+                "application/json": components["schemas"]["SearchJobIn"] | components["schemas"]["EvaluateJobIn"] | components["schemas"]["ValidateJobIn"];
             };
         };
         responses: {

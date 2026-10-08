@@ -4,8 +4,13 @@ import time
 
 import pytest
 
+from conftest import make_8_6
+from srmapp.case import CaseInputs
+from srmapp.requirements import Requirements
+from srmcore.model.design import Design, MeshSettings
+from srmweb import jobs
 from srmweb.config import Settings
-from srmweb.jobs import JobRunner, QueueFull, run_search_job
+from srmweb.jobs import JobRunner, QueueFull, run_job
 from srmweb.schemas import SearchRequest
 from srmweb.store import Store
 
@@ -207,8 +212,105 @@ def test_real_search_job_in_thread(make, tmp_path):
            "settings": dict(n_candidates=2, shortlist=1, preset="screening"),
            "grid": [4, 3]}
     SearchRequest.model_validate(req)
-    store, runner = make(lambda kind, r, rep: run_search_job(r, rep, runner._settings))
+    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, runner._settings))
     j = runner.submit("search", req)
     got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=1800)
     assert got["status"] == "done", got
     json.dumps(store.get_result(j), allow_nan=False)
+
+
+def _inputs() -> dict:
+    req = Requirements(peak_power_w=1000.0, peak_torque_nm=3.2, base_speed_rpm=3000.0, max_speed_rpm=6000.0)
+    design = Design(machine=make_8_6(), mesh=MeshSettings(preset="screening"))
+    return CaseInputs(requirements=req, design=design).model_dump(mode="json")
+
+
+def _real_runner(make, monkeypatch, evaluate=None, validate=None):
+    """A runner that goes through run_job with `evaluate_design` / `validate_case` replaced."""
+    if evaluate:
+        monkeypatch.setattr(jobs, "evaluate_design", evaluate)
+    if validate:
+        monkeypatch.setattr(jobs, "validate_case", validate)
+    holder = []
+    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, holder[0]._settings))
+    holder.append(runner)
+    return store, runner
+
+
+class _Ev:
+    def __init__(self, status="ok"):
+        self.status = status
+
+
+def test_evaluate_job_records_map_time(make, monkeypatch):
+    def fake(inputs, *, case_id, progress, cancel, **kw):
+        assert case_id == "c1" and not cancel()
+        progress(1, 3)
+        time.sleep(0.05)
+        progress(3, 3)
+        return _Ev()
+
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
+    got = _wait(store, j, {"done", "failed"})
+    assert got["status"] == "done", got
+    (seconds,) = store.recent_map_times("screening")
+    assert 0.04 < seconds < 5
+    assert got["progress"]["points_total"] == 3
+    assert got["case_id"] == "c1"
+
+
+def test_evaluate_job_result_belongs_to_the_case(make, monkeypatch):
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    store, runner = _real_runner(make, monkeypatch, evaluate=lambda inputs, **kw: _Ev())
+    case = store.create_case(origin="edit", inputs={}, label="e", stale=True)
+    j = runner.submit("evaluate", {"case_id": case, "inputs": _inputs()})
+    _wait(store, j, {"done"})
+    assert store.case_result(case, "evaluate") == {"status": "ok"}
+    got = store.get_case(case)
+    assert got["stale"] is False and got["job_id"] == j
+    assert store.recent_map_times("screening") == []  # no map points were reported
+
+
+def test_cancelled_evaluate_keeps_case_stale_and_records_no_time(make, monkeypatch):
+    def fake(inputs, *, progress, **kw):
+        progress(1, 3)
+        progress(2, 3)
+        return _Ev("cancelled")
+
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    case = store.create_case(origin="edit", inputs={}, label="e", stale=True)
+    j = runner.submit("evaluate", {"case_id": case, "inputs": _inputs()})
+    _wait(store, j, {"cancelled"})
+    assert store.get_case(case)["stale"] is True
+    assert store.case_result(case, "evaluate") is None
+    assert store.get_result(j) == {"cancelled": True}
+    assert store.recent_map_times("screening") == []
+
+
+def test_evaluate_job_value_error_fails_with_message(make, monkeypatch):
+    def fake(inputs, **kw):
+        raise ValueError("no winding fits")
+
+    store, runner = _real_runner(make, monkeypatch, evaluate=fake)
+    j = runner.submit("evaluate", {"case_id": "c", "inputs": _inputs()})
+    assert _wait(store, j, {"failed"})["error"] == "ValueError: no winding fits"
+
+
+def test_validate_job_stores_case_result(make, monkeypatch):
+    store, runner = _real_runner(make, monkeypatch, validate=lambda inputs, **kw: {"label": None, "x": float("nan")})
+    case = store.create_case(origin="edit", inputs={}, label="e", stale=True)
+    j = runner.submit("validate", {"case_id": case, "inputs": _inputs()})
+    got = _wait(store, j, {"done"})
+    assert got["progress"]["message"] == "validating (about 1 h)"
+    assert store.case_result(case, "validate") == {"label": None, "x": None}
+    assert store.get_case(case)["stale"] is True  # validation does not evaluate
+
+
+def test_job_with_bad_request_fails(make):
+    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, runner._settings))
+    j = runner.submit("evaluate", {"case_id": "c"})
+    assert _wait(store, j, {"failed"})["error"].startswith("ValidationError")
+    j = runner.submit("bogus", {})
+    assert "unknown job kind" in _wait(store, j, {"failed"})["error"]

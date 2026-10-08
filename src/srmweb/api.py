@@ -8,8 +8,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import srmcore
@@ -21,11 +23,10 @@ from srmcore.model.errors import InputError
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.config import Settings
 from srmweb.geometry import outline_svg
-from srmweb.jobs import JobRunner, QueueFull
+from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.schemas import JobIn, JobOut
-from srmweb.store import Store
+from srmweb.store import ACTIVE, RESUMABLE, Store
 
-_RESUMABLE = ("interrupted", "cancelled", "failed")
 _POLL_S = 0.5
 _KEEPALIVE_S = 15.0
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
@@ -40,7 +41,8 @@ def _job_out(job: dict, runner: JobRunner, live=...) -> JobOut:
         live = runner.progress(job["id"])
     if live is not None:
         job = {**job, "progress": live[1]}
-    return JobOut(**{k: job[k] for k in JobOut.model_fields})
+    return JobOut(**{k: job[k] for k in JobOut.model_fields if k in job},
+                  active=job["status"] in ACTIVE, resumable=job["status"] in RESUMABLE)
 
 
 def _submit(runner: JobRunner, kind: str, request: dict) -> dict:
@@ -63,6 +65,16 @@ def create_app(settings: Settings,
 
     app = FastAPI(title="srmweb", lifespan=lifespan, docs_url=None, redoc_url=None,
                   openapi_url=None)
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        """FastAPI's 422 body, without the job-kind tag that the `JobIn` union puts in `loc`:
+        `["body", "payload", ...]` stays the path of a field of a job request."""
+        errors = jsonable_encoder(exc.errors())
+        for e in errors:
+            if e["loc"][:1] == ["body"] and e["loc"][2:3] == ["payload"] and e["loc"][1] in KINDS:
+                del e["loc"][1]
+        return JSONResponse({"detail": errors}, status_code=422)
+
     app.state.settings, app.state.store, app.state.runner = settings, store, runner
     app.state.sessions = Sessions()
     router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
@@ -79,6 +91,8 @@ def create_app(settings: Settings,
 
     @router.post("/jobs", status_code=201)
     def create_job(job: JobIn):
+        if job.kind != "search":
+            raise HTTPException(422, "submit through /api/cases/{id}/evaluate or /validate")
         return _submit(runner, job.kind, job.payload.model_dump(mode="json"))
 
     @router.get("/jobs", response_model=list[JobOut])
@@ -101,7 +115,7 @@ def create_app(settings: Settings,
                     return
                 live = runner.progress(job_id)
                 out = _job_out(job, runner, live)
-                if job["status"] not in ("queued", "running"):
+                if job["status"] not in ACTIVE:
                     yield _sse("end", out)
                     return
                 key = (job["status"], live[0] if live else None)
@@ -135,13 +149,13 @@ def create_app(settings: Settings,
     @router.post("/jobs/{job_id}/resume", status_code=201)
     def resume_job(job_id: str):
         job = job_or_404(job_id)
-        if job["status"] not in _RESUMABLE:
+        if job["status"] not in RESUMABLE:
             raise HTTPException(409, f"cannot resume a {job['status']} job")
         return _submit(runner, job["kind"], job["request"])
 
     @router.delete("/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str):
-        if job_or_404(job_id)["status"] in ("queued", "running"):
+        if job_or_404(job_id)["status"] in ACTIVE:
             raise HTTPException(409, "job is queued or running; cancel it first")
         store.delete_job(job_id)
         return Response(status_code=204)
