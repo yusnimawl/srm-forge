@@ -1,6 +1,7 @@
 """Single-thread job runner: one job at a time, FIFO, progress kept in memory."""
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import deque
@@ -15,6 +16,8 @@ from srmweb.serialize import search_result_json
 from srmweb.store import Store
 
 Progress = dict
+
+_log = logging.getLogger(__name__)
 
 _STORE_INTERVAL_S = 1.0
 _INITIAL = dict(status="running", designs_done=0, designs_total=0, points_done=0,
@@ -124,21 +127,27 @@ class JobRunner:
                 self._running = (job_id, reporter)
             try:
                 self._run(job_id, reporter)
-            except Exception:
-                pass  # a store error must not end the worker
+            except Exception as exc:  # a store error must not end the worker
+                _log.exception("job %s failed outside its run function", job_id)
+                try:
+                    self._store.set_status(job_id, "failed", error=f"{type(exc).__name__}: {exc}")
+                except Exception:
+                    _log.exception("could not mark job %s failed", job_id)
             finally:
                 with self._cond:
                     self._running = None
 
     def _run(self, job_id: str, reporter: Reporter) -> None:
         job = self._store.get_job(job_id)
+        if job is None:  # deleted while queued
+            return
         self._store.set_status(job_id, "running")
         status, error = "done", None
         try:
             result = self._run_fn(job["kind"], job["request"], reporter)
             self._store.put_result(job_id, result)
             if result.get("cancelled"):
-                status = "cancelled"
+                status = "interrupted" if self._stopping else "cancelled"
         except Exception as exc:
             status, error = "failed", f"{type(exc).__name__}: {exc}"
         reporter.progress(status=status)

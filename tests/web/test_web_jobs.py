@@ -142,13 +142,15 @@ def test_restart_marks_interrupted_and_requeues(tmp_path):
 
 
 def test_progress_version_increments(make):
-    gate, seen = threading.Event(), threading.Event()
+    gate, seen, seen2, gate2 = (threading.Event() for _ in range(4))
 
     def fake(kind, req, rep):
         rep.progress(points_done=1)
         seen.set()
         gate.wait(5)
         rep.progress(points_done=2)
+        seen2.set()
+        gate2.wait(5)
         return {}
 
     store, runner = make(fake)
@@ -157,9 +159,45 @@ def test_progress_version_increments(make):
     v1, p1 = runner.progress(j)
     assert p1["points_done"] == 1 and p1["status"] == "running" and "elapsed_s" in p1
     gate.set()
+    assert seen2.wait(5)
+    v2, p2 = runner.progress(j)
+    assert v2 > v1 and p2["points_done"] == 2
+    gate2.set()
     _wait(store, j, {"done"})
     assert runner.progress(j) is None
     assert store.get_job(j)["progress"]["points_done"] == 2
+
+
+def test_job_deleted_while_queued_is_skipped(make):
+    gate = threading.Event()
+    store, runner = make(lambda k, r, rep: gate.wait(5) and {"n": r["n"]})
+    a = runner.submit("search", {"n": 1})
+    _wait(store, a, {"running"})
+    b = runner.submit("search", {"n": 2})
+    store.delete_job(b)
+    c = runner.submit("search", {"n": 3})
+    gate.set()
+    _wait(store, c, {"done"})
+    assert store.get_job(b) is None
+
+
+def test_stop_interrupts_running_job(tmp_path):
+    store = Store(tmp_path / "a.db")
+    started = threading.Event()
+
+    def fake(kind, req, rep):
+        started.set()
+        while not rep.cancelled():
+            time.sleep(0.01)
+        return {"cancelled": True}
+
+    runner = JobRunner(store, _settings(tmp_path), fake)
+    runner.start()
+    j = runner.submit("search", {})
+    assert started.wait(5)
+    runner.stop()
+    assert store.get_job(j)["status"] == "interrupted"
+    assert store.get_result(j) == {"cancelled": True}
 
 
 @pytest.mark.slow
