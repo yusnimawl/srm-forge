@@ -9,3 +9,7 @@ dist/
 out/
 .superpowers/
 tools/femm_work/
+srmweb.db*
+cache/
+web/node_modules/
+web/dist/

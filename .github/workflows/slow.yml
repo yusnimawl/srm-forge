@@ -18,5 +18,5 @@ jobs:
           python-version: "3.12"
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1
-      - run: python -m pip install -e ".[dev,ngsolve]"
+      - run: python -m pip install -e ".[dev,ngsolve,web]"
       - run: python -m pytest -m slow --durations=25
