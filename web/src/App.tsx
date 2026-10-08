@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { LoginPage } from "@/pages/LoginPage"
 import { NewSearchPage } from "@/pages/NewSearchPage"
 import { CandidatePage } from "@/pages/CandidatePage"
-import { Placeholder } from "@/pages/Placeholder"
+import { SettingsPage } from "@/pages/SettingsPage"
 import { RunPage } from "@/pages/RunPage"
 import { RunsPage } from "@/pages/RunsPage"
 
@@ -22,7 +22,7 @@ const router = createBrowserRouter([
       { path: "/runs", element: <RunsPage /> },
       { path: "/runs/:jobId", element: <RunPage /> },
       { path: "/runs/:jobId/candidates/:candidateId", element: <CandidatePage /> },
-      { path: "/settings", element: <Placeholder title="Settings" /> },
+      { path: "/settings", element: <SettingsPage /> },
     ],
   },
 ])
