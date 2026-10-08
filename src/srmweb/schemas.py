@@ -1,11 +1,13 @@
 """Request models of the web API."""
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import json
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from srmapp.case import CaseInputs
+from srmapp.references import REFERENCES
 from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
 
@@ -96,3 +98,49 @@ class JobOut(BaseModel):
     created: str
     started: str | None = None
     finished: str | None = None
+
+
+class CandidateCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    origin: Literal["candidate"]
+    job_id: str
+    candidate_id: str
+
+
+class ReferenceCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    origin: Literal["reference"]
+    name: Literal[tuple(REFERENCES)]    # type: ignore[valid-type]
+    requirements: Requirements
+    preset: Literal["screening", "full"] = "full"
+
+
+class EditCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    origin: Literal["edit"]
+    parent_case_id: str
+    inputs: CaseInputs
+
+
+CaseCreate = Annotated[CandidateCase | ReferenceCase | EditCase, Field(discriminator="origin")]
+
+
+class CasePatch(BaseModel):
+    """Fields left out (or null) stay as they are; `flag` is cleared with an empty string."""
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(None, max_length=120)
+    flag: str | None = Field(None, max_length=40)
+    comment: str | None = Field(None, max_length=2000)
+    show_in_graphs: bool | None = None
+    inputs: dict[str, Any] | None = None    # a draft's inputs, stored as sent; Evaluate validates them
+
+    @field_validator("inputs")
+    @classmethod
+    def _strict_json(cls, inputs):
+        if inputs is not None:
+            json.dumps(inputs, allow_nan=False)
+        return inputs

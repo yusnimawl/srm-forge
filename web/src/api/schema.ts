@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/api/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cases */
+        get: operations["list_cases_api_cases_get"];
+        put?: never;
+        /** Create Case */
+        post: operations["create_case_api_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_api_cases__case_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Case */
+        delete: operations["delete_case_api_cases__case_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Case */
+        patch: operations["patch_case_api_cases__case_id__patch"];
+        trace?: never;
+    };
     "/api/geometry": {
         parameters: {
             query?: never;
@@ -197,6 +234,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** References */
+        get: operations["references_api_references_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session": {
         parameters: {
             query?: never;
@@ -236,6 +290,46 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BudgetOut */
+        BudgetOut: {
+            /** Rows */
+            rows: components["schemas"]["BudgetRowOut"][];
+            /** Total */
+            total: {
+                [key: string]: number | null;
+            };
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
+            /** Values 2D */
+            values_2d: {
+                [key: string]: number | null;
+            };
+        };
+        /** BudgetRowOut */
+        BudgetRowOut: {
+            /** Note */
+            note: string;
+            /** Rel */
+            rel: {
+                [key: string]: number | null;
+            };
+            /** Source */
+            source: string;
+        };
+        /** CandidateCase */
+        CandidateCase: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Job Id */
+            job_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "candidate";
+        };
         /** CaseInputs */
         CaseInputs: {
             design: components["schemas"]["Design"];
@@ -253,6 +347,131 @@ export interface components {
              * @default auto
              */
             winding: "auto" | components["schemas"]["FixedWinding"];
+        };
+        /** CaseOut */
+        CaseOut: {
+            /** Comment */
+            comment: string | null;
+            /** Created */
+            created: string;
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            evaluation: components["schemas"]["EvaluationOut"] | null;
+            /** Feasible */
+            feasible: boolean | null;
+            /** Flag */
+            flag: string | null;
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: {
+                [key: string]: unknown;
+            };
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            /** Label */
+            label: string | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Origin */
+            origin: string;
+            /** Parent Case Id */
+            parent_case_id: string | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Poles */
+            poles: string | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Preset */
+            preset: string | null;
+            /** Show In Graphs */
+            show_in_graphs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Status */
+            status: string | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            /** Validated */
+            validated: boolean;
+            validation: components["schemas"]["ValidationOut"] | null;
+        };
+        /**
+         * CasePatch
+         * @description Fields left out (or null) stay as they are; `flag` is cleared with an empty string.
+         */
+        CasePatch: {
+            /** Comment */
+            comment?: string | null;
+            /** Flag */
+            flag?: string | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            } | null;
+            /** Label */
+            label?: string | null;
+            /** Show In Graphs */
+            show_in_graphs?: boolean | null;
+        };
+        /** CaseSummaryOut */
+        CaseSummaryOut: {
+            /** Comment */
+            comment: string | null;
+            /** Created */
+            created: string;
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            /** Feasible */
+            feasible: boolean | null;
+            /** Flag */
+            flag: string | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Origin */
+            origin: string;
+            /** Parent Case Id */
+            parent_case_id: string | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Poles */
+            poles: string | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Preset */
+            preset: string | null;
+            /** Show In Graphs */
+            show_in_graphs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Status */
+            status: string | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            /** Validated */
+            validated: boolean;
+        };
+        /** CheckOut */
+        CheckOut: {
+            /** Detail */
+            detail: string;
+            /** Limit */
+            limit: number | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value: number | null;
         };
         /** Design */
         Design: {
@@ -288,6 +507,44 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** EditCase */
+        EditCase: {
+            inputs: components["schemas"]["CaseInputs"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "edit";
+            /** Parent Case Id */
+            parent_case_id: string;
+        };
+        /** EnvelopeOut */
+        EnvelopeOut: {
+            /** Copper Loss */
+            copper_loss: (number | null)[];
+            /** Efficiency */
+            efficiency: (number | null)[];
+            /** I Rms */
+            i_rms: (number | null)[];
+            /** Power */
+            power: (number | null)[];
+            /** Speeds Rpm */
+            speeds_rpm: (number | null)[];
+            /** Theta Off */
+            theta_off: (number | null)[];
+            /** Theta Off El */
+            theta_off_el: (number | null)[];
+            /** Theta On */
+            theta_on: (number | null)[];
+            /** Theta On El */
+            theta_on_el: (number | null)[];
+            /** Torque */
+            torque: (number | null)[];
+            /** Work Loop */
+            work_loop: (number | null)[];
+            /** Work Torque */
+            work_torque: (number | null)[];
+        };
         /** EvaluateJobIn */
         EvaluateJobIn: {
             /**
@@ -307,6 +564,44 @@ export interface components {
                 number
             ] | null;
             inputs: components["schemas"]["CaseInputs"];
+        };
+        /** EvaluationOut */
+        EvaluationOut: {
+            curves?: components["schemas"]["MapCurvesOut"] | null;
+            design: components["schemas"]["Design"];
+            /** Efficiency Base */
+            efficiency_base: number | null;
+            envelope: components["schemas"]["EnvelopeOut"] | null;
+            /** Error */
+            error: string;
+            /** Feasible */
+            feasible: boolean;
+            /** I Rms A */
+            i_rms_a?: number | null;
+            /** Id */
+            id: string;
+            /** J Rms */
+            j_rms?: number | null;
+            key: components["schemas"]["KeyNumbersOut"] | null;
+            map?: components["schemas"]["MapArraysOut"] | null;
+            /** Mass Kg */
+            mass_kg: number | null;
+            /** Peak Power W */
+            peak_power_w: number | null;
+            /** Power Density Kw Per Kg */
+            power_density_kw_per_kg: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /**
+             * Scan
+             * @default []
+             */
+            scan: components["schemas"]["ScanPointOut"][];
+            /** Status */
+            status: string;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            winding: components["schemas"]["WindingOut"] | null;
         };
         /** FixedWinding */
         FixedWinding: {
@@ -357,6 +652,25 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** KeyNumbersOut */
+        KeyNumbersOut: {
+            /** Aligned Angle */
+            aligned_angle: number | null;
+            /** I Max */
+            i_max: number | null;
+            /** La */
+            la: number | null;
+            /** La Lu */
+            la_lu: number | null;
+            /** Lu */
+            lu: number | null;
+            /** Peak Torque */
+            peak_torque: number | null;
+            /** Psi Max */
+            psi_max: number | null;
+            /** Unaligned Angle */
+            unaligned_angle: number | null;
+        };
         /**
          * LitzWire
          * @description Litz or other multistrand conductor: `strands` round strands in a round bundle.
@@ -378,6 +692,49 @@ export interface components {
         LoginIn: {
             /** Token */
             token: string;
+        };
+        /** MapArraysOut */
+        MapArraysOut: {
+            /** Angles */
+            angles: (number | null)[];
+            /** Currents */
+            currents: (number | null)[];
+            /** Psi */
+            psi: (number | null)[][];
+            /** Torque */
+            torque: (number | null)[][];
+        };
+        /** MapCurvesOut */
+        MapCurvesOut: {
+            /** B Sp */
+            b_sp: (number | null)[];
+            /** B Sp K2 */
+            b_sp_k2: (number | null)[];
+            /** Currents */
+            currents: (number | null)[];
+            /** Inductance */
+            inductance: (number | null)[][];
+            /** K2 */
+            k2: (number | null)[];
+            /** La Lu */
+            la_lu: (number | null)[];
+            /** La Sat */
+            la_sat: (number | null)[];
+            /** La Unsat */
+            la_unsat: number | null;
+            /** Lu */
+            lu: (number | null)[];
+        };
+        /** MaterialOut */
+        MaterialOut: {
+            /** Grade */
+            grade: string;
+            /** Js */
+            js: number | null;
+            /** Name */
+            name: string;
+            /** Thickness Mm */
+            thickness_mm: number | null;
         };
         /** MeshSettings */
         MeshSettings: {
@@ -521,6 +878,32 @@ export interface components {
             /** Width */
             width: number;
         };
+        /** ReferenceCase */
+        ReferenceCase: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "8/6" | "12/8" | "24/16";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "reference";
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full";
+            requirements: components["schemas"]["Requirements"];
+        };
+        /** ReferenceOut */
+        ReferenceOut: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /** Name */
+            name: string;
+        };
         /** RegionMaterials */
         RegionMaterials: {
             /**
@@ -588,6 +971,18 @@ export interface components {
             /** Outer Diameter */
             outer_diameter: number;
         };
+        /** ScanPointOut */
+        ScanPointOut: {
+            /** Feasible */
+            feasible: boolean;
+            /** I Rms */
+            i_rms: number | null;
+            /** Power Ratio */
+            power_ratio: number | null;
+            /** Torque Ratio */
+            torque_ratio: number | null;
+            winding: components["schemas"]["WindingOut"];
+        };
         /** SearchJobIn */
         SearchJobIn: {
             /**
@@ -616,6 +1011,24 @@ export interface components {
              *     }
              */
             settings: components["schemas"]["SearchSettingsIn"];
+        };
+        /** SearchResultOut */
+        SearchResultOut: {
+            /** Cancelled */
+            cancelled: boolean;
+            /** Dropped */
+            dropped: {
+                [key: string]: number;
+            };
+            /** Evaluations */
+            evaluations: components["schemas"]["EvaluationOut"][];
+            /** Pareto Ids */
+            pareto_ids: string[];
+            requirements: components["schemas"]["Requirements"];
+            /** Sampled */
+            sampled: number;
+            /** Stage1 Rejected */
+            stage1_rejected: number;
         };
         /** SearchSettingsIn */
         SearchSettingsIn: {
@@ -687,6 +1100,42 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** ValidationOut */
+        ValidationOut: {
+            budget: components["schemas"]["BudgetOut"];
+            /** Checks */
+            checks: components["schemas"]["CheckOut"][];
+            /** Engine Version */
+            engine_version: string;
+            /** Label */
+            label: string | null;
+            /** Material Grades */
+            material_grades: {
+                [key: string]: string;
+            };
+        };
+        /** WindingOut */
+        WindingOut: {
+            /** Copper Area */
+            copper_area: number | null;
+            /** Copper Mass */
+            copper_mass: number | null;
+            /** Current */
+            current: number | null;
+            /**
+             * Paths
+             * @default 1
+             */
+            paths: number;
+            /** Resistance */
+            resistance: number | null;
+            /** Strands */
+            strands: number;
+            /** Turns */
+            turns: number;
+            /** Wire */
+            wire?: number | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -696,6 +1145,154 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_cases_api_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseSummaryOut"][];
+                };
+            };
+        };
+    };
+    create_case_api_cases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateCase"] | components["schemas"]["ReferenceCase"] | components["schemas"]["EditCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_api_cases__case_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_case_api_cases__case_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_case_api_cases__case_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CasePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     geometry_api_geometry_post: {
         parameters: {
             query?: never;
@@ -941,7 +1538,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SearchResultOut"];
                 };
             };
             /** @description Validation Error */
@@ -1050,7 +1647,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MaterialOut"][];
+                };
+            };
+        };
+    };
+    references_api_references_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceOut"][];
                 };
             };
         };

@@ -16,20 +16,45 @@ from fastapi.staticfiles import StaticFiles
 
 import srmcore
 import srmweb
+from srmapp.case import CaseInputs
+from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
 from srmcore.materials.schema import SoftMagneticMaterial
-from srmcore.model.design import RadialSRMParams
+from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.config import Settings
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
-from srmweb.schemas import JobIn, JobOut
+from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
+from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, EditCase, JobIn, JobOut,
+                            ReferenceCase)
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
 _KEEPALIVE_S = 15.0
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+MAX_SHOWN_CASES = 6
+_LIMITS = ("margin", "j_peak", "j_limit", "j_peak_max")
+_EVALUATED = ("status", "torque_ratio", "power_ratio", "peak_power_w", "mass_kg",
+              "power_density_kw_per_kg", "efficiency_base", "feasible")
+
+
+def _dig(obj, *keys):
+    """`obj[k1][k2]...`, or None where a draft's inputs lack a level."""
+    for k in keys:
+        obj = obj.get(k) if isinstance(obj, dict) else None
+    return obj
+
+
+def _summary(case: dict, evaluation: dict | None, validation: dict | None) -> dict:
+    inputs = case["inputs"]
+    ns, nr = (_dig(inputs, "design", "machine", k) for k in ("n_stator_poles", "n_rotor_poles"))
+    return {k: v for k, v in case.items() if k not in ("inputs", "job_id")} | {
+        "preset": _dig(inputs, "design", "mesh", "preset"),
+        "poles": f"{ns}/{nr}" if isinstance(ns, int) and isinstance(nr, int) else None,
+        **{k: (evaluation or {}).get(k) for k in _EVALUATED},
+        "validated": bool(validation and validation.get("label"))}
 
 
 def _sse(event: str, out: JobOut) -> str:
@@ -131,9 +156,10 @@ def create_app(settings: Settings,
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers=_SSE_HEADERS)
 
-    @router.get("/jobs/{job_id}/result")
+    @router.get("/jobs/{job_id}/result", response_model=SearchResultOut)
     def get_result(job_id: str):
-        job_or_404(job_id)
+        if job_or_404(job_id)["kind"] != "search":
+            raise HTTPException(404, "no result")
         body = store.get_result(job_id)
         if body is None:
             raise HTTPException(404, "no result")
@@ -171,7 +197,7 @@ def create_app(settings: Settings,
                 {"loc": ["body", i.parameter], "msg": i.message, "type": i.rule}
                 for i in exc.issues if i.severity == "error"]) from exc
 
-    @router.get("/materials")
+    @router.get("/materials", response_model=list[MaterialOut])
     def materials():
         out = []
         for name in available_materials():
@@ -181,6 +207,91 @@ def create_app(settings: Settings,
                             "thickness_mm": None if m.thickness is None else m.thickness * 1000,
                             "js": m.saturation_polarisation})
         return out
+
+    @router.get("/references", response_model=list[ReferenceOut])
+    def references():
+        return [{"name": name, "machine": make()} for name, make in REFERENCES.items()]
+
+    def case_or_404(case_id: str) -> dict:
+        case = store.get_case(case_id)
+        if case is None:
+            raise HTTPException(404, f"no case {case_id}")
+        return case
+
+    def case_out(case: dict) -> CaseOut:
+        evaluation, validation = (store.case_result(case["id"], k) for k in ("evaluate", "validate"))
+        return CaseOut(**_summary(case, evaluation, validation), inputs=case["inputs"],
+                       evaluation=evaluation, validation=validation,
+                       jobs=[_job_out(j, runner) for j in store.case_jobs(case["id"])])
+
+    def candidate_case(body: CandidateCase) -> str:
+        job = job_or_404(body.job_id)
+        result = store.get_result(body.job_id) if job["kind"] == "search" else None
+        found = [e for e in (result or {}).get("evaluations", []) if e["id"] == body.candidate_id]
+        if not found:
+            raise HTTPException(404, f"run {body.job_id} has no candidate {body.candidate_id}")
+        ev = found[0]
+        if ev["status"] != "ok":
+            raise HTTPException(409, f"candidate {body.candidate_id} did not evaluate ({ev['status']})")
+        request = job["request"]
+        inputs = CaseInputs(
+            requirements=request["requirements"], design=ev["design"], winding="auto",
+            **{k: v for k in _LIMITS if (v := request["settings"].get(k)) is not None})
+        machine = inputs.design.machine
+        case_id = store.create_case(
+            origin="candidate", inputs=inputs.model_dump(mode="json"), job_id=body.job_id, stale=True,
+            label=f"{machine.n_stator_poles}/{machine.n_rotor_poles} {body.candidate_id}")
+        store.put_result(body.job_id, ev, kind="evaluate", case_id=case_id)   # also clears stale
+        return case_id
+
+    def reference_case(body: ReferenceCase) -> str:
+        material = load_material("10JNEX900")
+        machine = REFERENCES[body.name](materials=RegionMaterials(stator=material.name, rotor=material.name),
+                                        lamination_thickness=material.thickness)
+        inputs = CaseInputs(requirements=body.requirements,
+                            design=Design(machine=machine, mesh=MeshSettings(preset=body.preset)))
+        return store.create_case(origin="reference", inputs=inputs.model_dump(mode="json"),
+                                 label=f"{body.name} reference", stale=True)
+
+    def edit_case(body: EditCase) -> str:
+        parent = case_or_404(body.parent_case_id)
+        return store.create_case(origin="edit", inputs=body.inputs.model_dump(mode="json"),
+                                 label=f"{parent['label']} · edit", parent_case_id=parent["id"], stale=True)
+
+    @router.get("/cases", response_model=list[CaseSummaryOut])
+    def list_cases():
+        return [_summary(c, store.case_result(c["id"], "evaluate"), store.case_result(c["id"], "validate"))
+                for c in store.list_cases()]
+
+    @router.post("/cases", status_code=201, response_model=CaseOut)
+    def create_case(body: CaseCreate):
+        make = {"candidate": candidate_case, "reference": reference_case, "edit": edit_case}[body.origin]
+        return case_out(store.get_case(make(body)))
+
+    @router.get("/cases/{case_id}", response_model=CaseOut)
+    def get_case(case_id: str):
+        return case_out(case_or_404(case_id))
+
+    @router.patch("/cases/{case_id}", response_model=CaseOut)
+    def patch_case(case_id: str, body: CasePatch):
+        case = case_or_404(case_id)
+        fields = body.model_dump(exclude_none=True)
+        if "inputs" in fields and not case["stale"]:
+            raise HTTPException(409, "evaluated cases are read-only; edit creates a new case")
+        if fields.get("show_in_graphs") and not case["show_in_graphs"]:
+            shown = sum(c["show_in_graphs"] for c in store.list_cases() if c["id"] != case_id)
+            if shown >= MAX_SHOWN_CASES:
+                raise HTTPException(409, f"at most {MAX_SHOWN_CASES} cases can be shown in the graphs")
+        store.update_case(case_id, **fields)
+        return case_out(store.get_case(case_id))
+
+    @router.delete("/cases/{case_id}", status_code=204)
+    def delete_case(case_id: str):
+        case_or_404(case_id)
+        if any(j["status"] in ACTIVE for j in store.case_jobs(case_id)):
+            raise HTTPException(409, "a job of this case is queued or running; cancel it first")
+        store.delete_case(case_id)
+        return Response(status_code=204)
 
     def cache_files():
         return list(settings.cache_dir.glob("*.h5")) if settings.cache_dir.is_dir() else []
