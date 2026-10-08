@@ -6,11 +6,12 @@ import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
 import srmcore
 import srmweb
+from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.config import Settings
 from srmweb.jobs import JobRunner, QueueFull
 from srmweb.schemas import JobIn, JobOut
@@ -54,7 +55,8 @@ def create_app(settings: Settings,
 
     app = FastAPI(title="srmweb", lifespan=lifespan)
     app.state.settings, app.state.store, app.state.runner = settings, store, runner
-    router = APIRouter(prefix="/api")
+    app.state.sessions = Sessions()
+    router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
     def job_or_404(job_id: str) -> dict:
         job = store.get_job(job_id)
@@ -135,5 +137,6 @@ def create_app(settings: Settings,
         store.delete_job(job_id)
         return Response(status_code=204)
 
+    app.include_router(auth_router)
     app.include_router(router)
     return app
