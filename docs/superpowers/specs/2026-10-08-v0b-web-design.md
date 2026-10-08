@@ -15,7 +15,7 @@ One spec, built and merged in three steps. Each step is usable on its own.
 | Step | Adds |
 |---|---|
 | **v0b-1** | server, job runner, store, security, search form, live progress, runs list, run results (Pareto + candidate table), read-only candidate detail, Swagger, generated TS types |
-| **v0b-2** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays |
+| **v0b-2** | cases: start from a candidate, a reference design or an imported setup; input tabs; live validation and motor diagram; Evaluate; Validate (EM); export/import; cases table with flags, comments and overlays; Field tab: interactive mesh, \|B\| and flux-line view, and a rotor animation (§7.9) |
 | **v0b-3** | one-parameter sweep (Range or Table) with a cost estimate |
 
 Out of scope: an optimiser (NSGA, Bayesian or other; §13), fixed conduction angles, custom B-H upload, PDF reports, accounts, HTTPS, N-T efficiency maps and thermal (no loss or thermal models exist).
@@ -72,7 +72,7 @@ All under `/api`, all behind auth (§8).
 
 | Route | Purpose |
 |---|---|
-| `POST /jobs` | submit a job: `kind` ∈ {`search`, `evaluate`, `sweep`, `validate`} plus its payload |
+| `POST /jobs` | submit a job: `kind` ∈ {`search`, `evaluate`, `sweep`, `validate`, `animate`} plus its payload |
 | `GET /jobs` | list jobs (kind, status, created, finished, summary) |
 | `GET /jobs/{id}` | one job with its latest progress |
 | `GET /jobs/{id}/events` | SSE stream of progress (§4.2) |
@@ -85,7 +85,9 @@ All under `/api`, all behind auth (§8).
 | `POST /geometry` | design → SVG paths, instant |
 | `GET /materials` | library materials with grade (A/B/C) and lamination thickness |
 | `GET /references` | reference designs (8/6, 12/8, 24/16) |
-| `GET /settings/cache`, `DELETE /settings/cache` | cache size; clear the map cache |
+| `POST /field` | case design, rotor angle, phase current → one field frame (§6.6), binary; runs on the quick lane (§4.3) |
+| `GET /jobs/{id}/frames` | the frames of a finished `animate` job, binary |
+| `GET /settings/cache`, `DELETE /settings/cache` | cache size; clear the map cache and the field-frame cache |
 | `POST /login`, `POST /logout` | §8 |
 
 ### 4.2 Live progress: Server-Sent Events
@@ -106,6 +108,7 @@ Progress flows one way, server to page, every one to two seconds. SSE fits: plai
 - A failed job stores the exception type and message. Per-design failures inside a search are already `Evaluation.status` values and show as failed candidates, not as a failed job.
 - The queue holds at most `SRMWEB_QUEUE_MAX` queued jobs; more are rejected with HTTP 429.
 - Risk to test first: a spawn pool started from a worker thread under uvicorn, on Windows and Linux.
+- **Quick lane.** Field work is short and interactive, so it does not wait behind a day-long search. A second runner lane (one thread, one worker process, single-threaded numerics) runs `POST /field` requests and `animate` jobs, one at a time, in arrival order. It competes with a running map for one core only. A field request times out after 120 s.
 
 ## 5. Storage
 
@@ -145,6 +148,16 @@ Case inputs (`inputs` in §5): `Requirements`, `Design` (geometry, materials, pr
 ### 6.4 Reference designs
 
 The `make_8_6`, `make_12_8`, `make_24_16` factories move from `tests/conftest.py` to `srmapp/references.py`; `conftest.py` imports them, so tests are unchanged.
+
+### 6.6 Field frames
+
+`field_frames(design, angles, coil_current, *, solver) -> FieldFrames` in `srmapp/field.py`. It builds the static mesh once (`build_machine_mesh`), then for each angle runs `solve_point(..., keep_field=True)` with phase A excited at `coil_current` (the reference-turns ampere-turns of the chosen winding at the asked phase current, so the field is exact for any turn count). Plain arrays only:
+
+- Static part, sent once: node coordinates (float32, metres), a flag per node for rotor nodes, the iron and coil triangles (uint32), the region kind per triangle (stator iron, rotor iron, shaft, coil A+ … D−, slot air, band), the phase of each coil.
+- Per frame: rotor angle (rad), the air-gap band triangles at that angle (the only triangles `mesh_at_angle` changes), \|B\| per element (float32, T) and A per node (float32, Wb/m), ψ and torque at that point, solver status.
+- The browser rotates the rotor nodes by the frame angle itself, so a frame carries no coordinates. A `screening` frame is about 0.7 MB, a `full` frame about 1.3 MB.
+
+Frames are cached on disk under `<cache_dir>/fields/` as compressed `.npz`, keyed by the map provenance (§6.5) plus angle and coil current, so a repeated view is instant. The binary wire format is a small JSON header (array names, dtypes, shapes, offsets) followed by the raw little-endian arrays.
 
 ### 6.5 What triggers a new map
 
@@ -227,6 +240,17 @@ One parameter, as **Range** (start, end, divisions) or **Table** (values). Any n
 - Loading skeletons only for waits above about 300 ms; long jobs show explicit progress.
 - Tested at 375, 768, 1024 and 1440 px widths.
 
+### 7.9 Field tab (v0b-2)
+
+On every evaluated case. Phase A only, as in the map.
+
+- **Snapshot**: rotor angle (slider, mechanical degrees with electrical degrees beside it; aligned and unaligned marked) and phase current (A, default the winding's peak current). **Show** calls `POST /field`; the UI says "about 10 s (mesh + one solve)" the first time and is instant from the cache after.
+- **Layers** (toggles): mesh wireframe, \|B\| colour map (viridis, colour bar in T, the material's last B-H point marked on the bar), flux lines (contours of A, 20 levels, drawn in the browser), region outlines. Zoom and pan with wheel, pinch and drag; hover shows \|B\| and the region.
+- **Animation**: **Animate stroke** submits an `animate` job: the rotor from unaligned to aligned at the chosen current, 36 frames by default (12–72), with progress over SSE like other jobs; the UI estimates "36 solves, about 2–3 min". When done the frames load once and play with play/pause, a frame slider and a speed control; ψ and torque of the current frame are shown beside the plot.
+- **Rendering**: WebGL2 (one small module, no new chart library): one draw call for the triangles with a per-element colour, lines for the wireframe and flux contours. Phones with no WebGL2 get the snapshot as a static image drawn on a 2D canvas, without the animation.
+
+Later, not in v0b-2: a drive animation with the commutated phase currents from the envelope at a chosen speed (needs current waveforms from `srmapp.drive`), and all phases excited together.
+
 ## 8. Security
 
 Built in v0b-1:
@@ -258,10 +282,11 @@ FastAPI's built-in Swagger UI at `/api/docs` (behind auth), from the OpenAPI sch
 
 ## 11. Testing
 
+- `srmapp`: `field_frames` on the 8/6 `screening` mesh: ψ and torque of a frame equal `solve_point` at the same angle and current; the band triangles plus the static triangles cover the mesh exactly; rotating the rotor nodes by the frame angle reproduces `mesh_at_angle`'s nodes; frame cache hit on a repeat.
 - `srmapp`: `evaluate_design` Auto and Fixed on the existing small fixtures; Fixed with the Auto winding reproduces the Auto result; `sweep` validation per value; `MapArrays` matches the rescaled map; reference designs unchanged for tests.
 - `srmweb` (pytest, FastAPI `TestClient`, fast suite): job lifecycle with a fake runner (submit, progress, SSE events, cancel, resume after `interrupted`, delete); store round trip; `to_json` for NaN, inf, ndarray and nested dataclasses; electrical-angle conversion on 6/4, 8/6, 12/8; auth (no token on loopback is open, non-loopback without token refuses to start, wrong token rejected, cookie flags); bounded inputs; setup-file import errors.
 - One slow end-to-end test: a real `search` job on one small design with a tiny grid through the API.
-- `web/`: Vitest for unit conversion, angle display and API client helpers. CI gets a Node job: `npm ci`, schema freshness check, `npm run build`, `vitest`.
+- `web/`: Vitest for unit conversion, angle display, API client helpers, the binary frame decoder and the A-contour (marching triangles) on a small known field. CI gets a Node job: `npm ci`, schema freshness check, `npm run build`, `vitest`.
 - Before each merge: a manual smoke test in the in-app browser at phone and laptop widths, light and dark.
 - Before each merge: an architecture review with the `mattpocock-skills:codebase-design` skill (replaces `/code-review ultra` from the handoff).
 
@@ -272,6 +297,7 @@ FastAPI's built-in Swagger UI at `/api/docs` (behind auth), from the OpenAPI sch
 | spawn pool from a worker thread under uvicorn misbehaves (Windows) | test first in v0b-1; fallback is a runner subprocess behind the same `JobRunner` interface |
 | results JSON grows large (many candidates with scans and maps) | measure in v0b-1; store `MapArrays` as float32 lists if needed |
 | plain-HTTP token on a LAN | documented; HTTPS later |
+| field frames heavy on a phone (36 × 1.3 MB on `full`) | frames load once per animation and stay cached on the server; the snapshot is one frame; measure in v0b-2 and drop A (flux lines) to float16 if needed |
 | engine numbers taken as validated | banner on every unvalidated result; Validate action shows the label |
 
 ## 13. Open items
