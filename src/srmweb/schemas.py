@@ -39,3 +39,21 @@ class SearchRequest(BaseModel):
     requirements: Requirements
     settings: SearchSettingsIn = SearchSettingsIn()
     grid: tuple[int, int] | None = None   # (angles, currents); overrides the preset grid, for tests
+
+
+class JobIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["search"]
+    payload: SearchRequest
+
+
+class JobOut(BaseModel):
+    id: str
+    kind: str
+    status: str
+    progress: dict | None = None
+    error: str | None = None
+    created: str
+    started: str | None = None
+    finished: str | None = None
