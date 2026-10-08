@@ -6,7 +6,6 @@ import type { MapArrays } from "@/api/types"
 import { LINE_COLORS, LINE_DASHES } from "@/lib/analysis"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
 
-
 export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligned: number | null }) {
   const c = useColors()
   const base = {

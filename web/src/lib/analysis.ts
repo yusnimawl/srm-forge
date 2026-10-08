@@ -13,6 +13,9 @@ export interface Trace {
   line: { color: string; dash: string; width: number }
   marker?: { symbol: string; size: number }
   yaxis?: "y2"
+  /** Per-point hover lines, shown through `hovertemplate`. */
+  text?: string[]
+  hovertemplate?: string
   connectgaps: false
 }
 
@@ -54,10 +57,13 @@ export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], main
     const e = evaluation.envelope
     if (!e) return
     const line = caseLine(n)
-    out.torque.push(trace(label, e.speeds_rpm, e.torque, line))
-    out.power.push(trace(label, e.speeds_rpm, conv(e.power, "kW"), line))
-    out.efficiency.push(trace(label, e.speeds_rpm, conv(e.efficiency, "%"), line))
-    out.current.push(trace(label, e.speeds_rpm, e.i_rms, line))
+    // The envelope's switching angles are already electrical degrees from the unaligned position.
+    const text = e.speeds_rpm.map((_, k) => `turn-on ${fmt(e.theta_on_el[k])}° el, turn-off ${fmt(e.theta_off_el[k])}° el`)
+    const hover = { mode: "lines+markers" as const, marker: { symbol: "circle", size: 5 }, text, hovertemplate: `%{x:.0f} rpm, ${label} %{y:.4g}<br>%{text}<extra></extra>` }
+    out.torque.push(trace(label, e.speeds_rpm, e.torque, line, hover))
+    out.power.push(trace(label, e.speeds_rpm, conv(e.power, "kW"), line, hover))
+    out.efficiency.push(trace(label, e.speeds_rpm, conv(e.efficiency, "%"), line, hover))
+    out.current.push(trace(label, e.speeds_rpm, e.i_rms, line, hover))
   })
   return out
 }

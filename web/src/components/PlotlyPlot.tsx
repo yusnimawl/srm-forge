@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentProps } from "react"
 import createPlotlyComponent from "react-plotly.js/factory"
 import Plotly, { type Data, type Layout } from "plotly.js-dist-min"
+import type { Trace } from "@/lib/analysis"
 
 const PlotBase = createPlotlyComponent(Plotly)
 
@@ -33,7 +34,9 @@ export function useColors() {
 }
 
 interface LinePlotProps {
-  data: object[]
+  data: Trace[]
+  /** The legend is dropped for a single series. */
+  legend?: boolean
   xTitle: string
   yTitle: string
   /** Title of the right-hand axis, for traces with `yaxis: "y2"`. */
@@ -42,7 +45,7 @@ interface LinePlotProps {
 }
 
 /** A themed line chart with the legend below the axes, readable from 375 px up. */
-export function LinePlot({ data, xTitle, yTitle, y2Title, height = 320 }: LinePlotProps) {
+export function LinePlot({ data, xTitle, yTitle, y2Title, legend = true, height = 320 }: LinePlotProps) {
   const c = useColors()
   const axis = (text: string, extra = {}) => ({ title: { text }, gridcolor: c.grid, color: c.fg, ...extra })
   const layout = {
@@ -54,6 +57,7 @@ export function LinePlot({ data, xTitle, yTitle, y2Title, height = 320 }: LinePl
     xaxis: axis(xTitle),
     yaxis: axis(yTitle),
     ...(y2Title && { yaxis2: axis(y2Title, { overlaying: "y", side: "right", showgrid: false }) }),
+    showlegend: legend,
     legend: { orientation: "h", y: -0.25 },
   }
   return <Plot data={data as Data[]} layout={layout as Partial<Layout>} config={{ responsive: true, displaylogo: false }} />

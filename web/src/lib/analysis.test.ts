@@ -15,6 +15,8 @@ const envelope = {
   power: [2000, 4000, null],
   efficiency: [0.9, 0.85, null],
   i_rms: [5, 6, 7],
+  theta_on_el: [10, 20.5, null],
+  theta_off_el: [150, 160, 170],
 }
 const ev = (e: Partial<typeof envelope> | null = {}) =>
   ({ id: "x", envelope: e && { ...envelope, ...e } }) as unknown as Evaluation
@@ -28,6 +30,17 @@ describe("performanceSeries", () => {
     expect(s.torque[0].y[0]).toBe(2)
     expect(s.current[0].y).toEqual([5, 6, 7])
     expect(s.torque[0].x).toEqual([1000, 2000, 3000])
+  })
+  it("hover text carries the turn-on and turn-off angles, null as a dash", () => {
+    const o: Overlay[] = [{ label: "other", evaluation: ev({ theta_on_el: [1, 2, 3] }) }]
+    const s = performanceSeries(ev(), o, "mine")
+    for (const t of [s.torque, s.power, s.efficiency, s.current]) {
+      expect(t[0].text).toEqual(["turn-on 10° el, turn-off 150° el", "turn-on 20.5° el, turn-off 160° el", "turn-on —° el, turn-off 170° el"])
+      expect(t[0].mode).toBe("lines+markers")
+      expect(t[1].text?.[0]).toBe("turn-on 1° el, turn-off 150° el")
+      expect(t[0].hovertemplate).toContain("%{text}")
+    }
+    expect(s.torque[0].name).toBe("mine")
   })
   it("keeps nulls as null (gaps)", () => {
     const s = performanceSeries(ev())
@@ -47,6 +60,8 @@ describe("performanceSeries", () => {
     const o: Overlay[] = [{ label: "none", evaluation: ev(null) }]
     expect(performanceSeries(ev(), o).torque).toHaveLength(1)
     expect(performanceSeries(ev(null)).torque).toHaveLength(0)
+    const only: Overlay[] = [{ label: "o", evaluation: ev() }]
+    expect(performanceSeries(ev(null), only).torque.map((t) => t.name)).toEqual(["o"])
   })
 })
 

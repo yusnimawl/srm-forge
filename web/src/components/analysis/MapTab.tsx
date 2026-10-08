@@ -1,6 +1,7 @@
 import { LinePlot } from "@/components/PlotlyPlot"
 import MapCharts from "@/components/candidate/MapCharts"
 import { inductanceCurves, torqueCurves } from "@/lib/analysis"
+import { UNIT_LABEL } from "@/lib/units"
 import type { Evaluation } from "@/api/types"
 
 export default function MapTab({ evaluation }: { evaluation: Evaluation }) {
@@ -11,12 +12,12 @@ export default function MapTab({ evaluation }: { evaluation: Evaluation }) {
       <MapCharts map={map} unaligned={evaluation.key?.unaligned_angle ?? null} />
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Torque vs rotor angle</h2>
-        <LinePlot data={torqueCurves(map)} xTitle="Rotor angle (° mechanical)" yTitle="Torque (N·m)" />
+        <LinePlot data={torqueCurves(map)} xTitle={`Rotor angle (${UNIT_LABEL.deg} mechanical)`} yTitle={`Torque (${UNIT_LABEL.Nm})`} />
       </section>
       {curves && (
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Inductance vs rotor angle</h2>
-          <LinePlot data={inductanceCurves(curves, map.angles)} xTitle="Rotor angle (° mechanical)" yTitle="L = ψ/i (mH)" />
+          <LinePlot data={inductanceCurves(curves, map.angles)} xTitle={`Rotor angle (${UNIT_LABEL.deg} mechanical)`} yTitle={`L = ψ/i (${UNIT_LABEL.mH})`} />
         </section>
       )}
     </div>
