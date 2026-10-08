@@ -425,6 +425,10 @@ def create_app(settings: Settings,
         inputs, errors, warnings = check_case(case["inputs"])
         if inputs is None:
             return _invalid(errors, warnings)
+        mesh = inputs.design.mesh
+        if mesh != MeshSettings(preset=mesh.preset):
+            return _invalid([{"loc": ["design", "mesh"],
+                              "msg": "custom mesh settings cannot be stored in a setup file"}], warnings)
         response.headers["Content-Disposition"] = f'attachment; filename="{_file_name(case["label"])}.srm-setup.json"'
         return setup_from_case(inputs, case["label"])
 

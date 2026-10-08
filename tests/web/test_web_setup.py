@@ -2,7 +2,7 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
-from srmapp.case import CaseInputs, FixedWinding
+from srmapp.case import LIMIT_FIELDS, CaseInputs
 from srmweb.setup import SetupFile, case_inputs_from_setup, setup_from_case
 from web_support import REQ, make_client
 
@@ -32,19 +32,34 @@ def _setup(client, **inputs_over):
 
 def test_setup_export_and_round_trip(client):
     fixed = {"turns": 20, "strands": 1, "paths": 1}
-    case, r = _setup(client, winding=fixed, j_limit=5e6)
+    limits = dict(zip(LIMIT_FIELDS, (1.2, 1.2e7, 5e6, 2.4e7)))
+    case, r = _setup(client, winding=fixed, **limits)
     assert r.status_code == 200, r.text
     assert r.headers["content-disposition"] == 'attachment; filename="8-6 reference.srm-setup.json"'
     body = r.json()
     assert body["schema"] == "srm-setup" and body["version"] == 1 and "search" not in body
     assert "materials" not in body["geometry"]["machine"] and body["materials"]["stator"] == "10JNEX900"
-    assert body["winding"] == {"mode": "fixed", "fixed": fixed | {"wire": None}, "margin": None,
-                               "j_peak": None, "j_limit": 5e6, "j_peak_max": None}
+    assert body["winding"] == {"mode": "fixed", "fixed": fixed | {"wire": None}} | limits
     assert body["drive"] == {"bus_voltage_v": 400.0, "phase_current_a": None}
     assert body["geometry"]["preset"] == "screening"
     inputs = CaseInputs.model_validate(client.get(f"/api/cases/{case['id']}").json()["inputs"])
     assert case_inputs_from_setup(SetupFile.model_validate(body)) == inputs
     assert setup_from_case(inputs, "x").model_dump(by_alias=True)["schema"] == "srm-setup"
+
+
+def test_wire_mode_fixed_winding_round_trip(client):
+    wired = REQ | {"wires": [WIRE], "phase_current_a": 30.0}
+    case = _reference(client, wired)
+    patch = {"inputs": case["inputs"] | {"winding": {"turns": 10, "strands": 1, "paths": 1, "wire": 0}}}
+    assert client.patch(f"/api/cases/{case['id']}", json=patch).status_code == 200
+    r = client.get(f"/api/cases/{case['id']}/setup")
+    assert r.status_code == 200, r.text
+    assert r.json()["winding"]["fixed"]["wire"] == 0 and r.json()["drive"]["phase_current_a"] == 30.0
+    inputs = CaseInputs.model_validate(client.get(f"/api/cases/{case['id']}").json()["inputs"])
+    assert case_inputs_from_setup(SetupFile.model_validate(r.json())) == inputs
+    imported = client.post("/api/cases", json={"origin": "import", "setup": r.json()})
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["inputs"] == client.get(f"/api/cases/{case['id']}").json()["inputs"]
 
 
 def test_import_creates_a_stale_draft(client):
@@ -130,5 +145,12 @@ def test_file_name_is_sanitised(client):
     assert r.headers["content-disposition"] == 'attachment; filename="ab-cd.srm-setup.json"'
 
 
-def test_fixed_winding_type():
-    assert FixedWinding(turns=3).paths == 1
+def test_export_refuses_mesh_settings_a_setup_file_cannot_hold(client):
+    case = _reference(client)
+    url = f"/api/cases/{case['id']}"
+    for mesh in ({"preset": "reference"}, {"preset": "full", "outer_air_thickness": 0.01}):
+        design = case["inputs"]["design"] | {"mesh": mesh}
+        assert client.patch(url, json={"inputs": case["inputs"] | {"design": design}}).status_code == 200
+        r = client.get(f"{url}/setup")
+        assert r.status_code == 422, r.text
+        assert r.json()["errors"][0]["loc"][:1] == ["design"]   # check_case rejects "reference"; a custom mesh is ours
