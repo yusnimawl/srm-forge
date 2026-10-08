@@ -44,28 +44,33 @@ function Bar({ label, done, total }: { label: string; done: number; total: numbe
   )
 }
 
-export function RunProgress({ job }: { job: JobOut }) {
-  const p = progressOf(job)
+/** The status line and the optional note after the elapsed time; the sampling message appears in only one of them. */
+export function progressLines(status: string, p: JobProgress): { line: string; note: string | null } {
   const dd = p.designs_done ?? 0
   const dt = p.designs_total ?? 0
-  const pd = p.points_done ?? 0
-  const pt = p.points_total ?? 0
+  const sampling = dt === 0
   const line =
-    job.status === "queued"
+    status === "queued"
       ? "Queued"
-      : dt === 0
+      : sampling
         ? (p.message ?? "Sampling candidates…")
-        : `Design ${Math.min(dd + 1, Math.max(dt, 1))} of ${dt}, map ${pd} of ${pt} points`
+        : `Design ${Math.min(dd + 1, dt)} of ${dt}, map ${p.points_done ?? 0} of ${p.points_total ?? 0} points`
+  return { line, note: p.message && !(sampling && status !== "queued") ? p.message : null }
+}
+
+export function RunProgress({ job }: { job: JobOut }) {
+  const p = progressOf(job)
+  const { line, note } = progressLines(job.status, p)
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      <Bar label="Designs" done={dd} total={dt} />
-      <Bar label="Map points (current design)" done={pd} total={pt} />
+      <Bar label="Designs" done={p.designs_done ?? 0} total={p.designs_total ?? 0} />
+      <Bar label="Map points (current design)" done={p.points_done ?? 0} total={p.points_total ?? 0} />
       <p aria-live="polite" className="text-sm">
         {line}
       </p>
       <p className="text-sm text-muted-foreground">
         Elapsed <span className="num">{fmtElapsed(p.elapsed_s)}</span>
-        {p.message ? ` · ${p.message}` : ""}
+        {note ? ` · ${note}` : ""}
       </p>
     </div>
   )

@@ -1,16 +1,11 @@
+import type { MapArrays } from "@/api/types"
 import { fromSI } from "./units"
 
-export type FluxMap = {
-  angles: number[] // rad
-  currents: number[] // A
-  psi: (number | null)[][] // [angle][current], Wb
-  torque: (number | null)[][] // [angle][current], N·m
-}
-
-const deg = (rad: number) => fromSI(rad, "deg")
+/** A missing angle is NaN, which Plotly draws as a gap, not as 0°. */
+const deg = (rad: number | null) => (rad == null ? NaN : fromSI(rad, "deg"))
 
 /** One ψ(i) curve per map angle: mechanical degrees, ψ in mWb. */
-export function psiCurves(map: FluxMap) {
+export function psiCurves(map: MapArrays) {
   return map.angles.map((a, k) => ({
     angleDeg: deg(a),
     i: map.currents,
@@ -19,7 +14,7 @@ export function psiCurves(map: FluxMap) {
 }
 
 /** Torque on the (angles x currents) grid, angles in mechanical degrees. */
-export function torqueGrid(map: FluxMap) {
+export function torqueGrid(map: MapArrays) {
   return {
     angleDeg: map.angles.map(deg),
     i: map.currents,
