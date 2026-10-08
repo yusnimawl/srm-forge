@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useMemo } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errorMessage"
 import { useJobEvents } from "@/api/useJobEvents"
 import { Banner } from "@/components/Banner"
 import { CandidateTable } from "@/components/run/CandidateTable"
@@ -40,8 +42,9 @@ export function RunPage() {
     enabled: status === "done" || status === "cancelled",
   })
   const rows = useMemo(() => (result.data ? toRows(result.data) : []), [result.data])
-  const cancel = useMutation({ mutationFn: () => api(`/api/jobs/${jobId}/cancel`, { method: "POST" }) })
+  const cancel = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${jobId}/cancel`, { method: "POST" }) })
   const resume = useMutation({
+    onError: (e) => toast.error(errorMessage(e)),
     mutationFn: () => api<{ id: string }>(`/api/jobs/${jobId}/resume`, { method: "POST" }),
     onSuccess: ({ id }) => navigate(`/runs/${id}`),
   })

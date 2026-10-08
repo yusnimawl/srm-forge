@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, type JobOut } from "@/api/client"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errorMessage"
 import { fmtElapsed, isActive, JobStatusBadge, progressOf } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -12,15 +14,16 @@ function Actions({ job }: { job: JobOut }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const refresh = () => qc.invalidateQueries({ queryKey: ["jobs"] })
-  const cancel = useMutation({ mutationFn: () => api(`/api/jobs/${job.id}/cancel`, { method: "POST" }), onSuccess: refresh })
+  const cancel = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${job.id}/cancel`, { method: "POST" }), onSuccess: refresh })
   const resume = useMutation({
+    onError: (e) => toast.error(errorMessage(e)),
     mutationFn: () => api<{ id: string }>(`/api/jobs/${job.id}/resume`, { method: "POST" }),
     onSuccess: ({ id }) => {
       refresh()
       navigate(`/runs/${id}`)
     },
   })
-  const del = useMutation({ mutationFn: () => api(`/api/jobs/${job.id}`, { method: "DELETE" }), onSuccess: refresh })
+  const del = useMutation({ onError: (e) => toast.error(errorMessage(e)), mutationFn: () => api(`/api/jobs/${job.id}`, { method: "DELETE" }), onSuccess: refresh })
   return (
     <div className="flex flex-wrap gap-2">
       <Button variant="outline" className="min-h-11" render={<Link to={`/runs/${job.id}`} />}>
