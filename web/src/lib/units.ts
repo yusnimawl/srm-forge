@@ -1,7 +1,7 @@
 // The one conversion table between the UI units and SI (the API is SI).
 export type Unit =
   | "mm" | "rpm" | "kW" | "Nm" | "V" | "A" | "A/mm2"
-  | "kg" | "mH" | "mOhm" | "mWb" | "deg" | "m" | "W"
+  | "kg" | "mH" | "mOhm" | "mWb" | "deg" | "m" | "W" | "%"
 
 /** SI value = UI value * FACTOR. */
 const FACTOR: Record<Unit, number> = {
@@ -19,6 +19,7 @@ const FACTOR: Record<Unit, number> = {
   deg: Math.PI / 180,
   m: 1,
   W: 1,
+  "%": 1e-2,
 }
 
 export const UNIT_LABEL: Record<Unit, string> = {
@@ -36,6 +37,7 @@ export const UNIT_LABEL: Record<Unit, string> = {
   deg: "°",
   m: "m",
   W: "W",
+  "%": "%",
 }
 
 export const toSI = (value: number, unit: Unit): number => value * FACTOR[unit]

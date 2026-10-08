@@ -3,10 +3,9 @@ import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
 import type { MapArrays } from "@/api/types"
+import { LINE_COLORS, LINE_DASHES } from "@/lib/analysis"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
 
-const DASH = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
-const LINE_COLORS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9"]
 
 export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligned: number | null }) {
   const c = useColors()
@@ -28,7 +27,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
       name: `${fmt(all[k].angleDeg, 3)}°`,
       x: all[k].i,
       y: all[k].psi_mWb,
-      line: { color: LINE_COLORS[n % 6], dash: DASH[n % 6], width: 2 },
+      line: { color: LINE_COLORS[n % 6], dash: LINE_DASHES[n % 6], width: 2 },
     }))
   }, [map, unaligned])
 

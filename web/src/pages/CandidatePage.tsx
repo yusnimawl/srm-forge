@@ -7,8 +7,7 @@ import { WindingScan } from "@/components/candidate/WindingScan"
 import { fmt, fmtSI } from "@/lib/format"
 import { UNIT_LABEL } from "@/lib/units"
 
-const MapCharts = lazy(() => import("@/components/candidate/MapCharts"))
-const EnvelopeChart = lazy(() => import("@/components/candidate/EnvelopeChart"))
+const AnalysisTabs = lazy(() => import("@/components/analysis/AnalysisTabs"))
 const fallback = <div className="h-[380px]" aria-busy="true" />
 
 function Item({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -95,20 +94,15 @@ export function CandidatePage() {
             </div>
           </section>
         )}
-        {ev.map && (
-          <Suspense fallback={fallback}>
-            <MapCharts map={ev.map} unaligned={k?.unaligned_angle ?? null} />
-          </Suspense>
-        )}
-        {ev.envelope && (
-          <section className="space-y-2 lg:col-span-2">
-            <h2 className="text-lg font-semibold">Torque and power vs speed</h2>
-            <Suspense fallback={fallback}>
-              <EnvelopeChart envelope={ev.envelope} />
-            </Suspense>
-          </section>
-        )}
       </div>
+      {(ev.map || ev.envelope) && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Analysis</h2>
+          <Suspense fallback={fallback}>
+            <AnalysisTabs evaluation={ev} />
+          </Suspense>
+        </section>
+      )}
       {ev.scan.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Winding scan</h2>
