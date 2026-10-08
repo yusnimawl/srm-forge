@@ -162,9 +162,6 @@ class EditCase(BaseModel):
     inputs: CaseInputs
 
 
-CaseCreate = Annotated[CandidateCase | ReferenceCase | EditCase, Field(discriminator="origin")]
-
-
 class CasePatch(BaseModel):
     """Fields left out (or null) stay as they are; `flag` is cleared with an empty string."""
     model_config = ConfigDict(extra="forbid")

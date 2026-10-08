@@ -92,6 +92,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Setup */
+        get: operations["case_setup_api_cases__case_id__setup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/validate": {
         parameters: {
             query?: never;
@@ -354,6 +371,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Setup */
+        post: operations["check_setup_api_setup_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/validate": {
         parameters: {
             query?: never;
@@ -582,6 +616,13 @@ export interface components {
              */
             schema_version: 1;
         };
+        /** DriveSection */
+        DriveSection: {
+            /** Bus Voltage V */
+            bus_voltage_v: number;
+            /** Phase Current A */
+            phase_current_a?: number | null;
+        };
         /** EdgeRefinement */
         EdgeRefinement: {
             /**
@@ -722,10 +763,29 @@ export interface components {
             /** Wire */
             wire?: number | null;
         };
+        /** GeometrySection */
+        GeometrySection: {
+            machine: components["schemas"]["RadialSRMParams"];
+            /**
+             * Preset
+             * @default full
+             * @enum {string}
+             */
+            preset: "screening" | "full";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** ImportCase */
+        ImportCase: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            origin: "import";
+            setup: components["schemas"]["SetupFile"];
         };
         /** IssueOut */
         IssueOut: {
@@ -1193,6 +1253,25 @@ export interface components {
              */
             stator: string;
         };
+        /** SetupFile */
+        SetupFile: {
+            drive?: components["schemas"]["DriveSection"] | null;
+            geometry?: components["schemas"]["GeometrySection"] | null;
+            materials?: components["schemas"]["RegionMaterials"] | null;
+            requirements?: components["schemas"]["Requirements"] | null;
+            /**
+             * Schema
+             * @constant
+             */
+            schema: "srm-setup";
+            search?: components["schemas"]["SearchSettingsIn"] | null;
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+            winding?: components["schemas"]["WindingSection"] | null;
+        };
         /** ValidateIn */
         ValidateIn: {
             /** Inputs */
@@ -1262,6 +1341,23 @@ export interface components {
             /** Wire */
             wire?: number | null;
         };
+        /** WindingSection */
+        WindingSection: {
+            fixed?: components["schemas"]["FixedWinding"] | null;
+            /** J Limit */
+            j_limit?: number | null;
+            /** J Peak */
+            j_peak?: number | null;
+            /** J Peak Max */
+            j_peak_max?: number | null;
+            /** Margin */
+            margin?: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "auto" | "fixed";
+        };
     };
     responses: never;
     parameters: never;
@@ -1300,7 +1396,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CandidateCase"] | components["schemas"]["ReferenceCase"] | components["schemas"]["EditCase"];
+                "application/json": components["schemas"]["CandidateCase"] | components["schemas"]["ReferenceCase"] | components["schemas"]["EditCase"] | components["schemas"]["ImportCase"];
             };
         };
         responses: {
@@ -1503,6 +1599,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_setup_api_cases__case_id__setup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupFile"];
                 };
             };
             /** @description Validation Error */
@@ -1983,6 +2110,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    check_setup_api_setup_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupFile"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

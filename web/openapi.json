@@ -793,6 +793,33 @@
         "title": "Design",
         "type": "object"
       },
+      "DriveSection": {
+        "additionalProperties": false,
+        "properties": {
+          "bus_voltage_v": {
+            "exclusiveMinimum": 0.0,
+            "title": "Bus Voltage V",
+            "type": "number"
+          },
+          "phase_current_a": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Current A"
+          }
+        },
+        "required": [
+          "bus_voltage_v"
+        ],
+        "title": "DriveSection",
+        "type": "object"
+      },
       "EdgeRefinement": {
         "additionalProperties": false,
         "properties": {
@@ -1385,6 +1412,28 @@
         "title": "FixedWinding",
         "type": "object"
       },
+      "GeometrySection": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/RadialSRMParams"
+          },
+          "preset": {
+            "default": "full",
+            "enum": [
+              "screening",
+              "full"
+            ],
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "machine"
+        ],
+        "title": "GeometrySection",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1396,6 +1445,25 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImportCase": {
+        "additionalProperties": false,
+        "properties": {
+          "origin": {
+            "const": "import",
+            "title": "Origin",
+            "type": "string"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/SetupFile"
+          }
+        },
+        "required": [
+          "origin",
+          "setup"
+        ],
+        "title": "ImportCase",
         "type": "object"
       },
       "IssueOut": {
@@ -2722,6 +2790,87 @@
         "title": "SearchSettingsIn",
         "type": "object"
       },
+      "SetupFile": {
+        "additionalProperties": false,
+        "properties": {
+          "drive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriveSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeometrySection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "materials": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionMaterials"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Requirements"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema": {
+            "const": "srm-setup",
+            "title": "Schema",
+            "type": "string"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchSettingsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "winding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WindingSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "schema",
+          "version"
+        ],
+        "title": "SetupFile",
+        "type": "object"
+      },
       "ValidateIn": {
         "additionalProperties": false,
         "properties": {
@@ -2938,6 +3087,82 @@
         ],
         "title": "WindingOut",
         "type": "object"
+      },
+      "WindingSection": {
+        "additionalProperties": false,
+        "properties": {
+          "fixed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FixedWinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "j_limit": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Limit"
+          },
+          "j_peak": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak"
+          },
+          "j_peak_max": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Peak Max"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "mode": {
+            "enum": [
+              "auto",
+              "fixed"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "WindingSection",
+        "type": "object"
       }
     }
   },
@@ -2978,6 +3203,7 @@
                   "mapping": {
                     "candidate": "#/components/schemas/CandidateCase",
                     "edit": "#/components/schemas/EditCase",
+                    "import": "#/components/schemas/ImportCase",
                     "reference": "#/components/schemas/ReferenceCase"
                   },
                   "propertyName": "origin"
@@ -2991,6 +3217,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/EditCase"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ImportCase"
                   }
                 ],
                 "title": "Body"
@@ -3270,6 +3499,45 @@
           }
         },
         "summary": "Map Mat"
+      }
+    },
+    "/api/cases/{case_id}/setup": {
+      "get": {
+        "operationId": "case_setup_api_cases__case_id__setup_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Case Setup"
       }
     },
     "/api/cases/{case_id}/validate": {
@@ -3787,6 +4055,44 @@
           }
         },
         "summary": "Cache Info"
+      }
+    },
+    "/api/setup/check": {
+      "post": {
+        "operationId": "check_setup_api_setup_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Setup"
       }
     },
     "/api/validate": {

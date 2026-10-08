@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import numpy as np
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
@@ -17,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from scipy.io import savemat
 
 import srmcore
@@ -34,9 +35,11 @@ from srmweb.config import Settings
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (CandidateCase, CaseCreate, CasePatch, EditCase, EstimateOut,
+from srmweb.schemas import (CandidateCase, CasePatch, EditCase, EstimateOut,
                             EvaluateBody, EvaluateRequest, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
                             ValidateIn, ValidateRequest, soft_magnetic)
+from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
+                          setup_from_case)
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
@@ -44,6 +47,7 @@ _KEEPALIVE_S = 15.0
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 MAX_SHOWN_CASES = 6
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
+CaseCreate = Annotated[CandidateCase | ReferenceCase | EditCase | ImportCase, Field(discriminator="origin")]
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 _EVALUATED = ("status", "torque_ratio", "power_ratio", "peak_power_w", "mass_kg",
               "power_density_kw_per_kg", "efficiency_base", "feasible")
@@ -97,6 +101,22 @@ def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
     if not stage.passes:
         warnings.append({"loc": [], "msg": f"stage 1: {stage.reason}"})
     return inputs, errors, warnings
+
+
+def _setup_loc(loc: list) -> list:
+    """A `check_case` loc (relative to the case inputs) as the path of the same value in a setup file."""
+    if loc[:3] == ["design", "machine", "materials"]:
+        return ["materials", *loc[3:]]
+    if loc[:2] == ["design", "machine"]:
+        return ["geometry", "machine", *loc[2:]]
+    if len(loc) == 2 and loc[0] == "winding":
+        return ["winding", "fixed", loc[1]]
+    return loc
+
+
+def _file_name(label: str) -> str:
+    """`label` as a header-safe file name stem."""
+    return re.sub(r"[^A-Za-z0-9 ._()+-]", "", label.replace("/", "-")).strip() or "case"
 
 
 def _invalid(errors: list[dict], warnings: list[dict]) -> JSONResponse:
@@ -312,6 +332,17 @@ def create_app(settings: Settings,
         return store.create_case(origin="edit", inputs=body.inputs.model_dump(mode="json"),
                                  label=f"{parent['label']} · edit", parent_case_id=parent["id"], stale=True)
 
+    def import_case(body: ImportCase) -> str | JSONResponse:
+        try:
+            raw = case_inputs_from_setup(body.setup)
+        except ValueError as exc:
+            return _invalid([{"loc": [], "msg": str(exc)}], [])
+        inputs, errors, warnings = check_case(raw.model_dump(mode="json"))
+        if inputs is None:
+            return _invalid([{**e, "loc": _setup_loc(e["loc"])} for e in errors], warnings)
+        return store.create_case(origin="import", inputs=inputs.model_dump(mode="json"),
+                                 label="imported setup", stale=True)
+
     @router.get("/cases", response_model=list[CaseSummaryOut])
     def list_cases():
         return [_summary(c, store.case_result(c["id"], "evaluate"), store.case_result(c["id"], "validate"))
@@ -319,8 +350,10 @@ def create_app(settings: Settings,
 
     @router.post("/cases", status_code=201, response_model=CaseOut)
     def create_case(body: CaseCreate):
-        make = {"candidate": candidate_case, "reference": reference_case, "edit": edit_case}[body.origin]
-        return case_out(store.get_case(make(body)))
+        make = {"candidate": candidate_case, "reference": reference_case, "edit": edit_case,
+                "import": import_case}[body.origin]
+        made = make(body)
+        return made if isinstance(made, Response) else case_out(store.get_case(made))
 
     @router.get("/cases/{case_id}", response_model=CaseOut)
     def get_case(case_id: str):
@@ -384,6 +417,20 @@ def create_app(settings: Settings,
         if times:
             return {"new_map": True, "seconds": sum(times) / len(times), "basis": "history"}
         return {"new_map": True, "seconds": BUDGET_S[preset], "basis": "budget"}
+
+    @router.get("/cases/{case_id}/setup", response_model=SetupFile,
+                response_model_exclude=NO_MACHINE_MATERIALS | {"search": True})
+    def case_setup(case_id: str, response: Response):
+        case = case_or_404(case_id)
+        inputs, errors, warnings = check_case(case["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        response.headers["Content-Disposition"] = f'attachment; filename="{_file_name(case["label"])}.srm-setup.json"'
+        return setup_from_case(inputs, case["label"])
+
+    @router.post("/setup/check", response_model=SetupFile, response_model_exclude=NO_MACHINE_MATERIALS)
+    def check_setup(setup: SetupFile):
+        return setup
 
     @router.get("/cases/{case_id}/map.mat")
     def map_mat(case_id: str):
