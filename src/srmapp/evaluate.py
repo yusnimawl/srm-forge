@@ -72,11 +72,13 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     j_peak_max: float | None = None, margin: float = 1.0, max_turns: int = DENSITY_MAX_TURNS,
                     solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
                     progress: Callable[[int, int], None] | None = None,
-                    cancel: Callable[[], bool] | None = None) -> Evaluation:
+                    cancel: Callable[[], bool] | None = None, only: Winding | None = None,
+                    i_map: float | None = None) -> Evaluation:
+    """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max."""
     design = candidate.design
     machine = design.machine
     try:
-        result = build_map(design, stage.i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
+        result = build_map(design, stage.i_map if i_map is None else i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
     except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
         return _failed(candidate, stage, type(exc).__name__, str(exc))
@@ -86,7 +88,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     result = with_end_winding(result, end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR))
     cap = stage.j_peak_max if j_peak_max is None else j_peak_max
     choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
-                          margin=margin, max_turns=max_turns)
+                          margin=margin, max_turns=max_turns, only=only)
     if choice.point is None:
         cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
         return _failed(candidate, stage, "no_winding",
