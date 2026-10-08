@@ -6,7 +6,10 @@ import { errorMessage } from "@/lib/errorMessage"
 import { toast } from "sonner"
 
 export type CasePatch = components["schemas"]["CasePatch"]
-export type CaseCreate = components["schemas"]["ReferenceCase"] | components["schemas"]["ImportCase"]
+export type CaseCreate =
+  | components["schemas"]["ReferenceCase"]
+  | components["schemas"]["ImportCase"]
+  | components["schemas"]["EditCase"]
 export type SetupFile = components["schemas"]["SetupFile"]
 
 const CASES = ["cases"] as const
