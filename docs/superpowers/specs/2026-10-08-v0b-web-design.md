@@ -99,7 +99,7 @@ Progress flows one way, server to page, every one to two seconds. SSE fits: plai
 
 ### 4.3 Job runner
 
-- One job runs at a time. A single map already fills the cores, and `build_map` starts its own spawn pool per design, whose start-up cost (seconds) is small next to a `full` map (about 13 min on the laptop). No long-lived pool.
+- One job runs at a time. A single map already fills the cores, and `build_map` starts its own spawn pool per design, whose start-up cost (seconds) is small next to a `full` map (26 min for the 8/6 and 35 min for the 12/8 with 8 workers, M5e2 speed budget; a search with a 40-design shortlist runs about a day). No long-lived pool.
 - The worker thread calls `srmapp` with `cache_dir` always set, `workers` from config, and `cancel=event.is_set`. Callbacks update the in-memory progress.
 - Job states: `queued` → `running` → `done` | `failed` | `cancelled`. On server start, any job left `running` becomes `interrupted`.
 - **Resume** re-submits the stored request. Sampling is seeded and finished maps are cache hits, so a resumed search skips the designs already mapped.
@@ -157,7 +157,7 @@ A map is a cache hit when its provenance is unchanged: geometry, materials, mesh
 | wire list, phase current, current-density caps | only if `i_map` changes |
 | any dimension, pole set, material, preset | yes |
 
-The UI shows this before Evaluate and Sweep ("no new map, seconds" or "1 new map, about 13 min").
+The UI shows this before Evaluate and Sweep ("no new map, seconds" or "1 new map, about 26 min"). The time per map is the mean wall time of the last five completed maps of the same preset on this server (stored with each job), so it adapts when the server changes; with no history it falls back to the M5e2 budget figures (`screening` 228 s, `full` 26 min for the 8/6 at 8 workers).
 
 ## 7. Frontend (`web/`)
 
