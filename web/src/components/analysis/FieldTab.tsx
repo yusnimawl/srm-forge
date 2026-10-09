@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useFieldMesh, useFieldSnapshot } from "@/api/field"
 import { ApiError } from "@/api/client"
+import AnimationSection from "./AnimationSection"
 import ColorBar from "@/components/field/ColorBar"
 import FieldCanvas from "@/components/field/FieldCanvas"
 import { Button } from "@/components/ui/button"
@@ -32,8 +33,12 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const [current, setCurrent] = useState<string | null>(null)
   // The last frame stays on screen while the next one solves, so the canvas (and its zoom) persists.
   const [frame, setFrame] = useState<FieldFrameData | null>(null)
+  // While an animation is shown its frame replaces the snapshot; the canvas stays mounted.
+  const [animFrame, setAnimFrame] = useState<FieldFrameData | null>(null)
+  const onAnimFrame = useCallback((f: FieldFrameData | null) => setAnimFrame(f), [])
   const [hover, setHover] = useState<string | null>(null)
   const mesh = meshQ.data
+  const shown = animFrame ?? frame
   const renderMode = useMemo(canRender, [])
 
   if (meshQ.isPending) return <p className="py-4 text-sm text-muted-foreground">Loading the field mesh...</p>
@@ -53,12 +58,12 @@ export default function FieldTab({ caseId }: { caseId: string }) {
       )}
       <div className="space-y-4">
         <div className="space-y-2">
-          {frame ? (
+          {shown ? (
             <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start">
               <div className="mx-auto w-full min-w-0 max-w-[70vh] flex-1">
-                <FieldCanvas mesh={mesh} frame={frame} layers={layers} onHover={setHover} />
+                <FieldCanvas mesh={mesh} frame={shown} layers={layers} onHover={setHover} />
               </div>
-              <ColorBar bMax={bMaxOf(mesh, frame)} bLast={mesh.bLast} />
+              <ColorBar bMax={bMaxOf(mesh, shown)} bLast={mesh.bLast} />
             </div>
           ) : (
             <div className="mx-auto grid aspect-square w-full max-w-[70vh] place-items-center rounded-lg border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
@@ -122,7 +127,9 @@ export default function FieldTab({ caseId }: { caseId: string }) {
           {snap.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{detail(snap.error)}</p>}
         </div>
       </div>
-      {/* The animation controls go here. */}
+      {renderMode === "webgl2" && (
+        <AnimationSection caseId={caseId} nRotorPoles={mesh.nRotorPoles} current={a} currentError={currentError} onFrame={onAnimFrame} />
+      )}
     </div>
   )
 }

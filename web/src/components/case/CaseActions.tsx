@@ -22,6 +22,8 @@ const report = (e: unknown) => {
   if (!(e instanceof NotSaved)) toast.error(requestMessage(e))
 }
 
+const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation", animate: "Animate" }
+
 /** Live state of the case's running job: the map-points bar while evaluating, the message while validating. The page
  *  refetches the case when the job ends. */
 function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
@@ -43,14 +45,14 @@ function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="font-medium">{validating ? "EM validation" : "Evaluation"}: {cur.status}</p>
+        <p className="font-medium">{KIND_LABEL[job.kind] ?? "Evaluation"}: {cur.status}</p>
         {cancellable && (
           <Button variant="outline" className="ml-auto min-h-11" onClick={() => actions.cancel(job.id)} disabled={actions.busy}>
             Cancel
           </Button>
         )}
       </div>
-      {!validating && <Bar label="Map points" done={p.points_done ?? 0} total={p.points_total ?? 0} />}
+      {!validating && <Bar label={job.kind === "animate" ? "Frames" : "Map points"} done={p.points_done ?? 0} total={p.points_total ?? 0} />}
       <p aria-live="polite" className="text-sm text-muted-foreground">
         Elapsed <span className="num">{fmtElapsed(p.elapsed_s)}</span>
         {p.message ? ` · ${p.message}` : ""}
