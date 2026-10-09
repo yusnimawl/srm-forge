@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from conftest import make_8_6
 
-from srmapp.field import cached_frame, field_frame, field_mesh, rotated_nodes
+from srmapp.field import _static, cached_frame, field_frame, field_mesh, rotated_nodes
 from srmcore.maps.point import solve_point
 from srmcore.mesh import build_machine_mesh, mesh_at_angle
 from srmcore.model.design import Design, MeshSettings
@@ -58,6 +58,7 @@ def test_frames_and_mesh_come_from_the_cache_on_repeat(cache, monkeypatch):
     assert np.array_equal(first.b, again.b) and again.psi == first.psi
     assert cached_frame(DESIGN, 0.3, 4.0, solver=SOLVER, cache_dir=cache).torque == first.torque
     assert cached_frame(DESIGN, 0.31, 4.0, solver=SOLVER, cache_dir=cache) is None
+    _static.cache_clear()
     field_mesh(DESIGN, solver=SOLVER, cache_dir=cache)          # served from disk
 
 
@@ -69,3 +70,9 @@ def test_probe_zones(mesh, cache):
     unaligned = field_frame(DESIGN, math.pi / m.n_rotor_poles, 5.0, solver=SOLVER, cache_dir=cache)
     for z in ("stator_pole", "rotor_pole"):
         assert aligned.probes[z] > 2 * unaligned.probes[z], z
+
+
+def test_cache_key_ignores_numeric_type(cache):
+    field_frame(DESIGN, np.float64(0.3), 4, solver=SOLVER, cache_dir=cache)
+    f = cached_frame(DESIGN, 0.3, 4.0, solver=SOLVER, cache_dir=cache)
+    assert f is not None and type(f.angle) is float

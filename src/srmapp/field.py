@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -67,7 +68,7 @@ def _fields_dir(cache_dir) -> Path:
 
 
 def _save(path: Path, **arrays) -> None:
-    tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npz")
+    tmp = path.with_name(f"{path.stem}.{os.getpid()}.{threading.get_ident()}.tmp.npz")
     np.savez_compressed(tmp, **arrays)
     os.replace(tmp, path)
 
@@ -141,7 +142,7 @@ def rotated_nodes(mesh: FieldMesh, angle: float) -> np.ndarray:
 
 def _frame_path(design: Design, angle: float, coil_current: float, solver: str, cache_dir) -> Path:
     key = field_key(design, solver)
-    h = hashlib.sha256(f"{key}|{angle!r}|{coil_current!r}".encode()).hexdigest()[:16]
+    h = hashlib.sha256(f"{key}|{float(angle)!r}|{float(coil_current)!r}".encode()).hexdigest()[:16]
     return _fields_dir(cache_dir) / f"frame_{h}.npz"
 
 
@@ -172,10 +173,10 @@ def field_frame(design: Design, angle: float, coil_current: float, *, solver: st
     band = mesh_at_angle(static, angle).triangles[m:].astype(np.int64)
     area = _areas(mesh.nodes, mesh.triangles)
     probes = {z: float((b[:m][i] * area[i]).sum() / area[i].sum()) for z, i in mesh.probes.items()}
-    frame = FieldFrame(angle, coil_current, band, b.astype(np.float32), p.field.a.astype(np.float32),
+    frame = FieldFrame(float(angle), float(coil_current), band, b.astype(np.float32), p.field.a.astype(np.float32),
                        float(p.psi[0]), float(p.torque_arkkio), p.status.value, probes)
     if cache_dir is not None:
-        _save(_frame_path(design, angle, coil_current, solver, cache_dir), angle=angle, coil_current=coil_current,
+        _save(_frame_path(design, angle, coil_current, solver, cache_dir), angle=frame.angle, coil_current=frame.coil_current,
               band=frame.band, b=frame.b, a=frame.a, psi=frame.psi, torque=frame.torque, status=frame.status,
               **{f"probe_{k}": v for k, v in probes.items()})
     return frame
