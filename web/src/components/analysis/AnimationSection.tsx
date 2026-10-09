@@ -22,7 +22,13 @@ import { frameInterval, nextFrame, probeSeries, SPEEDS } from "@/lib/playback"
 const FOCUS = "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
 
 /** Playback of the frames of one animate job once it is done; reports the shown frame through `onFrame`. */
-function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData; onFrame: (f: AnimShown | null) => void }) {
+function Playback({ jobId, mesh, onFrame, onActivate, pauseSignal }: {
+  jobId: string
+  mesh: FieldMeshData
+  onFrame: (f: AnimShown | null) => void
+  onActivate: () => void
+  pauseSignal: number
+}) {
   const { job } = useJobEvents(jobId)
   const actions = useJobActions()
   const done = job?.status === "done"
@@ -39,8 +45,14 @@ function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData
   }, [frames, playing, speed])
   const shown = frames?.[Math.min(idx, (frames?.length ?? 1) - 1)] ?? null
   const bMax = useMemo(() => (frames && mesh ? bMaxOfFrames(mesh, frames) : 0), [frames, mesh])
-  // The most recent action wins: playing, scrubbing or loading frames puts the animation on screen.
+  // Playing, scrubbing or loading frames puts the animation on screen (onActivate); ticks only update the frame.
   useEffect(() => onFrame(shown && { frame: shown, bMax }), [shown, bMax, onFrame])
+  const hasFrames = !!frames
+  useEffect(() => {
+    if (hasFrames) onActivate()
+  }, [hasFrames, onActivate])
+  // A new snapshot pauses playback so it stays on screen.
+  useEffect(() => setPlaying(false), [pauseSignal])
   useEffect(() => () => onFrame(null), [onFrame])
   const series = useMemo(() => (frames ? probeSeries(frames, mesh.nRotorPoles) : []), [frames, mesh])
 
@@ -69,7 +81,10 @@ function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" className="min-h-11 min-w-20" onClick={() => setPlaying((p) => !p)}>
+        <Button type="button" className="min-h-11 min-w-20" onClick={() => {
+          if (!playing) onActivate()
+          setPlaying((p) => !p)
+        }}>
           {playing ? "Pause" : "Play"}
         </Button>
         <div className="flex items-center gap-2">
@@ -86,7 +101,7 @@ function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData
           </select>
         </div>
         <dl className="grid grid-cols-[auto_auto] gap-x-2 text-sm">
-          <dt className="text-muted-foreground">Flux linkage</dt>
+          <dt className="text-muted-foreground">Flux linkage (2D, no end winding)</dt>
           <dd className="font-mono">{(shown.psi * 1e3).toFixed(2)} mWb</dd>
           <dt className="text-muted-foreground">Torque</dt>
           <dd className="font-mono">{shown.torque.toFixed(2)} N·m</dd>
@@ -106,6 +121,7 @@ function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData
           value={idx}
           onChange={(e) => {
             setPlaying(false)
+            onActivate()
             setIdx(Number(e.target.value))
           }}
           className={`min-h-11 w-full accent-primary ${FOCUS}`}
@@ -120,12 +136,14 @@ function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData
 }
 
 /** Frame count, Animate stroke, and the playback of the running or loaded animation. */
-export default function AnimationSection({ caseId, mesh, current, currentError, onFrame }: {
+export default function AnimationSection({ caseId, mesh, current, currentError, onFrame, onActivate, pauseSignal }: {
   caseId: string
   mesh: FieldMeshData
   current: number
   currentError?: string
   onFrame: (f: AnimShown | null) => void
+  onActivate: () => void
+  pauseSignal: number
 }) {
   const [frames, setFrames] = useState("36")
   const [jobId, setJobId] = useState<string | null>(null)
@@ -160,7 +178,7 @@ export default function AnimationSection({ caseId, mesh, current, currentError, 
         {framesError ?? `${animateEstimate(n)}, at the phase current above.`}
       </p>
       {animate.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{errorMessage(animate.error)}</p>}
-      {jobId && <Playback key={jobId} jobId={jobId} mesh={mesh} onFrame={onFrame} />}
+      {jobId && <Playback key={jobId} jobId={jobId} mesh={mesh} onFrame={onFrame} onActivate={onActivate} pauseSignal={pauseSignal} />}
     </section>
   )
 }

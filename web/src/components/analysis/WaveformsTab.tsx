@@ -2,6 +2,7 @@ import { useState } from "react"
 import { LinePlot } from "@/components/PlotlyPlot"
 import { defaultSpeedIndex, waveformSeries } from "@/lib/waveforms"
 import { UNIT_LABEL } from "@/lib/units"
+import { SELECT_CLASS } from "@/components/case/fields"
 import type { Evaluation } from "@/api/types"
 
 const X = "Rotor angle (° electrical, 0 = unaligned)"
@@ -9,7 +10,7 @@ const X = "Rotor angle (° electrical, 0 = unaligned)"
 export default function WaveformsTab({ evaluation, baseSpeedRpm }: { evaluation: Evaluation; baseSpeedRpm?: number }) {
   const [picked, setPicked] = useState<number | null>(null)
   const speeds = evaluation.envelope?.speeds_rpm ?? []
-  const k = picked ?? defaultSpeedIndex(evaluation, baseSpeedRpm)
+  const k = Math.max(0, Math.min(picked ?? defaultSpeedIndex(evaluation, baseSpeedRpm), speeds.length - 1))
   const s = waveformSeries(evaluation, k)
   if (!s) return <p className="py-4 text-sm text-muted-foreground">No waveforms for this case.</p>
   return (
@@ -17,12 +18,12 @@ export default function WaveformsTab({ evaluation, baseSpeedRpm }: { evaluation:
       <label className="flex items-center gap-2 text-sm">
         Speed
         <select
-          className="min-h-11 rounded-md border border-input bg-background px-3"
+          className={`${SELECT_CLASS} w-auto`}
           value={k}
           onChange={(e) => setPicked(Number(e.target.value))}
         >
           {speeds.map((v, i) => (
-            <option key={i} value={i}>{`${v ?? "?"} rpm`}</option>
+            <option key={i} value={i}>{`${v == null ? "?" : Math.round(v)} rpm`}</option>
           ))}
         </select>
       </label>

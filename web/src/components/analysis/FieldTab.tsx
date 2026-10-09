@@ -38,8 +38,11 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const [source, setSource] = useState<"snap" | "anim">("snap")
   const onAnimFrame = useCallback((f: AnimShown | null) => {
     setAnim(f)
-    if (f) setSource("anim")
+    if (!f) setSource("snap")
   }, [])
+  const onActivate = useCallback(() => setSource("anim"), [])
+  // Bumped when a snapshot is shown; the playback pauses on it.
+  const [pauseSignal, setPauseSignal] = useState(0)
   const [hover, setHover] = useState<string | null>(null)
   const mesh = meshQ.data
   const shown = source === "anim" && anim ? anim.frame : frame
@@ -54,7 +57,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const amps = current ?? mesh.windingCurrent.toFixed(1)
   const a = Number(amps)
   const tooHigh = a > 2 * mesh.iMax
-  const currentError = amps.trim() === "" || !Number.isFinite(a) ? "Enter a current in A." : tooHigh ? `At most ${(2 * mesh.iMax).toFixed(1)} A (twice the map's top current).` : undefined
+  const currentError = amps.trim() === "" || !Number.isFinite(a) || a <= 0 ? "Enter a current above 0 A." : tooHigh ? `At most ${(2 * mesh.iMax).toFixed(1)} A (twice the map's top current).` : undefined
 
   return (
     <div className="@container space-y-4 pt-2">
@@ -75,7 +78,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
               {snap.isPending ? "Solving..." : "Choose an angle and a current, then press Show."}
             </div>
           )}
-          <p className="min-h-6 text-sm" aria-live="polite">{hover ?? " "}</p>
+          <p className="min-h-6 text-sm">{hover ?? " "}</p>
         </div>
         <div className="grid gap-4 @2xl:grid-cols-2">
           <div className="space-y-1.5">
@@ -104,7 +107,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
             {currentError && <p id="field-current-err" className="text-sm text-destructive">{currentError}</p>}
           </div>
           <Button type="button" className="min-h-11" disabled={!!currentError || snap.isPending}
-            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a }, { onSuccess: (f) => { setFrame(f); setSource("snap") } })}>
+            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a }, { onSuccess: (f) => { setFrame(f); setSource("snap"); setPauseSignal((n) => n + 1) } })}>
             {snap.isPending ? "Solving..." : "Show"}
           </Button>
           <p className="text-xs text-muted-foreground">First view about 10 s (mesh + one solve); repeats are instant from the cache.</p>
@@ -120,7 +123,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
           </fieldset>
           {shown && (
             <dl className="grid grid-cols-2 gap-1 text-sm">
-              <dt className="text-muted-foreground">Flux linkage</dt>
+              <dt className="text-muted-foreground">Flux linkage (2D, no end winding)</dt>
               <dd className="font-mono">{(shown.psi * 1e3).toFixed(2)} mWb</dd>
               <dt className="text-muted-foreground">Torque</dt>
               <dd className="font-mono">{shown.torque.toFixed(2)} N·m</dd>
@@ -133,7 +136,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
         </div>
       </div>
       {renderMode === "webgl2" && (
-        <AnimationSection caseId={caseId} mesh={mesh} current={a} currentError={currentError} onFrame={onAnimFrame} />
+        <AnimationSection caseId={caseId} mesh={mesh} current={a} currentError={currentError} onFrame={onAnimFrame} onActivate={onActivate} pauseSignal={pauseSignal} />
       )}
     </div>
   )

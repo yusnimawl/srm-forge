@@ -126,3 +126,33 @@ def test_cache_counts_field_files(tmp_path, client):
     assert client.get("/api/settings/cache").json()["bytes"] == 3
     assert client.delete("/api/settings/cache").status_code == 204
     assert not (fields / "f.npz").exists() and (fields / "keep.txt").exists()
+
+
+def test_cache_ignores_temp_field_files(tmp_path, client):
+    fields = tmp_path / "cache" / "fields"
+    fields.mkdir(parents=True)
+    (fields / "f.npz").write_bytes(b"123")
+    (fields / "f.tmp.npz").write_bytes(b"45")
+    assert client.get("/api/settings/cache").json()["files"] == 1
+    assert client.delete("/api/settings/cache").status_code == 204
+    assert not (fields / "f.npz").exists() and (fields / "f.tmp.npz").exists()
+
+
+def test_cache_delete_conflicts_while_quick_lane_runs(tmp_path):
+    import threading
+    from srmweb.quick import QuickLane
+    gate, started = threading.Event(), threading.Event()
+    lane = QuickLane(spawn=False)
+    s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1,
+                 None, 10, tmp_path / "nostatic")
+    app = create_app(s, runner_factory=lambda store, st: JobRunner(store, st, quick=lane))
+    with TestClient(app) as c:
+        t = threading.Thread(target=lambda: lane.run(lambda: (started.set(), gate.wait(10))))
+        t.start()
+        try:
+            assert started.wait(10)
+            assert c.delete("/api/settings/cache").status_code == 409
+        finally:
+            gate.set()
+            t.join()
+        assert c.delete("/api/settings/cache").status_code == 204

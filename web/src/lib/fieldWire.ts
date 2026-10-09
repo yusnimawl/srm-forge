@@ -19,7 +19,7 @@ export function decode(buf: ArrayBuffer): { meta: any; arrays: Record<string, Wi
   return { meta: header.meta, arrays };
 }
 
-export type FieldRegion = { name: string; kind: string; part: string; phase: string | null; sign: number };
+export type FieldRegion = { name: string; kind: string; part: string; phase: string | null; sign: number | null };
 
 export type FieldMeshData = {
   nodes: Float32Array;

@@ -50,7 +50,7 @@ describe("fieldView", () => {
   });
 
   it("animateEstimate", () => {
-    expect(animateEstimate(36)).toBe("36 solves, about 2–3 min");
-    expect(animateEstimate(12)).toBe("12 solves, about 1 min");
+    expect(animateEstimate(36)).toBe("36 solves, about 3–5 min");
+    expect(animateEstimate(12)).toBe("12 solves, about 1–2 min");
   });
 });

@@ -65,7 +65,7 @@ export function electricalDeg(angle: number, nRotorPoles: number): number {
 }
 
 export function animateEstimate(n: number): string {
-  const lo = Math.max(1, Math.round((n * 3) / 60));
-  const hi = Math.max(1, Math.round((n * 5) / 60));
+  const lo = Math.max(1, Math.round((n * 5) / 60));
+  const hi = Math.max(1, Math.round((n * 8) / 60));
   return `${n} solves, about ${lo === hi ? `${lo}` : `${lo}–${hi}`} min`;
 }

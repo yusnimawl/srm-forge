@@ -22,7 +22,7 @@ const report = (e: unknown) => {
   if (!(e instanceof NotSaved)) toast.error(requestMessage(e))
 }
 
-const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation", animate: "Animate" }
+const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation" }
 
 /** Live state of the case's running job: the map-points bar while evaluating, the message while validating. The page
  *  refetches the case when the job ends. */
@@ -52,7 +52,7 @@ function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
           </Button>
         )}
       </div>
-      {!validating && <Bar label={job.kind === "animate" ? "Frames" : "Map points"} done={p.points_done ?? 0} total={p.points_total ?? 0} />}
+      {!validating && <Bar label="Map points" done={p.points_done ?? 0} total={p.points_total ?? 0} />}
       <p aria-live="polite" className="text-sm text-muted-foreground">
         Elapsed <span className="num">{fmtElapsed(p.elapsed_s)}</span>
         {p.message ? ` · ${p.message}` : ""}
@@ -76,7 +76,8 @@ type Props = {
 export function CaseActions({ data, editable, ready, savedText, flush }: Props) {
   const qc = useQueryClient()
   const [confirming, setConfirming] = useState(false)
-  const job = data.jobs.find((j) => j.active)
+  // An animate job runs on its own lane and reports in the Field tab.
+  const job = data.jobs.find((j) => j.active && j.kind !== "animate")
   const evaluation = editable ? null : data.evaluation
   const refresh = () =>
     Promise.all([qc.invalidateQueries({ queryKey: ["case", data.id] }), qc.invalidateQueries({ queryKey: ["cases"] })])

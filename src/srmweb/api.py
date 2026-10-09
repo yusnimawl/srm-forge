@@ -497,7 +497,7 @@ def create_app(settings: Settings,
     def cache_files():
         if not settings.cache_dir.is_dir():
             return []
-        return [*settings.cache_dir.glob("*.h5"), *(settings.cache_dir / "fields").glob("*.npz")]
+        return [*settings.cache_dir.glob("*.h5"), *(f for f in (settings.cache_dir / "fields").glob("*.npz") if not f.name.endswith(".tmp.npz"))]
 
     @router.get("/settings/cache")
     def cache_info():
@@ -507,7 +507,7 @@ def create_app(settings: Settings,
 
     @router.delete("/settings/cache", status_code=204)
     def clear_cache():
-        if runner.busy() or runner.busy("quick"):
+        if runner.busy() or runner.busy("quick") or runner.quick.busy():
             raise HTTPException(409, "a job is running; wait for it or cancel it")
         for f in cache_files():
             f.unlink(missing_ok=True)
