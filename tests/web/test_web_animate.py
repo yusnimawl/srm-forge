@@ -16,7 +16,7 @@ from srmweb.config import Settings
 from srmweb.jobs import JobRunner
 from srmweb.quick import QuickLane
 from test_web_field_routes import _case
-from test_web_frames import unpack
+from web_support import unpack
 
 K = 40 / (2 * REFERENCE_TURNS)
 

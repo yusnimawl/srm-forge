@@ -1,4 +1,7 @@
 """Fake search results and a test client for the srmweb case and result tests."""
+import json
+import struct
+
 import numpy as np
 from fastapi.testclient import TestClient
 
@@ -50,3 +53,15 @@ def store_search(client, *evaluations: Evaluation) -> str:
     store.put_result(job_id, search_body(*evaluations), kind="search")
     store.set_status(job_id, "done")
     return job_id
+
+
+def unpack(blob: bytes):
+    (h,) = struct.unpack_from("<I", blob)
+    header = json.loads(blob[4:4 + h])
+    data = blob[4 + h:]
+    out = {}
+    for a in header["arrays"]:
+        n = int(np.prod(a["shape"]))
+        out[a["name"]] = np.frombuffer(data, dtype=np.dtype(a["dtype"]).newbyteorder("<"), count=n,
+                                       offset=a["offset"]).reshape(a["shape"])
+    return header, h, out

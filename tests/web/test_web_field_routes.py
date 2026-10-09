@@ -14,8 +14,7 @@ from srmweb.api import create_app
 from srmweb.config import Settings
 from srmweb.jobs import JobRunner
 from srmweb.quick import LaneTimeout, QuickLane
-from test_web_frames import unpack
-from web_support import evaluation, store_search
+from web_support import evaluation, store_search, unpack
 
 
 @pytest.fixture
