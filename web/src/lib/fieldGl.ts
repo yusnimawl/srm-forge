@@ -134,16 +134,14 @@ export function createGlRenderer(canvas: HTMLCanvasElement, onLost?: () => void)
   const prog = gl.createProgram()
   const vs = gl.createShader(gl.VERTEX_SHADER)
   const fs = gl.createShader(gl.FRAGMENT_SHADER)
-  const vao = gl.createVertexArray()
   const buffers: (WebGLBuffer | null)[] = []
   const release = () => {
     buffers.forEach((b) => gl.deleteBuffer(b))
-    gl.deleteVertexArray(vao)
     gl.deleteProgram(prog)
     gl.deleteShader(vs)
     gl.deleteShader(fs)
   }
-  if (!prog || !vs || !fs || !vao) { release(); return null }
+  if (!prog || !vs || !fs) { release(); return null }
   for (const [sh, src] of [[vs, VS], [fs, FS]] as const) {
     gl.shaderSource(sh, src)
     gl.compileShader(sh)

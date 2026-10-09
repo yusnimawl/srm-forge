@@ -14,7 +14,7 @@ export default function ColorBar({ bMax, bLast }: { bMax: number; bLast: number 
       <div className="relative w-4 rounded border border-border" style={{ background: GRADIENT }}>
         <div className="absolute left-0 right-0 border-t-2 border-foreground" style={{ bottom: at(bLast) }} />
       </div>
-      <div className="relative w-36">
+      <div className="relative w-28">
         {bLast < 0.93 * bMax && <span className="absolute top-0 -translate-y-1/2">{bMax.toFixed(2)} T</span>}
         <span className="absolute bottom-0 translate-y-1/2">0 T</span>
         <span className="absolute translate-y-1/2" style={{ bottom: at(bLast) }}>last B-H point {bLast.toFixed(2)} T</span>

@@ -41,33 +41,33 @@ export default function FieldTab({ caseId }: { caseId: string }) {
 
   const pitchDeg = 360 / mesh.nRotorPoles
   const wrap = (rad: number) => ((((rad / RAD) % pitchDeg) + pitchDeg) % pitchDeg)
-  const amps = current ?? String(mesh.windingCurrent)
+  const amps = current ?? mesh.windingCurrent.toFixed(1)
   const a = Number(amps)
   const tooHigh = a > 2 * mesh.iMax
   const currentError = amps.trim() === "" || !Number.isFinite(a) ? "Enter a current in A." : tooHigh ? `At most ${(2 * mesh.iMax).toFixed(1)} A (twice the map's top current).` : undefined
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="@container space-y-4 pt-2">
       {renderMode === "canvas2d" && (
         <p className="text-sm text-muted-foreground">This browser has no WebGL2: snapshots only, no animation.</p>
       )}
-      <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="space-y-4">
         <div className="space-y-2">
           {frame ? (
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start">
+              <div className="mx-auto w-full min-w-0 max-w-[70vh] flex-1">
                 <FieldCanvas mesh={mesh} frame={frame} layers={layers} onHover={setHover} />
               </div>
               <ColorBar bMax={bMaxOf(mesh, frame)} bLast={mesh.bLast} />
             </div>
           ) : (
-            <div className="grid aspect-square place-items-center rounded-lg border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
+            <div className="mx-auto grid aspect-square w-full max-w-[70vh] place-items-center rounded-lg border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
               {snap.isPending ? "Solving..." : "Choose an angle and a current, then press Show."}
             </div>
           )}
           <p className="min-h-6 text-sm" aria-live="polite">{hover ?? " "}</p>
         </div>
-        <div className="space-y-4">
+        <div className="grid gap-4 @2xl:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="field-angle">Rotor angle</Label>
             <input

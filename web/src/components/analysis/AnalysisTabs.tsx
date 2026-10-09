@@ -55,7 +55,7 @@ export default function AnalysisTabs({
       {showField && (
         <TabsContent value="field">
           <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">Loading...</p>}>
-            <FieldTab caseId={caseId} />
+            <FieldTab key={caseId} caseId={caseId} />
           </Suspense>
         </TabsContent>
       )}
