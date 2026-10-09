@@ -66,7 +66,7 @@ def test_probe_zones(mesh, cache):
     m = DESIGN.machine
     zones = [set(mesh.probes[z]) for z in ("stator_pole", "stator_yoke", "rotor_pole")]
     assert all(zones) and not (zones[0] & zones[1]) and not (zones[0] & zones[2])
-    aligned = field_frame(DESIGN, 0.0, 5.0, solver=SOLVER, cache_dir=cache)
+    aligned = field_frame(DESIGN, 2 * math.pi / m.n_rotor_poles, 5.0, solver=SOLVER, cache_dir=cache)
     unaligned = field_frame(DESIGN, math.pi / m.n_rotor_poles, 5.0, solver=SOLVER, cache_dir=cache)
     for z in ("stator_pole", "rotor_pole"):
         assert aligned.probes[z] > 2 * unaligned.probes[z], z

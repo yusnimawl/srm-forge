@@ -21,6 +21,8 @@ from srmcore.mesh.static import StaticMesh
 from srmcore.model.design import Design
 from srmcore.solvers.factory import make_solver
 
+# Names the probe-zone definition in cache file names, so files written under another definition are not reused.
+PROBE_VERSION = 2
 PROBE_ZONES = ("stator_pole", "stator_yoke", "rotor_pole")
 
 
@@ -89,12 +91,16 @@ def _probe_zones(design: Design, nodes, tri, region, regions) -> dict[str, np.nd
     kind = np.array([regions[i].kind for i in region])
     c = nodes[tri].mean(axis=1)
     r, phi = np.hypot(c[:, 0], c[:, 1]), np.arctan2(c[:, 1], c[:, 0])
+    # The rotor pole centred at -2 pi / N_r in the rotor frame is the one that reaches phase A's x-axis stator pole
+    # at theta = 2 pi / N_r, the end of the stroke from the unaligned position.
+    d = phi + 2 * math.pi / m.n_rotor_poles
+    wrapped = np.arctan2(np.sin(d), np.cos(d))
     stator = (kind == "stator_iron") & (np.abs(phi) <= m.stator_pole_arc / 2)
     return {
         "stator_pole": np.flatnonzero(stator & (r >= m.bore_radius) & (r < m.stator_yoke_inner_radius)),
         "stator_yoke": np.flatnonzero(stator & (r >= m.stator_yoke_inner_radius)),
         "rotor_pole": np.flatnonzero((kind == "rotor_iron") & (r > m.rotor_yoke_outer_radius)
-                                     & (np.abs(phi) <= m.rotor_pole_arc / 2)),
+                                     & (np.abs(wrapped) <= m.rotor_pole_arc / 2)),
     }
 
 
@@ -121,7 +127,7 @@ def _load_mesh(path: Path) -> FieldMesh:
 
 
 def field_mesh(design: Design, *, solver: str = "ngsolve", cache_dir=None) -> FieldMesh:
-    path = _fields_dir(cache_dir) / f"mesh_{field_key(design, solver)}.npz" if cache_dir is not None else None
+    path = _fields_dir(cache_dir) / f"mesh{PROBE_VERSION}_{field_key(design, solver)}.npz" if cache_dir is not None else None
     if path is not None and path.exists():
         return _load_mesh(path)
     mesh = _mesh_from_static(design, _static(design.to_json()))
@@ -142,7 +148,7 @@ def rotated_nodes(mesh: FieldMesh, angle: float) -> np.ndarray:
 
 def _frame_path(design: Design, angle: float, coil_current: float, solver: str, cache_dir) -> Path:
     key = field_key(design, solver)
-    h = hashlib.sha256(f"{key}|{float(angle)!r}|{float(coil_current)!r}".encode()).hexdigest()[:16]
+    h = hashlib.sha256(f"{key}|v{PROBE_VERSION}|{float(angle)!r}|{float(coil_current)!r}".encode()).hexdigest()[:16]
     return _fields_dir(cache_dir) / f"frame_{h}.npz"
 
 
