@@ -652,8 +652,14 @@ export interface components {
             efficiency: (number | null)[];
             /** I Rms */
             i_rms: (number | null)[];
+            /** Line Mean */
+            line_mean: (number | null)[];
+            /** Line Rms */
+            line_rms: (number | null)[];
             /** Power */
             power: (number | null)[];
+            /** Power Factor */
+            power_factor: (number | null)[];
             /** Speeds Rpm */
             speeds_rpm: (number | null)[];
             /** Theta Off */
@@ -666,6 +672,7 @@ export interface components {
             theta_on_el: (number | null)[];
             /** Torque */
             torque: (number | null)[];
+            waveforms?: components["schemas"]["WaveformsOut"] | null;
             /** Work Loop */
             work_loop: (number | null)[];
             /** Work Torque */
@@ -1331,6 +1338,23 @@ export interface components {
              * @default 20
              */
             reference_turns: number;
+        };
+        /** WaveformsOut */
+        WaveformsOut: {
+            /** Current */
+            current: (number | null)[][];
+            /** Line */
+            line: (number | null)[][];
+            /** Psi */
+            psi: (number | null)[][];
+            /** Theta */
+            theta: (number | null)[];
+            /** Theta El */
+            theta_el: (number | null)[];
+            /** Torque */
+            torque: (number | null)[][];
+            /** Voltage */
+            voltage: (number | null)[][];
         };
         /** WindingOut */
         WindingOut: {

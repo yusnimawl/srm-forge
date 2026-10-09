@@ -33,7 +33,7 @@ def electrical_deg_from_unaligned(theta_mech: float, n_rotor_poles: int) -> floa
     return math.degrees((theta_mech - math.pi / n_rotor_poles) * n_rotor_poles)
 
 
-def evaluation_json(ev) -> dict:
+def evaluation_json(ev, *, waveforms: bool = True) -> dict:
     out = to_json(ev)
     if ev.envelope is not None:
         nr = ev.design.machine.n_rotor_poles
@@ -42,6 +42,11 @@ def evaluation_json(ev) -> dict:
             theta = getattr(ev.envelope, f"theta_{name}")
             env[f"theta_{name}_el"] = to_json([electrical_deg_from_unaligned(t, nr) for t in theta])
         env["efficiency"] = to_json(ev.envelope.efficiency)
+        wf = ev.envelope.waveforms
+        if not waveforms:
+            env.pop("waveforms", None)
+        elif wf is not None:
+            env["waveforms"]["theta_el"] = to_json([electrical_deg_from_unaligned(t, nr) for t in wf.theta])
     return out
 
 
@@ -52,6 +57,6 @@ def search_result_json(r) -> dict:
         "dropped": to_json(r.dropped),
         "stage1_rejected": r.stage1_rejected,
         "cancelled": r.cancelled,
-        "evaluations": [evaluation_json(e) for e in r.evaluations],
+        "evaluations": [evaluation_json(e, waveforms=False) for e in r.evaluations],
         "pareto_ids": [e.id for e in r.pareto()],
     }

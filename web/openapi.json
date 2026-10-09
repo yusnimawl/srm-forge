@@ -907,6 +907,34 @@
             "title": "I Rms",
             "type": "array"
           },
+          "line_mean": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Line Mean",
+            "type": "array"
+          },
+          "line_rms": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Line Rms",
+            "type": "array"
+          },
           "power": {
             "items": {
               "anyOf": [
@@ -919,6 +947,20 @@
               ]
             },
             "title": "Power",
+            "type": "array"
+          },
+          "power_factor": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Power Factor",
             "type": "array"
           },
           "speeds_rpm": {
@@ -1005,6 +1047,16 @@
             "title": "Torque",
             "type": "array"
           },
+          "waveforms": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaveformsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "work_loop": {
             "items": {
               "anyOf": [
@@ -1046,7 +1098,10 @@
           "i_rms",
           "theta_on_el",
           "theta_off_el",
-          "efficiency"
+          "efficiency",
+          "line_mean",
+          "line_rms",
+          "power_factor"
         ],
         "title": "EnvelopeOut",
         "type": "object"
@@ -3013,6 +3068,134 @@
           "material_grades"
         ],
         "title": "ValidationOut",
+        "type": "object"
+      },
+      "WaveformsOut": {
+        "properties": {
+          "current": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Current",
+            "type": "array"
+          },
+          "line": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Line",
+            "type": "array"
+          },
+          "psi": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Psi",
+            "type": "array"
+          },
+          "theta": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta",
+            "type": "array"
+          },
+          "theta_el": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta El",
+            "type": "array"
+          },
+          "torque": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Torque",
+            "type": "array"
+          },
+          "voltage": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Voltage",
+            "type": "array"
+          }
+        },
+        "required": [
+          "theta",
+          "theta_el",
+          "current",
+          "psi",
+          "voltage",
+          "torque",
+          "line"
+        ],
+        "title": "WaveformsOut",
         "type": "object"
       },
       "WindingOut": {
