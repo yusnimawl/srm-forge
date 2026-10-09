@@ -26,6 +26,12 @@ const ev = (e: Partial<typeof envelope> | null = {}) =>
 const overlays = (n: number): Overlay[] => Array.from({ length: n }, (_, k) => ({ label: `c${k}`, evaluation: ev() }))
 
 describe("performanceSeries line current and power factor", () => {
+  it("skips them for an envelope stored without them", () => {
+    const s = performanceSeries(ev({ line_mean: undefined, line_rms: undefined, power_factor: undefined }))
+    expect(s.lineCurrent).toEqual([])
+    expect(s.powerFactor).toEqual([])
+    expect(s.torque).toHaveLength(1)
+  })
   it("has mean and RMS traces per case and a power factor trace", () => {
     const s = performanceSeries(ev(), [{ label: "o", evaluation: ev() }])
     expect(s.lineCurrent.map((t) => t.name)).toEqual(["this case mean", "this case RMS", "o mean", "o RMS"])

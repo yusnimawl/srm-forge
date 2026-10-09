@@ -930,32 +930,46 @@
             "type": "array"
           },
           "line_mean": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "number"
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Line Mean",
-            "type": "array"
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Mean"
           },
           "line_rms": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "number"
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Line Rms",
-            "type": "array"
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Rms"
           },
           "power": {
             "items": {
@@ -972,18 +986,25 @@
             "type": "array"
           },
           "power_factor": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "number"
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Power Factor",
-            "type": "array"
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Factor"
           },
           "speeds_rpm": {
             "items": {
@@ -1120,10 +1141,7 @@
           "i_rms",
           "theta_on_el",
           "theta_off_el",
-          "efficiency",
-          "line_mean",
-          "line_rms",
-          "power_factor"
+          "efficiency"
         ],
         "title": "EnvelopeOut",
         "type": "object"

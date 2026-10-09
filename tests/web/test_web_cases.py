@@ -157,3 +157,21 @@ def test_list_cases_summaries_newest_first(client):
     assert [r["id"] for r in rows] == [b["id"], a["id"]]
     assert "inputs" not in rows[0] and rows[1]["power_ratio"] == 1.2 and rows[1]["mass_kg"] == 1.0
     assert rows[0]["torque_ratio"] is None and rows[0]["feasible"] is None
+
+
+def test_evaluation_stored_without_new_envelope_fields_still_serves(client):
+    from srmweb.results import EvaluationOut
+    from web_support import SEARCH_REQUEST, search_body
+
+    body = search_body(evaluation("c0"))
+    env = body["evaluations"][0]["envelope"]
+    for k in ("line_mean", "line_rms", "power_factor", "waveforms"):
+        env.pop(k, None)
+    EvaluationOut.model_validate(body["evaluations"][0])
+    job_id = client.app.state.store.create_job("search", SEARCH_REQUEST)
+    client.app.state.store.put_result(job_id, body, kind="search")
+    client.app.state.store.set_status(job_id, "done")
+    case = client.post("/api/cases", json={"origin": "candidate", "job_id": job_id, "candidate_id": "c0"}).json()
+    r = client.get(f"/api/cases/{case['id']}")
+    assert r.status_code == 200, r.text
+    assert r.json()["evaluation"]["envelope"]["power_factor"] is None

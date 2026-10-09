@@ -68,11 +68,14 @@ export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], main
     out.current.push(trace(label, e.speeds_rpm, e.i_rms, line, hover))
     const sym = (symbol: string) => ({ ...hover, marker: { symbol, size: 6 } })
     const lname = (q: string) => (n === 0 && overlays.length === 0 ? q : `${label} ${q}`)
-    out.lineCurrent.push(
-      trace(lname("mean"), e.speeds_rpm, e.line_mean, line, sym("circle")),
-      trace(lname("RMS"), e.speeds_rpm, e.line_rms, line, sym("square")),
-    )
-    out.powerFactor.push(trace(label, e.speeds_rpm, e.power_factor, line, hover))
+    // Evaluations stored before these quantities existed lack them.
+    if (e.line_mean && e.line_rms) {
+      out.lineCurrent.push(
+        trace(lname("mean"), e.speeds_rpm, e.line_mean, line, sym("circle")),
+        trace(lname("RMS"), e.speeds_rpm, e.line_rms, line, sym("square")),
+      )
+    }
+    if (e.power_factor) out.powerFactor.push(trace(label, e.speeds_rpm, e.power_factor, line, hover))
   })
   return out
 }

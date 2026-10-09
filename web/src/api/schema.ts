@@ -731,13 +731,13 @@ export interface components {
             /** I Rms */
             i_rms: (number | null)[];
             /** Line Mean */
-            line_mean: (number | null)[];
+            line_mean?: (number | null)[] | null;
             /** Line Rms */
-            line_rms: (number | null)[];
+            line_rms?: (number | null)[] | null;
             /** Power */
             power: (number | null)[];
             /** Power Factor */
-            power_factor: (number | null)[];
+            power_factor?: (number | null)[] | null;
             /** Speeds Rpm */
             speeds_rpm: (number | null)[];
             /** Theta Off */

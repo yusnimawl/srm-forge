@@ -65,9 +65,9 @@ class EnvelopeOut(_Out):
     theta_on_el: Vec
     theta_off_el: Vec
     efficiency: Vec
-    line_mean: Vec
-    line_rms: Vec
-    power_factor: Vec
+    line_mean: Vec | None = None
+    line_rms: Vec | None = None
+    power_factor: Vec | None = None
     waveforms: WaveformsOut | None = None
 
 
