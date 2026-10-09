@@ -14,6 +14,7 @@ from srmapp.evaluate import StageTwoGrid
 from srmapp.pipeline import SearchSettings, run_search
 from srmcore.model.design import RegionMaterials
 from srmweb.config import Settings
+from srmweb.quick import QuickLane
 from srmweb.schemas import EvaluateRequest, SearchRequest, ValidateRequest
 from srmweb.serialize import evaluation_json, search_result_json, to_json
 from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
@@ -68,8 +69,10 @@ class Reporter:
 
 class JobRunner:
     def __init__(self, store: Store, settings: Settings,
-                 run_fn: Callable[[str, dict, Reporter], dict] | None = None):
+                 run_fn: Callable[[str, dict, Reporter], dict] | None = None,
+                 quick: QuickLane | None = None):
         self._store, self._settings = store, settings
+        self.quick = quick or QuickLane()
         self._run_fn = run_fn or (lambda kind, req, rep: run_job(kind, req, rep, settings))
         self._cond = threading.Condition()
         self._queue: deque[str] = deque()
@@ -91,6 +94,7 @@ class JobRunner:
             if self._running:
                 self._running[1].cancel()
             self._cond.notify_all()
+        self.quick.stop()
         if self._thread is not None:
             self._thread.join(timeout)
 

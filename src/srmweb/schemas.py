@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -179,3 +180,10 @@ class CasePatch(BaseModel):
         if inputs is not None:
             json.dumps(inputs, allow_nan=False)
         return inputs
+
+
+class FieldIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    angle: float = Field(ge=0, lt=2 * math.pi)
+    current_a: float = Field(gt=0)
