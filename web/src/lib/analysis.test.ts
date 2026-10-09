@@ -17,10 +17,30 @@ const envelope = {
   i_rms: [5, 6, 7],
   theta_on_el: [10, 20.5, null],
   theta_off_el: [150, 160, 170],
+  line_mean: [1, 2, 3],
+  line_rms: [2, 3, 4],
+  power_factor: [0.5, null, 0.7],
 }
 const ev = (e: Partial<typeof envelope> | null = {}) =>
   ({ id: "x", envelope: e && { ...envelope, ...e } }) as unknown as Evaluation
 const overlays = (n: number): Overlay[] => Array.from({ length: n }, (_, k) => ({ label: `c${k}`, evaluation: ev() }))
+
+describe("performanceSeries line current and power factor", () => {
+  it("skips them for an envelope stored without them", () => {
+    const s = performanceSeries(ev({ line_mean: undefined, line_rms: undefined, power_factor: undefined }))
+    expect(s.lineCurrent).toEqual([])
+    expect(s.powerFactor).toEqual([])
+    expect(s.torque).toHaveLength(1)
+  })
+  it("has mean and RMS traces per case and a power factor trace", () => {
+    const s = performanceSeries(ev(), [{ label: "o", evaluation: ev() }])
+    expect(s.lineCurrent.map((t) => t.name)).toEqual(["this case mean", "this case RMS", "o mean", "o RMS"])
+    expect(s.lineCurrent[0].marker?.symbol).toBe("circle")
+    expect(s.lineCurrent[1].marker?.symbol).toBe("square")
+    expect(s.powerFactor[0].y).toEqual([0.5, null, 0.7])
+    expect(performanceSeries(ev()).lineCurrent.map((t) => t.name)).toEqual(["mean", "RMS"])
+  })
+})
 
 describe("performanceSeries", () => {
   it("converts W to kW and a fraction to percent", () => {

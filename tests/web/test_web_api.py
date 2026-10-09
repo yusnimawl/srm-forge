@@ -40,7 +40,7 @@ def gate():
 def make(tmp_path):
     clients = []
 
-    def _make(run_fn=lambda kind, req, rep: {"ok": 1}, **kw):
+    def _make(run_fn=lambda kind, req, rep, ctx: {"ok": 1}, **kw):
         app = create_app(_settings(tmp_path, **kw),
                          runner_factory=lambda store, s: JobRunner(store, s, run_fn=run_fn))
         c = TestClient(app)
@@ -70,7 +70,7 @@ def test_health(make):
 
 def test_submit_and_poll_search(make):
     body = search_body(evaluation("c0"))
-    c = make(run_fn=lambda kind, req, rep: body)
+    c = make(run_fn=lambda kind, req, rep, ctx: body)
     r = c.post("/api/jobs", json=_body())
     assert r.status_code == 201
     job_id = r.json()["id"]
@@ -106,7 +106,7 @@ def test_unknown_material_422(make, name):
 
 
 def test_queue_full_429(make, gate):
-    c = make(lambda kind, req, rep: gate.wait(10) and {}, queue_max=1)
+    c = make(lambda kind, req, rep, ctx: gate.wait(10) and {}, queue_max=1)
     first = c.post("/api/jobs", json=_body()).json()["id"]
     _wait(c, first, {"running"})
     assert c.post("/api/jobs", json=_body()).status_code == 201
@@ -128,7 +128,7 @@ def test_resume_creates_new_job(make, tmp_path):
 
 
 def test_resume_queue_full_429(make, gate):
-    c = make(lambda kind, req, rep: gate.wait(10) and {}, queue_max=1)
+    c = make(lambda kind, req, rep, ctx: gate.wait(10) and {}, queue_max=1)
     first = c.post("/api/jobs", json=_body()).json()["id"]
     _wait(c, first, {"running"})
     c.post("/api/jobs", json=_body())
@@ -137,14 +137,14 @@ def test_resume_queue_full_429(make, gate):
 
 
 def test_delete_running_409(make, gate):
-    c = make(lambda kind, req, rep: gate.wait(10) and {})
+    c = make(lambda kind, req, rep, ctx: gate.wait(10) and {})
     j = c.post("/api/jobs", json=_body()).json()["id"]
     _wait(c, j, {"running"})
     assert c.delete(f"/api/jobs/{j}").status_code == 409
 
 
 def test_running_job_reports_live_progress(make, gate):
-    def fn(kind, req, rep):
+    def fn(kind, req, rep, ctx):
         rep.progress(designs_done=3, designs_total=9)
         gate.wait(10)
         return {}
@@ -159,7 +159,7 @@ def test_running_job_reports_live_progress(make, gate):
 
 
 def test_cancel_running_202(make, gate):
-    def fn(kind, req, rep):
+    def fn(kind, req, rep, ctx):
         gate.wait(10)
         return {"cancelled": rep.cancelled()}
 
@@ -200,7 +200,7 @@ def test_grid_out_of_bounds_422(make, grid):
 
 
 def test_job_out_flags(make, gate):
-    c = make(lambda kind, req, rep: gate.wait(10) and {}, queue_max=3)
+    c = make(lambda kind, req, rep, ctx: gate.wait(10) and {}, queue_max=3)
     j = c.post("/api/jobs", json=_body()).json()["id"]
     _wait(c, j, {"running"})
     out = c.get(f"/api/jobs/{j}").json()

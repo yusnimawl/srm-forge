@@ -51,7 +51,7 @@ def make(tmp_path, gate):
     """A client whose jobs wait for `gate` and then fail, so they never touch a case's result."""
     clients = []
 
-    def fail(kind, req, rep):
+    def fail(kind, req, rep, ctx):
         gate.wait(10)
         raise RuntimeError("test job")
 

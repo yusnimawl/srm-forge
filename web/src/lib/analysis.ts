@@ -47,11 +47,13 @@ export interface PerformanceSeries {
   power: Trace[]
   efficiency: Trace[]
   current: Trace[]
+  lineCurrent: Trace[]
+  powerFactor: Trace[]
 }
 
 /** Envelope traces against speed in UI units; the main case first, then up to `MAX_SHOWN` overlays. */
 export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], mainLabel = MAIN_LABEL): PerformanceSeries {
-  const out: PerformanceSeries = { torque: [], power: [], efficiency: [], current: [] }
+  const out: PerformanceSeries = { torque: [], power: [], efficiency: [], current: [], lineCurrent: [], powerFactor: [] }
   const cases = [{ label: mainLabel, evaluation: ev }, ...overlays.slice(0, MAX_SHOWN)]
   cases.forEach(({ label, evaluation }, n) => {
     const e = evaluation.envelope
@@ -64,6 +66,16 @@ export function performanceSeries(ev: Evaluation, overlays: Overlay[] = [], main
     out.power.push(trace(label, e.speeds_rpm, conv(e.power, "kW"), line, hover))
     out.efficiency.push(trace(label, e.speeds_rpm, conv(e.efficiency, "%"), line, hover))
     out.current.push(trace(label, e.speeds_rpm, e.i_rms, line, hover))
+    const sym = (symbol: string) => ({ ...hover, marker: { symbol, size: 6 } })
+    const lname = (q: string) => (n === 0 && overlays.length === 0 ? q : `${label} ${q}`)
+    // Evaluations stored before these quantities existed lack them.
+    if (e.line_mean && e.line_rms) {
+      out.lineCurrent.push(
+        trace(lname("mean"), e.speeds_rpm, e.line_mean, line, sym("circle")),
+        trace(lname("RMS"), e.speeds_rpm, e.line_rms, line, sym("square")),
+      )
+    }
+    if (e.power_factor) out.powerFactor.push(trace(label, e.speeds_rpm, e.power_factor, line, hover))
   })
   return out
 }

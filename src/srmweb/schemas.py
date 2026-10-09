@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -58,6 +59,17 @@ class EvaluateRequest(BaseModel):
     case_id: str
     inputs: CaseInputs
     grid: Grid | None = None
+
+
+class AnimateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    inputs: CaseInputs
+    current_a: float = Field(gt=0)
+    coil_current: float = Field(gt=0)
+    k: float = Field(gt=0)
+    frames: int = Field(36, ge=12, le=72)
 
 
 class ValidateRequest(BaseModel):
@@ -179,3 +191,17 @@ class CasePatch(BaseModel):
         if inputs is not None:
             json.dumps(inputs, allow_nan=False)
         return inputs
+
+
+class AnimateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_a: float = Field(gt=0)
+    frames: int = Field(36, ge=12, le=72)
+
+
+class FieldIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    angle: float = Field(ge=0, lt=2 * math.pi)
+    current_a: float = Field(gt=0)

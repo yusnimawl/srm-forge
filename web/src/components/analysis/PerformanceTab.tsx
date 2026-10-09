@@ -14,7 +14,9 @@ export default function PerformanceTab({ evaluation, overlays, label }: { evalua
       <LinePlot data={s.power} legend={legend} xTitle={x} yTitle={`Power (${UNIT_LABEL.kW})`} />
       <LinePlot data={s.efficiency} legend={legend} xTitle={x} yTitle={`Efficiency (${UNIT_LABEL["%"]})`} />
       <LinePlot data={s.current} legend={legend} xTitle={x} yTitle={`Phase current, RMS (${UNIT_LABEL.A})`} />
-      <p className="text-sm text-muted-foreground lg:col-span-2">Efficiency counts copper loss only.</p>
+      <LinePlot data={s.lineCurrent} legend xTitle={x} yTitle={`Line current (${UNIT_LABEL.A})`} />
+      <LinePlot data={s.powerFactor} legend={legend} xTitle={x} yTitle="Power factor" />
+      <p className="text-sm text-muted-foreground lg:col-span-2">Efficiency and power factor count copper loss only.</p>
     </div>
   )
 }

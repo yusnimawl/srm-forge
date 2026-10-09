@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import math
 
@@ -47,7 +48,7 @@ def _eval(ok):
         return Evaluation("bad", design, "MapFailed", "boom", 1.0, None, NAN, NAN, NAN, NAN, NAN, False,
                           None, None)
     a = np.array([0.1, 0.2])
-    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a)
+    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a, None, a, a, a)
     m = MapArrays(a, a, np.zeros((2, 2)), np.full((2, 2), NAN))
     return Evaluation("good", design, "ok", "", 1.0, Winding(10, 1, 1e-6, 5.0, 0.1, 0.2, 0), 1.1, 1.1,
                       1000.0, 2.0, 0.9, True, env, None, map=m)
@@ -63,3 +64,35 @@ def test_search_result_json_is_strict():
     assert len(env["theta_on_el"]) == 2 and len(env["efficiency"]) == 2
     assert env["theta_off_el"][1] is None
     assert out["evaluations"][1]["envelope"] is None
+
+
+def _eval_with_waveforms(n=180, n_speeds=2):
+    from srmapp.drive.envelope import Waveforms
+    ev = _eval(True)
+    env = ev.envelope
+    z = np.zeros((n_speeds, n))
+    wf = Waveforms(np.arange(n) * (2 * math.pi / 6) / n, z, z, z, z, z)
+    return dataclasses.replace(ev, envelope=dataclasses.replace(env, waveforms=wf))
+
+
+def test_evaluation_json_has_waveforms_with_electrical_angles():
+    wf = evaluation_json(_eval_with_waveforms())["envelope"]["waveforms"]
+    assert wf["theta_el"][0] == pytest.approx(-180.0)
+    assert len(wf["theta_el"]) == 180 and all(len(row) == 180 for row in wf["line"])
+
+
+def test_search_result_json_leaves_out_waveforms():
+    req = Requirements(peak_power_w=1000, peak_torque_nm=10, base_speed_rpm=955, max_speed_rpm=2000)
+    r = SearchResult(req, 1, {}, 0, (_eval_with_waveforms(),), False)
+    env = search_result_json(r)["evaluations"][0]["envelope"]
+    assert "waveforms" not in env and "power_factor" in env
+
+
+def test_evaluation_out_parses_waveforms():
+    from srmweb.results import EvaluationOut
+    ev = _eval_with_waveforms()
+    out = EvaluationOut.model_validate(evaluation_json(ev))
+    assert out.envelope.waveforms.theta_el[0] == pytest.approx(-180.0)
+    nan_pf = dataclasses.replace(ev.envelope, power_factor=np.array([0.5, NAN]))
+    out = EvaluationOut.model_validate(evaluation_json(dataclasses.replace(ev, envelope=nan_pf)))
+    assert out.envelope.power_factor[1] is None

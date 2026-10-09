@@ -42,6 +42,16 @@ class KeyNumbersOut(_Out):
     unaligned_angle: F
 
 
+class WaveformsOut(_Out):
+    theta: Vec
+    theta_el: Vec
+    current: Mat
+    psi: Mat
+    voltage: Mat
+    torque: Mat
+    line: Mat
+
+
 class EnvelopeOut(_Out):
     speeds_rpm: Vec
     torque: Vec
@@ -55,6 +65,10 @@ class EnvelopeOut(_Out):
     theta_on_el: Vec
     theta_off_el: Vec
     efficiency: Vec
+    line_mean: Vec | None = None
+    line_rms: Vec | None = None
+    power_factor: Vec | None = None
+    waveforms: WaveformsOut | None = None
 
 
 class MapArraysOut(_Out):

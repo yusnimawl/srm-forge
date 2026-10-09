@@ -47,7 +47,7 @@ def make(tmp_path):
 
 
 def test_job_runs_and_stores_result(make):
-    store, runner = make(lambda kind, req, rep: {"ok": 1})
+    store, runner = make(lambda kind, req, rep, ctx: {"ok": 1})
     j = runner.submit("search", {"a": 1})
     _wait(store, j, {"done"})
     assert store.get_result(j) == {"ok": 1}
@@ -56,7 +56,7 @@ def test_job_runs_and_stores_result(make):
 def test_jobs_run_one_at_a_time_fifo(make):
     log, active = [], []
 
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         active.append(req["n"])
         assert len(active) == 1
         log.append(req["n"])
@@ -71,7 +71,7 @@ def test_jobs_run_one_at_a_time_fifo(make):
 
 
 def test_cancel_sets_cancelled(make):
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         while not rep.cancelled():
             time.sleep(0.01)
         return {"cancelled": True}
@@ -89,7 +89,7 @@ def test_cancel_queued_job_is_skipped(make):
     gate = threading.Event()
     ran = []
 
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         ran.append(req["n"])
         gate.wait(5)
         return {}
@@ -107,7 +107,7 @@ def test_cancel_queued_job_is_skipped(make):
 
 
 def test_failure_records_error_and_worker_survives(make):
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         if req.get("bad"):
             raise ValueError("boom")
         return {"ok": 1}
@@ -122,7 +122,7 @@ def test_failure_records_error_and_worker_survives(make):
 
 def test_queue_full(make):
     gate = threading.Event()
-    store, runner = make(lambda k, r, rep: gate.wait(5) and {}, queue_max=1)
+    store, runner = make(lambda k, r, rep, ctx: gate.wait(5) and {}, queue_max=1)
     a = runner.submit("search", {})
     _wait(store, a, {"running"})
     runner.submit("search", {})
@@ -136,7 +136,7 @@ def test_restart_marks_interrupted_and_requeues(tmp_path):
     r = store.create_job("search", {})
     store.set_status(r, "running")
     q = store.create_job("search", {"n": 1})
-    runner = JobRunner(store, _settings(tmp_path), lambda k, req, rep: {"n": req["n"]})
+    runner = JobRunner(store, _settings(tmp_path), lambda k, req, rep, ctx: {"n": req["n"]})
     runner.start()
     try:
         assert store.get_job(r)["status"] == "interrupted"
@@ -149,7 +149,7 @@ def test_restart_marks_interrupted_and_requeues(tmp_path):
 def test_progress_version_increments(make):
     gate, seen, seen2, gate2 = (threading.Event() for _ in range(4))
 
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         rep.progress(points_done=1)
         seen.set()
         gate.wait(5)
@@ -175,7 +175,7 @@ def test_progress_version_increments(make):
 
 def test_job_deleted_while_queued_is_skipped(make):
     gate = threading.Event()
-    store, runner = make(lambda k, r, rep: gate.wait(5) and {"n": r["n"]})
+    store, runner = make(lambda k, r, rep, ctx: gate.wait(5) and {"n": r["n"]})
     a = runner.submit("search", {"n": 1})
     _wait(store, a, {"running"})
     b = runner.submit("search", {"n": 2})
@@ -190,7 +190,7 @@ def test_stop_interrupts_running_job(tmp_path):
     store = Store(tmp_path / "a.db")
     started = threading.Event()
 
-    def fake(kind, req, rep):
+    def fake(kind, req, rep, ctx):
         started.set()
         while not rep.cancelled():
             time.sleep(0.01)
@@ -212,7 +212,7 @@ def test_real_search_job_in_thread(make, tmp_path):
            "settings": dict(n_candidates=2, shortlist=1, preset="screening"),
            "grid": [4, 3]}
     SearchRequest.model_validate(req)
-    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, runner._settings))
+    store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("search", req)
     got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=1800)
     assert got["status"] == "done", got
@@ -232,7 +232,7 @@ def _real_runner(make, monkeypatch, evaluate=None, validate=None):
     if validate:
         monkeypatch.setattr(jobs, "validate_case", validate)
     holder = []
-    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, holder[0]._settings))
+    store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     holder.append(runner)
     return store, runner
 
@@ -363,8 +363,57 @@ def test_validate_job_stores_case_result(make, monkeypatch):
 
 
 def test_job_with_bad_request_fails(make):
-    store, runner = make(lambda kind, r, rep: run_job(kind, r, rep, runner._settings))
+    store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("evaluate", {"case_id": "c"})
     assert _wait(store, j, {"failed"})["error"].startswith("ValidationError")
     j = runner.submit("bogus", {})
     assert "unknown job kind" in _wait(store, j, {"failed"})["error"]
+
+
+def _lane_fakes(gate):
+    def fake(kind, req, rep, ctx):
+        if kind == "animate":
+            return {"quick": 1}
+        gate.wait(5)
+        return {"main": 1}
+    return fake
+
+
+def test_quick_job_runs_while_a_main_job_runs(make):
+    gate = threading.Event()
+    store, runner = make(_lane_fakes(gate))
+    main = runner.submit("search", {})
+    _wait(store, main, {"running"})
+    quick = runner.submit("animate", {})
+    _wait(store, quick, {"done"})
+    assert store.get_job(main)["status"] == "running"
+    gate.set()
+    _wait(store, main, {"done"})
+
+
+def test_queue_cap_is_per_lane(make):
+    gate = threading.Event()
+    store, runner = make(lambda k, r, rep, ctx: gate.wait(5) and {}, queue_max=1)
+    _wait(store, runner.submit("search", {}), {"running"})
+    runner.submit("search", {})
+    _wait(store, runner.submit("animate", {}), {"running"})
+    runner.submit("animate", {})
+    with pytest.raises(QueueFull):
+        runner.submit("animate", {})
+    with pytest.raises(QueueFull):
+        runner.submit("search", {})
+    assert runner.busy() and runner.busy("quick")
+    gate.set()
+
+
+def test_start_requeues_each_lane(tmp_path):
+    store = Store(tmp_path / "a.db")
+    a, b = store.create_job("search", {}), store.create_job("animate", {})
+    runner = JobRunner(store, _settings(tmp_path), lambda k, r, rep, ctx: {"k": k})
+    runner.start()
+    try:
+        _wait(store, a, {"done"})
+        _wait(store, b, {"done"})
+        assert store.get_result(b) == {"k": "animate"}
+    finally:
+        runner.stop()

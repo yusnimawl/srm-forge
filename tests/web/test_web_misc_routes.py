@@ -13,7 +13,7 @@ from srmweb.config import Settings
 from srmweb.jobs import JobRunner
 
 
-def _client(tmp_path, token=None, static=None, run_fn=lambda kind, req, rep: {"ok": 1}):
+def _client(tmp_path, token=None, static=None, run_fn=lambda kind, req, rep, ctx: {"ok": 1}):
     s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1,
                  token, 10, static or tmp_path / "nostatic")
     app = create_app(s, runner_factory=lambda store, st: JobRunner(store, st, run_fn=run_fn))
@@ -64,7 +64,7 @@ def test_cache_settings(tmp_path, client):
 def test_cache_delete_conflicts_while_running(tmp_path):
     import threading
     gate = threading.Event()
-    with _client(tmp_path, run_fn=lambda k, r, rep: gate.wait(10) and {"ok": 1}) as c:
+    with _client(tmp_path, run_fn=lambda k, r, rep, ctx: gate.wait(10) and {"ok": 1}) as c:
         try:
             jid = c.post("/api/jobs", json={"kind": "search", "payload": {"requirements": dict(
                 peak_power_w=10000.0, peak_torque_nm=31.83, base_speed_rpm=3000.0,
@@ -116,3 +116,43 @@ def test_openapi_dump(tmp_path):
     out = tmp_path / "o.json"
     subprocess.run([sys.executable, "-m", "srmweb.openapi", str(out)], check=True)
     assert "/api/jobs" in json.loads(out.read_text())["paths"]
+
+
+def test_cache_counts_field_files(tmp_path, client):
+    fields = tmp_path / "cache" / "fields"
+    fields.mkdir(parents=True)
+    (fields / "f.npz").write_bytes(b"123")
+    (fields / "keep.txt").write_bytes(b"1")
+    assert client.get("/api/settings/cache").json()["bytes"] == 3
+    assert client.delete("/api/settings/cache").status_code == 204
+    assert not (fields / "f.npz").exists() and (fields / "keep.txt").exists()
+
+
+def test_cache_ignores_temp_field_files(tmp_path, client):
+    fields = tmp_path / "cache" / "fields"
+    fields.mkdir(parents=True)
+    (fields / "f.npz").write_bytes(b"123")
+    (fields / "f.tmp.npz").write_bytes(b"45")
+    assert client.get("/api/settings/cache").json()["files"] == 1
+    assert client.delete("/api/settings/cache").status_code == 204
+    assert not (fields / "f.npz").exists() and (fields / "f.tmp.npz").exists()
+
+
+def test_cache_delete_conflicts_while_quick_lane_runs(tmp_path):
+    import threading
+    from srmweb.quick import QuickLane
+    gate, started = threading.Event(), threading.Event()
+    lane = QuickLane(spawn=False)
+    s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1,
+                 None, 10, tmp_path / "nostatic")
+    app = create_app(s, runner_factory=lambda store, st: JobRunner(store, st, quick=lane))
+    with TestClient(app) as c:
+        t = threading.Thread(target=lambda: lane.run(lambda: (started.set(), gate.wait(10))))
+        t.start()
+        try:
+            assert started.wait(10)
+            assert c.delete("/api/settings/cache").status_code == 409
+        finally:
+            gate.set()
+            t.join()
+        assert c.delete("/api/settings/cache").status_code == 204

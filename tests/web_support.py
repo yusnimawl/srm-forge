@@ -1,4 +1,7 @@
 """Fake search results and a test client for the srmweb case and result tests."""
+import json
+import struct
+
 import numpy as np
 from fastapi.testclient import TestClient
 
@@ -23,7 +26,7 @@ SEARCH_REQUEST = {"requirements": REQ, "settings": {"margin": 1.1, "j_peak": 1.2
 
 def make_client(tmp_path):
     s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1, None, 10, tmp_path / "nostatic")
-    return TestClient(create_app(s, runner_factory=lambda store, st: JobRunner(store, st, run_fn=lambda k, r, p: {})))
+    return TestClient(create_app(s, runner_factory=lambda store, st: JobRunner(store, st, run_fn=lambda k, r, p, ctx: {})))
 
 
 def evaluation(ident: str, ok: bool = True) -> Evaluation:
@@ -31,7 +34,7 @@ def evaluation(ident: str, ok: bool = True) -> Evaluation:
     if not ok:
         return Evaluation(ident, design, "MapFailed", "boom", 1.0, None, NAN, NAN, NAN, NAN, NAN, False, None, None)
     a = np.array([0.1, 0.2])
-    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a)
+    env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a, None, a, a, a)
     m = MapArrays(a, a, np.zeros((2, 2)), np.full((2, 2), NAN))
     key = KeyNumbers(0.01, 0.002, 5.0, 30.0, 0.5, 20.0, 0.0, 0.5)
     curves = MapCurves(a, np.ones((2, 2)), a, a, 0.01, a, a, a, np.array([NAN, 1.0]))
@@ -50,3 +53,15 @@ def store_search(client, *evaluations: Evaluation) -> str:
     store.put_result(job_id, search_body(*evaluations), kind="search")
     store.set_status(job_id, "done")
     return job_id
+
+
+def unpack(blob: bytes):
+    (h,) = struct.unpack_from("<I", blob)
+    header = json.loads(blob[4:4 + h])
+    data = blob[4 + h:]
+    out = {}
+    for a in header["arrays"]:
+        n = int(np.prod(a["shape"]))
+        out[a["name"]] = np.frombuffer(data, dtype=np.dtype(a["dtype"]).newbyteorder("<"), count=n,
+                                       offset=a["offset"]).reshape(a["shape"])
+    return header, h, out

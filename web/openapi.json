@@ -1,6 +1,28 @@
 {
   "components": {
     "schemas": {
+      "AnimateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "current_a": {
+            "exclusiveMinimum": 0.0,
+            "title": "Current A",
+            "type": "number"
+          },
+          "frames": {
+            "default": 36,
+            "maximum": 72.0,
+            "minimum": 12.0,
+            "title": "Frames",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current_a"
+        ],
+        "title": "AnimateIn",
+        "type": "object"
+      },
       "BudgetOut": {
         "properties": {
           "rows": {
@@ -907,6 +929,48 @@
             "title": "I Rms",
             "type": "array"
           },
+          "line_mean": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Mean"
+          },
+          "line_rms": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Rms"
+          },
           "power": {
             "items": {
               "anyOf": [
@@ -920,6 +984,27 @@
             },
             "title": "Power",
             "type": "array"
+          },
+          "power_factor": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Factor"
           },
           "speeds_rpm": {
             "items": {
@@ -1004,6 +1089,16 @@
             },
             "title": "Torque",
             "type": "array"
+          },
+          "waveforms": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaveformsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "work_loop": {
             "items": {
@@ -1357,6 +1452,28 @@
           "key"
         ],
         "title": "EvaluationOut",
+        "type": "object"
+      },
+      "FieldIn": {
+        "additionalProperties": false,
+        "properties": {
+          "angle": {
+            "exclusiveMaximum": 6.283185307179586,
+            "minimum": 0.0,
+            "title": "Angle",
+            "type": "number"
+          },
+          "current_a": {
+            "exclusiveMinimum": 0.0,
+            "title": "Current A",
+            "type": "number"
+          }
+        },
+        "required": [
+          "angle",
+          "current_a"
+        ],
+        "title": "FieldIn",
         "type": "object"
       },
       "FixedWinding": {
@@ -3015,6 +3132,134 @@
         "title": "ValidationOut",
         "type": "object"
       },
+      "WaveformsOut": {
+        "properties": {
+          "current": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Current",
+            "type": "array"
+          },
+          "line": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Line",
+            "type": "array"
+          },
+          "psi": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Psi",
+            "type": "array"
+          },
+          "theta": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta",
+            "type": "array"
+          },
+          "theta_el": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Theta El",
+            "type": "array"
+          },
+          "torque": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Torque",
+            "type": "array"
+          },
+          "voltage": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Voltage",
+            "type": "array"
+          }
+        },
+        "required": [
+          "theta",
+          "theta_el",
+          "current",
+          "psi",
+          "voltage",
+          "torque",
+          "line"
+        ],
+        "title": "WaveformsOut",
+        "type": "object"
+      },
       "WindingOut": {
         "properties": {
           "copper_area": {
@@ -3177,7 +3422,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3378,6 +3623,55 @@
         "summary": "Patch Case"
       }
     },
+    "/api/cases/{case_id}/animate": {
+      "post": {
+        "operationId": "animate_case_api_cases__case_id__animate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnimateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Animate Case"
+      }
+    },
     "/api/cases/{case_id}/estimate": {
       "get": {
         "operationId": "estimate_api_cases__case_id__estimate_get",
@@ -3471,6 +3765,90 @@
           }
         },
         "summary": "Evaluate Case"
+      }
+    },
+    "/api/cases/{case_id}/field": {
+      "post": {
+        "operationId": "field_snapshot_api_cases__case_id__field_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Field Snapshot"
+      }
+    },
+    "/api/cases/{case_id}/field/mesh": {
+      "get": {
+        "operationId": "field_mesh_route_api_cases__case_id__field_mesh_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Field Mesh Route"
       }
     },
     "/api/cases/{case_id}/map.mat": {
@@ -3857,6 +4235,43 @@
           }
         },
         "summary": "Job Events"
+      }
+    },
+    "/api/jobs/{job_id}/frames": {
+      "get": {
+        "operationId": "job_frames_api_jobs__job_id__frames_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Frames"
       }
     },
     "/api/jobs/{job_id}/result": {

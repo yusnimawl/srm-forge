@@ -23,7 +23,9 @@ from scipy.io import savemat
 
 import srmcore
 import srmweb
-from srmapp.case import LIMIT_FIELDS, CaseInputs
+from srmapp import field
+from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
+from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
 from srmcore.materials.schema import SoftMagneticMaterial
@@ -32,14 +34,17 @@ from srmcore.model.errors import InputError
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
 from srmweb.config import Settings
+from srmweb.frames import FieldContext, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
+from srmweb.quick import LaneTimeout
 from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (CandidateCase, CasePatch, EditCase, EstimateOut,
-                            EvaluateBody, EvaluateRequest, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
+from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, EditCase, EstimateOut,
+                            EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
                             ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
                           setup_from_case, setup_loc)
+from srmweb.serialize import to_json
 from srmweb.store import ACTIVE, RESUMABLE, Store
 
 _POLL_S = 0.5
@@ -393,6 +398,81 @@ def create_app(settings: Settings,
     def check_setup(setup: SetupFile):
         return setup
 
+    def field_context(case_id: str) -> FieldContext:
+        case = case_or_404(case_id)
+        evaluation = None if case["stale"] else store.case_result(case_id, "evaluate")
+        if evaluation is None or evaluation.get("status") != "ok" or not evaluation.get("winding"):
+            raise HTTPException(409, "evaluate this case first")
+        inputs = CaseInputs.model_validate(case["inputs"])
+        w = evaluation["winding"]
+        return FieldContext(reference_design(inputs), inputs, w["turns"] / (w["paths"] * REFERENCE_TURNS),
+                            evaluation["key"]["i_max"], w["current"])
+
+    def limited_context(case_id: str, current_a: float) -> FieldContext:
+        ctx = field_context(case_id)
+        if current_a > 2 * ctx.i_max:
+            raise HTTPException(422, "current above twice the map's top current")
+        return ctx
+
+    def quick_run(fn, *args):
+        try:
+            return runner.quick.run(fn, *args)
+        except LaneTimeout as exc:
+            raise HTTPException(504, "the field solve took longer than 120 s") from exc
+        except Exception as exc:
+            raise HTTPException(500, f"{type(exc).__name__}: {exc}") from exc
+
+    def binary(meta: dict, arrays: dict) -> Response:
+        return Response(pack(to_json(meta), arrays), media_type="application/octet-stream")
+
+    @router.get("/cases/{case_id}/field/mesh")
+    def field_mesh_route(case_id: str):
+        ctx = field_context(case_id)
+        mesh = quick_run(mesh_task, ctx.design, settings.cache_dir)
+        key = store.case_result(case_id, "evaluate")["key"]
+        meta = {"n_stator_nodes": mesh.n_stator_nodes, "regions": [r.__dict__ for r in mesh.regions],
+                "b_last": mesh.b_last, "n_rotor_poles": ctx.inputs.design.machine.n_rotor_poles,
+                "aligned_angle": key["aligned_angle"], "unaligned_angle": key["unaligned_angle"],
+                "winding_current": ctx.winding_current, "i_max": ctx.i_max}
+        return binary(meta, {
+            "nodes": mesh.nodes.astype(np.float32), "triangles": mesh.triangles.astype(np.uint32),
+            "region": mesh.region.astype(np.uint8),
+            **{f"probe.{z}": mesh.probes[z].astype(np.uint32) for z in ("stator_pole", "stator_yoke", "rotor_pole")}})
+
+    @router.post("/cases/{case_id}/field")
+    def field_snapshot(case_id: str, body: FieldIn):
+        ctx = limited_context(case_id, body.current_a)
+        frame = quick_run(frame_task, ctx.design, body.angle, body.current_a * ctx.k, settings.cache_dir)
+        meta = {"angle": body.angle, "current_a": body.current_a, "psi": frame.psi * ctx.k,
+                "torque": frame.torque, "status": frame.status, "probes": frame.probes}
+        return binary(meta, {"band": frame.band.astype(np.uint32), "b": frame.b.astype(np.float32),
+                             "a": frame.a.astype(np.float32)})
+
+    @router.post("/cases/{case_id}/animate", status_code=201, response_model=JobCreated)
+    def animate_case(case_id: str, body: AnimateIn):
+        ctx = limited_context(case_id, body.current_a)
+        request = AnimateRequest(case_id=case_id, inputs=ctx.inputs, current_a=body.current_a,
+                                 coil_current=body.current_a * ctx.k, k=ctx.k, frames=body.frames)
+        return {"job_id": _submit(runner, "animate", request.model_dump(mode="json"))["id"]}
+
+    @router.get("/jobs/{job_id}/frames")
+    def job_frames(job_id: str):
+        job = job_or_404(job_id)
+        result = store.get_result(job_id) if job["kind"] == "animate" else None
+        if result is None or result.get("cancelled"):
+            raise HTTPException(404, "no frames")
+        request = AnimateRequest.model_validate(job["request"])
+        design = reference_design(request.inputs)
+        frames = [field.cached_frame(design, angle, request.coil_current, cache_dir=settings.cache_dir)
+                  for angle in result["angles"]]
+        if any(f is None for f in frames):
+            raise HTTPException(410, "the frames were cleared; animate again")
+        arrays = {}
+        for n, f in enumerate(frames):
+            arrays |= {f"band.{n}": f.band.astype(np.uint32), f"b.{n}": f.b.astype(np.float32),
+                       f"a.{n}": f.a.astype(np.float32)}
+        return binary(result, arrays)
+
     @router.get("/cases/{case_id}/map.mat")
     def map_mat(case_id: str):
         case_or_404(case_id)
@@ -415,7 +495,9 @@ def create_app(settings: Settings,
         return Response(status_code=204)
 
     def cache_files():
-        return list(settings.cache_dir.glob("*.h5")) if settings.cache_dir.is_dir() else []
+        if not settings.cache_dir.is_dir():
+            return []
+        return [*settings.cache_dir.glob("*.h5"), *(f for f in (settings.cache_dir / "fields").glob("*.npz") if not f.name.endswith(".tmp.npz"))]
 
     @router.get("/settings/cache")
     def cache_info():
@@ -425,7 +507,7 @@ def create_app(settings: Settings,
 
     @router.delete("/settings/cache", status_code=204)
     def clear_cache():
-        if runner.busy():
+        if runner.busy() or runner.busy("quick") or runner.quick.busy():
             raise HTTPException(409, "a job is running; wait for it or cancel it")
         for f in cache_files():
             f.unlink(missing_ok=True)
