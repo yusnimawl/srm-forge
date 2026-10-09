@@ -172,7 +172,7 @@ function CaseEditor({ data }: { data: Case }) {
               evaluation.status === "ok" ? (
                 <div className="space-y-6">
                   <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
-                    <AnalysisTabs evaluation={evaluation} label={data.label || data.id} />
+                    <AnalysisTabs evaluation={evaluation} label={data.label || data.id} baseSpeedRpm={(data.inputs as { requirements?: { base_speed_rpm?: number } }).requirements?.base_speed_rpm} caseId={data.id} />
                   </Suspense>
                   {data.validation && <ValidationPanel validation={data.validation} winding={evaluation.winding} />}
                 </div>
