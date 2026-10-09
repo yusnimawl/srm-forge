@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { errorMessage } from "@/lib/errorMessage"
 import { bMaxOf, canRender, type Layers } from "@/lib/fieldGl"
 import { electricalDeg } from "@/lib/fieldView"
+import type { FieldFrameData } from "@/lib/fieldWire"
 
 const LAYER_LABELS: [keyof Layers, string][] = [
   ["bmap", "|B| map"],
@@ -29,6 +30,8 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const [layers, setLayers] = useState<Layers>({ bmap: true, flux: true, mesh: false, outlines: true })
   const [deg, setDeg] = useState(0)
   const [current, setCurrent] = useState<string | null>(null)
+  // The last frame stays on screen while the next one solves, so the canvas (and its zoom) persists.
+  const [frame, setFrame] = useState<FieldFrameData | null>(null)
   const [hover, setHover] = useState<string | null>(null)
   const mesh = meshQ.data
   const renderMode = useMemo(canRender, [])
@@ -42,7 +45,6 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const a = Number(amps)
   const tooHigh = a > 2 * mesh.iMax
   const currentError = amps.trim() === "" || !Number.isFinite(a) ? "Enter a current in A." : tooHigh ? `At most ${(2 * mesh.iMax).toFixed(1)} A (twice the map's top current).` : undefined
-  const frame = snap.data
 
   return (
     <div className="space-y-4 pt-2">
@@ -92,7 +94,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
             {currentError && <p id="field-current-err" className="text-sm text-destructive">{currentError}</p>}
           </div>
           <Button type="button" className="min-h-11" disabled={!!currentError || snap.isPending}
-            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a })}>
+            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a }, { onSuccess: setFrame })}>
             {snap.isPending ? "Solving..." : "Show"}
           </Button>
           <p className="text-xs text-muted-foreground">First view about 10 s (mesh + one solve); repeats are instant from the cache.</p>

@@ -127,24 +127,30 @@ void main(){ o = use_c > 0.5 ? vec4(vc, 1.0) : flat_c; }`
 
 export type Renderer = { draw: (s: Scene, m: Float32Array, bmap: boolean) => void; dispose: () => void }
 
-/** WebGL2 renderer on `canvas`, or null when the context or the program is unavailable. */
-export function createGlRenderer(canvas: HTMLCanvasElement): Renderer | null {
+/** WebGL2 renderer on `canvas`, or null when the context or the program is unavailable. `onLost` is called when the context is dropped. */
+export function createGlRenderer(canvas: HTMLCanvasElement, onLost?: () => void): Renderer | null {
   const gl = canvas.getContext("webgl2", { premultipliedAlpha: false })
   if (!gl) return null
-  const shader = (type: number, src: string) => {
-    const sh = gl.createShader(type)!
+  const prog = gl.createProgram()
+  const vs = gl.createShader(gl.VERTEX_SHADER)
+  const fs = gl.createShader(gl.FRAGMENT_SHADER)
+  const vao = gl.createVertexArray()
+  const buffers: (WebGLBuffer | null)[] = []
+  const release = () => {
+    buffers.forEach((b) => gl.deleteBuffer(b))
+    gl.deleteVertexArray(vao)
+    gl.deleteProgram(prog)
+    gl.deleteShader(vs)
+    gl.deleteShader(fs)
+  }
+  if (!prog || !vs || !fs || !vao) { release(); return null }
+  for (const [sh, src] of [[vs, VS], [fs, FS]] as const) {
     gl.shaderSource(sh, src)
     gl.compileShader(sh)
-    return gl.getShaderParameter(sh, gl.COMPILE_STATUS) ? sh : null
+    gl.attachShader(prog, sh)
   }
-  const vs = shader(gl.VERTEX_SHADER, VS)
-  const fs = shader(gl.FRAGMENT_SHADER, FS)
-  if (!vs || !fs) return null
-  const prog = gl.createProgram()!
-  gl.attachShader(prog, vs)
-  gl.attachShader(prog, fs)
   gl.linkProgram(prog)
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { release(); return null }
   const loc = {
     p: gl.getAttribLocation(prog, "p"),
     c: gl.getAttribLocation(prog, "c"),
@@ -152,49 +158,79 @@ export function createGlRenderer(canvas: HTMLCanvasElement): Renderer | null {
     f: gl.getUniformLocation(prog, "flat_c"),
     u: gl.getUniformLocation(prog, "use_c"),
   }
-  const vao = gl.createVertexArray()
-  const bufs = [gl.createBuffer(), gl.createBuffer()]
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+  const lost = (e: Event) => { e.preventDefault(); onLost?.() }
+  canvas.addEventListener("webglcontextlost", lost)
 
-  const upload = (b: WebGLBuffer | null, data: Float32Array, attr: number, size: number) => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, b)
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW)
-    gl.enableVertexAttribArray(attr)
-    gl.vertexAttribPointer(attr, size, gl.FLOAT, false, 0, 0)
+  // One vertex array per layer, filled once per scene; a draw only sets the view uniform.
+  type Layer = { vao: WebGLVertexArrayObject; n: number }
+  const layer = (data: Float32Array, size: number, extra?: Float32Array): Layer => {
+    const v = gl.createVertexArray()!
+    gl.bindVertexArray(v)
+    const put = (d: Float32Array, attr: number, sz: number) => {
+      const b = gl.createBuffer()
+      buffers.push(b)
+      gl.bindBuffer(gl.ARRAY_BUFFER, b)
+      gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW)
+      gl.enableVertexAttribArray(attr)
+      gl.vertexAttribPointer(attr, sz, gl.FLOAT, false, 0, 0)
+    }
+    put(data, loc.p, size)
+    if (extra) put(extra, loc.c, 3)
+    else gl.vertexAttrib3f(loc.c, 0, 0, 0)
+    return { vao: v, n: data.length / size }
+  }
+  let uploaded: Scene | null = null
+  let tri: Layer | null = null
+  let lines: Layer[] = []
+  const vaos: WebGLVertexArrayObject[] = []
+  const drop = () => {
+    vaos.forEach((v) => gl.deleteVertexArray(v))
+    vaos.length = 0
+    buffers.forEach((b) => gl.deleteBuffer(b))
+    buffers.length = 0
+  }
+  const upload = (s: Scene) => {
+    drop()
+    tri = layer(s.triPos, 2, s.triRgb)
+    lines = s.lines.map((l) => layer(l.xy, 2))
+    vaos.push(tri.vao, ...lines.map((l) => l.vao))
+    uploaded = s
   }
   return {
     draw(s, m, bmap) {
+      if (s !== uploaded) upload(s)
       gl.viewport(0, 0, canvas.width, canvas.height)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.useProgram(prog)
-      gl.bindVertexArray(vao)
       gl.uniformMatrix3fv(loc.m, false, m)
-      if (bmap) {
-        upload(bufs[0], s.triPos, loc.p, 2)
-        upload(bufs[1], s.triRgb, loc.c, 3)
+      if (bmap && tri) {
         gl.uniform1f(loc.u, 1)
-        gl.drawArrays(gl.TRIANGLES, 0, s.triPos.length / 2)
+        gl.bindVertexArray(tri.vao)
+        gl.drawArrays(gl.TRIANGLES, 0, tri.n)
       }
-      gl.disableVertexAttribArray(loc.c)
-      gl.vertexAttrib3f(loc.c, 0, 0, 0)
       gl.uniform1f(loc.u, 0)
-      for (const l of s.lines) {
-        upload(bufs[0], l.xy, loc.p, 2)
-        gl.uniform4fv(loc.f, l.color)
-        gl.drawArrays(gl.LINES, 0, l.xy.length / 2)
-      }
+      lines.forEach((l, i) => {
+        gl.uniform4fv(loc.f, s.lines[i].color)
+        gl.bindVertexArray(l.vao)
+        gl.drawArrays(gl.LINES, 0, l.n)
+      })
     },
     dispose() {
-      gl.getExtension("WEBGL_lose_context")?.loseContext()
+      canvas.removeEventListener("webglcontextlost", lost)
+      drop()
+      release()
     },
   }
 }
 
 export function canRender(): "webgl2" | "canvas2d" {
   try {
-    return document.createElement("canvas").getContext("webgl2") ? "webgl2" : "canvas2d"
+    const gl = document.createElement("canvas").getContext("webgl2")
+    gl?.getExtension("WEBGL_lose_context")?.loseContext()
+    return gl ? "webgl2" : "canvas2d"
   } catch {
     return "canvas2d"
   }

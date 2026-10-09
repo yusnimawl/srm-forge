@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { buildScene, createGlRenderer, draw2d, viewMatrix, type Layers, type Renderer } from "@/lib/fieldGl"
+import { buildScene, canRender, createGlRenderer, draw2d, viewMatrix, type Layers, type Renderer } from "@/lib/fieldGl"
 import { pickTriangle } from "@/lib/fieldView"
 import type { FieldFrameData, FieldMeshData } from "@/lib/fieldWire"
 
@@ -24,13 +24,19 @@ export default function FieldCanvas({ mesh, frame, layers, onHover }: {
   const ref = useRef<HTMLCanvasElement>(null)
   const renderer = useRef<Renderer | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
+  // A canvas that has held a webgl2 context cannot give a 2d one, so falling back remounts a fresh canvas.
+  const [mode, setMode] = useState<{ gl: boolean; key: number }>(() => ({ gl: canRender() === "webgl2", key: 0 }))
+  const [ready, setReady] = useState(false)
   const [view, setView] = useState<View>(HOME)
   const scene = useMemo(() => buildScene(mesh, frame, layers), [mesh, frame, layers])
   const m = useMemo(() => viewMatrix(scene.bounds, size.w || 1, size.h || 1, view.zoom, view.pan), [scene.bounds, size, view])
 
   useEffect(() => {
     const c = ref.current!
-    renderer.current = createGlRenderer(c)
+    const fallBack = () => setMode((o) => ({ gl: false, key: o.key + 1 }))
+    renderer.current = mode.gl ? createGlRenderer(c, fallBack) : null
+    if (mode.gl && !renderer.current) fallBack()
+    setReady(true)
     const ro = new ResizeObserver(() => {
       const dpr = window.devicePixelRatio || 1
       const w = Math.max(1, Math.round(c.clientWidth * dpr))
@@ -44,15 +50,19 @@ export default function FieldCanvas({ mesh, frame, layers, onHover }: {
       ro.disconnect()
       renderer.current?.dispose()
       renderer.current = null
+      setReady(false)
     }
-  }, [])
+  }, [mode])
 
   useEffect(() => {
     const c = ref.current!
-    if (size.w === 0) return
+    if (!ready || size.w === 0) return
     if (renderer.current) renderer.current.draw(scene, m, layers.bmap)
-    else draw2d(c.getContext("2d")!, scene, m, size.w, size.h, layers.bmap)
-  }, [scene, m, size, layers.bmap])
+    else {
+      const ctx = c.getContext("2d")
+      if (ctx) draw2d(ctx, scene, m, size.w, size.h, layers.bmap)
+    }
+  }, [ready, scene, m, size, layers.bmap])
 
   const clipOf = (clientX: number, clientY: number): [number, number] => {
     const r = ref.current!.getBoundingClientRect()
@@ -97,6 +107,7 @@ export default function FieldCanvas({ mesh, frame, layers, onHover }: {
   return (
     <div className="relative">
       <canvas
+        key={mode.key}
         ref={ref}
         tabIndex={0}
         role="img"
