@@ -32,6 +32,18 @@ export const bMaxOf = (mesh: FieldMeshData, frame: FieldFrameData): number => {
   return m
 }
 
+/** One |B| scale for a whole set of frames, so colours compare across them. */
+export const bMaxOfFrames = (mesh: FieldMeshData, frames: FieldFrameData[]): number =>
+  frames.reduce((m, f) => Math.max(m, bMaxOf(mesh, f)), mesh.bLast)
+
+// Region edges of the static triangles are the same at every angle: the band's boundary edges are boundary edges of the static mesh.
+const staticEdges = new WeakMap<FieldMeshData, Uint32Array>()
+function regionEdgesOf(mesh: FieldMeshData): Uint32Array {
+  let e = staticEdges.get(mesh)
+  if (!e) staticEdges.set(mesh, (e = regionEdges(mesh.triangles, mesh.region)))
+  return e
+}
+
 /** Everything a renderer draws, in world metres. */
 export type Scene = {
   xy: Float32Array
@@ -55,11 +67,12 @@ function edgeCoords(xy: Float32Array, idx: Uint32Array): Float32Array {
   return out
 }
 
-export function buildScene(mesh: FieldMeshData, frame: FieldFrameData, layers: Layers): Scene {
+/** `bMaxOverride` fixes the colour scale; by default it is the frame's own maximum. */
+export function buildScene(mesh: FieldMeshData, frame: FieldFrameData, layers: Layers, bMaxOverride?: number): Scene {
   const xy = positions(mesh, frame.angle)
   const tris = allTriangles(mesh, frame)
   const nt = tris.length / 3
-  const bMax = bMaxOf(mesh, frame)
+  const bMax = bMaxOverride ?? bMaxOf(mesh, frame)
   const triPos = new Float32Array(nt * 6)
   const triRgb = new Float32Array(nt * 9)
   for (let t = 0; t < nt; t++) {
@@ -78,7 +91,7 @@ export function buildScene(mesh: FieldMeshData, frame: FieldFrameData, layers: L
     lines.push({ xy: edgeCoords(xy, e), color: WIRE })
   }
   if (layers.flux) lines.push({ xy: contourSegments(xy, tris, frame.a, contourLevels(frame.a)), color: FLUX })
-  if (layers.outlines) lines.push({ xy: edgeCoords(xy, regionEdges(tris, mesh.region)), color: OUTLINE })
+  if (layers.outlines) lines.push({ xy: edgeCoords(xy, regionEdgesOf(mesh)), color: OUTLINE })
   return { xy, tris, triPos, triRgb, lines, bounds: boundsOf(xy), bMax }
 }
 

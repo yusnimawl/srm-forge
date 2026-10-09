@@ -15,10 +15,12 @@ function hoverText(mesh: FieldMeshData, frame: FieldFrameData, t: number): strin
 }
 
 /** The field of one frame: B per element, flux lines, mesh and region outlines. Wheel or pinch zooms, drag pans, arrow keys and +/- work too. */
-export default function FieldCanvas({ mesh, frame, layers, onHover }: {
+export default function FieldCanvas({ mesh, frame, layers, bMax, onHover }: {
   mesh: FieldMeshData
   frame: FieldFrameData
   layers: Layers
+  /** Fixed colour scale (T); default is the frame's own maximum. */
+  bMax?: number
   onHover?: (text: string | null) => void
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -28,7 +30,7 @@ export default function FieldCanvas({ mesh, frame, layers, onHover }: {
   const [mode, setMode] = useState<{ gl: boolean; key: number }>(() => ({ gl: canRender() === "webgl2", key: 0 }))
   const [ready, setReady] = useState(false)
   const [view, setView] = useState<View>(HOME)
-  const scene = useMemo(() => buildScene(mesh, frame, layers), [mesh, frame, layers])
+  const scene = useMemo(() => buildScene(mesh, frame, layers, bMax), [mesh, frame, layers, bMax])
   const m = useMemo(() => viewMatrix(scene.bounds, size.w || 1, size.h || 1, view.zoom, view.pan), [scene.bounds, size, view])
 
   useEffect(() => {

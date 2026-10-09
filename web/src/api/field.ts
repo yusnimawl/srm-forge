@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, ApiError } from "./client"
 import { frameFromWire, framesFromWire, meshFromWire } from "@/lib/fieldWire"
 
@@ -34,11 +34,14 @@ export const useFieldSnapshot = (caseId: string) =>
   })
 
 /** Starts a stroke animation of `frames` field frames at a phase current; resolves with the job id. */
-export const useAnimate = (caseId: string) =>
-  useMutation({
+export const useAnimate = (caseId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
     mutationFn: (v: { current_a: number; frames: number }) =>
       api<{ job_id: string }>(`/api/cases/${caseId}/animate`, { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["case", caseId] }),
   })
+}
 
 /** The frames of a finished animate job, loaded once. */
 export const useFrames = (jobId: string | null) =>

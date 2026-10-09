@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { useFieldMesh, useFieldSnapshot } from "@/api/field"
 import { ApiError } from "@/api/client"
-import AnimationSection from "./AnimationSection"
+import AnimationSection, { type AnimShown } from "./AnimationSection"
 import ColorBar from "@/components/field/ColorBar"
 import FieldCanvas from "@/components/field/FieldCanvas"
 import { Button } from "@/components/ui/button"
@@ -34,11 +34,16 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   // The last frame stays on screen while the next one solves, so the canvas (and its zoom) persists.
   const [frame, setFrame] = useState<FieldFrameData | null>(null)
   // While an animation is shown its frame replaces the snapshot; the canvas stays mounted.
-  const [animFrame, setAnimFrame] = useState<FieldFrameData | null>(null)
-  const onAnimFrame = useCallback((f: FieldFrameData | null) => setAnimFrame(f), [])
+  const [anim, setAnim] = useState<AnimShown | null>(null)
+  const [source, setSource] = useState<"snap" | "anim">("snap")
+  const onAnimFrame = useCallback((f: AnimShown | null) => {
+    setAnim(f)
+    if (f) setSource("anim")
+  }, [])
   const [hover, setHover] = useState<string | null>(null)
   const mesh = meshQ.data
-  const shown = animFrame ?? frame
+  const shown = source === "anim" && anim ? anim.frame : frame
+  const shownBMax = source === "anim" && anim ? anim.bMax : undefined
   const renderMode = useMemo(canRender, [])
 
   if (meshQ.isPending) return <p className="py-4 text-sm text-muted-foreground">Loading the field mesh...</p>
@@ -61,9 +66,9 @@ export default function FieldTab({ caseId }: { caseId: string }) {
           {shown ? (
             <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start">
               <div className="mx-auto w-full min-w-0 max-w-[70vh] flex-1">
-                <FieldCanvas mesh={mesh} frame={shown} layers={layers} onHover={setHover} />
+                <FieldCanvas mesh={mesh} frame={shown} layers={layers} bMax={shownBMax} onHover={setHover} />
               </div>
-              <ColorBar bMax={bMaxOf(mesh, shown)} bLast={mesh.bLast} />
+              <ColorBar bMax={shownBMax ?? bMaxOf(mesh, shown)} bLast={mesh.bLast} />
             </div>
           ) : (
             <div className="mx-auto grid aspect-square w-full max-w-[70vh] place-items-center rounded-lg border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
@@ -99,7 +104,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
             {currentError && <p id="field-current-err" className="text-sm text-destructive">{currentError}</p>}
           </div>
           <Button type="button" className="min-h-11" disabled={!!currentError || snap.isPending}
-            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a }, { onSuccess: setFrame })}>
+            onClick={() => snap.mutate({ angle: deg * RAD, current_a: a }, { onSuccess: (f) => { setFrame(f); setSource("snap") } })}>
             {snap.isPending ? "Solving..." : "Show"}
           </Button>
           <p className="text-xs text-muted-foreground">First view about 10 s (mesh + one solve); repeats are instant from the cache.</p>
@@ -113,22 +118,22 @@ export default function FieldTab({ caseId }: { caseId: string }) {
               </label>
             ))}
           </fieldset>
-          {frame && (
+          {shown && (
             <dl className="grid grid-cols-2 gap-1 text-sm">
               <dt className="text-muted-foreground">Flux linkage</dt>
-              <dd className="font-mono">{(frame.psi * 1e3).toFixed(2)} mWb</dd>
+              <dd className="font-mono">{(shown.psi * 1e3).toFixed(2)} mWb</dd>
               <dt className="text-muted-foreground">Torque</dt>
-              <dd className="font-mono">{frame.torque.toFixed(2)} N·m</dd>
+              <dd className="font-mono">{shown.torque.toFixed(2)} N·m</dd>
             </dl>
           )}
-          {frame?.status === "NONCONVERGED" && (
+          {source === "snap" && shown?.status === "NONCONVERGED" && (
             <p className="text-sm text-destructive">The solve did not converge; read this frame with care.</p>
           )}
           {snap.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{detail(snap.error)}</p>}
         </div>
       </div>
       {renderMode === "webgl2" && (
-        <AnimationSection caseId={caseId} nRotorPoles={mesh.nRotorPoles} current={a} currentError={currentError} onFrame={onAnimFrame} />
+        <AnimationSection caseId={caseId} mesh={mesh} current={a} currentError={currentError} onFrame={onAnimFrame} />
       )}
     </div>
   )

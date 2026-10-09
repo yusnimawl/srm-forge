@@ -12,13 +12,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { errorMessage } from "@/lib/errorMessage"
 import { animateEstimate } from "@/lib/fieldView"
-import type { FieldFrameData } from "@/lib/fieldWire"
+import type { FieldFrameData, FieldMeshData } from "@/lib/fieldWire"
+
+/** The animation frame on screen, with the colour scale shared by all frames. */
+export type AnimShown = { frame: FieldFrameData; bMax: number }
+import { bMaxOfFrames } from "@/lib/fieldGl"
 import { frameInterval, nextFrame, probeSeries, SPEEDS } from "@/lib/playback"
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
 
 /** Playback of the frames of one animate job once it is done; reports the shown frame through `onFrame`. */
-function Playback({ jobId, nRotorPoles, onFrame }: { jobId: string; nRotorPoles: number; onFrame: (f: FieldFrameData | null) => void }) {
+function Playback({ jobId, mesh, onFrame }: { jobId: string; mesh: FieldMeshData; onFrame: (f: AnimShown | null) => void }) {
   const { job } = useJobEvents(jobId)
   const actions = useJobActions()
   const done = job?.status === "done"
@@ -34,9 +38,11 @@ function Playback({ jobId, nRotorPoles, onFrame }: { jobId: string; nRotorPoles:
     return () => clearInterval(t)
   }, [frames, playing, speed])
   const shown = frames?.[Math.min(idx, (frames?.length ?? 1) - 1)] ?? null
-  useEffect(() => onFrame(shown), [shown, onFrame])
+  const bMax = useMemo(() => (frames && mesh ? bMaxOfFrames(mesh, frames) : 0), [frames, mesh])
+  // The most recent action wins: playing, scrubbing or loading frames puts the animation on screen.
+  useEffect(() => onFrame(shown && { frame: shown, bMax }), [shown, bMax, onFrame])
   useEffect(() => () => onFrame(null), [onFrame])
-  const series = useMemo(() => (frames ? probeSeries(frames, nRotorPoles) : []), [frames, nRotorPoles])
+  const series = useMemo(() => (frames ? probeSeries(frames, mesh.nRotorPoles) : []), [frames, mesh])
 
   if (!job) return <p className="text-sm text-muted-foreground">Loading the animation...</p>
   if (job.active) {
@@ -86,6 +92,9 @@ function Playback({ jobId, nRotorPoles, onFrame }: { jobId: string; nRotorPoles:
           <dd className="font-mono">{shown.torque.toFixed(2)} N·m</dd>
         </dl>
       </div>
+      {shown.status === "NONCONVERGED" && (
+        <p className="text-sm text-destructive">The solve did not converge; read this frame with care.</p>
+      )}
       <div className="space-y-1.5">
         <Label htmlFor="anim-frame">{`Frame ${idx + 1} of ${frames.length} at ${shown.currentA.toFixed(1)} A`}</Label>
         <input
@@ -111,12 +120,12 @@ function Playback({ jobId, nRotorPoles, onFrame }: { jobId: string; nRotorPoles:
 }
 
 /** Frame count, Animate stroke, and the playback of the running or loaded animation. */
-export default function AnimationSection({ caseId, nRotorPoles, current, currentError, onFrame }: {
+export default function AnimationSection({ caseId, mesh, current, currentError, onFrame }: {
   caseId: string
-  nRotorPoles: number
+  mesh: FieldMeshData
   current: number
   currentError?: string
-  onFrame: (f: FieldFrameData | null) => void
+  onFrame: (f: AnimShown | null) => void
 }) {
   const [frames, setFrames] = useState("36")
   const [jobId, setJobId] = useState<string | null>(null)
@@ -151,7 +160,7 @@ export default function AnimationSection({ caseId, nRotorPoles, current, current
         {framesError ?? `${animateEstimate(n)}, at the phase current above.`}
       </p>
       {animate.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{errorMessage(animate.error)}</p>}
-      {jobId && <Playback key={jobId} jobId={jobId} nRotorPoles={nRotorPoles} onFrame={onFrame} />}
+      {jobId && <Playback key={jobId} jobId={jobId} mesh={mesh} onFrame={onFrame} />}
     </section>
   )
 }
