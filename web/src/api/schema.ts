@@ -41,6 +41,23 @@ export interface paths {
         patch: operations["patch_case_api_cases__case_id__patch"];
         trace?: never;
     };
+    "/api/cases/{case_id}/animate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Animate Case */
+        post: operations["animate_case_api_cases__case_id__animate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/estimate": {
         parameters: {
             query?: never;
@@ -69,6 +86,40 @@ export interface paths {
         put?: never;
         /** Evaluate Case */
         post: operations["evaluate_case_api_cases__case_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/field": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Field Snapshot */
+        post: operations["field_snapshot_api_cases__case_id__field_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/field/mesh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Field Mesh Route */
+        get: operations["field_mesh_route_api_cases__case_id__field_mesh_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -226,6 +277,23 @@ export interface paths {
         };
         /** Job Events */
         get: operations["job_events_api_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Frames */
+        get: operations["job_frames_api_jobs__job_id__frames_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -409,6 +477,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnimateIn */
+        AnimateIn: {
+            /** Current A */
+            current_a: number;
+            /**
+             * Frames
+             * @default 36
+             */
+            frames: number;
+        };
         /** BudgetOut */
         BudgetOut: {
             /** Rows */
@@ -755,6 +833,13 @@ export interface components {
             /** Torque Ratio */
             torque_ratio: number | null;
             winding: components["schemas"]["WindingOut"] | null;
+        };
+        /** FieldIn */
+        FieldIn: {
+            /** Angle */
+            angle: number;
+            /** Current A */
+            current_a: number;
         };
         /** FixedWinding */
         FixedWinding: {
@@ -1552,6 +1637,41 @@ export interface operations {
             };
         };
     };
+    animate_case_api_cases__case_id__animate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnimateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     estimate_api_cases__case_id__estimate_get: {
         parameters: {
             query?: never;
@@ -1605,6 +1725,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_snapshot_api_cases__case_id__field_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_mesh_route_api_cases__case_id__field_mesh_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -1909,6 +2095,37 @@ export interface operations {
         };
     };
     job_events_api_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_frames_api_jobs__job_id__frames_get: {
         parameters: {
             query?: never;
             header?: never;

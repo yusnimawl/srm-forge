@@ -13,7 +13,7 @@ def _client(tmp_path, token):
     s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1,
                  token, 10, tmp_path)
     app = create_app(s, runner_factory=lambda store, st: JobRunner(
-        store, st, run_fn=lambda kind, req, rep: {"ok": 1}))
+        store, st, run_fn=lambda kind, req, rep, ctx: {"ok": 1}))
     return TestClient(app)
 
 

@@ -78,7 +78,7 @@ def _wait_done(client, job_id):
 
 
 def test_events_sends_current_state_first(make, gate):
-    def fn(kind, req, rep):
+    def fn(kind, req, rep, ctx):
         rep.progress(points_done=7)
         gate.wait(10)
         return {}
@@ -94,7 +94,7 @@ def test_events_sends_current_state_first(make, gate):
 
 
 def test_events_end_on_done(make, gate):
-    def fn(kind, req, rep):
+    def fn(kind, req, rep, ctx):
         rep.progress(points_done=1)
         gate.wait(10)
         return {}
@@ -110,7 +110,7 @@ def test_events_end_on_done(make, gate):
 
 
 def test_events_terminal_job_single_end(make):
-    c = make(lambda kind, req, rep: {})
+    c = make(lambda kind, req, rep, ctx: {})
     j = c.post("/api/jobs", json=BODY).json()["id"]
     _wait_done(c, j)
     ev = _events(c, j, lambda n, d: False)
@@ -119,14 +119,14 @@ def test_events_terminal_job_single_end(make):
 
 
 def test_events_404(make):
-    assert make(lambda kind, req, rep: {}).get("/api/jobs/x/events").status_code == 404
+    assert make(lambda kind, req, rep, ctx: {}).get("/api/jobs/x/events").status_code == 404
 
 
 def test_events_queued_then_running_then_end(make):
     gates = [threading.Event(), threading.Event()]
     calls = []
 
-    def fn(kind, req, rep):
+    def fn(kind, req, rep, ctx):
         calls.append(1)
         gates[len(calls) - 1].wait(10)
         return {}

@@ -22,7 +22,7 @@ from web_support import evaluation, store_search
 def client(tmp_path):
     s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1, None, 10, tmp_path / "nostatic")
     return TestClient(create_app(s, runner_factory=lambda store, st: JobRunner(
-        store, st, run_fn=lambda k, r, p: {}, quick=QuickLane(spawn=False))))
+        store, st, run_fn=lambda k, r, p, ctx: {}, quick=QuickLane(spawn=False))))
 
 
 def _case(client, stale=False, status="ok"):

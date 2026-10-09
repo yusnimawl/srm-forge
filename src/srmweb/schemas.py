@@ -61,6 +61,17 @@ class EvaluateRequest(BaseModel):
     grid: Grid | None = None
 
 
+class AnimateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    inputs: CaseInputs
+    current_a: float = Field(gt=0)
+    coil_current: float = Field(gt=0)
+    k: float = Field(gt=0)
+    frames: int = Field(36, ge=12, le=72)
+
+
 class ValidateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -180,6 +191,13 @@ class CasePatch(BaseModel):
         if inputs is not None:
             json.dumps(inputs, allow_nan=False)
         return inputs
+
+
+class AnimateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_a: float = Field(gt=0)
+    frames: int = Field(36, ge=12, le=72)
 
 
 class FieldIn(BaseModel):

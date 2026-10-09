@@ -23,7 +23,7 @@ SEARCH_REQUEST = {"requirements": REQ, "settings": {"margin": 1.1, "j_peak": 1.2
 
 def make_client(tmp_path):
     s = Settings("127.0.0.1", 8000, tmp_path / "a.db", tmp_path / "cache", 1, None, 10, tmp_path / "nostatic")
-    return TestClient(create_app(s, runner_factory=lambda store, st: JobRunner(store, st, run_fn=lambda k, r, p: {})))
+    return TestClient(create_app(s, runner_factory=lambda store, st: JobRunner(store, st, run_fn=lambda k, r, p, ctx: {})))
 
 
 def evaluation(ident: str, ok: bool = True) -> Evaluation:
