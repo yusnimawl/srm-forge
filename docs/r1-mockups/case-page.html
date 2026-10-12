@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R1 theme mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Shared structure; each theme only swaps tokens. */
+  :root, [data-theme="graphite"] {
+    --bg: #0a0a0a; --panel: #111111; --raised: #181818; --border: #232323; --border-strong: #333333;
+    --text: #ededed; --muted: #8a8a8a; --faint: #5c5c5c;
+    --accent: #ededed; --accent-text: #0a0a0a; --accent-soft: #ffffff14;
+    --ok: #9bd88a; --warn: #e8b04a; --bad: #f2716b;
+    --s1: #ededed; --s2: #e8b04a; --s3: #9bd88a; --s4: #e07fb5;
+    --iron: #2a2a2a; --iron-edge: #4a4a4a; --coil: #6b4a2b;
+  }
+  [data-theme="ember"] {
+    --bg: #0b0a09; --panel: #12100e; --raised: #1a1714; --border: #26221e; --border-strong: #3a332c;
+    --text: #efe9e2; --muted: #918a82; --faint: #5f5852;
+    --accent: #ff6b2c; --accent-text: #0b0a09; --accent-soft: #ff6b2c1f;
+    --ok: #a3d977; --warn: #f2b84b; --bad: #ff5c5c;
+    --s1: #ff6b2c; --s2: #efe9e2; --s3: #a3d977; --s4: #d98ad0;
+    --iron: #2b2622; --iron-edge: #4d443c; --coil: #8a4a24;
+  }
+  [data-theme="phosphor"] {
+    --bg: #070807; --panel: #0d0f0d; --raised: #141714; --border: #1f241f; --border-strong: #2f362f;
+    --text: #e4ebe4; --muted: #849084; --faint: #556055;
+    --accent: #5fe38a; --accent-text: #070807; --accent-soft: #5fe38a1c;
+    --ok: #5fe38a; --warn: #f0c04a; --bad: #ff6b6b;
+    --s1: #5fe38a; --s2: #f0c04a; --s3: #e4ebe4; --s4: #ff8fb1;
+    --iron: #1d221d; --iron-edge: #3d473d; --coil: #6e5a2a;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.5 "Geist", ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono, .num { font-family: "Geist Mono", ui-monospace, monospace; font-feature-settings: "tnum"; }
+
+  /* Theme picker (mockup only) */
+  .picker { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .picker span { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .picker button { font: inherit; font-size: 13px; color: var(--muted); background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .picker button[aria-pressed="true"] { color: var(--text); border-color: var(--border-strong); background: var(--raised); }
+  .picker .note { margin-left: auto; color: var(--faint); font-size: 12px; }
+
+  .shell { display: grid; grid-template-columns: 208px 1fr; min-height: calc(100vh - 51px); }
+  nav { border-right: 1px solid var(--border); padding: 16px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 10px 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand i { width: 14px; height: 14px; border: 2px solid var(--accent); border-radius: 50%; display: inline-block; }
+  nav a { color: var(--muted); text-decoration: none; padding: 7px 10px; border-radius: 6px; font-size: 13.5px; }
+  nav a:hover { color: var(--text); background: var(--raised); }
+  nav a.on { color: var(--text); background: var(--raised); }
+  nav .sep { height: 1px; background: var(--border); margin: 10px 6px; }
+
+  main { padding: 24px 28px 48px; min-width: 0; }
+  .crumbs { color: var(--faint); font-size: 12.5px; margin-bottom: 6px; }
+  .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .tag { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; }
+  .tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+  .spacer { flex: 1; }
+  .btn { font: inherit; font-size: 13px; font-weight: 500; border-radius: 6px; padding: 7px 14px; cursor: pointer;
+    border: 1px solid var(--border-strong); background: var(--raised); color: var(--text); }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .btn:hover { filter: brightness(1.12); }
+
+  .notes { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 18px; }
+  .note-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+  .note-chip b { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  .note-chip.warn b { background: var(--warn); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .card h2 { margin: 0; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+
+  .tabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+  .tabs button { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 8px 10px;
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+
+  .fields { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .field { display: grid; grid-template-columns: 1fr 140px; align-items: center; gap: 12px; }
+  .field label { color: var(--muted); font-size: 13px; }
+  .input { display: flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); }
+  .input input { width: 100%; min-width: 0; font: 13px "Geist Mono", monospace; color: var(--text); background: none; border: 0; padding: 7px 0 7px 10px; outline: none; }
+  .input span { color: var(--faint); font-size: 12px; padding: 0 10px; white-space: nowrap; }
+  .input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field.err .input { border-color: var(--bad); }
+  .hint { align-self: flex-end; color: var(--bad); font-size: 12px; margin-top: -6px; }
+
+  .diagram { display: grid; place-items: center; padding: 10px; }
+  .diagram svg { width: 100%; max-width: 300px; height: auto; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
+  .kpi { padding: 14px 16px; border-right: 1px solid var(--border); }
+  .kpi:last-child { border-right: 0; }
+  .kpi .v { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+  .kpi .v small { font-size: 12px; color: var(--muted); margin-left: 3px; font-weight: 400; }
+  .kpi .k { font-size: 12px; color: var(--muted); }
+  .chart { padding: 8px 12px 12px; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 16px; padding: 0 16px 14px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    nav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 12px; }
+    .brand { padding: 4px 10px; }
+    nav .sep { display: none; }
+    main { padding: 16px; }
+    .grid { grid-template-columns: 1fr; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi:nth-child(2) { border-right: 0; }
+    .kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+    .picker .note { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="picker" role="group" aria-label="Theme">
+  <span>Theme</span>
+  <button data-t="graphite" aria-pressed="true">1 · Graphite</button>
+  <button data-t="ember" aria-pressed="false">2 · Ember</button>
+  <button data-t="phosphor" aria-pressed="false">3 · Phosphor</button>
+  <span class="note">Mockup with sample numbers (8/6 reference). Layout is today's Case page.</span>
+</div>
+
+<div class="shell">
+  <nav aria-label="Main">
+    <div class="brand"><i></i>SRM designer</div>
+    <a href="#">New search</a>
+    <a href="#">Runs</a>
+    <a href="#" class="on">Cases</a>
+    <div class="sep"></div>
+    <a href="#">Settings</a>
+  </nav>
+
+  <main>
+    <div class="crumbs">Cases / 8_6-ref</div>
+    <div class="head">
+      <h1>8/6 reference · 10JNEX900</h1>
+      <span class="tag">reference</span>
+      <span class="tag ok">Evaluated</span>
+      <span class="spacer"></span>
+      <button class="btn">Export setup</button>
+      <button class="btn">map.mat</button>
+      <button class="btn primary">Edit</button>
+    </div>
+    <div class="notes">
+      <span class="note-chip"><b></b>2D-verified · srmcore 0.4.0</span>
+      <span class="note-chip warn"><b></b>Peak only · assumes j_limit 20 A/mm²</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="on">Requirement</button><button>Dimension</button><button>Material</button><button>Winding</button><button>Drive</button>
+        </div>
+        <div class="fields">
+          <div class="field"><label>Peak power</label><div class="input"><input value="12.0"><span>kW</span></div></div>
+          <div class="field"><label>Peak torque</label><div class="input"><input value="38.2"><span>N·m</span></div></div>
+          <div class="field"><label>Base speed</label><div class="input"><input value="3000"><span>rpm</span></div></div>
+          <div class="field"><label>Max speed</label><div class="input"><input value="9000"><span>rpm</span></div></div>
+          <div class="field"><label>Bus voltage</label><div class="input"><input value="400"><span>V</span></div></div>
+          <div class="field err"><label>Outer diameter limit</label><div class="input"><input value="0.15"><span>m</span></div></div>
+          <div class="hint">Below the stator OD 0.168 m</div>
+          <div class="field"><label>Mass limit</label><div class="input"><input value="" placeholder="none"><span>kg</span></div></div>
+        </div>
+        <div class="card-head" style="border-top:1px solid var(--border);border-bottom:0"><h2>Cross-section</h2><span class="mono" style="font-size:12px;color:var(--faint)">θ = 0°</span></div>
+        <div class="diagram"><svg id="motor" viewBox="-110 -110 220 220" aria-label="8/6 cross-section"></svg></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="on">Performance</button><button>Waveforms</button><button>Map</button><button>Design factors</button><button>Field</button>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="v num">12.4<small>N·m</small></div><div class="k">Peak static torque</div></div>
+          <div class="kpi"><div class="v num">32.9<small>mH</small></div><div class="k">La at 5 % I_max</div></div>
+          <div class="kpi"><div class="v num">3.59<small>mH</small></div><div class="k">Lu</div></div>
+          <div class="kpi"><div class="v num">0.32<small>Wb</small></div><div class="k">ψ_max</div></div>
+        </div>
+        <div class="card-head" style="border-bottom:0"><h2>Torque and power vs speed</h2><span class="mono" style="font-size:12px;color:var(--faint)">400 V · 20 A/mm²</span></div>
+        <div class="chart"><svg id="ts" viewBox="0 0 640 300" aria-label="Torque-speed chart"></svg></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Torque</span><span><i style="background:var(--s2)"></i>Power</span><span><i style="background:var(--s3)"></i>Efficiency (copper only)</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Theme picker
+  document.querySelectorAll(".picker button").forEach(b => b.addEventListener("click", () => {
+    document.documentElement.dataset.theme = b.dataset.t;
+    document.querySelectorAll(".picker button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  }));
+
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+
+  // Motor cross-section: 8 stator poles, 6 rotor poles, polar outlines.
+  function poleRing(r0, r1, n, arc, offset) {
+    // r0: base radius, r1: tip radius; poles of angular width `arc` (rad) around each centre.
+    const pts = [];
+    for (let k = 0; k < n; k++) {
+      const c = offset + 2 * Math.PI * k / n, a0 = c - arc / 2, a1 = c + arc / 2, next = c + 2 * Math.PI / n - arc / 2;
+      const steps = 6;
+      for (let s = 0; s <= steps; s++) { const a = a0 + (a1 - a0) * s / steps; pts.push([r1 * Math.cos(a), r1 * Math.sin(a)]); }
+      for (let s = 0; s <= steps * 2; s++) { const a = a1 + (next - a1) * s / (steps * 2); pts.push([r0 * Math.cos(a), r0 * Math.sin(a)]); }
+    }
+    return "M" + pts.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join("L") + "Z";
+  }
+  const m = document.getElementById("motor");
+  const css = getComputedStyle(document.documentElement);
+  // stator: outer circle minus pole ring (even-odd)
+  el("path", { d: "M100 0A100 100 0 1 0 -100 0A100 100 0 1 0 100 0Z " + poleRing(78, 52, 8, 0.36, 0),
+    "fill-rule": "evenodd", fill: "var(--iron)", stroke: "var(--iron-edge)", "stroke-width": 0.8 }, m);
+  // coils beside each stator pole
+  for (let k = 0; k < 8; k++) {
+    const c = 2 * Math.PI * k / 8;
+    for (const side of [-1, 1]) {
+      const a0 = c + side * 0.19, a1 = c + side * 0.36, ri = 58, ro = 75;
+      const p = [[ri, a0], [ro, a0], [ro, a1], [ri, a1]].map(([r, a]) => (r * Math.cos(a)).toFixed(2) + " " + (r * Math.sin(a)).toFixed(2));
+      el("path", { d: "M" + p.join("L") + "Z", fill: "var(--coil)", opacity: k % 4 === 0 ? 1 : 0.45 }, m);
+    }
+  }
+  // rotor and shaft
+  el("path", { d: poleRing(36, 51, 6, 0.42, 0), fill: "var(--iron)", stroke: "var(--iron-edge)", "stroke-width": 0.8 }, m);
+  el("circle", { r: 14, fill: "var(--bg)", stroke: "var(--iron-edge)", "stroke-width": 0.8 }, m);
+  // phase A axis
+  el("line", { x1: -104, y1: 0, x2: 104, y2: 0, stroke: "var(--accent)", "stroke-width": 0.6, "stroke-dasharray": "3 3", opacity: 0.7 }, m);
+
+  // Torque-speed chart
+  const s = document.getElementById("ts");
+  const W = 640, H = 300, L = 48, R = 48, T = 14, B = 34, pw = W - L - R, ph = H - T - B;
+  const nMax = 9000, nb = 3000, Tmax = 38.2, Pmax = 12.0;
+  const x = n => L + pw * n / nMax, yT = t => T + ph * (1 - t / 45), yP = p => T + ph * (1 - p / 14), yE = e => T + ph * (1 - e / 100);
+  for (let g = 0; g <= 9; g += 1.5) {
+    el("line", { x1: x(g * 1000), x2: x(g * 1000), y1: T, y2: T + ph, stroke: "var(--border)", "stroke-width": 1 }, s);
+    el("text", { x: x(g * 1000), y: H - 12, fill: "var(--faint)", "font-size": 11, "text-anchor": "middle", "font-family": "Geist Mono" }, s).textContent = g * 1000;
+  }
+  for (let t = 0; t <= 45; t += 15) {
+    el("line", { x1: L, x2: L + pw, y1: yT(t), y2: yT(t), stroke: "var(--border)", "stroke-width": 1 }, s);
+    el("text", { x: L - 8, y: yT(t) + 4, fill: "var(--faint)", "font-size": 11, "text-anchor": "end", "font-family": "Geist Mono" }, s).textContent = t;
+  }
+  for (let p = 0; p <= 14; p += 3.5)
+    el("text", { x: L + pw + 8, y: yP(p) + 4, fill: "var(--faint)", "font-size": 11, "font-family": "Geist Mono" }, s).textContent = p;
+  el("text", { x: L, y: H - 0, fill: "var(--muted)", "font-size": 11 }, s).textContent = "";
+  el("text", { x: L + pw / 2, y: H, fill: "var(--muted)", "font-size": 11, "text-anchor": "middle" }, s).textContent = "speed (rpm)";
+  el("text", { x: 12, y: T + 8, fill: "var(--muted)", "font-size": 11 }, s).textContent = "N·m";
+  el("text", { x: W - 26, y: T + 8, fill: "var(--muted)", "font-size": 11 }, s).textContent = "kW";
+  const torque = n => n <= nb ? Tmax : Pmax * 1000 / (n * 2 * Math.PI / 60) * Math.pow(nb / n, 0.35);
+  const line = (f, y) => { let d = ""; for (let n = 0; n <= nMax; n += 100) d += (n ? "L" : "M") + x(n).toFixed(1) + " " + y(f(n)).toFixed(1); return d; };
+  el("path", { d: line(n => 72 + 22 * (1 - Math.exp(-n / 1500)) - 4 * (n / nMax) ** 2, yE), fill: "none", stroke: "var(--s3)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, s);
+  el("path", { d: line(n => torque(n) * n * 2 * Math.PI / 60 / 1000, yP), fill: "none", stroke: "var(--s2)", "stroke-width": 2 }, s);
+  el("path", { d: line(torque, yT), fill: "none", stroke: "var(--s1)", "stroke-width": 2.25 }, s);
+  el("line", { x1: x(nb), x2: x(nb), y1: T, y2: T + ph, stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "2 4" }, s);
+  el("text", { x: x(nb) + 6, y: T + 12, fill: "var(--muted)", "font-size": 11 }, s).textContent = "base speed";
+</script>
+</body>
+</html>
