@@ -82,16 +82,14 @@ export function NewSearchPage() {
   const materialSelect = (key: "stator" | "rotor", label: string) => {
     const m = materials.data?.find((x) => x.name === v[key])
     return (
-      <Field id={key} label={label} error={errors[`settings.${key}`]}>
+      <Field id={key} label={label} error={errors[`settings.${key}`]}
+        aside={m && <Badge variant="secondary" className="shrink-0">Grade {m.grade}</Badge>}>
         {(aria) => (
-          <>
             <select {...aria} className={SELECT_CLASS} value={v[key]} onChange={(e) => set(key, e.target.value)}>
               {(materials.data ?? [{ name: v[key] }]).map((x) => (
                 <option key={x.name} value={x.name}>{x.name}</option>
               ))}
             </select>
-            {m && <Badge variant="secondary" className="shrink-0">Grade {m.grade}</Badge>}
-          </>
         )}
       </Field>
     )

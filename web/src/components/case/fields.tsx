@@ -18,11 +18,13 @@ export type TabProps = {
 
 export type Aria = { id: string; "aria-invalid": boolean; "aria-describedby"?: string }
 
-export function Field({ id, label, unit, hint, error, children }: {
+export function Field({ id, label, unit, hint, aside, error, children }: {
   id: string
   label: string
   unit?: string
   hint?: string
+  /** Shown in the row under the field, beside the hint. */
+  aside?: ReactNode
   error?: string
   children: (aria: Aria) => ReactNode
 }) {
@@ -35,7 +37,12 @@ export function Field({ id, label, unit, hint, error, children }: {
         {children({ id, "aria-invalid": !!error, "aria-describedby": described })}
         {unitText && <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-faint">{unitText}</span>}
       </div>
-      {hint && <p id={`${id}-hint`} className="col-span-2 text-xs text-faint">{hint}</p>}
+      {(hint || aside) && (
+        <div className="col-span-2 flex flex-wrap items-center justify-between gap-2">
+          {hint ? <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p> : <span />}
+          {aside}
+        </div>
+      )}
       {error && <p id={`${id}-err`} className="col-span-2 text-right text-xs text-destructive">{error}</p>}
     </div>
   )

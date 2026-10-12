@@ -149,12 +149,12 @@ function CaseEditor({ data }: { data: Case }) {
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <section aria-label="Inputs" className={cn("min-w-0 space-y-3", pane("input"))}>
           {check.isError && (
-            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <p role="alert" className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               Validation unavailable: {errorMessage(check.error)}
             </p>
           )}
           {unplaced.length > 0 && (
-            <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <p className="font-medium">Check the inputs:</p>
               <ul className="list-disc pl-5">
                 {unplaced.map((e, k) => <li key={k}>{e.loc.length > 0 ? `${issueKey(e.loc)}: ` : ""}{e.msg}</li>)}
@@ -162,7 +162,7 @@ function CaseEditor({ data }: { data: Case }) {
             </div>
           )}
           {(issues?.warnings.length ?? 0) > 0 && (
-            <ul className="list-disc rounded-lg border p-3 pl-8 text-sm text-muted-foreground">
+            <ul className="list-disc rounded-[10px] border p-3 pl-8 text-sm text-muted-foreground">
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}
