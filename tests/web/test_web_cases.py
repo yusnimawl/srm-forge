@@ -2,6 +2,7 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
+import srmcore.maps.validation as V
 from srmcore.maps.checks import Check
 from srmcore.maps.validation import BudgetRow, EmValidation, UncertaintyBudget
 from srmweb.serialize import to_json
@@ -140,10 +141,10 @@ def test_delete_case_while_job_active_409(client):
 def test_validation_result_and_label(client):
     case = _candidate(client).json()
     budget = UncertaintyBudget({"la": 1.0}, {"la": 1.1}, (BudgetRow("mesh", {"la": 0.01}, "n"),), {"la": 0.01})
-    ok = EmValidation("EM-validated", (Check("preset", "pass", 1.0, NAN, "full"),), budget, "0.4.0", {"stator": "B"})
+    ok = EmValidation(V.LABEL, (Check("preset", "pass", 1.0, NAN, "full"),), budget, "0.4.0", {"stator": "B"})
     client.app.state.store.put_result(None, to_json(ok), kind="validate", case_id=case["id"])
     got = client.get(f"/api/cases/{case['id']}").json()
-    assert got["validated"] is True and got["validation"]["label"] == "EM-validated"
+    assert got["validated"] is True and got["validation"]["label"] == V.LABEL
     assert got["validation"]["checks"][0]["limit"] is None
     assert got["validation"]["budget"]["rows"][0]["rel"] == {"la": 0.01}
     assert got["validation"]["engine_version"] == "0.4.0" and got["validation"]["material_grades"] == {"stator": "B"}
@@ -157,6 +158,20 @@ def test_list_cases_summaries_newest_first(client):
     assert [r["id"] for r in rows] == [b["id"], a["id"]]
     assert "inputs" not in rows[0] and rows[1]["power_ratio"] == 1.2 and rows[1]["mass_kg"] == 1.0
     assert rows[0]["torque_ratio"] is None and rows[0]["feasible"] is None
+
+
+def test_evaluation_stored_without_j_limit_still_serves(client):
+    from web_support import SEARCH_REQUEST, search_body
+
+    body = search_body(evaluation("c0"))
+    body["evaluations"][0].pop("j_limit", None)
+    job_id = client.app.state.store.create_job("search", SEARCH_REQUEST)
+    client.app.state.store.put_result(job_id, body, kind="search")
+    client.app.state.store.set_status(job_id, "done")
+    case = client.post("/api/cases", json={"origin": "candidate", "job_id": job_id, "candidate_id": "c0"}).json()
+    r = client.get(f"/api/cases/{case['id']}")
+    assert r.status_code == 200, r.text
+    assert r.json()["evaluation"]["j_limit"] is None
 
 
 def test_evaluation_stored_without_new_envelope_fields_still_serves(client):

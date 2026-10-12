@@ -21,6 +21,10 @@ from srmcore.model.errors import InputError
 DESIGN = Design(machine=make_8_6(), mesh=MeshSettings(preset="full"))
 
 
+def test_label_text():
+    assert V.LABEL == "2D-verified"
+
+
 def test_key_points_follow_the_key_numbers():
     r = synthetic_map(n_angles=16)
     pts = {p.key: p for p in key_points(r, DESIGN.machine)}

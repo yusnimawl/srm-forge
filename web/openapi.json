@@ -1326,6 +1326,17 @@
             "title": "Id",
             "type": "string"
           },
+          "j_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "J Limit"
+          },
           "j_rms": {
             "anyOf": [
               {

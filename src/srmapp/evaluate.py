@@ -62,11 +62,12 @@ class Evaluation:
     j_rms: float = _NAN         # A/m², conductor RMS current density at i_rms_a
     map: MapArrays | None = None  # set with status "ok"
     curves: MapCurves | None = None  # set with status "ok"
+    j_limit: float = J_LIMIT    # A/m², the RMS current-density limit the winding choice used
 
 
-def _failed(candidate: Candidate, stage: Stage1, status: str, error: str) -> Evaluation:
+def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limit: float) -> Evaluation:
     return Evaluation(candidate.id, candidate.design, status, error, stage.mass.iron, None,
-                      _NAN, _NAN, _NAN, _NAN, _NAN, False, None, None)
+                      _NAN, _NAN, _NAN, _NAN, _NAN, False, None, None, j_limit=j_limit)
 
 
 def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, grid: StageTwoGrid = StageTwoGrid(),
@@ -84,9 +85,9 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         result = build_map(design, stage.i_map if i_map is None else i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
     except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
-        return _failed(candidate, stage, type(exc).__name__, str(exc))
+        return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
     if not result.complete:
-        return _failed(candidate, stage, "cancelled", "map cancelled")
+        return _failed(candidate, stage, "cancelled", "map cancelled", j_limit)
     if on_scan is not None:
         on_scan()
     # L_end scales with turns², so the correction at the reference turns stays exact under rescale_turns.
@@ -98,7 +99,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     if choice.point is None:
         cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
         return _failed(candidate, stage, "no_winding",
-                       f"no turn count meets the wire, phase current and current-density limits{cap_text}")
+                       f"no turn count meets the wire, phase current and current-density limits{cap_text}", j_limit)
     w, env = choice.point.winding, choice.envelope
     chosen = machine.model_copy(update={"turns_per_pole": w.turns,
                                         "fill_factor": w.turns * w.copper_area / coil_side_area(machine)})
@@ -124,4 +125,4 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                       choice.point.torque_ratio, choice.point.power_ratio, peak_power, peak_power / 1000 / mass,
                       float(env.efficiency[at_base]), choice.feasible and not over_mass, env, key, choice.scan,
                       i_rms, i_rms / (w.paths * w.copper_area), arrays,
-                      map_curves(arrays, chosen, w, key, l_end * k * k))
+                      map_curves(arrays, chosen, w, key, l_end * k * k), j_limit)
