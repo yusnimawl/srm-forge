@@ -74,7 +74,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
               <ColorBar bMax={shownBMax ?? bMaxOf(mesh, shown)} bLast={mesh.bLast} />
             </div>
           ) : (
-            <div className="mx-auto grid aspect-square w-full max-w-[70vh] place-items-center rounded-lg border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
+            <div className="mx-auto grid aspect-square w-full max-w-[70vh] place-items-center rounded-[10px] border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
               {snap.isPending ? "Solving..." : "Choose an angle and a current, then press Show."}
             </div>
           )}
@@ -132,7 +132,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
           {source === "snap" && shown?.status === "NONCONVERGED" && (
             <p className="text-sm text-destructive">The solve did not converge; read this frame with care.</p>
           )}
-          {snap.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{detail(snap.error)}</p>}
+          {snap.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{detail(snap.error)}</p>}
         </div>
       </div>
       {renderMode === "webgl2" && (

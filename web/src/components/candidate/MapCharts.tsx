@@ -39,7 +39,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
   return (
     <>
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Flux linkage vs current</h2>
+        <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Flux linkage vs current</h2>
         <Plot
           data={lines as Data[]}
           layout={{ ...base, xaxis: axis("Current (A)"), yaxis: axis("ψ (mWb)"), legend: { title: { text: "Rotor angle" } } } as Partial<Layout>}
@@ -47,7 +47,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
         />
       </section>
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Torque map</h2>
+        <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Torque map</h2>
         <Plot
           data={heat as Data[]}
           layout={{ ...base, xaxis: axis("Current (A)"), yaxis: axis("Rotor angle (° mechanical)") } as Partial<Layout>}

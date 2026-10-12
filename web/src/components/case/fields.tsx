@@ -5,7 +5,7 @@ import type { CaseForm } from "@/lib/caseForm"
 import { UNIT_LABEL, type Unit } from "@/lib/units"
 
 export const SELECT_CLASS =
-  "min-h-11 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+  "min-h-11 w-full rounded-[6px] border border-border-strong bg-background px-2.5 font-mono text-[13px] outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/[0.08] aria-invalid:border-destructive disabled:opacity-50"
 
 /** What every input tab gets: the form, an updater, and the validation errors by dotted field name. */
 export type TabProps = {
@@ -29,14 +29,14 @@ export function Field({ id, label, unit, hint, error, children }: {
   const described = [hint && `${id}-hint`, error && `${id}-err`].filter(Boolean).join(" ") || undefined
   const unitText = unit && (unit in UNIT_LABEL ? UNIT_LABEL[unit as Unit] : unit)
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="flex items-center gap-2">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,9rem)] items-center gap-x-3 gap-y-1.5">
+      <Label htmlFor={id} className="text-[13px] font-normal leading-snug text-muted-foreground">{label}</Label>
+      <div className="relative [&_input]:pr-14">
         {children({ id, "aria-invalid": !!error, "aria-describedby": described })}
-        {unitText && <span className="w-12 shrink-0 text-sm text-muted-foreground">{unitText}</span>}
+        {unitText && <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-faint">{unitText}</span>}
       </div>
-      {hint && <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p>}
-      {error && <p id={`${id}-err`} className="text-sm text-destructive">{error}</p>}
+      {hint && <p id={`${id}-hint`} className="col-span-2 text-xs text-faint">{hint}</p>}
+      {error && <p id={`${id}-err`} className="col-span-2 text-right text-xs text-destructive">{error}</p>}
     </div>
   )
 }
@@ -54,7 +54,7 @@ export function NumField({ id, label, unit, hint, error, value, onChange, disabl
   return (
     <Field id={id} label={label} unit={unit} hint={hint} error={error}>
       {(aria) => (
-        <Input {...aria} inputMode="decimal" className="min-h-11 font-mono" value={String(value)} disabled={disabled}
+        <Input {...aria} inputMode="decimal" className="min-h-11" value={String(value)} disabled={disabled}
           onChange={(e) => onChange(e.target.value)} />
       )}
     </Field>

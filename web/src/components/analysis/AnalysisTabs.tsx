@@ -30,8 +30,8 @@ export default function AnalysisTabs({
   if (performanceOnly) return <PerformanceTab evaluation={evaluation} overlays={overlays} label={label} />
   const showField = !!caseId && evaluation.status === "ok"
   return (
-    <Tabs defaultValue="performance">
-      <TabsList>
+    <Tabs defaultValue="performance" className="gap-0 overflow-hidden rounded-[10px] border border-border bg-card [&_[data-slot=tabs-content]]:px-4 [&_[data-slot=tabs-content]]:pb-4">
+      <TabsList className="px-2.5 pt-2">
         <TabsTrigger value="performance">Performance</TabsTrigger>
         {evaluation.envelope?.waveforms && <TabsTrigger value="waveforms">Waveforms</TabsTrigger>}
         <TabsTrigger value="map">Map</TabsTrigger>

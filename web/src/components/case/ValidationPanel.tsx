@@ -37,9 +37,9 @@ export function ValidationPanel({ validation, winding }: { validation: Validatio
   const val = (k: string, v: number | null | undefined) => (KEY_LABEL[k]?.unit ? fmtSI(v, KEY_LABEL[k].unit!, 4) : fmt(v, 4))
   return (
     <section aria-label="EM validation" className="min-w-0 space-y-4">
-      <h2 className="text-lg font-semibold">
+      <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
         EM validation: {validation.label ?? "not validated"}
-        <span className="ml-2 text-sm font-normal text-muted-foreground">srmcore {validation.engine_version}</span>
+        <span className="ml-2 text-xs font-normal normal-case tracking-normal text-faint">srmcore {validation.engine_version}</span>
       </h2>
       {Object.keys(validation.material_grades).length > 0 && (
         <p className="text-sm text-muted-foreground">

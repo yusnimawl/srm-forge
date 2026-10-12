@@ -36,7 +36,7 @@ export function MaterialTab({ form, update, errors, margin }: TabProps) {
       : "Margin follows the grade once the materials are known"
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3.5">
       {select("stator", "Stator material")}
       {select("rotor", "Rotor material")}
       <NumField id="margin" label="Margin" value={form.margin} error={errors.margin}
