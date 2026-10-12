@@ -32,7 +32,7 @@ export function WindingTab({ form, update, errors }: TabProps) {
         {MODES.map(([m, label]) => (
           <button key={m} type="button" role="radio" aria-checked={w.mode === m}
             onClick={() => set({ mode: m })}
-            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               w.mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
             {label}
           </button>

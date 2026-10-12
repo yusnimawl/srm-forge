@@ -32,7 +32,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
       y: grid.angleDeg,
       z: grid.torque,
       colorscale: INFERNO_SCALE,
-      colorbar: { title: { text: "N·m", side: "right" } },
+      colorbar: { title: { text: "N·m", side: "right" }, tickfont: { color: c.muted } },
       hovertemplate: "i %{x:.3g} A<br>θ %{y:.3g}°<br>T %{z:.3g} N·m<extra></extra>",
     },
   ]

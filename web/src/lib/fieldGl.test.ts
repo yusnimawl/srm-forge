@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { viewMatrix } from "./fieldGl"
+import { OUTLINE, viewMatrix } from "./fieldGl"
+import { inferno } from "./inferno"
 
 const sq = { minX: 0, minY: 0, maxX: 1, maxY: 1 }
 const clip = (m: Float32Array, x: number, y: number) => [m[0] * x + m[3] * y + m[6], m[1] * x + m[4] * y + m[7]]
@@ -16,5 +17,13 @@ describe("viewMatrix", () => {
     const m = viewMatrix(sq, 200, 100, 2, [0.25, -0.1])
     expect(clip(m, 1, 0.5)[0]).toBeCloseTo(1.25)
     expect(clip(m, 0.5, 0.5)[1]).toBeCloseTo(-0.1)
+  })
+})
+
+describe("line colours", () => {
+  const luminance = ([r, g, b]: number[]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
+  it("pins the region outline grey", () => expect(OUTLINE).toEqual([0.54, 0.54, 0.54, 0.9]))
+  it("keeps the outline clearly lighter than the darkest inferno shade", () => {
+    expect(luminance(OUTLINE)).toBeGreaterThan(luminance(inferno(0).map((v) => v / 255)) + 0.4)
   })
 })

@@ -37,8 +37,11 @@ def _evaluate(inputs, **kw):
 
 def test_evaluation_records_j_limit():
     fixed = FixedWinding(turns=10)      # one winding, so no turn scan
-    assert _evaluate(_inputs(winding=fixed, j_limit=12e6))[0].j_limit == 12e6
-    assert _evaluate(_inputs(winding=fixed))[0].j_limit == J_LIMIT
+    custom = _evaluate(_inputs(winding=fixed, j_limit=12e6))[0]
+    default = _evaluate(_inputs(winding=fixed))[0]
+    assert custom.status == "ok" and default.status == "ok"
+    assert custom.j_limit == 12e6
+    assert default.j_limit == J_LIMIT
 
 
 def test_fixed_with_the_auto_winding_reproduces_auto():

@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { fmt, fmtSI } from "@/lib/format"
 import { fromSI, UNIT_LABEL, type Unit } from "@/lib/units"
 import { atScale, turnsScale } from "@/lib/validation"
+import { VERIFIED_LABEL } from "@/lib/chips"
 import { cn } from "@/lib/utils"
 
 const KEY_LABEL: Record<string, { label: string; unit?: Unit }> = {
@@ -13,10 +14,10 @@ const KEY_LABEL: Record<string, { label: string; unit?: Unit }> = {
   psi_max: { label: "ψ max", unit: "mWb" },
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  pass: "bg-feasible/15 text-feasible",
-  warn: "bg-secondary text-secondary-foreground",
-  fail: "bg-destructive/15 text-destructive",
+const STATUS_BADGE: Record<string, { variant: "ok" | "destructive" | "outline"; className?: string }> = {
+  pass: { variant: "ok" },
+  warn: { variant: "outline", className: "border-warn/40 text-warn" },
+  fail: { variant: "destructive" },
 }
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${fmt(fromSI(v, "%"), 2)} %`)
@@ -38,8 +39,8 @@ export function ValidationPanel({ validation, winding }: { validation: Validatio
   return (
     <section aria-label="EM validation" className="min-w-0 space-y-4">
       <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
-        EM validation: {validation.label ?? "not validated"}
-        <span className="ml-2 text-xs font-normal normal-case tracking-normal text-faint">srmcore {validation.engine_version}</span>
+        EM validation: {validation.label ? VERIFIED_LABEL : "not validated"}
+        <span className="ml-2 text-xs font-normal normal-case tracking-normal text-muted-foreground">srmcore {validation.engine_version}</span>
       </h2>
       {Object.keys(validation.material_grades).length > 0 && (
         <p className="text-sm text-muted-foreground">
@@ -62,7 +63,7 @@ export function ValidationPanel({ validation, winding }: { validation: Validatio
               <TableRow key={c.name}>
                 <TableCell className="num">{c.name}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={cn("uppercase", STATUS_CLASS[c.status])}>{c.status}</Badge>
+                  <Badge variant={STATUS_BADGE[c.status]?.variant ?? "outline"} className={cn("uppercase", STATUS_BADGE[c.status]?.className)}>{c.status}</Badge>
                 </TableCell>
                 <TableCell className="num text-right">{fmt(c.value, 3)}</TableCell>
                 <TableCell className="num text-right">{fmt(c.limit, 3)}</TableCell>

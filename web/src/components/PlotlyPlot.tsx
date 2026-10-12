@@ -45,7 +45,7 @@ export function plotTheme(c: Colors): Partial<Layout> {
     zerolinecolor: c.zero,
     linecolor: c.grid,
     color: c.muted,
-    tickfont: { family: "Geist Mono, monospace", size: 11, color: c.faint },
+    tickfont: { family: "Geist Mono, monospace", size: 11, color: c.muted },
   }
   return {
     paper_bgcolor: "rgba(0,0,0,0)",
@@ -55,7 +55,7 @@ export function plotTheme(c: Colors): Partial<Layout> {
     yaxis: axis,
     colorway: LINE_COLORS,
     hoverlabel: { bgcolor: c.raised, bordercolor: c.strong, font: { color: c.fg, family: "Geist" } },
-    modebar: { bgcolor: "rgba(0,0,0,0)", color: c.faint, activecolor: c.fg },
+    modebar: { bgcolor: "rgba(0,0,0,0)", color: c.muted, activecolor: c.fg },
   }
 }
 

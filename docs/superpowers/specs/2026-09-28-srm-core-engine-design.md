@@ -57,7 +57,7 @@ Loss models, thermal, structural, drive simulation, sizing, optimization, fabric
   - measured-data comparison for at least one SRM reference **reported with error and uncertainty** (not hard pass/fail), before and after end-effect correction;
   - speed budgets met on the owner's machine (8 physical cores), as defined in §7.2;
   - validation report (markdown table + plots) generated.
-- Sub-project #1 can award at most the label **"EM-validated"**. It never awards "fabrication-ready".
+- Sub-project #1 can award at most the label **"2D-verified"** (called EM-validated until 2026-10-12). It never awards "fabrication-ready".
 
 ---
 

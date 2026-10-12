@@ -35,7 +35,7 @@ export function Field({ id, label, unit, hint, aside, error, children }: {
       <Label htmlFor={id} className="text-[13px] font-normal leading-snug text-muted-foreground">{label}</Label>
       <div className="relative [&_input]:pr-14">
         {children({ id, "aria-invalid": !!error, "aria-describedby": described })}
-        {unitText && <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-faint">{unitText}</span>}
+        {unitText && <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">{unitText}</span>}
       </div>
       {(hint || aside) && (
         <div className="col-span-2 flex flex-wrap items-center justify-between gap-2">

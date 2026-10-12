@@ -4,13 +4,12 @@ import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
 import { INFERNO_SCALE } from "@/lib/inferno"
+import { SELECT_CLASS } from "@/components/case/fields"
 
 const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 // scatter3d has no triangle marker
 const SYMBOLS_3D = ["circle", "square", "diamond", "cross"]
 const KEYS = Object.keys(AXES) as AxisKey[]
-const SELECT_CLASS =
-  "min-h-11 rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 
 function useMedia(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches)
@@ -27,7 +26,7 @@ function AxisSelect({ label, value, onChange }: { label: string; value: AxisKey;
   return (
     <label className="flex items-center gap-2 text-sm">
       {label}
-      <select className={SELECT_CLASS} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
+      <select className={`${SELECT_CLASS} w-auto`} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
         {KEYS.map((k) => (
           <option key={k} value={k}>
             {AXES[k]}
@@ -85,10 +84,11 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
             cmin,
             cmax,
             showscale: !colorbarShown,
-            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.faint } },
+            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.muted } },
+            // every marker has an outline so the darkest inferno stop stays visible on the page; the Pareto set's is heavier and brighter
             line: {
-              color: good.map((r) => (r.pareto ? c.primary : "rgba(0,0,0,0)")),
-              width: good.map((r) => (r.pareto ? 3 : 0)),
+              color: good.map((r) => (r.pareto ? c.primary : c.muted)),
+              width: good.map((r) => (r.pareto ? 3 : 1)),
             },
           },
         })

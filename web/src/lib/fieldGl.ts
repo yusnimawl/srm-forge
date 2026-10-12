@@ -58,7 +58,7 @@ export type Scene = {
 
 // Line colours are data: the greys and white must read on every inferno shade.
 const WIRE: Rgba = [1, 1, 1, 0.08]
-const OUTLINE: Rgba = [0.54, 0.54, 0.54, 0.9]
+export const OUTLINE: Rgba = [0.54, 0.54, 0.54, 0.9]
 const FLUX: Rgba = [1, 1, 1, 0.9]
 
 function edgeCoords(xy: Float32Array, idx: Uint32Array): Float32Array {

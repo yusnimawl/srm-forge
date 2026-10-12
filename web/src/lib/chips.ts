@@ -1,9 +1,12 @@
 export type ChipTone = "ok" | "warn" | "none"
 
+/** The name of the label a case carries once every validation check passes. */
+export const VERIFIED_LABEL = "2D-verified"
+
 /** The verification chip: names the engine version when the case carries the 2D-verified label. */
 export function verifiedChip(engineVersion: string | null | undefined): { text: string; tone: "ok" | "none" } {
   return engineVersion
-    ? { text: `2D-verified · srmcore ${engineVersion}`, tone: "ok" }
+    ? { text: `${VERIFIED_LABEL} · srmcore ${engineVersion}`, tone: "ok" }
     : { text: "Unvalidated", tone: "none" }
 }
 

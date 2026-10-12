@@ -24,7 +24,7 @@ function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "group/tabs-list flex w-full items-end gap-0.5 overflow-x-auto border-b border-border text-muted-foreground [scrollbar-width:none] group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:border-b-0",
+        "group/tabs-list flex w-full flex-wrap items-end gap-0.5 border-b border-border text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:border-b-0",
         className
       )}
       {...props}
