@@ -12,12 +12,21 @@ function Chip({ text, tone }: { text: string; tone: ChipTone }) {
   )
 }
 
-/** Shown on every result page: whether the case is 2D-verified, and that the numbers are peak-only at an assumed j_limit. */
-export function StatusChips({ engineVersion, jLimit }: { engineVersion?: string | null; jLimit?: number | null }) {
+/**
+ * Shown under a result header: whether the case is 2D-verified, and, once an evaluation exists, that its numbers are
+ * peak-only at an assumed j_limit (an evaluation stored without the field reads "not recorded").
+ */
+export function StatusChips({
+  engineVersion,
+  evaluation,
+}: {
+  engineVersion?: string | null
+  evaluation?: { j_limit?: number | null } | null
+}) {
   return (
     <div role="note" className="flex flex-wrap gap-2">
       <Chip {...verifiedChip(engineVersion)} />
-      <Chip {...jLimitChip(jLimit)} />
+      {evaluation && <Chip {...jLimitChip(evaluation.j_limit)} />}
     </div>
   )
 }

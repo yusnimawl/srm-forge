@@ -57,7 +57,7 @@ export function RunPage() {
           </Button>
         )}
       </div>
-      <StatusChips jLimit={r?.evaluations[0]?.j_limit} />
+      <StatusChips evaluation={r?.evaluations[0]} />
       {job?.active && <RunProgress job={job} />}
       {job?.error && <p className="text-destructive">{job.error}</p>}
       {result.isError && <p className="text-destructive">Could not load the result.</p>}

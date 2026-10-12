@@ -127,7 +127,7 @@ function CaseEditor({ data }: { data: Case }) {
         </div>
         <StatusChips
           engineVersion={data.validation?.label ? data.validation.engine_version : null}
-          jLimit={evaluation?.j_limit}
+          evaluation={evaluation}
         />
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}

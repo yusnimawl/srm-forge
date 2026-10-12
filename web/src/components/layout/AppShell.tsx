@@ -65,7 +65,7 @@ export function AppShell() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border bg-sidebar px-3 md:hidden">
-          <Brand className="px-3 py-2" />
+          <Brand className="py-2" />
         </header>
         <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />

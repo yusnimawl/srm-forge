@@ -73,7 +73,7 @@ export function CandidatePage() {
           {create.isPending ? "Opening…" : "Open as case"}
         </Button>
       </div>
-      <StatusChips jLimit={ev.j_limit} />
+      <StatusChips evaluation={ev} />
       {ev.error &&
         (ev.status === "ok" ? (
           <p className="text-sm text-muted-foreground">Notes: {ev.error}</p>
