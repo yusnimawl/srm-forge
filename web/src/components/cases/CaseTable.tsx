@@ -20,17 +20,15 @@ export type CaseActions = {
   canShowMore: boolean
 }
 
-const STATUS_CLASS: Record<CaseStatus, string> = {
-  Draft: "bg-secondary text-secondary-foreground",
-  Evaluated: "",
-  "2D-verified": "bg-feasible/15 text-feasible",
-  Failed: "bg-destructive/15 text-destructive",
+const STATUS_VARIANT: Record<CaseStatus, "secondary" | "outline" | "ok" | "destructive"> = {
+  Draft: "secondary",
+  Evaluated: "outline",
+  "2D-verified": "ok",
+  Failed: "destructive",
 }
 
 export const CaseStatusBadge = ({ status }: { status: CaseStatus }) => (
-  <Badge variant="outline" className={STATUS_CLASS[status]}>
-    {status}
-  </Badge>
+  <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>
 )
 
 /** Text that turns into an input on click; Enter or leaving the field commits, Escape cancels. An empty value is committed only when `allowEmpty`. */
@@ -64,7 +62,7 @@ function InlineText({
       <button
         type="button"
         aria-label={`Edit ${label}`}
-        className="min-h-11 max-w-full rounded-md px-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+        className="min-h-11 max-w-full rounded-md px-1 text-left hover:bg-accent outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
           done.current = false
           setDraft(value)
@@ -136,7 +134,7 @@ function CommentCell({ row, a }: { row: CaseRow; a: CaseActions }) {
       <PopoverContent className="space-y-2">
         <textarea
           aria-label="Comment"
-          className="min-h-24 w-full rounded-lg border border-input bg-transparent p-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+          className="min-h-24 w-full rounded-[6px] border border-border-strong bg-background p-2 text-base outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/[0.08] md:text-sm"
           maxLength={2000}
           autoFocus
           value={draft}
@@ -195,6 +193,7 @@ const num = (key: NumKey, header: string): ColumnDef<CaseRow> => ({
   accessorKey: key,
   header,
   cell: ({ getValue }) => <span className="num">{fmt(getValue() as number | null)}</span>,
+  meta: { numeric: true },
 })
 
 const columns = (a: CaseActions): ColumnDef<CaseRow>[] => [
@@ -226,7 +225,7 @@ const CARD_FIELDS: [string, NumKey][] = [
 
 function CaseCard({ row, a }: { row: CaseRow; a: CaseActions }) {
   return (
-    <li className="space-y-2 rounded-lg border border-border p-3 text-sm">
+    <li className="space-y-2 rounded-[10px] border border-border bg-card p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
         <FlagCell row={row} a={a} />
         <CaseStatusBadge status={row.status} />
@@ -266,7 +265,7 @@ export function CaseTable({ rows, actions }: { rows: CaseRow[]; actions: CaseAct
             {table.getHeaderGroups().map((g) => (
               <TableRow key={g.id}>
                 {g.headers.map((h) => (
-                  <TableHead key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                  <TableHead key={h.id} className={cn(h.column.columnDef.meta?.numeric && "text-right")}>{flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
                 ))}
               </TableRow>
             ))}
@@ -275,7 +274,7 @@ export function CaseTable({ rows, actions }: { rows: CaseRow[]; actions: CaseAct
             {table.getRowModel().rows.map((r) => (
               <TableRow key={r.id}>
                 {r.getVisibleCells().map((c) => (
-                  <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
+                  <TableCell key={c.id} className={cn(c.column.columnDef.meta?.numeric && "text-right")}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
                 ))}
               </TableRow>
             ))}

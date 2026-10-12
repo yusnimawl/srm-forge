@@ -16,9 +16,9 @@ const ParetoPlot = lazy(() => import("@/components/run/ParetoPlot"))
 
 function Count({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-border p-3">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="num text-xl">{fmt(value, 6)}</div>
+    <div className="rounded-[10px] border border-border bg-card p-3">
+      <div className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
+      <div className="num mt-1 text-xl font-medium">{fmt(value, 6)}</div>
     </div>
   )
 }
@@ -42,22 +42,29 @@ export function RunPage() {
   const dropped = Object.entries(r?.dropped ?? {})
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-primary">Run</h1>
-        <span className="num text-sm text-muted-foreground">{jobId}</span>
-        {status && <JobStatusBadge status={status} />}
-        {job?.active && (
-          <Button variant="outline" className="min-h-11" onClick={() => actions.cancel(jobId)} disabled={actions.busy}>
-            Cancel
-          </Button>
-        )}
-        {job?.resumable && (
-          <Button className="min-h-11" onClick={() => actions.resume(jobId)} disabled={actions.busy}>
-            Resume
-          </Button>
-        )}
-      </div>
-      <StatusChips evaluation={r?.evaluations[0]} />
+      <header className="space-y-2">
+        <nav aria-label="Breadcrumb" className="text-[12.5px] text-faint">
+          <Link to="/runs" className="hover:text-muted-foreground">Runs</Link> / <span className="num">{jobId}</span>
+        </nav>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Run</h1>
+          <span className="num text-sm text-muted-foreground">{jobId}</span>
+          {status && <JobStatusBadge status={status} />}
+          <div className="ml-auto flex flex-wrap gap-2">
+            {job?.active && (
+              <Button variant="outline" className="min-h-11" onClick={() => actions.cancel(jobId)} disabled={actions.busy}>
+                Cancel
+              </Button>
+            )}
+            {job?.resumable && (
+              <Button className="min-h-11" onClick={() => actions.resume(jobId)} disabled={actions.busy}>
+                Resume
+              </Button>
+            )}
+          </div>
+        </div>
+        <StatusChips evaluation={r?.evaluations[0]} />
+      </header>
       {job?.active && <RunProgress job={job} />}
       {job?.error && <p className="text-destructive">{job.error}</p>}
       {result.isError && <p className="text-destructive">Could not load the result.</p>}
@@ -95,7 +102,7 @@ export function RunPage() {
           )}
         </>
       )}
-      <Link to="/runs" className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2">
+      <Link to="/runs" className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground">
         All runs
       </Link>
     </div>

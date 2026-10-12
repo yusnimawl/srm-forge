@@ -96,9 +96,9 @@ export function NewSearchPage() {
   }
 
   return (
-    <form onSubmit={submit} noValidate className="mx-auto max-w-4xl space-y-6">
+    <form onSubmit={submit} noValidate className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-primary">New search</h1>
+        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">New search</h1>
         <div className="ml-auto flex gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={() => fileInput.current?.click()}>
             Import setup
@@ -117,7 +117,7 @@ export function NewSearchPage() {
       </div>
 
       {summary.length > 0 && (
-        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div role="alert" className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           <p className="font-medium">Check the form:</p>
           <ul className="list-disc pl-5">
             {summary.map(([k, msg]) => <li key={k}>{SUMMARY_LABEL[k] ? `${SUMMARY_LABEL[k]}: ${msg}` : msg}</li>)}
@@ -126,7 +126,7 @@ export function NewSearchPage() {
       )}
 
       <Card>
-        <CardHeader><CardTitle>Requirements</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Requirements</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {num("peakPowerKw", "requirements.peak_power_w", "peak-power", "Peak power", "kW")}
           {num("peakTorqueNm", "requirements.peak_torque_nm", "peak-torque", "Peak torque", "Nm")}
@@ -141,15 +141,15 @@ export function NewSearchPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Winding</CardTitle>
+          <CardTitle className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Winding</CardTitle>
           <CardDescription>Density mode sizes the turns from current density. Wire mode uses your wires and inverter current.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div role="radiogroup" aria-label="Winding mode" className="inline-flex rounded-lg border p-0.5">
+          <div role="radiogroup" aria-label="Winding mode" className="inline-flex rounded-[6px] border border-border-strong p-0.5">
             {(["density", "wires"] as const).map((m) => (
               <button key={m} type="button" role="radio" aria-checked={v.windingMode === m}
                 onClick={() => set("windingMode", m)}
-                className={cn("min-h-11 rounded-md px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   v.windingMode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
                 {m === "density" ? "Density" : "Wire list"}
               </button>
@@ -167,7 +167,7 @@ export function NewSearchPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Search</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Search</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {num("nCandidates", "settings.n_candidates", "n-candidates", "Candidates", undefined, "1 to 2000.")}
           {num("shortlist", "settings.shortlist", "shortlist", "Shortlist", undefined, "1 to 200.")}

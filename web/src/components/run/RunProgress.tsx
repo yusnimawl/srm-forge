@@ -1,7 +1,6 @@
 import type { JobOut } from "@/api/client"
 import { Badge } from "@/components/ui/badge"
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
-import { cn } from "@/lib/utils"
 
 export type JobProgress = {
   designs_done?: number
@@ -21,15 +20,15 @@ export function fmtElapsed(seconds: number | null | undefined): string {
   return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  done: "bg-feasible/15 text-feasible",
-  failed: "bg-destructive/15 text-destructive",
-  running: "bg-secondary text-secondary-foreground",
+const STATUS_VARIANT: Record<string, "ok" | "destructive" | "secondary"> = {
+  done: "ok",
+  failed: "destructive",
+  running: "secondary",
 }
 
 export function JobStatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant="outline" className={cn("capitalize", STATUS_CLASS[status])}>
+    <Badge variant={STATUS_VARIANT[status] ?? "outline"} className="capitalize">
       {status}
     </Badge>
   )
@@ -62,10 +61,10 @@ export function RunProgress({ job }: { job: JobOut }) {
   const p = progressOf(job)
   const { line, note } = progressLines(job.status, p)
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
+    <div className="space-y-3 rounded-[10px] border border-border bg-card p-4">
       <Bar label="Designs" done={p.designs_done ?? 0} total={p.designs_total ?? 0} />
       <Bar label="Map points (current design)" done={p.points_done ?? 0} total={p.points_total ?? 0} />
-      <p aria-live="polite" className="text-sm">
+      <p aria-live="polite" className="text-[13px]">
         {line}
       </p>
       <p className="text-sm text-muted-foreground">

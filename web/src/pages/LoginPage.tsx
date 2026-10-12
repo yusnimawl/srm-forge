@@ -31,16 +31,16 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm items-center px-4">
+    <main className="mx-auto flex min-h-dvh max-w-[360px] items-center px-4">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-xl">Sign in</CardTitle>
+          <CardTitle className="text-[22px] font-semibold tracking-[-0.02em]">Sign in</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4" noValidate>
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <div className="space-y-1.5">
-              <Label htmlFor="token">Access token</Label>
+              <Label htmlFor="token" className="text-[13px] font-normal text-muted-foreground">Access token</Label>
               <Input id="token" type="password" autoComplete="current-password" autoFocus value={token}
                 onChange={(e) => setToken(e.target.value)} className="min-h-11" />
             </div>

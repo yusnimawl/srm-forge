@@ -34,8 +34,8 @@ export function WireListEditor({ wires, onChange, errors }: Props) {
         <p className="text-sm text-muted-foreground">No wires yet. Add at least one to search in wire mode.</p>
       )}
       {wires.map((w, i) => (
-        <fieldset key={i} className="rounded-lg border p-3">
-          <legend className="px-1 text-sm font-medium">{KIND_LABEL[w.kind]} wire {i + 1}</legend>
+        <fieldset key={i} className="rounded-[10px] border border-border bg-card p-3">
+          <legend className="px-1 text-[13px] font-medium text-muted-foreground">{KIND_LABEL[w.kind]} wire {i + 1}</legend>
           {errors[`requirements.wires.${i}`] && (
             <p role="alert" className="mb-2 text-sm text-destructive">{errors[`requirements.wires.${i}`]}</p>
           )}
@@ -45,7 +45,7 @@ export function WireListEditor({ wires, onChange, errors }: Props) {
               const err = errors[`requirements.wires.${i}.${f.key}`]
               return (
                 <div key={f.key} className="space-y-1.5">
-                  <Label htmlFor={id}>{f.label}{f.mm ? ` (${UNIT_LABEL.mm})` : ""}</Label>
+                  <Label htmlFor={id} className="text-[13px] font-normal leading-snug text-muted-foreground">{f.label}{f.mm ? ` (${UNIT_LABEL.mm})` : ""}</Label>
                   <Input id={id} inputMode="decimal" className="min-h-11 font-mono" aria-invalid={!!err}
                     aria-describedby={err ? `${id}-err` : undefined}
                     value={String((w as Record<string, unknown>)[f.key])}

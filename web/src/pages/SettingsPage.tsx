@@ -33,11 +33,11 @@ export function SettingsPage() {
   })
 
   return (
-    <div className="max-w-xl space-y-8">
-      <h1 className="text-2xl font-semibold text-primary">Settings</h1>
+    <div className="max-w-xl space-y-6">
+      <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Settings</h1>
 
-      <section className="space-y-2">
-        <h2 className="font-medium">Map cache</h2>
+      <section className="space-y-2 rounded-[10px] border border-border bg-card p-4">
+        <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Map cache</h2>
         {cache.isError ? (
           <p className="text-destructive">Could not read the cache.</p>
         ) : (
@@ -57,16 +57,16 @@ export function SettingsPage() {
         {running && <p className="text-sm text-muted-foreground">Available when no run is active.</p>}
       </section>
 
-      <section className="space-y-1 text-sm">
-        <h2 className="font-medium">Units</h2>
+      <section className="space-y-1 rounded-[10px] border border-border bg-card p-4 text-sm">
+        <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Units</h2>
         <p className="text-muted-foreground">
           Lengths in millimetres, current in amperes, torque in newton-metres; the engine works in SI internally.
           Map angles are mechanical degrees, 0° = phase A aligned; turn-on and turn-off angles are electrical degrees, 0° el = unaligned.
         </p>
       </section>
 
-      <section className="space-y-1 text-sm">
-        <h2 className="font-medium">Versions</h2>
+      <section className="space-y-1 rounded-[10px] border border-border bg-card p-4 text-sm">
+        <h2 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Versions</h2>
         <p className="text-muted-foreground">
           {health.data
             ? `srmweb ${health.data.version}, srmcore ${health.data.srmcore}`
