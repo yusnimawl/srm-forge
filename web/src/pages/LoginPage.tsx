@@ -31,8 +31,8 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[360px] items-center px-4">
-      <Card className="w-full">
+    <main className="mx-auto flex min-h-dvh items-center px-4">
+      <Card className="mx-auto w-full max-w-[360px]">
         <CardHeader>
           <CardTitle className="text-[22px] font-semibold tracking-[-0.02em]">Sign in</CardTitle>
         </CardHeader>

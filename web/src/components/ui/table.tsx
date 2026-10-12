@@ -4,7 +4,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 declare module "@tanstack/react-table" {
-  // `numeric` right-aligns the column's header and cells.
+  // Marks a numeric column; callers apply `text-right` to its header and cells when it is set.
   interface ColumnMeta<TData, TValue> {
     numeric?: boolean
   }

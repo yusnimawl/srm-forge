@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
+import { INFERNO_SCALE } from "@/lib/inferno"
 import type { MapArrays } from "@/api/types"
 import { caseLine } from "@/lib/analysis"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
@@ -30,7 +31,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
       x: grid.i,
       y: grid.angleDeg,
       z: grid.torque,
-      colorscale: "Inferno",
+      colorscale: INFERNO_SCALE,
       colorbar: { title: { text: "N·m", side: "right" } },
       hovertemplate: "i %{x:.3g} A<br>θ %{y:.3g}°<br>T %{z:.3g} N·m<extra></extra>",
     },

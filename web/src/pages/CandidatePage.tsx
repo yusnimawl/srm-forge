@@ -42,7 +42,7 @@ export function CandidatePage() {
   const navigate = useNavigate()
   const create = useCreateCase()
   const back = (
-    <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-[12.5px] text-faint hover:text-muted-foreground">
+    <Link to={`/runs/${jobId}`} className="inline-flex min-h-11 items-center text-[12.5px] text-muted-foreground hover:text-foreground">
       Back to the run
     </Link>
   )

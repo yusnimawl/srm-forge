@@ -3,6 +3,7 @@ import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
+import { INFERNO_SCALE } from "@/lib/inferno"
 
 const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 // scatter3d has no triangle marker
@@ -80,7 +81,7 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
             symbol,
             size: 10,
             color: good.map((r) => r.efficiency_base),
-            colorscale: "Inferno",
+            colorscale: INFERNO_SCALE,
             cmin,
             cmax,
             showscale: !colorbarShown,

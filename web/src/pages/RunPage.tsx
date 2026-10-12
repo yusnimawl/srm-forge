@@ -43,8 +43,8 @@ export function RunPage() {
   return (
     <div className="space-y-4">
       <header className="space-y-2">
-        <nav aria-label="Breadcrumb" className="text-[12.5px] text-faint">
-          <Link to="/runs" className="hover:text-muted-foreground">Runs</Link> / <span className="num">{jobId}</span>
+        <nav aria-label="Breadcrumb" className="text-[12.5px] text-muted-foreground">
+          <Link to="/runs" className="hover:text-foreground">Runs</Link> / <span className="num">{jobId}</span>
         </nav>
         <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Run</h1>

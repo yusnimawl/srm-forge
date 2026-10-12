@@ -5,6 +5,9 @@ const STOPS: [number, number, number][] = [
   [249, 201, 50], [242, 232, 101], [252, 255, 164],
 ];
 
+/** Plotly colourscale of the same stops; Plotly.js has no named "Inferno". */
+export const INFERNO_SCALE: [number, string][] = STOPS.map(([r, g, b], k) => [k / (STOPS.length - 1), `rgb(${r},${g},${b})`])
+
 export function inferno(t: number): [number, number, number] {
   const x = Math.min(1, Math.max(0, t)) * (STOPS.length - 1);
   const i = Math.min(Math.floor(x), STOPS.length - 2);

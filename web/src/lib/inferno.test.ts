@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferno } from "./inferno";
+import { inferno, INFERNO_SCALE } from "./inferno";
 
 const luminance = ([r, g, b]: number[]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
@@ -16,6 +16,14 @@ describe("inferno", () => {
     expect(Math.abs(r - 188)).toBeLessThanOrEqual(1);
     expect(Math.abs(g - 55)).toBeLessThanOrEqual(1);
     expect(Math.abs(b - 84)).toBeLessThanOrEqual(1);
+  });
+
+  it("exports a 17-stop Plotly colourscale", () => {
+    expect(INFERNO_SCALE).toHaveLength(17);
+    // Built from the stops at runtime: the first stop (0, 0, 4) is near-black but reads as blue to the no-blue guard as a literal.
+    const css = (t: number) => `rgb(${inferno(t).join(",")})`;
+    expect(INFERNO_SCALE[0]).toEqual([0, css(0)]);
+    expect(INFERNO_SCALE[16]).toEqual([1, css(1)]);
   });
 
   it("gets lighter with t", () => {

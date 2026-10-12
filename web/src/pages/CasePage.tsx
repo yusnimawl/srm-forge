@@ -9,6 +9,7 @@ import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { CaseActions } from "@/components/case/CaseActions"
 import { InputTabs } from "@/components/case/InputTabs"
 import { ValidationPanel } from "@/components/case/ValidationPanel"
+import { CaseStatusBadge } from "@/components/cases/CaseTable"
 import { StatusChips } from "@/components/StatusChips"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -115,13 +116,13 @@ function CaseEditor({ data }: { data: Case }) {
   return (
     <div className="space-y-4">
       <header className="space-y-2">
-        <nav aria-label="Breadcrumb" className="text-[12.5px] text-faint">
-          <Link to="/cases" className="hover:text-muted-foreground">Cases</Link> / {data.label || data.id}
+        <nav aria-label="Breadcrumb" className="text-[12.5px] text-muted-foreground">
+          <Link to="/cases" className="hover:text-foreground">Cases</Link> / {data.label || data.id}
         </nav>
         <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">{data.label || data.id}</h1>
           <Badge variant="outline">{data.origin}</Badge>
-          <Badge variant={status === "Failed" ? "destructive" : status === "Draft" ? "secondary" : "ok"}>{status}</Badge>
+          <CaseStatusBadge status={status} />
           {!editable && (
             <Button className="ml-auto min-h-11" onClick={edit} disabled={create.isPending}>
               {create.isPending ? "Creating…" : "Edit"}
@@ -139,7 +140,7 @@ function CaseEditor({ data }: { data: Case }) {
       <div role="radiogroup" aria-label="Page section" className="inline-flex rounded-[6px] border border-border-strong p-0.5 md:hidden">
         {VIEWS.map(([v, label]) => (
           <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)}
-            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
             {label}
           </button>
