@@ -1,16 +1,18 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/api/client"
+import { LINE_COLORS } from "@/lib/analysis"
 import { errorMessage } from "@/lib/errorMessage"
 
 type Coil = { name: string; phase: string; sign: "+" | "-"; d: string }
 type Geometry = { view_box: [number, number, number, number]; stator: string; rotor: string; shaft: string; coils: Coil[] }
 
-// Colour-blind-safe set; the legend names the phases.
-const PHASE_COLOR: Record<string, string> = { A: "#0072b2", B: "#d55e00", C: "#009e73", D: "#cc79a7" }
+// The series palette; the legend names the phases.
+const PHASE_COLOR: Record<string, string> = { A: LINE_COLORS[0], B: LINE_COLORS[1], C: LINE_COLORS[2], D: LINE_COLORS[3] }
+const OTHER_PHASE = LINE_COLORS[6]
 
 function CoilShape({ coil }: { coil: Coil }) {
   return (
-    <path d={coil.d} fill={PHASE_COLOR[coil.phase] ?? "#888"} fillOpacity={coil.sign === "+" ? 0.9 : 0.5} stroke="var(--background)" strokeWidth={0.2} />
+    <path d={coil.d} fill={PHASE_COLOR[coil.phase] ?? OTHER_PHASE} fillOpacity={coil.sign === "+" ? 0.9 : 0.5} stroke="var(--background)" strokeWidth={0.2} />
   )
 }
 
@@ -37,7 +39,7 @@ export function MotorDiagram({ machine }: { machine: object }) {
       <ul className="flex flex-wrap justify-center gap-4 text-sm">
         {phases.map((p) => (
           <li key={p} className="flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded-sm" style={{ background: PHASE_COLOR[p] ?? "#888" }} />
+            <span className="inline-block size-3 rounded-sm" style={{ background: PHASE_COLOR[p] ?? OTHER_PHASE }} />
             Phase {p}
           </li>
         ))}

@@ -26,13 +26,16 @@ export interface Overlay {
   evaluation: Evaluation
 }
 
-/** Okabe-Ito colours, colour-blind safe. */
-export const LINE_COLORS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9", "#8c8c8c"]
-export const LINE_DASHES = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
-/** Case n gets its own colour and a dash from this cycle, so cases stay apart without colour. */
-const CASE_DASHES = ["solid", "dash", "dot"]
+/** Series colours, no blue: bright enough on black and told apart by hue and by dash. */
+export const LINE_COLORS = ["#ededed", "#e8b04a", "#9bd88a", "#e07fb5", "#f2716b", "#c3a6f0", "#8a8a8a"]
+export const LINE_DASHES = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot", "solid"]
 
-const caseLine = (n: number) => ({ color: LINE_COLORS[n % LINE_COLORS.length], dash: CASE_DASHES[n % CASE_DASHES.length], width: 2 })
+/** Series n gets its own colour and dash, so series stay apart without colour; the last, grey, is thinner. */
+export const caseLine = (n: number) => ({
+  color: LINE_COLORS[n % LINE_COLORS.length],
+  dash: LINE_DASHES[n % LINE_DASHES.length],
+  width: n % LINE_COLORS.length === LINE_COLORS.length - 1 ? 1.25 : 2,
+})
 
 const conv = (values: Num[], unit: Parameters<typeof fromSI>[1]): Num[] => values.map((v) => (v == null ? null : fromSI(v, unit)))
 
@@ -90,19 +93,18 @@ function pickCurrents(currents: Num[], max = 6): number[] {
 
 const column = (grid: Num[][], j: number): Num[] => grid.map((row) => row[j])
 const angleDeg = (angles: Num[]): Num[] => conv(angles, "deg")
-const currentLine = (n: number) => ({ color: LINE_COLORS[n % LINE_COLORS.length], dash: LINE_DASHES[n % LINE_DASHES.length], width: 2 })
 
 /** T against mechanical angle (degrees), one trace per picked current. */
 export function torqueCurves(map: MapArrays): Trace[] {
   const x = angleDeg(map.angles)
-  return pickCurrents(map.currents).map((j, n) => trace(`${fmt(map.currents[j])} A`, x, column(map.torque, j), currentLine(n)))
+  return pickCurrents(map.currents).map((j, n) => trace(`${fmt(map.currents[j])} A`, x, column(map.torque, j), caseLine(n)))
 }
 
 /** L (mH) against mechanical angle (degrees), one trace per picked current. */
 export function inductanceCurves(curves: MapCurves, angles: Num[]): Trace[] {
   const x = angleDeg(angles)
   return pickCurrents(curves.currents).map((j, n) =>
-    trace(`${fmt(curves.currents[j])} A`, x, conv(column(curves.inductance, j), "mH"), currentLine(n)),
+    trace(`${fmt(curves.currents[j])} A`, x, conv(column(curves.inductance, j), "mH"), caseLine(n)),
   )
 }
 

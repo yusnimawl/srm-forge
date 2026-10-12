@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
-import { Plot, useColors } from "@/components/PlotlyPlot"
+import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
 
@@ -80,11 +80,11 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
             symbol,
             size: 10,
             color: good.map((r) => r.efficiency_base),
-            colorscale: "Viridis",
+            colorscale: "Inferno",
             cmin,
             cmax,
             showscale: !colorbarShown,
-            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.fg } },
+            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.faint } },
             line: {
               color: good.map((r) => (r.pareto ? c.primary : "rgba(0,0,0,0)")),
               width: good.map((r) => (r.pareto ? 3 : 0)),
@@ -107,14 +107,13 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
     return traces
   }, [rows, pole, x, y, z, is3d, c])
 
-  const axis = (k: AxisKey) => ({ title: { text: AXES[k] }, gridcolor: c.grid, color: c.fg })
+  const theme = plotTheme(c)
+  const axis = (k: AxisKey) => ({ ...theme.xaxis, title: { text: AXES[k] } })
   const layout = {
+    ...theme,
     autosize: true,
     height: 460,
     margin: { l: 60, r: 10, t: 10, b: 50 },
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Geist, sans-serif", color: c.fg },
     legend: { orientation: "h", y: -0.2 },
     ...(is3d ? { scene: { xaxis: axis(x), yaxis: axis(y), zaxis: axis(z) } } : { xaxis: axis(x), yaxis: axis(y) }),
   }

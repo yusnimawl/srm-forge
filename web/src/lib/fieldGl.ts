@@ -1,7 +1,7 @@
 import { contourLevels, contourSegments } from "./contours"
 import { allTriangles, positions, regionEdges } from "./fieldView"
 import type { FieldFrameData, FieldMeshData } from "./fieldWire"
-import { viridis } from "./viridis"
+import { inferno } from "./inferno"
 
 export type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
 export type Layers = { bmap: boolean; flux: boolean; mesh: boolean; outlines: boolean }
@@ -56,9 +56,9 @@ export type Scene = {
   bMax: number
 }
 
-// Line colours are data: they must read on every viridis shade.
-const WIRE: Rgba = [0, 0, 0, 0.25]
-const OUTLINE: Rgba = [0, 0, 0, 0.9]
+// Line colours are data: the greys and white must read on every inferno shade.
+const WIRE: Rgba = [1, 1, 1, 0.08]
+const OUTLINE: Rgba = [0.54, 0.54, 0.54, 0.9]
 const FLUX: Rgba = [1, 1, 1, 0.9]
 
 function edgeCoords(xy: Float32Array, idx: Uint32Array): Float32Array {
@@ -76,7 +76,7 @@ export function buildScene(mesh: FieldMeshData, frame: FieldFrameData, layers: L
   const triPos = new Float32Array(nt * 6)
   const triRgb = new Float32Array(nt * 9)
   for (let t = 0; t < nt; t++) {
-    const [r, g, b] = viridis((frame.b[t] ?? 0) / bMax)
+    const [r, g, b] = inferno((frame.b[t] ?? 0) / bMax)
     for (let k = 0; k < 3; k++) {
       const n = tris[3 * t + k]
       triPos[6 * t + 2 * k] = xy[2 * n]

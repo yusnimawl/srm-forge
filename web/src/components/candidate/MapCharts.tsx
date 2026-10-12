@@ -1,22 +1,15 @@
 import { useMemo } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
-import { Plot, useColors } from "@/components/PlotlyPlot"
+import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
 import type { MapArrays } from "@/api/types"
-import { LINE_COLORS, LINE_DASHES } from "@/lib/analysis"
+import { caseLine } from "@/lib/analysis"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
 
 export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligned: number | null }) {
   const c = useColors()
-  const base = {
-    autosize: true,
-    height: 380,
-    margin: { l: 60, r: 10, t: 10, b: 50 },
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Geist, sans-serif", color: c.fg },
-  }
-  const axis = (text: string) => ({ title: { text }, gridcolor: c.grid, color: c.fg })
+  const base = { ...plotTheme(c), autosize: true, height: 380, margin: { l: 60, r: 10, t: 10, b: 50 } }
+  const axis = (text: string) => ({ ...base.xaxis, title: { text } })
 
   const lines = useMemo(() => {
     const all = psiCurves(map)
@@ -26,7 +19,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
       name: `${fmt(all[k].angleDeg, 3)}°`,
       x: all[k].i,
       y: all[k].psi_mWb,
-      line: { color: LINE_COLORS[n % 6], dash: LINE_DASHES[n % 6], width: 2 },
+      line: caseLine(n),
     }))
   }, [map, unaligned])
 
@@ -37,7 +30,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
       x: grid.i,
       y: grid.angleDeg,
       z: grid.torque,
-      colorscale: "Viridis",
+      colorscale: "Inferno",
       colorbar: { title: { text: "N·m", side: "right" } },
       hovertemplate: "i %{x:.3g} A<br>θ %{y:.3g}°<br>T %{z:.3g} N·m<extra></extra>",
     },
