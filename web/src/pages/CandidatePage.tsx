@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 import { useCreateCase } from "@/api/cases"
 import { useRunResult } from "@/api/useRunResult"
-import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { WindingScan } from "@/components/candidate/WindingScan"
+import { StatusChips } from "@/components/StatusChips"
 import { Button } from "@/components/ui/button"
 import { errorMessage } from "@/lib/errorMessage"
 import { fmt, fmtSI } from "@/lib/format"
@@ -73,7 +73,7 @@ export function CandidatePage() {
           {create.isPending ? "Opening…" : "Open as case"}
         </Button>
       </div>
-      <Banner />
+      <StatusChips jLimit={ev.j_limit} />
       {ev.error &&
         (ev.status === "ok" ? (
           <p className="text-sm text-muted-foreground">Notes: {ev.error}</p>

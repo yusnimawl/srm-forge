@@ -4,7 +4,7 @@ import { fromSI } from "./units"
 /** Cases shown in the graphs at once; the server enforces the same limit. */
 export const MAX_SHOWN = 6
 
-export type CaseStatus = "Draft" | "Evaluated" | "EM-validated" | "Failed"
+export type CaseStatus = "Draft" | "Evaluated" | "2D-verified" | "Failed"
 
 export type CaseRow = {
   id: string
@@ -27,7 +27,7 @@ export type CaseRow = {
 export function caseStatus(c: Pick<CaseSummary, "stale" | "status" | "validated">): CaseStatus {
   if (c.stale) return "Draft"
   if (c.status !== "ok") return "Failed"
-  return c.validated ? "EM-validated" : "Evaluated"
+  return c.validated ? "2D-verified" : "Evaluated"
 }
 
 export function toCaseRows(list: CaseSummary[]): CaseRow[] {

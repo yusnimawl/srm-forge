@@ -34,8 +34,8 @@ describe("caseStatus", () => {
   it("is Failed when the evaluation status is not ok", () => {
     expect(caseStatus(summary("a", { status: "no_winding" }))).toBe("Failed")
   })
-  it("is EM-validated when validated, else Evaluated", () => {
-    expect(caseStatus(summary("a", { validated: true }))).toBe("EM-validated")
+  it("is 2D-verified when validated, else Evaluated", () => {
+    expect(caseStatus(summary("a", { validated: true }))).toBe("2D-verified")
     expect(caseStatus(summary("a"))).toBe("Evaluated")
   })
 })

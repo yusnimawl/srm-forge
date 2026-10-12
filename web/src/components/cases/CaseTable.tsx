@@ -23,7 +23,7 @@ export type CaseActions = {
 const STATUS_CLASS: Record<CaseStatus, string> = {
   Draft: "bg-secondary text-secondary-foreground",
   Evaluated: "",
-  "EM-validated": "bg-feasible/15 text-feasible",
+  "2D-verified": "bg-feasible/15 text-feasible",
   Failed: "bg-destructive/15 text-destructive",
 }
 

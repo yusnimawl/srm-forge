@@ -4,9 +4,9 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useJobActions } from "@/api/useJobActions"
 import { useRunResult } from "@/api/useRunResult"
 import { useJobEvents } from "@/api/useJobEvents"
-import { Banner } from "@/components/Banner"
 import { CandidateTable } from "@/components/run/CandidateTable"
 import { JobStatusBadge, RunProgress } from "@/components/run/RunProgress"
+import { StatusChips } from "@/components/StatusChips"
 import { Button } from "@/components/ui/button"
 import { toRows } from "@/lib/candidates"
 import { candidatesCsv, download } from "@/lib/exports"
@@ -57,7 +57,7 @@ export function RunPage() {
           </Button>
         )}
       </div>
-      <Banner />
+      <StatusChips jLimit={r?.evaluations[0]?.j_limit} />
       {job?.active && <RunProgress job={job} />}
       {job?.error && <p className="text-destructive">{job.error}</p>}
       {result.isError && <p className="text-destructive">Could not load the result.</p>}

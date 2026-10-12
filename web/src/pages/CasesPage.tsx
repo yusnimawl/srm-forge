@@ -69,7 +69,7 @@ export function CasesPage() {
               {details.some((d) => d.isPending) ? "Loading the shown cases…" : "None of the shown cases has an envelope to plot: they are drafts or their evaluation failed."}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">Unvalidated, peak-only, except cases whose status reads EM-validated.</p>
+          <p className="text-xs text-muted-foreground">Unvalidated, peak-only, except cases whose status reads 2D-verified.</p>
         </section>
       )}
       {rows.length > 0 && (

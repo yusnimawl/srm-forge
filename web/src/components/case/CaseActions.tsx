@@ -108,7 +108,7 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
   const validateWhy = job
     ? "A job is running"
     : data.validation?.label
-      ? "Already EM-validated"
+      ? "Already 2D-verified"
       : editable
         ? "Evaluate this case first"
         : data.preset !== "full"

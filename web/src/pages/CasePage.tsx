@@ -5,11 +5,11 @@ import { toast } from "sonner"
 import { useCreateCase, usePatchCase } from "@/api/cases"
 import { api } from "@/api/client"
 import type { Case, CaseInputs } from "@/api/types"
-import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { CaseActions } from "@/components/case/CaseActions"
 import { InputTabs } from "@/components/case/InputTabs"
 import { ValidationPanel } from "@/components/case/ValidationPanel"
+import { StatusChips } from "@/components/StatusChips"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { issueKey, tabOfKey, toForm, toInputs, useDebounced, validationByField, type CaseForm, type IssuesResponse } from "@/lib/caseForm"
@@ -125,7 +125,10 @@ function CaseEditor({ data }: { data: Case }) {
             </Button>
           )}
         </div>
-        <Banner engineVersion={data.validation?.label ? data.validation.engine_version : null} />
+        <StatusChips
+          engineVersion={data.validation?.label ? data.validation.engine_version : null}
+          jLimit={evaluation?.j_limit}
+        />
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>
