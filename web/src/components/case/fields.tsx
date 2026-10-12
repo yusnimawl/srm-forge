@@ -5,7 +5,7 @@ import type { CaseForm } from "@/lib/caseForm"
 import { UNIT_LABEL, type Unit } from "@/lib/units"
 
 export const SELECT_CLASS =
-  "min-h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
+  "min-h-11 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
 
 /** What every input tab gets: the form, an updater, and the validation errors by dotted field name. */
 export type TabProps = {

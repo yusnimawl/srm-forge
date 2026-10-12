@@ -3,18 +3,15 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { api, type JobOut } from "@/api/client"
 import { errorMessage } from "@/lib/errorMessage"
-import { setThemePreference, useTheme, type ThemePreference } from "@/lib/theme"
 
 type Health = { version: string; srmcore: string }
 type Cache = { path: string; files: number; bytes: number }
 type Session = { auth_required: boolean; logged_in: boolean }
 
-const THEMES: ThemePreference[] = ["system", "light", "dark"]
 const mb = (b: number) => `${(b / 1e6).toFixed(1)} MB`
 
 export function SettingsPage() {
   const qc = useQueryClient()
-  const { preference } = useTheme()
   const health = useQuery({ queryKey: ["health"], queryFn: () => api<Health>("/api/health") })
   const cache = useQuery({ queryKey: ["cache"], queryFn: () => api<Cache>("/api/settings/cache") })
   const session = useQuery({ queryKey: ["session"], queryFn: () => api<Session>("/api/session") })
@@ -38,24 +35,6 @@ export function SettingsPage() {
   return (
     <div className="max-w-xl space-y-8">
       <h1 className="text-2xl font-semibold text-primary">Settings</h1>
-
-      <section className="space-y-2">
-        <h2 className="font-medium">Theme</h2>
-        <div role="radiogroup" aria-label="Theme" className="flex gap-2">
-          {THEMES.map((t) => (
-            <Button
-              key={t}
-              role="radio"
-              aria-checked={preference === t}
-              variant={preference === t ? "default" : "outline"}
-              className="min-h-11 capitalize"
-              onClick={() => setThemePreference(t)}
-            >
-              {t}
-            </Button>
-          ))}
-        </div>
-      </section>
 
       <section className="space-y-2">
         <h2 className="font-medium">Map cache</h2>

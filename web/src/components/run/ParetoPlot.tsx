@@ -9,7 +9,7 @@ const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 const SYMBOLS_3D = ["circle", "square", "diamond", "cross"]
 const KEYS = Object.keys(AXES) as AxisKey[]
 const SELECT_CLASS =
-  "min-h-11 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+  "min-h-11 rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 
 function useMedia(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches)
@@ -114,7 +114,7 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
     margin: { l: 60, r: 10, t: 10, b: 50 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Fira Sans, sans-serif", color: c.fg },
+    font: { family: "Geist, sans-serif", color: c.fg },
     legend: { orientation: "h", y: -0.2 },
     ...(is3d ? { scene: { xaxis: axis(x), yaxis: axis(y), zaxis: axis(z) } } : { xaxis: axis(x), yaxis: axis(y) }),
   }

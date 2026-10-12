@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from "react"
+import { useState, type ComponentProps } from "react"
 import createPlotlyComponent from "react-plotly.js/factory"
 import Plotly, { type Data, type Layout } from "plotly.js-dist-min"
 import type { Trace } from "@/lib/analysis"
@@ -19,18 +19,19 @@ export function Plot({ layout, style, ...rest }: PlotProps) {
 const readColors = () => {
   const s = getComputedStyle(document.documentElement)
   const v = (n: string) => s.getPropertyValue(n).trim()
-  return { primary: v("--primary"), fg: v("--foreground"), muted: v("--muted-foreground"), grid: v("--border") }
+  return {
+    primary: v("--primary"),
+    fg: v("--foreground"),
+    muted: v("--muted-foreground"),
+    faint: v("--faint"),
+    grid: v("--border"),
+    zero: v("--border-strong"),
+  }
 }
 
-/** Theme tokens are read from the document so plots follow light and dark. */
+/** Theme tokens, read from the document once. */
 export function useColors() {
-  const [colors, setColors] = useState(readColors)
-  useEffect(() => {
-    const obs = new MutationObserver(() => setColors(readColors()))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] })
-    return () => obs.disconnect()
-  }, [])
-  return colors
+  return useState(readColors)[0]
 }
 
 interface LinePlotProps {
@@ -53,7 +54,7 @@ export function LinePlot({ data, xTitle, yTitle, y2Title, legend = true, height 
     margin: { l: 60, r: y2Title ? 60 : 10, t: 10, b: 50 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Fira Sans, sans-serif", color: c.fg },
+    font: { family: "Geist, sans-serif", color: c.fg },
     xaxis: axis(xTitle),
     yaxis: axis(yTitle),
     ...(y2Title && { yaxis2: axis(y2Title, { overlaying: "y", side: "right", showgrid: false }) }),

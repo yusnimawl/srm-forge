@@ -14,7 +14,7 @@ export default function MapCharts({ map, unaligned }: { map: MapArrays; unaligne
     margin: { l: 60, r: 10, t: 10, b: 50 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Fira Sans, sans-serif", color: c.fg },
+    font: { family: "Geist, sans-serif", color: c.fg },
   }
   const axis = (text: string) => ({ title: { text }, gridcolor: c.grid, color: c.fg })
 

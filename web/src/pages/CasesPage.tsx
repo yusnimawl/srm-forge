@@ -37,7 +37,7 @@ export function CasesPage() {
           {flags.length > 0 && (
             <select
               aria-label="Filter by flag"
-              className="h-11 rounded-lg border border-input bg-transparent px-2 text-base md:text-sm dark:bg-input/30"
+              className="h-11 rounded-lg border border-input bg-input/30 px-2 text-base md:text-sm"
               value={active ?? ""}
               onChange={(e) => setFlag(e.target.value || null)}
             >

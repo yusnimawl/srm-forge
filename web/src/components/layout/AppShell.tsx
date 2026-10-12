@@ -2,7 +2,6 @@ import type { ComponentType } from "react"
 import { NavLink, Outlet } from "react-router"
 import { Layers, List, Search, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ThemeToggle } from "./ThemeToggle"
 
 type Item = { label: string; to: string; icon: ComponentType<{ className?: string }> }
 
@@ -51,14 +50,10 @@ export function AppShell() {
             <NavItem key={i.label} item={i} bar={false} />
           ))}
         </nav>
-        <div className="mt-auto">
-          <ThemeToggle />
-        </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border bg-sidebar px-3 md:hidden">
           <span className="text-base font-semibold text-primary">SRM designer</span>
-          <ThemeToggle />
         </header>
         <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />
