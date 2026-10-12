@@ -6,7 +6,7 @@ Status: approved in chat 2026-10-12 (owner). Replaces the sub-project order in t
 
 A tool the owner can run without knowing motor design. They enter requirements and get recommendations for the most power-dense SRM. Then they edit the chosen shape and simulate and tune its control.
 
-- **Inputs:** torque and rpm on the output side of the transmission (wheel or sprocket), plus bus voltage and limits. A ratio field is `auto` (the tool picks the ratio and the motor rpm) or a fixed number; ratio 1 is direct drive and is the same as today's motor-side input.
+- **Inputs:** torque and rpm on the output side of the transmission (wheel or sprocket), plus bus voltage and limits. A ratio field is `auto` (the tool picks the ratio and the motor rpm) or a fixed number; ratio 1 is direct drive and is the same as today's motor-side input. An optional motor rpm cap limits `auto` (bearings, balancing, noise, or simply preference).
 - **Objectives:** peak and continuous, each as kW/kg and kW/L (active parts). The axes of the options graph are chosen after the preliminary design.
 - **What-ifs:** "if I cool it this much, I get X"; limits on bus voltage and current; linked inputs (P = T·ω).
 - **Geometry:** parametric designs, DXF export, edits in external CAD (coil-holder notches, laser-weld V-grooves, lightening holes), then DXF import, solve, and a before/after comparison.
@@ -76,7 +76,7 @@ Order chosen by the owner: physics first, with the DXF round trip early because 
 ### R7 — Decide for me
 - [ ] Spike first: NSGA-III vs surrogate/Bayesian vs the current sample-and-filter funnel, same budget and requirements; pick from the results
 - [ ] Explore at `screening`, confirm finalists at `full` (fidelity rule above)
-- [ ] Ratio `auto`: push motor rpm up until rotor stress, electrical frequency or bus voltage limits it; report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
+- [ ] Ratio `auto`: push motor rpm up until the owner's optional motor rpm cap, rotor stress, electrical frequency or bus voltage limits it (the tool says which one bound); report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
 - [ ] Plain-language recommendations ("pick this because …")
 - Done when: requirements in → ranked recommendations with reasons out, on a stated compute budget.
 
