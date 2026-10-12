@@ -39,7 +39,7 @@ Fonts: Geist (UI) and Geist Mono (numbers, inputs, axis ticks; `tnum`) from Goog
 
 ## 4. Data colours
 
-- **|B| colour map:** `web/src/lib/inferno.ts` (matplotlib inferno, 17 stops, same interface and tests as `viridis.ts`) replaces `viridis` in `fieldGl.ts` and `ColorBar.tsx`; `viridis.ts` and its test are deleted. Flux lines on the field plot: `#ededed` at 0.7 alpha (they must read on every inferno shade; checked on the dark and bright ends).
+- **|B| colour map:** `web/src/lib/inferno.ts` (matplotlib inferno, 17 stops, same interface and tests as `viridis.ts`) replaces `viridis` in `fieldGl.ts` and `ColorBar.tsx`; `viridis.ts` and its test are deleted. Field line colours: flux lines stay white at 0.9 alpha (as today); region outlines become `#8a8a8a` at 0.9 (black outlines vanish on inferno's black end); the mesh wire becomes white at 0.08. White flux lines read on inferno's black-to-orange range and fade on its pale-yellow top, as they already do on viridis's yellow top.
 - **Series palette** (`LINE_COLORS` in `lib/analysis.ts`), in order: `#ededed` white, `#e8b04a` amber, `#9bd88a` green, `#e07fb5` pink, `#f2716b` coral, `#c3a6f0` lavender, `#8a8a8a` grey. Every hue is outside 190–250°.
 - **Dash patterns** (`LINE_DASHES`, same index as the colour): solid, dash, dot, dash-dot, long-dash, long-dash-dot, solid thin. Applied wherever cases are overlaid.
 - **Plotly template:** one template in `PlotlyPlot.tsx` (transparent paper and plot background, grid `#232323`, zero line `#333333`, tick font Geist Mono 11 px `#5c5c5c`, title and legend font Geist `#8a8a8a`, hover label `#181818`/`#ededed`, colourway = the series palette). No chart sets its own background or font.
