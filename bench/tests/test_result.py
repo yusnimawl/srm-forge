@@ -66,3 +66,12 @@ def test_read_results_skips_foreign_and_broken(tmp_path):
 
 def test_read_results_missing_dir(tmp_path):
     assert read_results(tmp_path / "nope") == []
+
+
+def test_read_results_skips_a_non_string_started(tmp_path):
+    write_result(_result(), tmp_path)
+    d = tmp_path / "odd"
+    d.mkdir()
+    data = _result().__dict__ | {"started": 123}
+    (d / "numeric-start.json").write_text(json.dumps(data), encoding="utf-8")
+    assert [r.label for r in read_results(tmp_path)] == ["lattepanda-sigma"]

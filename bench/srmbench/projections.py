@@ -24,6 +24,16 @@ def choose_workers(batches: list[dict], tier: str) -> int:
     return best_workers(batches) if tier == "quick" else recommended_workers(batches)
 
 
+def throughput_at(batches: list[dict], workers: int) -> float:
+    """Solves per minute at `workers`: the largest measured batch with at most that many workers. When every
+    measured batch is larger (a RAM cap below the smallest), the smallest one scaled linearly."""
+    fitting = [b for b in batches if b["workers"] <= workers]
+    if fitting:
+        return max(fitting, key=lambda b: b["workers"])["per_min"]
+    smallest = min(batches, key=lambda b: b["workers"])
+    return smallest["per_min"] * workers / smallest["workers"]
+
+
 def project(mesh_s: dict, single: dict, throughput_per_min: float, points: dict) -> dict:
     """Map times from the mesh time, the point count and the batch throughput. A `full` point costs
     `single["full"] / single["screening"]` screening points."""
@@ -47,11 +57,12 @@ def _rollup(steps: dict) -> dict:
 
 
 def summary(steps: dict, tier: str) -> dict:
-    """The headline numbers of a run, from the `steps` dict that `tiers.run_tier` fills."""
+    """The headline numbers of a run, from the `steps` dict that `tiers.run_tier` fills. The recommended worker
+    count is `steps["recommended"]["workers"]` (RAM-capped); without it, the uncapped choice for the tier."""
     batches = steps["batches"]
     best = best_workers(batches)
-    recommended = choose_workers(batches, tier)
-    throughput = next(b["per_min"] for b in batches if b["workers"] == recommended)
+    recommended = steps["recommended"]["workers"] if "recommended" in steps else choose_workers(batches, tier)
+    throughput = throughput_at(batches, recommended)
     single = {k: steps["single_solve"][k]["median"] for k in ("screening", "full")}
     projected = project({k: steps["mesh"][k]["seconds"] for k in ("screening", "full")}, single, throughput,
                         {k: steps["mesh"][k]["points"] for k in ("screening", "full")})

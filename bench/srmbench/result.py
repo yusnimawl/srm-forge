@@ -65,7 +65,8 @@ def _load(path: Path) -> Result | None:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or data.get("schema") != SCHEMA:
             return None
-        return Result(**{f.name: data[f.name] for f in dataclasses.fields(Result)})
+        r = Result(**{f.name: data[f.name] for f in dataclasses.fields(Result)})
+        return r if isinstance(r.started, str) else None
     except (OSError, ValueError, KeyError):
         return None
 
@@ -83,5 +84,5 @@ def read_results(results_dir: Path) -> list[Result]:
 def _start_key(started: str):
     try:
         return datetime.fromisoformat(started).timestamp()
-    except ValueError:
+    except (ValueError, TypeError):
         return float("inf")

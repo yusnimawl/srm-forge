@@ -5,6 +5,7 @@
   single_solve        {"screening" | "full": {samples, median}}
   correctness_points  {points, correctness}
   batches             [time_batch result, ...] in ascending worker count
+  recommended         {workers, uncapped, ram_cap}: workers = the RAM-capped count every later step runs at
   screening_map       map_run summary + workers                               standard, long
   sustained           workload.sustained result + workers, minutes            standard, long
   full_maps           {"8_6" | "12_8": {map, extras, workers}}                long
@@ -74,11 +75,14 @@ def run_tier(tier: str, label: str, platform: Platform, worker_cap: int | None, 
         log(f"mesh 8/6 {name}: {_seconds(m['seconds'])}, {nodes} nodes")
 
     steps["single_solve"] = {}
-    for name, d, static in (("screening", d_scr, static_scr), ("full", d_full, static_full)):
-        steps["single_solve"][name] = workload.single_solves(static, d, SINGLE_SOLVES[name])
-        s = steps["single_solve"][name]
+
+    def solve_singles(name: str, d, static) -> None:
+        s = steps["single_solve"][name] = workload.single_solves(static, d, SINGLE_SOLVES[name])
         log(f"single solve 8/6 {name}: median {_seconds(s['median'])} of {len(s['samples'])}")
-    del static_full, static
+
+    solve_singles("screening", d_scr, static_scr)
+    solve_singles("full", d_full, static_full)
+    del static_full
 
     points = workload.reference_points(static_scr, d_scr)
     correctness = workload.check_points(points, workload.load_reference("points_8_6.json"),
@@ -101,10 +105,14 @@ def run_tier(tier: str, label: str, platform: Platform, worker_cap: int | None, 
             ram_known = True
             cap = max_workers(logical, _available_gb(), b["peak_ram_gb"], worker_cap)
 
-    recommended = choose_workers(steps["batches"], tier)
+    uncapped = choose_workers(steps["batches"], tier)
     peaks = [b["peak_ram_gb"] for b in steps["batches"] if b["peak_ram_gb"] is not None]
     peak = max(peaks) if peaks else None
-    run_workers = min(recommended, max_workers(logical, _available_gb(), peak, worker_cap))
+    ram_cap = None if peak is None else max_workers(logical, _available_gb(), peak, worker_cap)
+    run_workers = uncapped if ram_cap is None else min(uncapped, ram_cap)
+    steps["recommended"] = {"workers": run_workers, "uncapped": uncapped, "ram_cap": ram_cap}
+    if run_workers != uncapped:
+        log(f"workers capped by RAM: {uncapped} -> {run_workers}")
 
     if tier in SUSTAINED_MIN:
         goldens = workload.load_reference("goldens_8_6.json")
@@ -121,7 +129,7 @@ def run_tier(tier: str, label: str, platform: Platform, worker_cap: int | None, 
     if tier == "long":
         node_ratio = mesh_full["nodes"] / mesh_scr["nodes"]
         full_peak = None if peak is None else peak * node_ratio
-        full_workers = min(recommended, max_workers(logical, _available_gb(), full_peak, worker_cap))
+        full_workers = min(run_workers, max_workers(logical, _available_gb(), full_peak, worker_cap))
         steps["full_maps"] = {}
         for name in ("8_6", "12_8"):
             d = workload.design(name, "full")

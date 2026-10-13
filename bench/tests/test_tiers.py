@@ -97,7 +97,7 @@ def test_run_tier_quick_with_fake_workload(fake):
     r = run_tier("quick", "test-box", PLATFORM, None, lines.append)
     assert r.status == "complete" and r.tier == "quick" and r.label == "test-box"
     assert r.schema == "srmbench-result" and r.lock_hash == "deadbeef0000"
-    assert set(r.steps) == {"mesh", "single_solve", "correctness_points", "batches"}
+    assert set(r.steps) == {"mesh", "single_solve", "correctness_points", "batches", "recommended"}
     assert [b["workers"] for b in r.steps["batches"]] == [8, 16]
     assert r.summary["recommended_workers"] in {8, 16}
     assert r.summary["srmweb_workers"] == r.summary["recommended_workers"]
@@ -142,10 +142,40 @@ def test_run_tier_ram_cap_from_first_batch_with_a_figure(fake, monkeypatch):
     assert r.summary["recommended_workers"] == 2
 
 
+def test_run_tier_quick_recommendation_is_ram_capped(fake, monkeypatch):
+    # 6 GB available, 0.8 GB per worker: the W=8 batch runs, then the cap is 6 and W=16 is dropped.
+    monkeypatch.setattr(tiers, "_available_gb", lambda: 6.0)
+    r = run_tier("quick", "small-ram", PLATFORM, None, lambda s: None)
+    assert [b["workers"] for b in r.steps["batches"]] == [8]
+    assert r.steps["recommended"] == {"workers": 6, "uncapped": 8, "ram_cap": 6}
+    assert r.summary["recommended_workers"] == 6 and r.summary["srmweb_workers"] == 6
+    batch = r.steps["batches"][0]
+    assert r.summary["throughput_per_min"] == pytest.approx(batch["per_min"] * 6 / 8)
+
+
+def test_run_tier_standard_run_workers_agree_with_summary(fake, monkeypatch):
+    # Later batches report a larger per-worker peak, which lowers the worker count below the 95 % choice.
+    peaks = {1: None, 2: 0.8, 4: 3.0, 8: 3.0, 16: 3.0}
+
+    def batch(static, d, workers):
+        return {"workers": workers, "points": 8 * workers, "seconds": 10.0, "per_min": 100.0 * workers ** 0.5,
+                "peak_ram_gb": peaks[workers]}
+
+    monkeypatch.setattr(tiers.workload, "time_batch", batch)
+    r = run_tier("standard", "mixed", PLATFORM, None, lambda s: None)
+    assert [b["workers"] for b in r.steps["batches"]] == [1, 2, 4, 8, 16]
+    assert r.steps["recommended"] == {"workers": 9, "uncapped": 16, "ram_cap": 9}
+    assert r.steps["screening_map"]["workers"] == 9 and r.steps["sustained"]["workers"] == 9
+    assert r.summary["recommended_workers"] == 9 and r.summary["srmweb_workers"] == 9
+    assert r.summary["throughput_per_min"] == pytest.approx(100.0 * 8 ** 0.5)  # largest measured batch <= 9
+    assert ("map_run", ("8_6", "screening"), 9, True) in fake.calls
+
+
 def test_run_tier_standard(fake):
     r = run_tier("standard", "test-box", PLATFORM, 8, lambda s: None)
     assert [b["workers"] for b in r.steps["batches"]] == [1, 2, 4, 8]
-    assert set(r.steps) == {"mesh", "single_solve", "correctness_points", "batches", "screening_map", "sustained"}
+    assert set(r.steps) == {"mesh", "single_solve", "correctness_points", "batches", "recommended",
+                          "screening_map", "sustained"}
     assert r.summary["recommended_workers"] == 8
     assert ("map_run", ("8_6", "screening"), 8, True) in fake.calls
     assert ("sustained", 8, 5) in fake.calls

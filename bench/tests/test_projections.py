@@ -129,3 +129,19 @@ def test_correctness_rollup():
     steps = _steps(screening_map_s=228.0)
     steps["correctness_points"]["correctness"] = _c("not checked")
     assert summary(steps, "standard")["correctness"]["status"] == "pass"
+
+
+def test_summary_uses_the_capped_recommendation_and_its_throughput():
+    steps = _steps()
+    steps["recommended"] = {"workers": 10, "uncapped": 16, "ram_cap": 10}
+    s = summary(steps, "standard")
+    assert s["recommended_workers"] == s["srmweb_workers"] == 10
+    assert s["best_workers"] == 16
+    assert s["throughput_per_min"] == 137.1  # the W = 8 batch
+    assert s["screening_map_s"]["value"] == pytest.approx(5 + 360 * 60 / 137.1)
+
+
+def test_throughput_below_every_measured_batch_scales_the_smallest():
+    steps = _steps()
+    steps["recommended"] = {"workers": 2, "uncapped": 16, "ram_cap": 2}
+    assert summary(steps, "quick")["throughput_per_min"] == pytest.approx(60.0)
