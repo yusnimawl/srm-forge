@@ -79,6 +79,8 @@ def test_unsupported_message_names_reason_and_supported_list():
         ((16, 30.0, 1.0, 4), 4),
         ((16, 1.2, 2.0, None), 1),
         ((16, 30.0, None, None), 16),
+        ((16, 30.0, 0.0, None), 16),
+        ((16, 30.0, -1.0, 4), 4),
     ],
 )
 def test_max_workers(args, want):

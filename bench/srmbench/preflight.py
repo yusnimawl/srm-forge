@@ -181,6 +181,6 @@ def max_workers(logical: int, available_gb: float, per_worker_gb: float | None, 
     n = logical
     if cap is not None:
         n = min(n, cap)
-    if per_worker_gb is not None:
+    if per_worker_gb is not None and per_worker_gb > 0:
         n = min(n, int((available_gb - 1) // per_worker_gb))
     return max(n, 1)
