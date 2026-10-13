@@ -10,7 +10,7 @@ export function DriveTab({ form, update, errors, evaluation }: TabProps & { eval
   const env = evaluation?.envelope
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3.5">
         <NumField id="bus-voltage" label="Bus voltage" unit="V" value={r.busVoltageV} error={errors["requirements.bus_voltage_v"]}
           onChange={(v) => set("busVoltageV", v)} />
         <NumField id="phase-current" label="Phase current limit" unit="A" value={r.phaseCurrentA}

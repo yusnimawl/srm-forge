@@ -116,6 +116,7 @@ class EvaluationOut(_Out):
     scan: list[ScanPointOut] = []
     i_rms_a: F = None
     j_rms: F = None
+    j_limit: F = None
     map: MapArraysOut | None = None
     curves: MapCurvesOut | None = None
 

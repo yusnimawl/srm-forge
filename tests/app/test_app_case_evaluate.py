@@ -7,6 +7,7 @@ from map_fixtures import synthetic_map
 
 from srmapp.case import CaseInputs, FixedWinding, evaluate_design, map_cache_hit, map_request, validate_case
 from srmapp.requirements import Requirements
+from srmapp.sizing.estimates import J_LIMIT
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmcore.maps import build_map
 from srmcore.model.design import Design, MeshSettings
@@ -32,6 +33,15 @@ def _fake_map(design, i_max, **kw):
 def _evaluate(inputs, **kw):
     with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map) as bm:
         return evaluate_design(inputs, **kw), bm
+
+
+def test_evaluation_records_j_limit():
+    fixed = FixedWinding(turns=10)      # one winding, so no turn scan
+    custom = _evaluate(_inputs(winding=fixed, j_limit=12e6))[0]
+    default = _evaluate(_inputs(winding=fixed))[0]
+    assert custom.status == "ok" and default.status == "ok"
+    assert custom.j_limit == 12e6
+    assert default.j_limit == J_LIMIT
 
 
 def test_fixed_with_the_auto_winding_reproduces_auto():

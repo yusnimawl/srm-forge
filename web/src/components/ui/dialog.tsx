@@ -12,12 +12,12 @@ function DialogContent({ className, ...props }: DialogPrimitive.Popup.Props) {
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
         data-slot="dialog-overlay"
-        className="fixed inset-0 z-50 bg-black/30 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0"
+        className="fixed inset-0 z-50 bg-black/60 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0"
       />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 flex max-h-[85svh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0",
+          "fixed top-1/2 left-1/2 z-50 flex max-h-[85svh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto rounded-[8px] border border-border-strong bg-popover p-4 text-sm text-popover-foreground transition duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0",
           className
         )}
         {...props}
@@ -27,7 +27,7 @@ function DialogContent({ className, ...props }: DialogPrimitive.Popup.Props) {
 }
 
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-base font-medium", className)} {...props} />
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-[15px] font-semibold tracking-[-0.01em]", className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {

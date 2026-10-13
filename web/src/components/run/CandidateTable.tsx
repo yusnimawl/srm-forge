@@ -14,6 +14,7 @@ const num = (key: keyof CandidateRow, header: string, digits = 3): ColumnDef<Can
   header,
   cell: ({ getValue }) => <span className="num">{fmt(getValue() as number | null, digits)}</span>,
   sortUndefined: "last",
+  meta: { numeric: true },
 })
 
 const CARD_FIELDS = [
@@ -34,7 +35,7 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <Link to={href(row.original)} className="num text-primary underline underline-offset-2">
+        <Link to={href(row.original)} className="num text-foreground underline underline-offset-2 hover:text-muted-foreground">
           {row.original.id}
         </Link>
       ),
@@ -77,10 +78,10 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
                 {hg.headers.map((h) => {
                   const dir = h.column.getIsSorted()
                   return (
-                    <TableHead key={h.id} aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none"}>
+                    <TableHead key={h.id} className={cn(h.column.columnDef.meta?.numeric && "text-right")} aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none"}>
                       <button
                         type="button"
-                        className="inline-flex min-h-11 items-center gap-1 font-medium"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-[4px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={h.column.getToggleSortingHandler()}
                       >
                         {flexRender(h.column.columnDef.header, h.getContext())}
@@ -97,7 +98,7 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
             {table.getRowModel().rows.map((r) => (
               <TableRow key={r.id} title={tip(r.original)} className={cn(!r.original.feasible && "text-muted-foreground")}>
                 {r.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                  <TableCell key={cell.id} className={cn(cell.column.columnDef.meta?.numeric && "text-right")}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                 ))}
               </TableRow>
             ))}
@@ -108,9 +109,9 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
         {table.getRowModel().rows.map((r) => {
           const c = r.original
           return (
-            <li key={c.id} title={tip(c)} className="rounded-lg border border-border p-3 text-sm">
+            <li key={c.id} title={tip(c)} className="rounded-[10px] border border-border bg-card p-3 text-sm">
               <div className="flex items-center justify-between">
-                <Link to={href(c)} className="num inline-flex min-h-11 items-center text-primary underline underline-offset-2">
+                <Link to={href(c)} className="num inline-flex min-h-11 items-center text-foreground underline underline-offset-2">
                   {c.id}
                 </Link>
                 <span className={cn(c.status !== "ok" && "text-destructive")}>

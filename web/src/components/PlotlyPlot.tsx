@@ -1,7 +1,7 @@
-import { useEffect, useState, type ComponentProps } from "react"
+import { useState, type ComponentProps } from "react"
 import createPlotlyComponent from "react-plotly.js/factory"
 import Plotly, { type Data, type Layout } from "plotly.js-dist-min"
-import type { Trace } from "@/lib/analysis"
+import { LINE_COLORS, type Trace } from "@/lib/analysis"
 
 const PlotBase = createPlotlyComponent(Plotly)
 
@@ -19,18 +19,44 @@ export function Plot({ layout, style, ...rest }: PlotProps) {
 const readColors = () => {
   const s = getComputedStyle(document.documentElement)
   const v = (n: string) => s.getPropertyValue(n).trim()
-  return { primary: v("--primary"), fg: v("--foreground"), muted: v("--muted-foreground"), grid: v("--border") }
+  return {
+    primary: v("--primary"),
+    fg: v("--foreground"),
+    muted: v("--muted-foreground"),
+    faint: v("--faint"),
+    grid: v("--border"),
+    zero: v("--border-strong"),
+    raised: v("--muted"),
+    strong: v("--border-strong"),
+  }
 }
 
-/** Theme tokens are read from the document so plots follow light and dark. */
+/** Theme tokens, read from the document once. */
 export function useColors() {
-  const [colors, setColors] = useState(readColors)
-  useEffect(() => {
-    const obs = new MutationObserver(() => setColors(readColors()))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] })
-    return () => obs.disconnect()
-  }, [])
-  return colors
+  return useState(readColors)[0]
+}
+
+type Colors = ReturnType<typeof useColors>
+
+/** The one chart theme: transparent panels, Geist text, hairline grid, series palette. */
+export function plotTheme(c: Colors): Partial<Layout> {
+  const axis = {
+    gridcolor: c.grid,
+    zerolinecolor: c.zero,
+    linecolor: c.grid,
+    color: c.muted,
+    tickfont: { family: "Geist Mono, monospace", size: 11, color: c.muted },
+  }
+  return {
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: "Geist, sans-serif", color: c.muted },
+    xaxis: axis,
+    yaxis: axis,
+    colorway: LINE_COLORS,
+    hoverlabel: { bgcolor: c.raised, bordercolor: c.strong, font: { color: c.fg, family: "Geist" } },
+    modebar: { bgcolor: "rgba(0,0,0,0)", color: c.muted, activecolor: c.fg },
+  }
 }
 
 interface LinePlotProps {
@@ -47,13 +73,12 @@ interface LinePlotProps {
 /** A themed line chart with the legend below the axes, readable from 375 px up. */
 export function LinePlot({ data, xTitle, yTitle, y2Title, legend = true, height = 320 }: LinePlotProps) {
   const c = useColors()
-  const axis = (text: string, extra = {}) => ({ title: { text }, gridcolor: c.grid, color: c.fg, ...extra })
+  const theme = plotTheme(c)
+  const axis = (text: string, extra = {}) => ({ ...theme.xaxis, title: { text }, ...extra })
   const layout = {
+    ...theme,
     height,
     margin: { l: 60, r: y2Title ? 60 : 10, t: 10, b: 50 },
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Fira Sans, sans-serif", color: c.fg },
     xaxis: axis(xTitle),
     yaxis: axis(yTitle),
     ...(y2Title && { yaxis2: axis(y2Title, { overlaying: "y", side: "right", showgrid: false }) }),

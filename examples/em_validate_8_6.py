@@ -1,4 +1,4 @@
-r"""EM-validated label checks and uncertainty budget for the 8/6 golden design on a `full` map.
+r"""2D-verified label checks and uncertainty budget for the 8/6 golden design on a `full` map.
 
 Usage: python examples\em_validate_8_6.py [workers] [--json PATH]   (default grids, about 1 h)
 """

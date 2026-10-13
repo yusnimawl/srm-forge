@@ -1,15 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useCreateCase, usePatchCase } from "@/api/cases"
 import { api } from "@/api/client"
 import type { Case, CaseInputs } from "@/api/types"
-import { Banner } from "@/components/Banner"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { CaseActions } from "@/components/case/CaseActions"
 import { InputTabs } from "@/components/case/InputTabs"
 import { ValidationPanel } from "@/components/case/ValidationPanel"
+import { CaseStatusBadge } from "@/components/cases/CaseTable"
+import { StatusChips } from "@/components/StatusChips"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { issueKey, tabOfKey, toForm, toInputs, useDebounced, validationByField, type CaseForm, type IssuesResponse } from "@/lib/caseForm"
@@ -115,25 +116,31 @@ function CaseEditor({ data }: { data: Case }) {
   return (
     <div className="space-y-4">
       <header className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold text-primary">{data.label || data.id}</h1>
+        <nav aria-label="Breadcrumb" className="text-[12.5px] text-muted-foreground">
+          <Link to="/cases" className="hover:text-foreground">Cases</Link> / {data.label || data.id}
+        </nav>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">{data.label || data.id}</h1>
           <Badge variant="outline">{data.origin}</Badge>
-          <Badge variant={status === "Failed" ? "destructive" : status === "Draft" ? "secondary" : "default"}>{status}</Badge>
+          <CaseStatusBadge status={status} />
           {!editable && (
             <Button className="ml-auto min-h-11" onClick={edit} disabled={create.isPending}>
               {create.isPending ? "Creating…" : "Edit"}
             </Button>
           )}
         </div>
-        <Banner engineVersion={data.validation?.label ? data.validation.engine_version : null} />
+        <StatusChips
+          engineVersion={data.validation?.label ? data.validation.engine_version : null}
+          evaluation={evaluation}
+        />
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>
 
-      <div role="radiogroup" aria-label="Page section" className="inline-flex rounded-lg border p-0.5 md:hidden">
+      <div role="radiogroup" aria-label="Page section" className="inline-flex rounded-[6px] border border-border-strong p-0.5 md:hidden">
         {VIEWS.map(([v, label]) => (
           <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)}
-            className={cn("min-h-11 rounded-md px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
             {label}
           </button>
@@ -143,12 +150,12 @@ function CaseEditor({ data }: { data: Case }) {
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <section aria-label="Inputs" className={cn("min-w-0 space-y-3", pane("input"))}>
           {check.isError && (
-            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <p role="alert" className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               Validation unavailable: {errorMessage(check.error)}
             </p>
           )}
           {unplaced.length > 0 && (
-            <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <div role="alert" className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <p className="font-medium">Check the inputs:</p>
               <ul className="list-disc pl-5">
                 {unplaced.map((e, k) => <li key={k}>{e.loc.length > 0 ? `${issueKey(e.loc)}: ` : ""}{e.msg}</li>)}
@@ -156,7 +163,7 @@ function CaseEditor({ data }: { data: Case }) {
             </div>
           )}
           {(issues?.warnings.length ?? 0) > 0 && (
-            <ul className="list-disc rounded-lg border p-3 pl-8 text-sm text-muted-foreground">
+            <ul className="list-disc rounded-[10px] border p-3 pl-8 text-sm text-muted-foreground">
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}

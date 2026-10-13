@@ -114,7 +114,7 @@ export default function FieldCanvas({ mesh, frame, layers, bMax, onHover }: {
         tabIndex={0}
         role="img"
         aria-label="Magnetic field of the machine. Arrow keys pan, plus and minus zoom."
-        className="aspect-square w-full touch-none rounded-lg border border-border bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="aspect-square w-full touch-none rounded-[10px] border border-border bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
           pointers.current.set(e.pointerId, [e.clientX, e.clientY])

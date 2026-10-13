@@ -811,6 +811,8 @@ export interface components {
             i_rms_a?: number | null;
             /** Id */
             id: string;
+            /** J Limit */
+            j_limit?: number | null;
             /** J Rms */
             j_rms?: number | null;
             key: components["schemas"]["KeyNumbersOut"] | null;

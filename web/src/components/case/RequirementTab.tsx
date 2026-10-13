@@ -14,7 +14,7 @@ export function RequirementTab({ form, update, errors }: TabProps) {
   )
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3.5">
         {num("peakPowerKw", "peak_power_w", "peak-power", "Peak power", "kW")}
         {num("peakTorqueNm", "peak_torque_nm", "peak-torque", "Peak torque", "Nm")}
         {num("baseSpeedRpm", "base_speed_rpm", "base-speed", "Base speed", "rpm")}

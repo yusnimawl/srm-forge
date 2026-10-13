@@ -32,7 +32,7 @@ function SectionIo({ tab, form, update, canImport }: TabProps & { tab: CaseTab; 
   }
 
   return (
-    <div className="flex flex-wrap gap-2 py-2">
+    <div className="flex flex-wrap gap-2 px-4 py-3">
       <Button variant="outline" className="min-h-11" onClick={() => download(`${tab}.srm-setup.json`, JSON.stringify(sectionSetup(form, tab), null, 2))}>
         Export {label.toLowerCase()}
       </Button>
@@ -54,13 +54,13 @@ export function InputTabs({ readOnly, evaluation, ...p }: TabProps & { readOnly:
   const [tab, setTab] = useState<CaseTab>("requirement")
   const count = (id: string) => Object.keys(p.errors).filter((k) => tabOfKey(k) === id).length
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as CaseTab)}>
-      <TabsList className="max-w-full overflow-x-auto">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as CaseTab)} className="gap-0 overflow-hidden rounded-[10px] border border-border bg-card">
+      <TabsList className="px-2.5 pt-2">
         {CASE_TABS.map((t) => (
           <TabsTrigger key={t.id} value={t.id}>
             {t.label}
             {count(t.id) > 0 && (
-              <span className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-white" aria-label={`${count(t.id)} ${count(t.id) === 1 ? "error" : "errors"}`}>
+              <span className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-background" aria-label={`${count(t.id)} ${count(t.id) === 1 ? "error" : "errors"}`}>
                 {count(t.id)}
               </span>
             )}
@@ -68,7 +68,7 @@ export function InputTabs({ readOnly, evaluation, ...p }: TabProps & { readOnly:
         ))}
       </TabsList>
       <SectionIo tab={tab} canImport={!readOnly} {...p} />
-      <fieldset disabled={readOnly} className="min-w-0 border-0 p-0">
+      <fieldset disabled={readOnly} className="min-w-0 border-0 px-4 pb-5 pt-1">
         <TabsContent value="requirement"><RequirementTab {...p} /></TabsContent>
         <TabsContent value="dimension"><DimensionTab {...p} /></TabsContent>
         <TabsContent value="material"><MaterialTab {...p} /></TabsContent>

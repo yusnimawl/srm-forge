@@ -13,16 +13,14 @@ export function MaterialTab({ form, update, errors, margin }: TabProps) {
     const g = grade(form[key])
     const names = materials.data?.map((x) => x.name) ?? []
     return (
-      <Field id={key} label={label} error={errors[`design.machine.materials.${key}`]}>
+      <Field id={key} label={label} error={errors[`design.machine.materials.${key}`]}
+        aside={g && <Badge variant="secondary" className="shrink-0">Grade {g}</Badge>}>
         {(aria) => (
-          <>
             <select {...aria} className={SELECT_CLASS} value={form[key]}
               onChange={(e) => update((f) => ({ ...f, [key]: e.target.value }))}>
               {!names.includes(form[key]) && <option value={form[key]}>{form[key] || "Choose a material"}</option>}
               {names.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
-            {g && <Badge variant="secondary" className="shrink-0">Grade {g}</Badge>}
-          </>
         )}
       </Field>
     )
@@ -36,7 +34,7 @@ export function MaterialTab({ form, update, errors, margin }: TabProps) {
       : "Margin follows the grade once the materials are known"
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3.5">
       {select("stator", "Stator material")}
       {select("rotor", "Rotor material")}
       <NumField id="margin" label="Margin" value={form.margin} error={errors.margin}

@@ -18,7 +18,7 @@ export function DimensionTab({ form, update, errors }: TabProps) {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3.5">
       <Field id="pole-set" label="Pole set" hint="Stator/rotor poles and phases." error={poleError}>
         {(aria) => (
           <select {...aria} className={SELECT_CLASS} value={options.includes(current) ? current : ""}

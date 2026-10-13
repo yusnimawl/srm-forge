@@ -1,11 +1,11 @@
-import { viridis } from "@/lib/viridis"
+import { inferno } from "@/lib/inferno"
 
 const GRADIENT = `linear-gradient(to top, ${Array.from({ length: 9 }, (_, i) => {
-  const [r, g, b] = viridis(i / 8)
+  const [r, g, b] = inferno(i / 8)
   return `rgb(${r},${g},${b})`
 }).join(", ")})`
 
-/** Vertical viridis bar for |B| in T from 0 to bMax, with a mark at the last B-H point. */
+/** Vertical inferno bar for |B| in T from 0 to bMax, with a mark at the last B-H point. */
 export default function ColorBar({ bMax, bLast }: { bMax: number; bLast: number }) {
   const at = (v: number) => `${(100 * v) / bMax}%`
   return (

@@ -60,7 +60,7 @@ function Playback({ jobId, mesh, onFrame, onActivate, pauseSignal }: {
   if (job.active) {
     const p = progressOf(job)
     return (
-      <div className="space-y-2 rounded-lg border border-border p-3">
+      <div className="space-y-2 rounded-[10px] border border-border bg-card p-3">
         <Bar label="Frames" done={p.points_done ?? 0} total={p.points_total ?? 0} />
         <div className="flex flex-wrap items-center gap-3">
           <p aria-live="polite" className="text-sm text-muted-foreground">
@@ -93,7 +93,7 @@ function Playback({ jobId, mesh, onFrame, onActivate, pauseSignal }: {
             id="anim-speed"
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className={`min-h-11 rounded-lg border border-input bg-background px-2 text-sm ${FOCUS}`}
+            className={`min-h-11 rounded-[6px] border border-border-strong bg-background px-2 font-mono text-[13px] ${FOCUS}`}
           >
             {SPEEDS.map((s) => (
               <option key={s} value={s}>{`${s}×`}</option>
@@ -157,7 +157,7 @@ export default function AnimationSection({ caseId, mesh, current, currentError, 
 
   return (
     <section className="space-y-3 border-t border-border pt-4" aria-labelledby="anim-h">
-      <h2 id="anim-h" className="text-base font-semibold">Stroke animation</h2>
+      <h2 id="anim-h" className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">Stroke animation</h2>
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="anim-n">Frames</Label>
@@ -177,7 +177,7 @@ export default function AnimationSection({ caseId, mesh, current, currentError, 
       <p id="anim-note" className={`text-xs ${framesError ? "text-destructive" : "text-muted-foreground"}`}>
         {framesError ?? `${animateEstimate(n)}, at the phase current above.`}
       </p>
-      {animate.error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{errorMessage(animate.error)}</p>}
+      {animate.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(animate.error)}</p>}
       {jobId && <Playback key={jobId} jobId={jobId} mesh={mesh} onFrame={onFrame} onActivate={onActivate} pauseSignal={pauseSignal} />}
     </section>
   )

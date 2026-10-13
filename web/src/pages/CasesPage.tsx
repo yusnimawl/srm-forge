@@ -32,12 +32,12 @@ export function CasesPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-primary">Cases</h1>
+        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Cases</h1>
         <div className="flex flex-wrap items-center gap-2">
           {flags.length > 0 && (
             <select
               aria-label="Filter by flag"
-              className="h-11 rounded-lg border border-input bg-transparent px-2 text-base md:text-sm dark:bg-input/30"
+              className="h-11 rounded-[6px] border border-border-strong bg-background px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring md:text-[13px]"
               value={active ?? ""}
               onChange={(e) => setFlag(e.target.value || null)}
             >
@@ -54,7 +54,7 @@ export function CasesPage() {
       </div>
       {list.isError && <p className="text-destructive">Could not load the cases.</p>}
       {list.isSuccess && rows.length === 0 && (
-        <div className="rounded-lg border border-border p-6 text-center">
+        <div className="rounded-[10px] border border-border bg-card p-6 text-center text-muted-foreground">
           No cases yet — open a candidate as a case, or start from a reference
         </div>
       )}
@@ -69,7 +69,7 @@ export function CasesPage() {
               {details.some((d) => d.isPending) ? "Loading the shown cases…" : "None of the shown cases has an envelope to plot: they are drafts or their evaluation failed."}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">Unvalidated, peak-only, except cases whose status reads EM-validated.</p>
+          <p className="text-xs text-muted-foreground">Unvalidated, peak-only, except cases whose status reads 2D-verified.</p>
         </section>
       )}
       {rows.length > 0 && (

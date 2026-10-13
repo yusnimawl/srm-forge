@@ -43,7 +43,7 @@ function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
   // An EM validation cannot be stopped once it runs; a queued one can.
   const cancellable = !(validating && cur.status === "running")
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
+    <div className="space-y-3 rounded-[10px] border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-3">
         <p className="font-medium">{KIND_LABEL[job.kind] ?? "Evaluation"}: {cur.status}</p>
         {cancellable && (
@@ -108,7 +108,7 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
   const validateWhy = job
     ? "A job is running"
     : data.validation?.label
-      ? "Already EM-validated"
+      ? "Already 2D-verified"
       : editable
         ? "Evaluate this case first"
         : data.preset !== "full"

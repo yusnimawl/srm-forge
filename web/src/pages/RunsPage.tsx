@@ -68,10 +68,10 @@ export function RunsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-primary">Runs</h1>
+      <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Runs</h1>
       {jobs.isError && <p className="text-destructive">Could not load the runs.</p>}
       {jobs.isSuccess && list.length === 0 && (
-        <div className="space-y-3 rounded-lg border border-border p-6 text-center">
+        <div className="space-y-3 rounded-[10px] border border-border bg-card p-6 text-center">
           <p>No runs yet</p>
           <Button className="min-h-11" render={<Link to="/search" />}>
             Start a search
@@ -98,7 +98,7 @@ export function RunsPage() {
                     <TableCell>
                       <JobStatusBadge status={j.status} />
                     </TableCell>
-                    <TableCell>{when(j.created)}</TableCell>
+                    <TableCell className="num text-muted-foreground">{when(j.created)}</TableCell>
                     <TableCell>
                       <JobProgressBar job={j} />
                     </TableCell>
@@ -112,7 +112,7 @@ export function RunsPage() {
           </div>
           <ul className="space-y-2 md:hidden">
             {list.map((j) => (
-              <li key={j.id} className="space-y-2 rounded-lg border border-border p-3 text-sm">
+              <li key={j.id} className="space-y-2 rounded-[10px] border border-border bg-card p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="num">{j.id}</span>
                   <JobStatusBadge status={j.status} />

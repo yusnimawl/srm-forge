@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { Evaluation, MapArrays, MapCurves } from "@/api/types"
 import {
+  LINE_COLORS,
+  LINE_DASHES,
   designFactorTraces,
   inductanceCurves,
   performanceSeries,
@@ -77,12 +79,20 @@ describe("performanceSeries", () => {
     expect(s.power[0].y[2]).toBeNull()
     expect(s.efficiency[0].y[2]).toBeNull()
   })
-  it("overlays differ by colour and cycle the dash style", () => {
+  it("overlays differ by colour and by dash style", () => {
     const s = performanceSeries(ev(), overlays(4)).torque
     expect(s).toHaveLength(5)
-    expect(s.map((t) => t.line.dash)).toEqual(["solid", "dash", "dot", "solid", "dash"])
+    expect(s.map((t) => t.line.dash)).toEqual(["solid", "dash", "dot", "dashdot", "longdash"])
     expect(new Set(s.map((t) => t.line.color)).size).toBe(5)
     expect(s[1].name).toBe("c0")
+  })
+  it("has seven palette entries and gives cases 0..6 seven distinct colour and dash pairs", () => {
+    expect(LINE_COLORS).toHaveLength(7)
+    expect(LINE_DASHES).toHaveLength(7)
+    const s = performanceSeries(ev(), overlays(6)).torque
+    expect(new Set(s.map((t) => `${t.line.color}/${t.line.dash}`)).size).toBe(7)
+    expect(s[6].line.width).toBe(1.25)
+    expect(s[0].line.width).toBe(2)
   })
   it("draws at most 6 overlays and skips a case without an envelope", () => {
     expect(performanceSeries(ev(), overlays(9)).torque).toHaveLength(1 + MAX_SHOWN)

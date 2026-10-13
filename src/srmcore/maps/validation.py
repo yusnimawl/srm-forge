@@ -1,4 +1,4 @@
-"""EM-validated label (spec §8.5) and the worst-case uncertainty budget of the key numbers (§8.4)."""
+"""2D-verified label (spec §8.5) and the worst-case uncertainty budget of the key numbers (§8.4)."""
 import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,7 +31,7 @@ KEYS = ("la", "lu", "peak_torque", "psi_max")
 # srmcore versions whose results the validation campaign has covered (docs/validation-report.md); the label needs
 # the running one in here.
 VALIDATED_VERSIONS: tuple[str, ...] = ("0.4.0",)
-LABEL = "EM-validated"
+LABEL = "2D-verified"
 PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
 TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point
 MAP_MATCH_TOLERANCE = 1e-3        # peak-torque solve on the design's mesh vs the map value (solvers agree to 1e-4)
@@ -132,7 +132,7 @@ def _point_check(name: str, keys: Sequence[str], vals: dict[str, dict[str, float
 
 def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
                 workers: int | None = None) -> EmValidation:
-    """The EM-validated checks and the uncertainty budget of a complete map. `label` is LABEL only when every
+    """The 2D-verified checks and the uncertainty budget of a complete map. `label` is LABEL only when every
     check passes. Solves the four key points on the full and reference meshes and at Js ± JS_STEP."""
     require_complete(result)
     machine = design.machine

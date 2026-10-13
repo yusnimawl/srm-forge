@@ -1,15 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Fira Sans', ui-sans-serif, system-ui, sans-serif;
-    --font-mono: 'Fira Code', ui-monospace, monospace;
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, monospace;
     --color-feasible: var(--feasible);
+    --color-warn: var(--warn);
+    --color-faint: var(--faint);
+    --color-border-strong: var(--border-strong);
+    --color-iron: var(--iron);
+    --color-iron-edge: var(--iron-edge);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,74 +54,46 @@
 }
 
 :root {
-    --background: #F8FAFC;
-    --foreground: #0F172A;
-    --card: #FFFFFF;
-    --card-foreground: #0F172A;
-    --popover: #FFFFFF;
-    --popover-foreground: #0F172A;
-    --primary: #1E3A5F;
-    --primary-foreground: #FFFFFF;
-    --secondary: #E2E8F0;
-    --secondary-foreground: #1E3A5F;
-    --muted: #F1F5F9;
-    --muted-foreground: #475569;
-    --accent: #DBEAFE;
-    --accent-foreground: #1E3A5F;
-    --destructive: #DC2626;
-    --feasible: #059669;
-    --border: #CBD5E1;
-    --input: #CBD5E1;
-    --ring: #2563EB;
-    --chart-1: #2563EB;
-    --chart-2: #059669;
-    --chart-3: #D97706;
-    --chart-4: #7C3AED;
-    --chart-5: #DC2626;
-    --radius: 0.5rem;
-    --sidebar: #FFFFFF;
-    --sidebar-foreground: #0F172A;
-    --sidebar-primary: #1E3A5F;
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: #DBEAFE;
-    --sidebar-accent-foreground: #1E3A5F;
-    --sidebar-border: #CBD5E1;
-    --sidebar-ring: #2563EB;
-}
-
-.dark {
-    --background: #0B1220;
-    --foreground: #E2E8F0;
-    --card: #111A2E;
-    --card-foreground: #E2E8F0;
-    --popover: #111A2E;
-    --popover-foreground: #E2E8F0;
-    --primary: #60A5FA;
-    --primary-foreground: #0B1220;
-    --secondary: #1E293B;
-    --secondary-foreground: #E2E8F0;
-    --muted: #1E293B;
-    --muted-foreground: #A3B1C6;
-    --accent: #1E3A5F;
-    --accent-foreground: #E2E8F0;
-    --destructive: #F87171;
-    --feasible: #34D399;
-    --border: #2B3A55;
-    --input: #2B3A55;
-    --ring: #60A5FA;
-    --chart-1: #60A5FA;
-    --chart-2: #34D399;
-    --chart-3: #FBBF24;
-    --chart-4: #A78BFA;
-    --chart-5: #F87171;
-    --sidebar: #0F182B;
-    --sidebar-foreground: #E2E8F0;
-    --sidebar-primary: #60A5FA;
-    --sidebar-primary-foreground: #0B1220;
-    --sidebar-accent: #1E3A5F;
-    --sidebar-accent-foreground: #E2E8F0;
-    --sidebar-border: #2B3A55;
-    --sidebar-ring: #60A5FA;
+    color-scheme: dark;
+    accent-color: var(--primary);
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card: #111111;
+    --card-foreground: #ededed;
+    --popover: #111111;
+    --popover-foreground: #ededed;
+    --primary: #ededed;
+    --primary-foreground: #0a0a0a;
+    --secondary: #181818;
+    --secondary-foreground: #ededed;
+    --muted: #181818;
+    --muted-foreground: #8a8a8a;
+    --faint: #5c5c5c;
+    --accent: #181818;
+    --accent-foreground: #ededed;
+    --destructive: #f2716b;
+    --feasible: #9bd88a;
+    --warn: #e8b04a;
+    --border: #232323;
+    --border-strong: #333333;
+    --input: #232323;
+    --ring: #ededed;
+    --chart-1: #ededed;
+    --chart-2: #e8b04a;
+    --chart-3: #9bd88a;
+    --chart-4: #e07fb5;
+    --chart-5: #f2716b;
+    --radius: 0.625rem;
+    --sidebar: #111111;
+    --sidebar-foreground: #ededed;
+    --sidebar-primary: #ededed;
+    --sidebar-primary-foreground: #0a0a0a;
+    --sidebar-accent: #181818;
+    --sidebar-accent-foreground: #ededed;
+    --sidebar-border: #232323;
+    --sidebar-ring: #ededed;
+    --iron: #2a2a2a;
+    --iron-edge: #4a4a4a;
 }
 
 .num {
@@ -138,7 +113,9 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
     }
   html {
     @apply font-sans;

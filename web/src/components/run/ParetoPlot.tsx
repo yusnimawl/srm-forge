@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
-import { Plot, useColors } from "@/components/PlotlyPlot"
+import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
+import { INFERNO_SCALE } from "@/lib/inferno"
+import { SELECT_CLASS } from "@/components/case/fields"
 
 const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 // scatter3d has no triangle marker
 const SYMBOLS_3D = ["circle", "square", "diamond", "cross"]
 const KEYS = Object.keys(AXES) as AxisKey[]
-const SELECT_CLASS =
-  "min-h-11 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
 
 function useMedia(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches)
@@ -26,7 +26,7 @@ function AxisSelect({ label, value, onChange }: { label: string; value: AxisKey;
   return (
     <label className="flex items-center gap-2 text-sm">
       {label}
-      <select className={SELECT_CLASS} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
+      <select className={`${SELECT_CLASS} w-auto`} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
         {KEYS.map((k) => (
           <option key={k} value={k}>
             {AXES[k]}
@@ -80,14 +80,15 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
             symbol,
             size: 10,
             color: good.map((r) => r.efficiency_base),
-            colorscale: "Viridis",
+            colorscale: INFERNO_SCALE,
             cmin,
             cmax,
             showscale: !colorbarShown,
-            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.fg } },
+            colorbar: { title: { text: "Efficiency at base speed", side: "right" }, tickfont: { color: c.muted } },
+            // every marker has an outline so the darkest inferno stop stays visible on the page; the Pareto set's is heavier and brighter
             line: {
-              color: good.map((r) => (r.pareto ? c.primary : "rgba(0,0,0,0)")),
-              width: good.map((r) => (r.pareto ? 3 : 0)),
+              color: good.map((r) => (r.pareto ? c.primary : c.muted)),
+              width: good.map((r) => (r.pareto ? 3 : 1)),
             },
           },
         })
@@ -107,14 +108,13 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
     return traces
   }, [rows, pole, x, y, z, is3d, c])
 
-  const axis = (k: AxisKey) => ({ title: { text: AXES[k] }, gridcolor: c.grid, color: c.fg })
+  const theme = plotTheme(c)
+  const axis = (k: AxisKey) => ({ ...theme.xaxis, title: { text: AXES[k] } })
   const layout = {
+    ...theme,
     autosize: true,
     height: 460,
     margin: { l: 60, r: 10, t: 10, b: 50 },
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Fira Sans, sans-serif", color: c.fg },
     legend: { orientation: "h", y: -0.2 },
     ...(is3d ? { scene: { xaxis: axis(x), yaxis: axis(y), zaxis: axis(z) } } : { xaxis: axis(x), yaxis: axis(y) }),
   }

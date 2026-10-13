@@ -28,11 +28,11 @@ export function WindingTab({ form, update, errors }: TabProps) {
 
   return (
     <div className="space-y-6">
-      <div role="radiogroup" aria-label="Winding mode" className="inline-flex rounded-lg border p-0.5">
+      <div role="radiogroup" aria-label="Winding mode" className="inline-flex rounded-[6px] border border-border-strong p-0.5">
         {MODES.map(([m, label]) => (
           <button key={m} type="button" role="radio" aria-checked={w.mode === m}
             onClick={() => set({ mode: m })}
-            className={cn("min-h-11 rounded-md px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className={cn("min-h-11 rounded-[5px] px-4 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               w.mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
             {label}
           </button>
@@ -41,7 +41,7 @@ export function WindingTab({ form, update, errors }: TabProps) {
       {w.mode === "auto" ? (
         <p className="text-sm text-muted-foreground">Auto picks the turns, paths and wire that the drive can carry.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3.5">
           <NumField id="w-turns" label="Turns per pole" value={w.turns} error={errors["winding.turns"]}
             onChange={(v) => set({ turns: v })} />
           <NumField id="w-strands" label="Strands" value={density ? "1" : w.strands} error={errors["winding.strands"]}
@@ -66,7 +66,7 @@ export function WindingTab({ form, update, errors }: TabProps) {
           </Field>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3.5">
         {j("jLimit", "j_limit", "RMS current density limit", "Empty takes the default.")}
         {j("jPeak", "j_peak", "Peak current density", "Empty takes the default.")}
         {j("jPeakMax", "j_peak_max", "Peak density cap", "Caps the map range. Empty means twice the RMS limit.")}
