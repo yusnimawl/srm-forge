@@ -4,7 +4,16 @@ from dataclasses import replace
 import pytest
 
 from srmbench import preflight
-from srmbench.preflight import Platform, check_imports, check_load, check_platform, current_platform, max_workers
+from srmbench.preflight import (
+    Platform,
+    apply_cgroup,
+    cgroup_memory,
+    check_imports,
+    check_load,
+    check_platform,
+    current_platform,
+    max_workers,
+)
 
 WIN = Platform("Windows", "AMD64", "", None, 22631, 16.0, 9.0, 100.0, 16)
 LNX = Platform("Linux", "x86_64", "glibc", (2, 39), None, 16.0, 9.0, 100.0, 4)
@@ -118,3 +127,54 @@ def test_check_load_quiet_machine(monkeypatch):
     assert check_load(0.0) == []
     monkeypatch.setattr(preflight.psutil, "sensors_battery", lambda: _Battery(True))
     assert check_load(0.0) == []
+
+
+def test_check_load_unknown_ac_state_is_not_a_warning(monkeypatch):
+    monkeypatch.setattr(preflight.psutil, "sensors_battery", lambda: _Battery(None))
+    monkeypatch.setattr(preflight.psutil, "cpu_percent", lambda interval=None: 3.0)
+    assert check_load(0.0) == []
+
+
+def _write(root, rel, text):
+    f = root / rel
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(text)
+
+
+def test_cgroup_v2_limited(tmp_path):
+    _write(tmp_path, "memory.max", "4294967296\n")
+    _write(tmp_path, "memory.current", "1073741824\n")
+    assert cgroup_memory(tmp_path) == (4294967296, 1073741824)
+
+
+def test_cgroup_v2_max_means_unlimited(tmp_path):
+    _write(tmp_path, "memory.max", "max\n")
+    _write(tmp_path, "memory.current", "1073741824\n")
+    assert cgroup_memory(tmp_path) is None
+
+
+def test_cgroup_v1_limited(tmp_path):
+    _write(tmp_path, "memory/memory.limit_in_bytes", "2147483648\n")
+    _write(tmp_path, "memory/memory.usage_in_bytes", "536870912\n")
+    assert cgroup_memory(tmp_path) == (2147483648, 536870912)
+
+
+def test_cgroup_v1_unlimited(tmp_path):
+    _write(tmp_path, "memory/memory.limit_in_bytes", "9223372036854771712\n")
+    _write(tmp_path, "memory/memory.usage_in_bytes", "536870912\n")
+    assert cgroup_memory(tmp_path) is None
+
+
+def test_cgroup_files_missing_or_garbled(tmp_path):
+    assert cgroup_memory(tmp_path) is None
+    _write(tmp_path, "memory.max", "garbage")
+    _write(tmp_path, "memory.current", "1")
+    assert cgroup_memory(tmp_path) is None
+
+
+def test_apply_cgroup_takes_the_smaller_figures():
+    gb = 1_000_000_000
+    assert apply_cgroup(64 * gb, 50 * gb, (4 * gb, 1 * gb)) == (4 * gb, 3 * gb)
+    assert apply_cgroup(8 * gb, 2 * gb, (16 * gb, 1 * gb)) == (8 * gb, 2 * gb)
+    assert apply_cgroup(8 * gb, 2 * gb, (4 * gb, 5 * gb)) == (4 * gb, 0)
+    assert apply_cgroup(8 * gb, 2 * gb, None) == (8 * gb, 2 * gb)

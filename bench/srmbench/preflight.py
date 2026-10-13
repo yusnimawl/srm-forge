@@ -21,6 +21,9 @@ WIN_BUILD_MIN = 17134
 # Total RAM is reported below the installed figure (reserved memory), so a machine passes at this share.
 RAM_ACCEPT_SHARE = 0.9
 BUSY_CPU_PERCENT = 20.0
+# cgroup memory limits at or above this mean "unlimited".
+CGROUP_UNLIMITED = 2**60
+CGROUP_ROOT = Path("/sys/fs/cgroup")
 
 _SUPPORTED = "Windows 10 1803+ or 11 on x64, Linux x86_64 with glibc 2.28+."
 _IMPORTS = ("srmcore", "gmsh", "ngsolve")
@@ -72,18 +75,49 @@ def _free_disk_gb(path: Path) -> float:
     return shutil.disk_usage(probe).free / 1e9
 
 
+def _read_int(path: Path) -> int | None:
+    try:
+        return int(path.read_text().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def cgroup_memory(root: Path = CGROUP_ROOT) -> tuple[int, int] | None:
+    """(limit, usage) in bytes of the container memory cgroup, v2 then v1; None when unlimited or unreadable."""
+    for limit_file, usage_file in (
+        ("memory.max", "memory.current"),
+        ("memory/memory.limit_in_bytes", "memory/memory.usage_in_bytes"),
+    ):
+        limit = _read_int(root / limit_file)
+        usage = _read_int(root / usage_file)
+        if limit is not None and usage is not None and limit < CGROUP_UNLIMITED:
+            return limit, usage
+    return None
+
+
+def apply_cgroup(total: float, available: float, cgroup: tuple[int, int] | None) -> tuple[float, float]:
+    """Cap total and available memory (bytes) by a cgroup limit and its remaining headroom."""
+    if cgroup is None:
+        return total, available
+    limit, usage = cgroup
+    return min(total, limit), min(available, max(limit - usage, 0))
+
+
 def current_platform(runtime_dir: Path) -> Platform:
     libc, glibc = _libc()
     build = sys.getwindowsversion().build if platform.system() == "Windows" else None
     mem = psutil.virtual_memory()
+    total, available = (
+        apply_cgroup(mem.total, mem.available, cgroup_memory()) if platform.system() == "Linux" else (mem.total, mem.available)
+    )
     return Platform(
         system=platform.system(),
         machine=platform.machine(),
         libc=libc,
         glibc=glibc,
         windows_build=build,
-        ram_gb=mem.total / 1e9,
-        available_ram_gb=mem.available / 1e9,
+        ram_gb=total / 1e9,
+        available_ram_gb=available / 1e9,
         free_disk_gb=_free_disk_gb(runtime_dir),
         logical_cpus=psutil.cpu_count(logical=True) or 1,
     )
@@ -135,7 +169,7 @@ def check_imports() -> list[Problem]:
 def check_load(sample_s: float = 3.0) -> list[Problem]:
     problems = []
     battery = psutil.sensors_battery()
-    if battery is not None and not battery.power_plugged:
+    if battery is not None and battery.power_plugged is False:
         problems.append(Problem(False, "The machine is running on battery; plug it in for a representative timing."))
     busy = psutil.cpu_percent(interval=sample_s)
     if busy > BUSY_CPU_PERCENT:
