@@ -9,13 +9,12 @@ SAMPLE_SECONDS = 0.5
 
 
 class WorkerRam:
-    """Context manager: samples every descendant of this process (plus this process when `workers == 1`,
-    because a single-worker run solves in-process) and keeps the largest single-process resident set seen.
-    On Windows the OS-reported peak working set of each process is read too, so a process that grew and shrank
-    between two samples still counts."""
+    """Context manager: samples every descendant of this process and keeps the largest single-process
+    resident set seen. This process is not sampled: its peak includes everything it did earlier (meshing).
+    On Windows the OS-reported peak working set of each descendant is read too, so a process that grew and
+    shrank between two samples still counts."""
 
-    def __init__(self, workers: int):
-        self.workers = workers
+    def __init__(self):
         self.peak_bytes = 0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -25,13 +24,10 @@ class WorkerRam:
         return self.peak_bytes / 1e9
 
     def _sample(self) -> None:
-        me = psutil.Process()
         try:
-            procs = me.children(recursive=True)
+            procs = psutil.Process().children(recursive=True)
         except psutil.Error:
-            procs = []
-        if self.workers == 1:
-            procs.append(me)
+            return
         for p in procs:
             try:
                 info = p.memory_info()

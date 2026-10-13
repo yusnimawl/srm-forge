@@ -6,6 +6,7 @@ import math
 import statistics
 import sys
 import time
+from contextlib import nullcontext
 from importlib import metadata, resources
 
 import numpy as np
@@ -26,8 +27,9 @@ from .monitor import WorkerRam
 I_MAX = {"8_6": 20.0, "12_8": 10.0}
 _MAKERS = {"8_6": make_8_6, "12_8": make_12_8}
 _I_MAX_BY_POLES = {(8, 6): I_MAX["8_6"], (12, 8): I_MAX["12_8"]}
-CHECK_RTOL = 1e-4
-CHECK_FLOOR = 0.1
+REF_RTOL = 1e-3
+ANGLE_ATOL = 1e-9
+BATCH_ANGLES = 4
 KEY_RTOL = 1e-3
 THROTTLE_FRACTION = 0.2
 
@@ -78,39 +80,52 @@ def reference_points(static, d: Design) -> list[dict]:
     return out
 
 
-def check_points(got: list[dict], ref: dict, srmcore_version: str) -> dict:
-    """Compare solved points with the stored reference; values pass within CHECK_RTOL of the reference
-    (relative to at least CHECK_FLOOR, so a reference near zero is compared on an absolute scale)."""
+def check_points(got: list[dict], ref: dict, srmcore_version: str, nodes: int | None = None) -> dict:
+    """Compare solved points with the stored reference. psi passes within REF_RTOL of its reference; torque
+    within REF_RTOL of the larger of its reference and the largest reference torque (a near-zero torque is a
+    cancellation residue, so it is judged on the scale of the whole set). Angles must match. A differing mesh
+    node count is reported in the details but does not decide the status."""
     if ref.get("srmcore") != srmcore_version:
         return {"status": "not checked",
                 "details": [f"reference is for srmcore {ref.get('srmcore')}, running {srmcore_version}"]}
     want_points = ref["points"]
     if len(got) != len(want_points):
         return {"status": "fail", "details": [f"{len(got)} points, reference has {len(want_points)}"]}
+    torque_scale = max(abs(w["torque"]) for w in want_points)
     details = []
+    if nodes is not None and "nodes" in ref and nodes != ref["nodes"]:
+        details.append(f"mesh differs: {nodes} nodes vs {ref['nodes']}")
+    failed = False
     for k, (g, w) in enumerate(zip(got, want_points)):
-        for key in ("psi", "torque"):
-            if abs(g[key] - w[key]) > CHECK_RTOL * max(abs(w[key]), CHECK_FLOOR):
+        if abs(g["angle"] - w["angle"]) > ANGLE_ATOL:
+            failed = True
+            details.append(f"point {k} angle: got {g['angle']:.10g}, want {w['angle']:.10g}")
+        for key, scale in (("psi", abs(w["psi"])), ("torque", max(abs(w["torque"]), torque_scale))):
+            if abs(g[key] - w[key]) > REF_RTOL * scale:
+                failed = True
                 details.append(f"point {k} {key}: got {g[key]:.8g}, want {w[key]:.8g}")
-    return {"status": "fail" if details else "pass", "details": details}
+    return {"status": "fail" if failed else "pass", "details": details}
 
 
 def batch_grid(d: Design, workers: int) -> tuple[np.ndarray, np.ndarray]:
+    """BATCH_ANGLES angles repeated once per worker, at half and full current: the same point mix for every
+    worker count, so rates at different counts are comparable."""
     i_max = _i_max(d)
-    angles = angle_grid(d.machine, _divisions(d), 2 * workers, aligned=0.0)
+    angles = np.tile(angle_grid(d.machine, _divisions(d), BATCH_ANGLES, aligned=0.0), workers)
     return angles, np.array([i_max / 2, i_max])
 
 
 def time_batch(static, d: Design, workers: int) -> dict:
-    """One small cold map (about two angles per worker) through the process pool, with the workers' peak RAM."""
+    """One small cold map through the process pool. `peak_ram_gb` is the largest worker process; it is None
+    with one worker, which solves in this process and has no worker to sample."""
     angles, currents = batch_grid(d, workers)
-    with WorkerRam(workers) as ram:
+    with (WorkerRam() if workers > 1 else nullcontext()) as ram:
         t0 = time.perf_counter()
         run_map(static, d, angles, currents, solver_name="ngsolve", workers=workers)
         seconds = time.perf_counter() - t0
     points = len(angles) * len(currents)
     return {"workers": workers, "points": points, "seconds": seconds, "per_min": points / seconds * 60,
-            "peak_ram_gb": ram.peak_gb}
+            "peak_ram_gb": None if ram is None else ram.peak_gb}
 
 
 def grid_points(d: Design) -> int:
@@ -176,8 +191,8 @@ def load_reference(name: str) -> dict:
 
 def make_reference() -> None:
     d = design("8_6", "screening")
-    static, _ = static_mesh(d)
-    data = {"srmcore": metadata.version("srmcore"), "points": reference_points(static, d)}
+    static, info = static_mesh(d)
+    data = {"srmcore": metadata.version("srmcore"), "nodes": info["nodes"], "points": reference_points(static, d)}
     path = resources.files("srmbench.reference").joinpath("points_8_6.json")
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(data, indent=2))

@@ -13,7 +13,7 @@ def _allocate_and_sleep(mb: float, seconds: float) -> None:
 
 def test_worker_ram_sees_child_process():
     ctx = mp.get_context("spawn")
-    with WorkerRam(workers=2) as ram:
+    with WorkerRam() as ram:
         child = ctx.Process(target=_allocate_and_sleep, args=(200, 2.0))
         child.start()
         child.join()
@@ -22,7 +22,7 @@ def test_worker_ram_sees_child_process():
 
 def test_worker_ram_tolerates_exit():
     ctx = mp.get_context("spawn")
-    with WorkerRam(workers=2) as ram:
+    with WorkerRam() as ram:
         child = ctx.Process(target=_allocate_and_sleep, args=(1, 0.0))
         child.start()
         child.join()
