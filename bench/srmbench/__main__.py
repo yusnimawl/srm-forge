@@ -202,7 +202,7 @@ def _preflight(tier: str, args, input_fn) -> tuple | int:
             print(f"Warning: {message}")
         if not args.yes and not _yes(input_fn, "Continue anyway? [y/N] "):
             print("Nothing was run.")
-            return 1
+            return 0
     return platform, warnings
 
 

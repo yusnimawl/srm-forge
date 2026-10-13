@@ -76,6 +76,12 @@ def env(tmp_path, monkeypatch):
     return Env(tmp_path, monkeypatch)
 
 
+def _sparse(path, size):
+    """A file of `size` bytes without writing them."""
+    with open(path, "wb") as f:
+        f.truncate(size)
+
+
 def _answers(*values):
     it = iter(values)
     asked = []
@@ -232,8 +238,8 @@ def test_cli_warnings_are_asked_and_recorded(env):
 
 def test_cli_warnings_declined(env):
     env.load_problems = [Problem(False, "The machine is running on battery.")]
-    assert cli.main(["--tier", "quick", "--label", "t1"], input_fn=_answers("n")) == 1
-    assert env.run_calls == []
+    assert cli.main(["--tier", "quick", "--label", "t1"], input_fn=_answers("n")) == 0
+    assert env.run_calls == [] and env.finish is None
 
 
 def test_cli_yes_accepts_warnings(env):
@@ -281,7 +287,7 @@ def test_cli_tier_required_with_yes(env, capsys):
 
 def test_cli_delete_prompt_shows_runtime_size(env):
     env.runtime.mkdir()
-    (env.runtime / "blob").write_bytes(b"\0" * 150_000_000)
+    _sparse(env.runtime / "blob", 150_000_000)
     ask = _answers("n", "n", "n")
     cli.main(["--tier", "quick", "--label", "t1"], input_fn=ask)
     assert "(about 0.1 GB)" in ask.asked[1]
@@ -289,7 +295,7 @@ def test_cli_delete_prompt_shows_runtime_size(env):
 
 def test_runtime_size_gb(tmp_path):
     (tmp_path / "a").mkdir()
-    (tmp_path / "a" / "f").write_bytes(b"\0" * 700_000_000)
+    _sparse(tmp_path / "a" / "f", 700_000_000)
     (tmp_path / "g").write_bytes(b"\0" * 10)
     assert cli.runtime_size_gb(tmp_path) == pytest.approx(0.7, abs=0.01)
     assert cli.runtime_size_gb(tmp_path / "missing") == 0.0
