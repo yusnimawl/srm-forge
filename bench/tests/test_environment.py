@@ -49,3 +49,19 @@ def test_scripts_line_endings():
     attributes = (REPO / ".gitattributes").read_text(encoding="utf-8").splitlines()
     assert "*.sh text eol=lf" in attributes
     assert "*.bat text eol=crlf" in attributes
+
+
+def _launch_index(text: str, marker: str) -> tuple[int, int]:
+    lines = text.splitlines()
+    launch = next(i for i, ln in enumerate(lines) if "-m srmbench" in ln and not ln.lstrip().startswith(("rem", "#")))
+    clear = next(i for i, ln in enumerate(lines) if "finish" in ln and marker in ln)
+    return clear, launch
+
+
+def test_scripts_clear_a_stale_finish_flag_before_running_python():
+    bat = (BENCH / "run.bat").read_text(encoding="utf-8")
+    clear, launch = _launch_index(bat, "del ")
+    assert clear < launch
+    sh = (BENCH / "run.sh").read_text(encoding="utf-8")
+    clear, launch = _launch_index(sh, "rm -f")
+    assert clear < launch

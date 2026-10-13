@@ -136,6 +136,8 @@ fi
 
 # ---- 6. Run ----------------------------------------------------------------------------
 # Ctrl+C reaches Python (which handles it); this shell stays alive for the finish step.
+# A flag left by an interrupted earlier run must not be acted on.
+rm -f "$RT/finish"
 trap : INT
 set +e
 PYTHONPATH="$BENCH" "$PY" -m srmbench "$@"

@@ -78,6 +78,8 @@ if errorlevel 1 goto setup_failed
 
 rem ---- 6. Run ----------------------------------------------------------------------------
 :run
+rem A flag left by an interrupted earlier run must not be acted on.
+if exist "%RT%\finish" del "%RT%\finish"
 set "PYTHONPATH=%BENCH:~0,-1%"
 "%PY%" -m srmbench %*
 set "RC=%ERRORLEVEL%"
