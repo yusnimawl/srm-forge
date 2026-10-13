@@ -1,0 +1,174 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-13T20:30:00+07:00",
+ "label": "lattepanda",
+ "lock_hash": "0123456789ab",
+ "machine": {
+  "arch": "AMD64",
+  "cpu_model": "Intel(R) N100",
+  "glibc": null,
+  "logical_cpus": 4,
+  "os": "Windows",
+  "os_version": "10.0.22631",
+  "physical_cores": 4,
+  "python": "3.12.8",
+  "ram_gb": 7.7
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-13T20:30:00+07:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": null,
+    "per_min": 8.6,
+    "points": 8,
+    "seconds": 55.81395348837209,
+    "workers": 1
+   },
+   {
+    "peak_ram_gb": 0.8,
+    "per_min": 16.0,
+    "points": 16,
+    "seconds": 60.0,
+    "workers": 2
+   },
+   {
+    "peak_ram_gb": 0.82,
+    "per_min": 29.0,
+    "points": 32,
+    "seconds": 66.20689655172414,
+    "workers": 4
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3,
+     "torque": 0.0
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 98412,
+    "points": 1008,
+    "seconds": 34.0
+   },
+   "screening": {
+    "nodes": 30112,
+    "points": 360,
+    "seconds": 11.0
+   }
+  },
+  "recommended": {
+   "ram_cap": null,
+   "uncapped": 4,
+   "workers": 4
+  },
+  "screening_map": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "key_numbers": {
+    "la": 0.031,
+    "peak_torque": 1.9
+   },
+   "points": 360,
+   "seconds": 720.0,
+   "statuses": {
+    "la_lu": "pass"
+   },
+   "workers": 4
+  },
+  "single_solve": {
+   "full": {
+    "median": 20.4,
+    "samples": [
+     20.4,
+     20.808,
+     20.195999999999998
+    ]
+   },
+   "screening": {
+    "median": 6.8,
+    "samples": [
+     6.936,
+     6.8,
+     6.732,
+     6.867999999999999,
+     6.8
+    ]
+   }
+  },
+  "sustained": {
+   "batches": [
+    {
+     "per_min": 29.0,
+     "t": 1.0
+    },
+    {
+     "per_min": 27.695,
+     "t": 61.0
+    },
+    {
+     "per_min": 26.39,
+     "t": 121.0
+    },
+    {
+     "per_min": 25.085,
+     "t": 181.0
+    },
+    {
+     "per_min": 23.78,
+     "t": 241.0
+    }
+   ],
+   "minutes": 5,
+   "throttle_pct": -18.0,
+   "workers": 4
+  }
+ },
+ "summary": {
+  "best_workers": 4,
+  "correctness": {
+   "details": [],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 6290.551724137931
+  },
+  "peak_ram_worker_gb": 0.82,
+  "projection_error_pct": null,
+  "recommended_workers": 4,
+  "screening_map_s": {
+   "measured": true,
+   "value": 720.0
+  },
+  "search_h": 41.93701149425287,
+  "single_solve_full_s": 20.4,
+  "single_solve_s": 6.8,
+  "srmweb_workers": 4,
+  "throttle_pct": -18.0,
+  "throughput_per_min": 29.0
+ },
+ "tier": "standard",
+ "versions": {
+  "gmsh": "4.13.1",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2601",
+  "numpy": "2.1.3",
+  "psutil": "6.1.0",
+  "scipy": "1.14.1",
+  "srmcore": "0.4.0"
+ },
+ "warnings": []
+}
