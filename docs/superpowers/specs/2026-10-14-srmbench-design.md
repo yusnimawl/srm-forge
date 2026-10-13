@@ -72,7 +72,7 @@ Both scripts do the same steps; everything goes under `bench/.runtime/` (`UV_CAC
 1. **Platform gate (in the shell, before any download).** Windows: `PROCESSOR_ARCHITECTURE` (and `PROCESSOR_ARCHITEW6432`) must be `AMD64`; the Windows build must be ≥ 17134. Linux: `uname -m` must be `x86_64`; glibc from `ldd --version` must be ≥ 2.28; musl is detected and refused. On failure: one plain message naming the problem and the supported list, exit code 2, nothing downloaded.
 2. **uv.** If `.runtime/uv/uv(.exe)` is missing: download the pinned uv release archive from GitHub (`curl.exe` on Windows; `curl` or `wget` on Linux), check its SHA-256 against `uv.version` (`certutil -hashfile` / `sha256sum`), unpack (`tar`). A hash mismatch stops with a message.
 3. **Python and venv.** `uv python install 3.12`, `uv venv .runtime/venv --python 3.12` (skipped when present and its lock hash stamp matches).
-4. **Packages.** `uv pip sync requirements.lock` then `uv pip install --no-deps ..` (srmcore, srmapp, srmweb from the checkout, non-editable). A stamp file holds the hash of `requirements.lock` plus the srmcore version; a mismatch reinstalls.
+4. **Packages.** `uv pip sync requirements.lock` then `uv pip install --no-deps -e ..` (srmcore, srmapp, srmweb from the checkout, editable, so the benchmark always runs the checked-out source). A stamp file holds the hashes of `requirements.lock` and `../pyproject.toml`; a mismatch reinstalls.
 5. **Linux system libraries.** After install, `python -c "import gmsh"`. If it fails with a missing shared library: with `apt-get` install `libglu1-mesa libxcursor1 libxft2 libxinerama1`; with `dnf`/`yum` install `mesa-libGLU libXcursor libXft libXinerama`; prefix `sudo` unless running as root; if neither root nor sudo is available, or the package manager is unknown, print the exact command and stop. Then re-check the import.
 6. **Run.** `.runtime/venv/.../python -m srmbench <args>`.
 7. **Cleanup (after Python exits, so no file is in use).** Python leaves a flag file in `.runtime/` saying what the user chose at the finish prompt; the script acts on it: delete `.runtime/` entirely, or keep it, or keep it and `uv pip install "..[web]"` so `srmweb` runs from this environment (and print that the web frontend build needs Node: `cd web; npm ci; npm run build`).
@@ -87,7 +87,7 @@ run.bat | ./run.sh [--tier quick|standard|long] [--label NAME] [--workers N]
                    [--report-only] [--self-test]
 ```
 
-- No `--tier`: a menu with the three tiers and their estimated time on this machine (from the preflight's quick single-solve timing scaled by the reference machine's tier times; shown as "about").
+- No `--tier`: a menu with the three tiers and their time on the reference laptop (quick about 3 min, standard about 15 min, long about 2.2 h; "slower machines take longer").
 - `--label`: the machine label (lowercase, `[a-z0-9-]`, max 40). Without it, asked once with the hostname as default and remembered in `.runtime/label`.
 - `--workers N`: cap the largest worker count (default: RAM- and CPU-capped as in §3).
 - `--yes`: no prompts (cloud and CI); with it, the finish defaults are `--keep` and `--no-push` unless given.
@@ -135,8 +135,8 @@ A correctness failure does not stop the run; the result records it and the READM
 
 Every result carries projections, labelled "projected" when estimated and "measured" when the tier ran the step:
 
-- `screening` map (8/6) = mesh time + 320 points × (60 / batch throughput at the recommended W).
-- `full` map (8/6) = full mesh time + 960 points × (single solve `full` / single solve `screening`) × (60 / throughput).
+- `screening` map (8/6) = mesh time + (the `screening` grid's point count, `len(angle_grid) × len(current_grid)`) × (60 / batch throughput at the recommended W).
+- `full` map (8/6) = full mesh time + (the `full` grid's point count) × (single solve `full` / single solve `screening`) × (60 / throughput).
 - Search, 24 candidates = 24 × the `full` map projection. Labelled rough: the real search adds the stage-1 filter and the turns scan, and candidate sizes vary.
 - Recommended `SRMWEB_WORKERS` = the recommended W.
 
