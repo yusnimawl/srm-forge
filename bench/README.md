@@ -150,5 +150,69 @@ Times are for the reference laptop (i7-13620H, 10 cores, 16 threads, 16 GB). Slo
 Temperature and GPU. There is no reliable cross-platform temperature reading without administrator rights, so the sustained run stands in for it.
 
 <!-- srmbench:results:start -->
-_No results yet._
+![Full 8/6 map time](results/charts/full_map.svg)
+
+![Solves per minute against workers](results/charts/scaling.svg)
+
+![Single-core and all-core index](results/charts/index.svg)
+
+| Machine | CPU | Cores | RAM (GB) | OS | Tier | Single solve (s) | Workers | Screening map (min) | Full map (min) | Search of 24 (h) | RAM per worker (GB) | Throttle (%) | Correct | Index single/all |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| [i7-13620h-laptop](#machine-i7-13620h-laptop) | 13th Gen Intel(R) Core(TM) i7-13620H | 10C/16T | 17 | Windows 11 | standard | 3.4 | 10 | 4.1 | ~36 | ~14 | 0.29 | +0.8 | ✓ | 100/100 |
+
+`~` marks a projected value (a map not run, estimated from the batch throughput); the search is always projected. Correct: ✓ passed, ✗ failed, – not checked.
+
+<details id="machine-i7-13620h-laptop">
+<summary><b>i7-13620h-laptop</b> – 13th Gen Intel(R) Core(TM) i7-13620H, standard, 2026-10-15</summary>
+
+- Machine: 13th Gen Intel(R) Core(TM) i7-13620H; 10 cores, 16 threads; 16.9 GB RAM; Windows 11 (10.0.26200, AMD64); Python 3.12.14
+- Versions: engine commit 905a87b, gmsh 4.15.2, matplotlib 3.11.2, ngsolve 6.2.2608, numpy 2.5.4, psutil 7.2.2, scipy 1.18.1, srmcore 0.4.0; srmbench 1.0; lock 3e7c9e8c8462
+- Run: 2026-10-15T17:11:06+07:00 to 2026-10-15T17:28:45+07:00, tier standard, status complete
+- Result file: [2026-10-15T1711-standard.json](results/i7-13620h-laptop/2026-10-15T1711-standard.json)
+
+**Mesh (8/6)**
+
+| Preset | Seconds | Nodes | Grid points |
+|---|---|---|---|
+| screening | 7.39 | 42 935 | 360 |
+| full | 10.91 | 81 984 | 1008 |
+
+**Single solve (8/6)**
+
+| Preset | Median (s) | Samples (s) |
+|---|---|---|
+| screening | 3.433 | 3.730, 3.433, 3.554, 3.317, 3.158 |
+| full | 7.535 | 7.674, 7.403, 7.535 |
+
+**Correctness points:** pass
+
+**Batches**
+
+| Workers | Points | Seconds | Solves per minute | Peak RAM per worker (GB) |
+|---|---|---|---|---|
+| 1 | 8 | 28.86 | 16.6 | – |
+| 2 | 16 | 35.01 | 27.4 | 0.29 |
+| 4 | 32 | 43.49 | 44.1 | 0.29 |
+| 8 | 64 | 66.42 | 57.8 | 0.29 |
+| 10 | 80 | 77.86 | 61.7 | 0.29 |
+| 16 | 128 | 122.63 | 62.6 | 0.29 |
+
+**Recommended workers:** 10 (uncapped choice 10, RAM cap 16)
+
+**Screening map 8/6:** 244.0 s, 360 points, 10 workers, correctness pass; key numbers: aligned_angle 0, i_max 20, la 0.0328289, la_lu 9.16354, lu 0.00358256, peak_torque 12.4247, psi_max 0.320169, unaligned_angle 0.523599
+
+**Sustained load:** 5 min at 10 workers, throttle +0.8 %; trace (time: solves per minute): 74 s: 64.7; 148 s: 64.7; 222 s: 65.0; 297 s: 64.5; 370 s: 65.2
+
+**Scaling**
+
+| Workers | Solves per minute | Speed-up over 1 worker(s) | Efficiency (%) |
+|---|---|---|---|
+| 1 | 16.6 | 1.00 | 100 |
+| 2 | 27.4 | 1.65 | 82 |
+| 4 | 44.1 | 2.65 | 66 |
+| 8 | 57.8 | 3.48 | 43 |
+| 10 | 61.7 | 3.71 | 37 |
+| 16 | 62.6 | 3.77 | 24 |
+
+</details>
 <!-- srmbench:results:end -->
