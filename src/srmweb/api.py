@@ -478,16 +478,18 @@ def create_app(settings: Settings,
                        f"a.{n}": f.a.astype(np.float32)}
         return binary(result, arrays)
 
-    def case_machine(case: dict) -> RadialSRMParams:
-        try:
-            return CaseInputs.model_validate(case["inputs"]).design.machine
-        except ValueError as exc:
-            raise HTTPException(422, "this case's inputs do not validate") from exc
+    def case_machine(case: dict) -> RadialSRMParams | JSONResponse:
+        """The case's machine, or the 422 response for inputs that fail the case check."""
+        inputs, errors, warnings = check_case(case["inputs"])
+        return _invalid(errors, warnings) if inputs is None else inputs.design.machine
 
     @router.get("/cases/{case_id}/dxf")
     def dxf_export(case_id: str):
         case = case_or_404(case_id)
-        return Response(write_dxf(case_machine(case)), media_type="application/dxf",
+        machine = case_machine(case)
+        if isinstance(machine, JSONResponse):
+            return machine
+        return Response(write_dxf(machine), media_type="application/dxf",
                         headers={"Content-Disposition": f'attachment; filename="{_file_name(case["label"])}.dxf"'})
 
     @router.post("/cases/{case_id}/dxf", status_code=201, response_model=DxfImportOut)
@@ -497,7 +499,9 @@ def create_app(settings: Settings,
         if len(data) > DXF_MAX_BYTES:
             raise HTTPException(413, "the DXF file is larger than 10 MB")
         machine = case_machine(parent)
-        iron, issues = import_dxf(data, machine.model_copy(update={"iron": None}))
+        if isinstance(machine, JSONResponse):
+            return machine
+        iron, issues = import_dxf(data, machine)
         found = [{"loc": ["iron"], "msg": f"[{i.rule}] {i.message}"} for i in issues]
         if iron is None:
             return _invalid([e for e, i in zip(found, issues) if i.severity == "error"],

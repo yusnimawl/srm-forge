@@ -40,6 +40,8 @@ def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
     for issue in validate_params(inputs.design.machine):
         out = {"loc": ["design", "machine", issue.parameter], "msg": f"[{issue.rule}] {issue.message}"}
         (errors if issue.severity == "error" else warnings).append(out)
+    if errors:   # check_iron needs a machine that passes the parameter rules
+        return None, errors, warnings
     for issue in check_iron(inputs.design.machine):
         out = {"loc": ["design", "machine", "iron"], "msg": f"[{issue.rule}] {issue.message}"}
         (errors if issue.severity == "error" else warnings).append(out)

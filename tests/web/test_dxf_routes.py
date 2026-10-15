@@ -43,12 +43,12 @@ def _circle(cx, cy, r):
     return tuple(IronArc(start=pts[i], end=pts[(i + 1) % 4], center=(cx, cy)) for i in range(4))
 
 
-def _iron_machine(n=8, holes=0):
+def _iron_machine(n=8, holes=0, hole_r=1 * MM):
     p = make_8_6()
     kw = {"stator_outer": _grooved_outer(p.stator_outer_radius, n)}
     if holes:
         r = p.stator_outer_radius - 4 * MM
-        kw["stator_holes"] = tuple(_circle(r * math.cos(k), r * math.sin(k), 1 * MM) for k in (2 * math.pi * j / 8 for j in range(holes)))
+        kw["stator_holes"] = tuple(_circle(r * math.cos(k), r * math.sin(k), hole_r) for k in (2 * math.pi * j / 8 for j in range(holes)))
     return p.model_copy(update={"iron": parametric_iron(p).model_copy(update=kw)})
 
 
@@ -167,3 +167,51 @@ def test_geometry_svg_has_one_path_per_hole():
     plain = outline_svg(_iron_machine(8))
     holed = outline_svg(_iron_machine(8, holes=8))
     assert holed["stator"].count("M") == plain["stator"].count("M") + 8
+
+
+def _dxf_case(client, **kw):
+    parent = _case(client)
+    return _upload(client, parent, write_dxf(_iron_machine(8, **kw))).json()["case"]
+
+
+def test_validate_with_iron_and_bad_params_reports_params_not_500(client):
+    machine = _iron_machine(8).model_copy(update={"stator_pole_arc": 1.2})
+    inputs, errors, _ = check_case(_inputs(machine))
+    assert inputs is None and errors and all(e["loc"][2] != "iron" for e in errors)
+    r = client.post("/api/validate", json={"inputs": _inputs(machine)})
+    assert r.status_code == 200 and r.json()["errors"]
+
+
+def test_dxf_routes_on_invalid_draft_give_422(client):
+    bad = _iron_machine(8).model_copy(update={"stator_pole_arc": 1.2})
+    cid = _case(client, bad)
+    assert client.get(f"/api/cases/{cid}/dxf").status_code == 422
+    assert _upload(client, cid, write_dxf(_iron_machine(8))).status_code == 422
+
+
+def test_reimport_compares_with_parent_iron(client, monkeypatch):
+    from srmweb import api
+    case = _dxf_case(client, holes=8, hole_r=1.5 * MM)
+    seen = []
+    real = api.import_dxf
+    monkeypatch.setattr(api, "import_dxf", lambda data, p: seen.append(p) or real(data, p))
+    r = _upload(client, case["id"], client.get(f"/api/cases/{case['id']}/dxf").content)
+    assert r.status_code == 201, r.text
+    assert seen[0].iron.model_dump(mode="json") == case["inputs"]["design"]["machine"]["iron"]
+
+
+def test_garbage_upload_refused_without_case(client):
+    cid = _case(client)
+    r = _upload(client, cid, bytes(range(256)) * 20)
+    assert r.status_code == 422
+    assert r.json()["errors"] and all(e["loc"] == ["iron"] for e in r.json()["errors"])
+    assert len(client.get("/api/cases").json()) == 1
+
+
+def test_export_of_dxf_case_keeps_holes(client):
+    case = _dxf_case(client, holes=8)
+    iron = case["inputs"]["design"]["machine"]["iron"]
+    assert len(iron["stator_holes"]) == 8
+    data = client.get(f"/api/cases/{case['id']}/dxf").content
+    back, issues = import_dxf(data, CaseInputs.model_validate(case["inputs"]).design.machine)
+    assert back is not None and back.model_dump(mode="json") == iron
