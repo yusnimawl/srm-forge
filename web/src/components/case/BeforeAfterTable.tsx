@@ -8,6 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { compareRows } from "@/lib/compare"
 import { fmt } from "@/lib/format"
 
+export const COMPARE_POLL_MS = 5000
+
 /** Key numbers of the parent case beside those of this (imported) case. An unevaluated parent gets an Evaluate button. */
 export function BeforeAfterTable({ caseId, evaluated }: { caseId: string; evaluated: boolean }) {
   const qc = useQueryClient()
@@ -15,12 +17,15 @@ export function BeforeAfterTable({ caseId, evaluated }: { caseId: string; evalua
     queryKey: ["compare", caseId, evaluated],
     queryFn: () => api<Compare>(`/api/cases/${caseId}/compare`),
     retry: false,
+    // The parent's evaluation runs as a job of its own; poll until it has finished.
+    refetchInterval: (q) => (q.state.data && !q.state.data.parent_evaluated ? COMPARE_POLL_MS : false),
   })
   const evaluate = useMutation({
     mutationFn: (id: string) => api(`/api/cases/${id}/evaluate`, { method: "POST" }),
     onSuccess: () => {
       toast.message("Parent evaluation started")
       qc.invalidateQueries({ queryKey: ["cases"] })
+      qc.invalidateQueries({ queryKey: ["compare", caseId] })
     },
     onError: (e) => toast.error(requestMessage(e)),
   })

@@ -18,7 +18,7 @@ export function DimensionTab({ form, update, errors, imported }: TabProps & { im
   }
 
   return (
-    <fieldset disabled={imported} className="grid min-w-0 gap-3.5 border-0 p-0">
+    <div className="grid gap-3.5">
       {imported && (
         <p className="text-sm text-muted-foreground">
           Geometry comes from the imported DXF. Edit the parent case and import again to change it.
@@ -26,7 +26,7 @@ export function DimensionTab({ form, update, errors, imported }: TabProps & { im
       )}
       <Field id="pole-set" label="Pole set" hint="Stator/rotor poles and phases." error={poleError}>
         {(aria) => (
-          <select {...aria} className={SELECT_CLASS} value={options.includes(current) ? current : ""}
+          <select {...aria} className={SELECT_CLASS} disabled={imported} value={options.includes(current) ? current : ""}
             onChange={(e) => setPoles(e.target.value)}>
             {!options.includes(current) && <option value="">Choose a pole set</option>}
             {options.map((s) => <option key={s} value={s}>{label(s)}</option>)}
@@ -45,9 +45,9 @@ export function DimensionTab({ form, update, errors, imported }: TabProps & { im
       </Field>
       {MACHINE_FIELDS.map((f) => (
         <NumField key={f.key} id={`m-${f.key}`} label={f.label} unit={f.unit} hint={f.hint} value={m[f.key]}
-          error={errors[`design.machine.${f.key}`]}
+          disabled={imported} error={errors[`design.machine.${f.key}`]}
           onChange={(v) => update((old) => ({ ...old, machine: { ...old.machine, [f.key]: v } }))} />
       ))}
-    </fieldset>
+    </div>
   )
 }

@@ -17,15 +17,17 @@ const post = (caseId: string, file: File) => {
   return api<DxfImport>(`/api/cases/${caseId}/dxf`, { method: "POST", body })
 }
 
-/** Shows the parent and the imported case in the graphs while there is room for them. Best effort: the import is
+/** Shows the given cases in the graphs while there is room, skipping those already shown. Best effort: the import is
  *  already stored when this runs. */
-async function showInGraphs(ids: string[]) {
+export async function showInGraphs(ids: string[]) {
   try {
-    let shown = (await api<CaseSummary[]>("/api/cases")).filter((c) => c.show_in_graphs).length
+    const list = await api<CaseSummary[]>("/api/cases")
+    const shown = new Set(list.filter((c) => c.show_in_graphs).map((c) => c.id))
     for (const id of ids) {
-      if (shown >= MAX_SHOWN) break
+      if (shown.has(id)) continue
+      if (shown.size >= MAX_SHOWN) break
       await api(`/api/cases/${id}`, { method: "PATCH", body: JSON.stringify({ show_in_graphs: true }) })
-      shown += 1
+      shown.add(id)
     }
   } catch {
     // The graphs selection can be set from the case list.

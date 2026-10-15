@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 const navigate = vi.fn()
 vi.mock("react-router", () => ({ useNavigate: () => navigate }))
 
-import { DxfImportDialog } from "./DxfImportDialog"
+import { DxfImportDialog, showInGraphs } from "./DxfImportDialog"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -59,5 +59,18 @@ describe("DxfImportDialog", () => {
       return json(200, {})
     }) as never)
     expect(navigate).toHaveBeenCalledWith("/cases/c2")
+  })
+})
+
+describe("showInGraphs", () => {
+  it("does not count a case that is already shown twice", async () => {
+    const list = ["p1", "a", "b", "c", "d"].map((id) => ({ id, show_in_graphs: true })).concat([{ id: "new", show_in_graphs: false }])
+    const calls: string[] = []
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") calls.push(url)
+      return json(200, init?.method ? {} : list)
+    })
+    await showInGraphs(["p1", "new"])
+    expect(calls).toEqual(["/api/cases/new"])
   })
 })
