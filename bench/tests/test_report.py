@@ -248,3 +248,24 @@ def test_fixture_files_are_valid_json_with_the_real_layout():
         d = json.loads(p.read_text(encoding="utf-8"))
         assert d["schema"] == "srmbench-result" and p.parent.name == d["label"]
         assert {"mesh", "single_solve", "correctness_points", "batches", "recommended"} <= set(d["steps"])
+
+
+def test_all_core_index_uses_best_throughput_and_falls_back_for_old_results(env):
+    by = {r.label: r for r in read_results(env[0]) if r.bench_version == "1.0"}
+    ref, lp = by[REF], by["lattepanda"]
+    ref.summary["best_throughput_per_min"] = 2 * ref.summary["throughput_per_min"]
+    lp.summary["best_throughput_per_min"] = lp.summary["throughput_per_min"]
+    assert report._index(lp, ref)[1] == round(lp.summary["throughput_per_min"] / (2 * ref.summary["throughput_per_min"]) * 100)
+    del ref.summary["best_throughput_per_min"], lp.summary["best_throughput_per_min"]
+    assert report._index(lp, ref)[1] == round(lp.summary["throughput_per_min"] / ref.summary["throughput_per_min"] * 100)
+
+
+def test_line_styles_do_not_repeat_for_many_machines():
+    class Row:
+        def __init__(self, label):
+            self.label = label
+
+    rows = [Row(f"box-{i}") for i in range(7)] + [Row("ref")]
+    styles = report._line_styles(rows, "ref")
+    others = [v for k, v in styles.items() if k != "ref"]
+    assert len(others) == 7 and len(set(map(str, others))) == 7

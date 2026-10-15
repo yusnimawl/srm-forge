@@ -41,10 +41,11 @@ Without `--tier`, a menu asks. Unattended (cloud, scripts), with no prompts, kee
 ./bench/run.sh --tier standard --label my-machine --yes --keep --no-push
 ```
 
-Claude cloud sessions are Ubuntu 24.04 on 4 vCPU and 16 GB RAM, running as root. A command times out after 2 minutes by default, and a background command stops after 30 more minutes. For `standard`, raise `BASH_DEFAULT_TIMEOUT_MS` in the cloud environment (for example `3600000`). `long` is not advised there.
+Claude cloud sessions are Ubuntu 24.04 on 4 vCPU and 16 GB RAM, running as root. A command times out after 2 minutes by default, and a background command stops after 30 more minutes. Any tier can exceed the default, even `quick` on a first run (the setup downloads about 195 MB first). Set both `BASH_DEFAULT_TIMEOUT_MS` and `BASH_MAX_TIMEOUT_MS` in the cloud environment (for example `3600000`), or run the benchmark as a background command. `long` is still not advised there.
 
 ### Before you run
 
+- The reference laptop must run with `--label i7-13620h-laptop` (the name in `bench/reference-machine.txt`). Under any other label the index columns and the index chart stay empty.
 - Plug in the charger. Laptops throttle on battery.
 - On Windows, set the power mode to "Best performance" (Settings, System, Power). The benchmark cannot read this setting reliably.
 - Close heavy programs (browsers, sync clients, memory cleaners). The benchmark warns when other processes use more than 20 % of the CPU, and the numbers then are not representative.
@@ -86,7 +87,8 @@ Times are for the reference laptop (i7-13620H, 10 cores, 16 threads, 16 GB). Slo
 - Index chart: single-core and all-core speed relative to the reference machine (100). Higher is faster.
 - `~` in the table marks a projected value. Search time (24 candidates) is a rough projection: the real search adds the stage-1 filter and the turns scan.
 - A cross in the correctness column means the solver returned wrong numbers on that machine. Suspect RAM errors, an overclock or heat, and run again.
-- Throttle is the sustained throughput in the last minute against the first minute (standard and long only). A large negative value means the machine slows down under load.
+- Throttle is the sustained throughput in the last 20 % of the batches against the first 20 % (standard and long only). A large negative value means the machine slows down under load.
+- Batch throughput includes starting the worker pool for every batch, which costs more on Windows, so Windows all-core figures are slightly pessimistic. The long tier's projection error (in the machine's details) shows how large this effect is. The all-core index uses the best measured throughput, so tiers compare.
 - Only results with the current benchmark version are compared. Older ones are listed separately.
 
 ## Not measured

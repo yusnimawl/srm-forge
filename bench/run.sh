@@ -4,7 +4,7 @@
 # Exit codes: 2 unsupported platform, 3 setup failure, otherwise the exit code of srmbench.
 set -eu
 
-BENCH=$(cd "$(dirname "$0")" && pwd)
+BENCH=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 REPO=$(dirname "$BENCH")
 RT="$BENCH/.runtime"
 UV="$RT/uv/uv"

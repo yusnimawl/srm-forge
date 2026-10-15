@@ -31,8 +31,8 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%BENCH%uv.version") do (
     if "%%A"=="version" set "UV_VER=%%B"
     if "%%A"=="windows_sha256" set "WIN_SHA=%%B"
 )
-if not defined UV_VER echo uv.version has no version line.& exit /b 3
-if not defined WIN_SHA echo uv.version has no windows_sha256 line.& exit /b 3
+if not defined UV_VER echo uv.version has no version line.& goto setup_failed
+if not defined WIN_SHA echo uv.version has no windows_sha256 line.& goto setup_failed
 
 if exist "%UV%" goto uv_ready
 echo Downloading uv %UV_VER% ...
@@ -90,11 +90,13 @@ if exist "%RT%\finish" set /p FIN=<"%RT%\finish"
 if /i "!FIN!"=="delete" goto finish_delete
 if /i "!FIN!"=="keep-full" goto finish_full
 if exist "%RT%\finish" del "%RT%\finish"
+if "%~1"=="" pause
 exit /b %RC%
 
 :finish_delete
 cd /d "%BENCH%"
 rmdir /s /q "%RT%"
+if "%~1"=="" pause
 exit /b %RC%
 
 :finish_full
@@ -102,14 +104,17 @@ del "%RT%\finish"
 "%UV%" pip install --python "%PY%" -e "%BENCH%..[web]"
 if errorlevel 1 echo Installing the web extra failed; the benchmark environment is unchanged otherwise.
 echo Web frontend: cd web, npm ci, npm run build (needs Node 22).
+if "%~1"=="" pause
 exit /b %RC%
 
 :unsupported
 echo This machine is not supported: %WHY%. Supported: Windows 10 1803+ or 11 on x64, Linux x86_64 with glibc 2.28+.
+if "%~1"=="" pause
 exit /b 2
 
 :setup_failed
 echo Setup failed. Delete %RT% and run this script again; if it keeps failing, see bench\README.md.
+if "%~1"=="" pause
 exit /b 3
 
 rem Sets the variable named by %2 to the SHA-256 of the file %1 (lower case, no spaces).

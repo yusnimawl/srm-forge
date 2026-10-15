@@ -104,7 +104,10 @@ def publish(repo: Path, message: str, rebuild: Callable[[], None], run=subproces
         if n != 1:
             return False, (f"after the commit the branch is {n} commits ahead of its upstream instead of 1, "
                            "so nothing was pushed; check `git log @{u}..HEAD` and push by hand")
-        _step(run, repo, "push", "push")
+        try:
+            _step(run, repo, "push", "push")
+        except _Stop as stop:
+            raise _Stop(f"{stop}. Your results are committed locally; run `git push` yourself.") from None
     except _Stop as stop:
         return False, str(stop)
     return True, "Committed and pushed."

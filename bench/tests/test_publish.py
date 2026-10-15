@@ -130,6 +130,7 @@ def test_publish_stops_on_push_failure(tmp_path):
     ok, message = publish.publish(tmp_path, "m", lambda: None, run=fake)
     assert not ok
     assert "push" in message and "rejected" in message
+    assert "committed locally" in message and "run `git push` yourself" in message
     assert "commit" in fake.subcommands()
 
 

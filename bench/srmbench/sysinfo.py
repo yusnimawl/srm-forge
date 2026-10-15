@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import platform
+import subprocess
 from pathlib import Path
 
 import psutil
@@ -51,6 +52,25 @@ def package_versions() -> dict:
         except importlib.metadata.PackageNotFoundError:
             out[name] = None
     return out
+
+
+def git_commit(repo: Path, run=subprocess.run) -> str | None:
+    """Short HEAD of the checkout the engine is installed from, plus "-dirty" when tracked files differ;
+    None without git or on any error."""
+    def git(*args: str) -> str:
+        proc = run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                   timeout=10)
+        if proc.returncode != 0:
+            raise OSError(proc.stderr)
+        return proc.stdout.strip()
+
+    try:
+        commit = git("rev-parse", "--short", "HEAD")
+        if not commit:
+            return None
+        return commit + ("-dirty" if git("status", "--porcelain", "--untracked-files=no") else "")
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def lock_hash(path: Path) -> str:

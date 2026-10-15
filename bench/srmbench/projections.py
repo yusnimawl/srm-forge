@@ -84,6 +84,7 @@ def summary(steps: dict, tier: str) -> dict:
         "best_workers": best,
         "recommended_workers": recommended,
         "throughput_per_min": throughput,
+        "best_throughput_per_min": max(b["per_min"] for b in batches),
         "peak_ram_worker_gb": max(peaks) if peaks else None,
         "throttle_pct": steps["sustained"]["throttle_pct"] if "sustained" in steps else None,
         "screening_map_s": map_time(measured_screening, projected["screening_map_s"]),

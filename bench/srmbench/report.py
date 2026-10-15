@@ -65,12 +65,17 @@ def latest_per_machine(results: list[Result]) -> list[Result]:
     return sorted(newest.values(), key=lambda r: (r.summary["full_map_s"]["value"], r.label))
 
 
+def _best(r: Result) -> float:
+    """Best measured throughput, so tiers that time different worker counts compare; older results lack it."""
+    return r.summary.get("best_throughput_per_min", r.summary["throughput_per_min"])
+
+
 def _index(row: Result, ref: Result | None) -> tuple[int, int] | None:
     """(single-core, all-core) index of `row` against `ref`, the reference being 100."""
     if ref is None:
         return None
     single = ref.summary["single_solve_s"] / row.summary["single_solve_s"] * 100
-    everything = row.summary["throughput_per_min"] / ref.summary["throughput_per_min"] * 100
+    everything = _best(row) / _best(ref) * 100
     return round(single), round(everything)
 
 
@@ -123,7 +128,7 @@ def _line_styles(rows: list[Result], reference_label: str | None) -> dict[str, t
     styles: dict[str, tuple[str, object]] = {}
     others = sorted(r.label for r in rows if r.label != reference_label)
     for i, label in enumerate(others):
-        styles[label] = (LINE_COLORS[i % len(LINE_COLORS)], LINE_DASHES[i % len(LINE_DASHES)])
+        styles[label] = (LINE_COLORS[i % len(LINE_COLORS)], LINE_DASHES[(i + i // len(LINE_COLORS)) % len(LINE_DASHES)])
     if reference_label is not None:
         styles[reference_label] = (GREY, "solid")
     return styles
@@ -353,7 +358,8 @@ def _details(r: Result, history: list[Result], names: dict[int, str], link) -> l
         f"- Machine: {cpu}; {m.get('physical_cores') or '?'} cores, {m.get('logical_cpus') or '?'} threads; "
         f"{m.get('ram_gb')} GB RAM; {_md(_os(m))} ({_md(m.get('os_version', ''))}, {_md(m.get('arch', ''))}); "
         f"Python {_md(m.get('python', ''))}",
-        "- Versions: " + ", ".join(f"{k} {v}" for k, v in r.versions.items() if v is not None)
+        "- Versions: " + ", ".join(f"{'engine commit' if k == 'git_commit' else k} {_md(v)}"
+                                   for k, v in r.versions.items() if v is not None)
         + f"; srmbench {r.bench_version}; lock {r.lock_hash}",
         f"- Run: {r.started} to {r.finished}, tier {r.tier}, status {r.status}",
         f"- Result file: [{names[id(r)]}]({link(r)})",

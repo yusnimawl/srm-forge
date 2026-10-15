@@ -133,9 +133,12 @@ def grid_points(d: Design) -> int:
     return len(angle_grid(d.machine, _divisions(d), n_a, aligned=0.0)) * len(current_grid(_i_max(d), n_i))
 
 
-def _correctness(key_numbers: dict, statuses: dict, goldens: dict | None) -> dict:
+def _correctness(key_numbers: dict, statuses: dict, goldens: dict | None, srmcore_version: str | None = None) -> dict:
     if goldens is None:
         return {"status": "not checked", "details": []}
+    if goldens.get("srmcore") != srmcore_version:
+        return {"status": "not checked",
+                "details": [f"goldens are for srmcore {goldens.get('srmcore')}, running {srmcore_version}"]}
     details = []
     for name, want in goldens["key_numbers"].items():
         got = key_numbers[name]
@@ -156,7 +159,7 @@ def map_run(d: Design, workers: int, goldens: dict | None):
     key_numbers = {k: float(v) for k, v in dataclasses.asdict(report.key_numbers).items()}
     statuses = {c.name: c.status for c in report.checks}
     summary = {"seconds": seconds, "points": int(result.status.size), "key_numbers": key_numbers,
-               "statuses": statuses, "correctness": _correctness(key_numbers, statuses, goldens)}
+               "statuses": statuses, "correctness": _correctness(key_numbers, statuses, goldens, metadata.version("srmcore"))}
     return summary, result
 
 

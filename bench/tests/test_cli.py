@@ -196,6 +196,7 @@ def test_cli_publish_failure_is_not_fatal(env, capsys):
     assert cli.main(["--tier", "quick", "--label", "t1", "--yes", "--push"], input_fn=_answers()) == 0
     assert "rejected" in capsys.readouterr().out
     assert list((env.results / "t1").glob("*.json"))
+    assert len(env.report_calls) == 3  # after saving, inside the failed publish, and again after the failure
 
 
 def test_cli_push_skipped_without_git(env, capsys):

@@ -145,3 +145,10 @@ def test_throughput_below_every_measured_batch_scales_the_smallest():
     steps = _steps()
     steps["recommended"] = {"workers": 2, "uncapped": 16, "ram_cap": 2}
     assert summary(steps, "quick")["throughput_per_min"] == pytest.approx(60.0)
+
+
+def test_summary_best_throughput_is_the_largest_batch_rate_not_the_recommended_one():
+    steps = _steps()
+    steps["recommended"] = {"workers": 4, "uncapped": 4, "ram_cap": None}
+    s = summary(steps, "standard")
+    assert s["throughput_per_min"] == 120.0 and s["best_throughput_per_min"] == 200.0

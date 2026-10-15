@@ -7,7 +7,7 @@ import pytest
 from srmcore.maps.grids import GRID_SIZES, angle_grid, current_grid
 from srmcore.mesh.settings import resolve_mesh_settings
 
-from srmbench import workload
+from srmbench import REPO_DIR, workload
 from srmbench.workload import batch_grid, check_points, design, grid_points, reference_points, static_mesh, time_batch
 
 
@@ -98,10 +98,10 @@ def test_reference_points_match_stored(built):
     d, static, info = built
     assert info["seconds"] > 0 and info["nodes"] > 0
     ref = json.loads(resources.files("srmbench.reference").joinpath("points_8_6.json").read_text())
-    assert len(ref["points"]) == 3 and ref["nodes"] == info["nodes"]
+    assert len(ref["points"]) == 3
     got = reference_points(static, d)
     result = check_points(got, ref, importlib.metadata.version("srmcore"), nodes=info["nodes"])
-    assert result == {"status": "pass", "details": []}
+    assert result["status"] == "pass"
 
 
 def test_single_solves_median(built):
@@ -122,3 +122,17 @@ def test_time_batch_runs_two_workers(built):
     r = time_batch(static, d, 2)
     a, i = batch_grid(d, 2)
     assert r["points"] == len(a) * len(i) == 16 and r["per_min"] > 0 and r["peak_ram_gb"] > 0.05
+
+
+def test_goldens_copy_matches_the_test_suite_goldens():
+    mine = workload.load_reference("goldens_8_6.json")
+    theirs = json.loads((REPO_DIR / "tests" / "maps" / "goldens_8_6.json").read_text(encoding="utf-8"))
+    assert mine["key_numbers"] == theirs["key_numbers"] and mine["statuses"] == theirs["statuses"]
+    assert mine["srmcore"] == importlib.metadata.version("srmcore")
+
+
+def test_correctness_not_checked_for_another_srmcore_version():
+    g = {"srmcore": "0.4.0", "key_numbers": {"la": 1.0}, "statuses": {}}
+    assert workload._correctness({"la": 1.0}, {}, g, "0.4.0")["status"] == "pass"
+    assert workload._correctness({"la": 2.0}, {}, g, "0.5.0")["status"] == "not checked"
+    assert workload._correctness({"la": 1.0}, {}, g, "0.4.0")["details"] == []

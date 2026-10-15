@@ -252,6 +252,7 @@ def _publish(result, label: str, tier: str, args, input_fn, ref_label) -> None:
     else:
         print(f"Publishing failed: {detail}")
         print("The result file is saved; nothing was lost. Fix git and publish by hand.")
+        _rebuild_report(ref_label)
 
 
 def _finish(args, input_fn) -> None:

@@ -18,11 +18,11 @@ from collections.abc import Callable
 
 import psutil
 
-from . import BENCH_DIR, BENCH_VERSION, workload
+from . import BENCH_DIR, BENCH_VERSION, REPO_DIR, workload
 from .preflight import Platform, apply_cgroup, cgroup_memory, max_workers
 from .projections import choose_workers, summary
 from .result import SCHEMA, Result, now_iso
-from .sysinfo import lock_hash, machine_info, package_versions
+from .sysinfo import git_commit, lock_hash, machine_info, package_versions
 
 TIERS = ("quick", "standard", "long")
 SUSTAINED_MIN = {"standard": 5, "long": 20}
@@ -60,6 +60,7 @@ def run_tier(tier: str, label: str, platform: Platform, worker_cap: int | None, 
     info = machine_info()
     physical = min(info.get("physical_cores") or logical, logical)
     versions = package_versions()
+    versions["git_commit"] = git_commit(REPO_DIR)
     log(f"machine: {info.get('cpu_model')}, {physical} cores, {logical} threads, {platform.ram_gb:.1f} GB RAM")
 
     steps: dict = {}
