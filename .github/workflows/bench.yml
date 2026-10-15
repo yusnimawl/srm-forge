@@ -1,0 +1,38 @@
+name: bench
+on:
+  push:
+    paths:
+      - "bench/**"
+      - ".github/workflows/bench.yml"
+  workflow_dispatch:
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-test (Linux)
+        if: runner.os == 'Linux'
+        run: sh bench/run.sh --self-test --yes --keep
+      - name: Quick tier, delete the environment (Linux)
+        if: runner.os == 'Linux'
+        run: sh bench/run.sh --tier quick --label ci-linux --yes --delete --no-push
+      - name: Check the environment is gone (Linux)
+        if: runner.os == 'Linux'
+        run: test ! -d bench/.runtime
+      - name: Self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: bench\run.bat --self-test --yes --keep
+      - name: Quick tier, delete the environment (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: bench\run.bat --tier quick --label ci-windows --yes --delete --no-push
+      - name: Check the environment is gone (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: if exist bench\.runtime exit /b 1
