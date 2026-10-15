@@ -21,6 +21,60 @@ srmbench times the real workload of this tool on your machine: the Gmsh mesh, th
 
 Everything the script installs goes under `bench/.runtime/` (uv, Python, the virtual environment, the uv cache). Deleting that folder removes all of it. The scripts never touch the repository's own `.venv` or any system setting, apart from the Linux libraries above.
 
+## Tutorial: first run
+
+### Windows (10 or 11)
+
+1. **Get the repository.** Install Git for Windows (https://git-scm.com/download/win) if `git --version` fails. The repository is private, so sign in when Git asks (a browser window opens). Then, in PowerShell:
+   ```powershell
+   git clone https://github.com/yusnimawl/srm-forge.git
+   cd srm-forge
+   ```
+   Already cloned? `cd` into it and run `git pull`.
+2. **Prepare the machine.** Plug in the charger, set Settings > System > Power > Power mode to "Best performance", close the browser and other heavy programs.
+3. **Start it.** Double-click `bench\run.bat` in Explorer, or in the terminal:
+   ```powershell
+   bench\run.bat
+   ```
+   The first run downloads about 195 MB (uv, Python 3.12, the packages) into `bench\.runtime\`. That takes a few minutes; later runs start in seconds.
+4. **Answer the questions.**
+   - Machine label: a short name for this machine, for example `laptop-asus-i5`. Lowercase letters, digits and `-` only. It is remembered. The reference laptop must use `i7-13620h-laptop`.
+   - Tier: `1` quick (minutes), `2` standard (about 15 min on the reference laptop), `3` long (hours). Start with quick.
+   - If it warns about battery or a busy CPU, fix that and answer `N`, then run again.
+5. **Wait.** Each step prints a timestamped line. Do not use the machine meanwhile.
+6. **Read the summary** it prints at the end: single-solve time, recommended workers, projected map and search times, correctness. The result is saved in `bench\results\<label>\` and this README is rebuilt.
+7. **Publish** (optional): answer `y` to "Commit and push results?". It commits only the result and this README and pushes them. It refuses if your branch has other unpushed commits.
+8. **Finish:** "Delete the benchmark environment?" `y` frees about 0.7 GB (the next run downloads it again); `N` keeps it for faster reruns.
+9. **See the comparison:** open `bench/README.md` on GitHub. The table and charts at the bottom show every machine that has published.
+
+### Linux (Ubuntu, Debian, Fedora, WSL2, Proxmox, cloud)
+
+1. **Get the repository.**
+   ```sh
+   sudo apt-get install -y git        # Fedora: sudo dnf install -y git
+   git clone https://github.com/yusnimawl/srm-forge.git
+   cd srm-forge
+   ```
+   The repository is private: use `gh auth login` (GitHub CLI) or a personal access token as the password when Git asks.
+2. **Prepare the machine.** Laptops: plug in. Close heavy programs. On WSL, the Windows side must also be idle.
+3. **Start it as your normal user** (not with `sudo`; the script asks for `sudo` itself only to install the Gmsh libraries the first time):
+   ```sh
+   sh bench/run.sh
+   ```
+   The first run downloads about 195 MB into `bench/.runtime/`.
+4. **Answer the same questions** as on Windows (label, tier, warnings).
+5. **Wait, read the summary, publish if you want, choose keep or delete** — the same as Windows steps 5 to 8.
+6. **Headless or cloud machine** (no questions asked, nothing published):
+   ```sh
+   sh bench/run.sh --tier quick --label my-server --yes --keep --no-push
+   ```
+   Then commit the result yourself with `git add bench/results bench/README.md`, `git commit`, `git push`, or rerun later with `--push`.
+
+### Running it again
+
+- Rerun the same command; it skips the download. A new result file is added; the README shows each machine's latest run and lists the earlier ones in its details.
+- After `git pull` on a machine that changed nothing locally, `bench/run.bat --report-only` (Windows) or `sh bench/run.sh --report-only` (Linux) rebuilds the comparison from everything published so far.
+
 ## How to run
 
 Windows: double-click `bench\run.bat`, or in a terminal:
