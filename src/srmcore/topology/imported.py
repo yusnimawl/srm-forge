@@ -50,6 +50,7 @@ def parametric_iron(p: RadialSRMParams) -> ImportedIron:
 STEP = 1e-4        # sampling step along contours (m)
 TOL = 1e-6         # geometric tolerance (m)
 _CHUNK = 256
+_REFINE = 256     # candidate web pairs measured exactly
 
 
 def _issue(rule: str, message: str) -> ValidationIssue:
@@ -69,6 +70,13 @@ def _sample_loop(segs) -> np.ndarray:
     pts: list = []
     for s in segs:
         pts.extend(sample_segment(s, STEP)[:-1])
+    return np.array(pts)
+
+
+def _sample_loop_step(segs, step: float) -> np.ndarray:
+    pts: list = []
+    for s in segs:
+        pts.extend(sample_segment(s, step)[:-1])
     return np.array(pts)
 
 
@@ -135,7 +143,9 @@ def _loop_issues(body: _Body) -> list[ValidationIssue]:
     out = []
     for label, segs in zip(body.labels, body.loops):
         if len(segs) < 2:
-            out.append(_issue("bad_segment", f"The {body.name} {label} contour has fewer than 2 edges."))
+            where = _at(segs[0].start) if segs else _at((0.0, 0.0))
+            out.append(_issue("bad_segment", f"The {body.name} {label} contour near {where} has fewer than 2 edges. "
+                              "Redraw it as a closed contour."))
             continue
         for i, s in enumerate(segs):
             nxt = segs[(i + 1) % len(segs)]
@@ -273,6 +283,13 @@ def _coil_overlap(p: RadialSRMParams, stator: _Body) -> list[ValidationIssue]:
     if len(near):
         return [_issue("coil_overlap", f"Iron near {_at(pts[near[0]])} is closer than half the slot-liner thickness "
                        f"({half * 1e3:.2f} mm) to a coil. Keep iron out of the coil region.")]
+    coil_pts = np.vstack([_sample_loop_step(b, 2e-3) for b in sides])
+    # coils lie inside the outer contour, so a point is in iron when it is in none or an even number of the others
+    inside = np.nonzero(~_parity(coil_pts, stator.pts[1:]))[0]
+    inside = inside[_dist(coil_pts[inside], stator.segs) > TOL]
+    if len(inside):
+        return [_issue("coil_overlap", f"A coil near {_at(coil_pts[inside[0]])} lies inside solid iron. "
+                       "Keep iron out of the coil region (the slots must stay open).")]
     for b in sides:
         poly = _sample_loop(b)
         sel = np.nonzero(np.all((pts >= poly.min(axis=0)) & (pts <= poly.max(axis=0)), axis=1))[0]
@@ -305,7 +322,7 @@ def _web(body: _Body, web: float) -> list[ValidationIssue]:
     idx = np.concatenate([np.arange(len(a)) for a in body.pts])
     ln = np.concatenate([np.full(len(a), len(a)) for a in body.pts])
     tree = cKDTree(P)
-    pr = tree.query_pairs(web, output_type="ndarray")
+    pr = tree.query_pairs(web * 1.05, output_type="ndarray")
     if not len(pr):
         return []
     i, j = pr[:, 0], pr[:, 1]
@@ -316,19 +333,61 @@ def _web(body: _Body, web: float) -> list[ValidationIssue]:
     d = np.hypot(*(P[i] - P[j]).T)
     mid = (P[i] + P[j]) / 2
     # the nearest sample is never closer than the true boundary, so this only discards impossible pairs
-    keep = (tree.query(mid)[0] >= 0.9 * d / 2) & (d < web * (1 - 1e-9))
+    keep = (tree.query(mid)[0] >= 0.9 * d / 2) & (d < web * 1.05)
     d, mid = d[keep], mid[keep]
     order = np.argsort(d)
-    d, mid = d[order], mid[order]
+    d, mid, i, j = d[order], mid[order], i[keep][order], j[keep][order]
+    found: list[int] = []
     for k in range(0, len(d), _CHUNK):
         m = mid[k:k + _CHUNK]
         ok = (_dist(m, body.segs) >= 0.9 * d[k:k + _CHUNK] / 2) & _parity(m, body.pts)
-        if ok.any():
-            n = int(np.argmax(ok))
-            return [_issue("web_width", f"The {body.name} iron is only {d[k + n] * 1e3:.2f} mm wide near {_at(m[n])}; "
-                           f"the minimum is {web * 1e3:.2f} mm (max(1 mm, 2 x lamination thickness)). "
-                           "Thicken it or move the hole or groove.")]
+        found.extend(k + int(n) for n in np.nonzero(ok)[0])
+        if len(found) >= _REFINE:
+            break
+    best = None
+    for n in found[:_REFINE]:
+        w = _exact_width(body, P[i[n]], P[j[n]])
+        if best is None or w[0] < best[0]:
+            best = w
+    if best is not None and best[0] < web - 1e-9:
+        return [_issue("web_width", f"The {body.name} iron is only {best[0] * 1e3:.2f} mm wide near {_at(best[1])}; "
+                       f"the minimum is {web * 1e3:.2f} mm (max(1 mm, 2 x lamination thickness)). "
+                       "Thicken it or move the hole or groove.")]
     return []
+
+
+def _facing(body: _Body, q: np.ndarray) -> list[Segment]:
+    return [s for s in body.segs if _seg_dist(q[None, :], s)[0] < 1e-9]
+
+
+def _slide(seg: Segment, q: np.ndarray) -> np.ndarray:
+    """Points of the segment within one sampling step of q, 1 µm apart."""
+    t = np.linspace(-STEP, STEP, 201)
+    if isinstance(seg, Line):
+        u = np.array(seg.end) - np.array(seg.start)
+        pts = q + t[:, None] * (u / np.hypot(*u))
+    else:
+        c = np.array(seg.center)
+        r = math.dist(seg.start, seg.center)
+        a = np.arctan2(q[1] - c[1], q[0] - c[0]) + t / r
+        pts = c + r * np.stack([np.cos(a), np.sin(a)], axis=1)
+    return pts[_seg_dist(pts, seg) < 1e-9]
+
+
+def _exact_width(body: _Body, a: np.ndarray, b: np.ndarray) -> tuple[float, np.ndarray]:
+    """The width across iron between two facing boundary samples, from exact distances: each point slides along
+    its own edge and is measured to the edges at the other point."""
+    best = (math.dist(a, b), (a + b) / 2)
+    for p0, p1 in ((a, b), (b, a)):
+        other = _facing(body, p1)
+        for seg in _facing(body, p0):
+            pts = _slide(seg, p0)
+            if len(pts):
+                d = _dist(pts, other)
+                k = int(np.argmin(d))
+                if d[k] < best[0]:
+                    best = (float(d[k]), (pts[k] + p1) / 2)
+    return best
 
 
 def check_iron(p: RadialSRMParams) -> list[ValidationIssue]:
@@ -433,12 +492,14 @@ def _classify(loops: list[list[Segment]], p: RadialSRMParams):
     roles: dict = {"sh": [], "rh": []}
     roots = sorted((i for i in range(n) if parent[i] is None), key=lambda i: -area[i])
     if not roots:
-        return None, [_issue("bodies", "No stator outline found.")]
+        return None, [_issue("bodies", f"No iron outline found near {_at((0.0, 0.0))}; the drawing needs the stator "
+                             "and rotor contours (coil outlines are ignored).")]
     roles["so"] = roots[0]
     used.add(roots[0])
     bore = [k for k in kids(roots[0]) if around(k)]
     if not bore:
-        issues.append(_issue("bodies", "No loop around the centre inside the stator outline (the stator bore)."))
+        issues.append(_issue("bodies", f"No stator bore loop around the centre near {_at((p.bore_radius, 0.0))}. "
+                             "Close the stator bore contour and keep it around the machine centre."))
     else:
         roles["sb"] = bore[0]
         used.add(bore[0])
@@ -449,14 +510,17 @@ def _classify(loops: list[list[Segment]], p: RadialSRMParams):
         rkids = kids(bore[0])
         rotor = [k for k in rkids if around(k)]
         if not rotor:
+            where = _at(polys[rkids[0]][0]) if rkids else _at((p.rotor_outer_radius, 0.0))
             issues.append(_issue("bodies", f"The rotor must be one closed loop around the centre; found {len(rkids)} "
-                                 "loop(s) inside the stator bore and none around the centre."))
+                                 f"loop(s) inside the stator bore (first near {where}) and none around the centre. "
+                                 "Join the rotor pieces into one contour."))
         else:
             roles["ro"] = rotor[0]
             used.add(rotor[0])
             inner = [k for k in kids(rotor[0]) if around(k)]
             if not inner:
-                issues.append(_issue("bodies", "No loop around the centre inside the rotor outline (the rotor bore)."))
+                issues.append(_issue("bodies", f"No rotor bore loop around the centre near {_at((p.shaft_radius, 0.0))}. "
+                                     "Draw the shaft circle inside the rotor outline."))
             else:
                 roles["rb"] = inner[0]
                 used.add(inner[0])
@@ -481,7 +545,14 @@ def iron_from_loops(loops: list[tuple[Segment, ...]], p: RadialSRMParams) -> tup
     coils = [side.boundary for side in _coil_sides(p)]
     rest = [_chain(loop) for loop in loops if not any(_matches(loop, c) for c in coils)]
     if any(len(loop) < 2 for loop in rest):
-        return None, [_issue("bad_segment", "A loop has fewer than 2 edges.")]
+        bad = next(loop for loop in rest if len(loop) < 2)
+        return None, [_issue("bad_segment", f"A loop near {_at(bad[0].start)} has fewer than 2 edges. "
+                             "Redraw it as a closed contour.")]
+    gaps = [_issue("open_loop", f"A contour is open near {_at(s.end)} (gap {math.dist(s.end, loop[(i + 1) % len(loop)].start) * 1e3:.3f} mm). "
+                   "Close the loop so its ends meet within 1 µm.")
+            for loop in rest for i, s in enumerate(loop) if math.dist(s.end, loop[(i + 1) % len(loop)].start) > TOL]
+    if gaps:
+        return None, gaps
     roles, issues = _classify(rest, p)
     if roles is None:
         return None, issues
