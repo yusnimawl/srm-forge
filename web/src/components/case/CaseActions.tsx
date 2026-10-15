@@ -10,6 +10,7 @@ import { Bar, fmtElapsed, progressOf } from "@/components/run/RunProgress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DxfImportDialog } from "@/components/case/DxfImportDialog"
 import { estimateText } from "@/lib/cases"
 import { download, mapCsv } from "@/lib/exports"
 
@@ -76,6 +77,7 @@ type Props = {
 export function CaseActions({ data, editable, ready, savedText, flush }: Props) {
   const qc = useQueryClient()
   const [confirming, setConfirming] = useState(false)
+  const [importing, setImporting] = useState(false)
   // An animate job runs on its own lane and reports in the Field tab.
   const job = data.jobs.find((j) => j.active && j.kind !== "animate")
   const evaluation = editable ? null : data.evaluation
@@ -131,6 +133,14 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
       (b) => download(`${stem(data)}_map.mat`, b),
       report,
     )
+  const exportDxf = async () => {
+    try {
+      if (!(await flush())) throw new NotSaved()
+      download(`${stem(data)}.dxf`, await apiBlob(`/api/cases/${data.id}/dxf`))
+    } catch (e) {
+      report(e)
+    }
+  }
   const map = evaluation?.map
 
   return (
@@ -159,9 +169,12 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
             <Button variant="ghost" className="min-h-11 w-full justify-start" disabled={!map}
               onClick={() => map && download(`${stem(data)}_map.csv`, mapCsv(map))}>Map (CSV)</Button>
             <Button variant="ghost" className="min-h-11 w-full justify-start" disabled={!map} onClick={exportMat}>Map (MAT)</Button>
+            <Button variant="ghost" className="min-h-11 w-full justify-start" onClick={exportDxf}>Geometry (DXF)</Button>
           </PopoverContent>
         </Popover>
+        <Button variant="outline" className="min-h-11" onClick={() => setImporting(true)}>Import DXF</Button>
       </div>
+      <DxfImportDialog caseId={data.id} open={importing} onOpenChange={setImporting} />
       {job && <CaseJobProgress key={job.id} job={job} caseId={data.id} />}
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent>

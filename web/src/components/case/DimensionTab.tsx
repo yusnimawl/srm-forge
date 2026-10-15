@@ -1,7 +1,7 @@
 import { MACHINE_FIELDS, POLE_KEYS, POLE_SETS } from "@/lib/caseForm"
 import { Field, NumField, SELECT_CLASS, type TabProps } from "./fields"
 
-export function DimensionTab({ form, update, errors }: TabProps) {
+export function DimensionTab({ form, update, errors, imported }: TabProps & { imported?: boolean }) {
   const m = form.machine
   const current = POLE_KEYS.map((k) => String(m[k])).join("/")
   const sets = POLE_SETS.map((s) => s.join("/"))
@@ -18,7 +18,12 @@ export function DimensionTab({ form, update, errors }: TabProps) {
   }
 
   return (
-    <div className="grid gap-3.5">
+    <fieldset disabled={imported} className="grid min-w-0 gap-3.5 border-0 p-0">
+      {imported && (
+        <p className="text-sm text-muted-foreground">
+          Geometry comes from the imported DXF. Edit the parent case and import again to change it.
+        </p>
+      )}
       <Field id="pole-set" label="Pole set" hint="Stator/rotor poles and phases." error={poleError}>
         {(aria) => (
           <select {...aria} className={SELECT_CLASS} value={options.includes(current) ? current : ""}
@@ -43,6 +48,6 @@ export function DimensionTab({ form, update, errors }: TabProps) {
           error={errors[`design.machine.${f.key}`]}
           onChange={(v) => update((old) => ({ ...old, machine: { ...old.machine, [f.key]: v } }))} />
       ))}
-    </div>
+    </fieldset>
   )
 }

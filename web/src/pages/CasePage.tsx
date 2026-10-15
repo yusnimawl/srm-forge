@@ -6,6 +6,7 @@ import { useCreateCase, usePatchCase } from "@/api/cases"
 import { api } from "@/api/client"
 import type { Case, CaseInputs } from "@/api/types"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
+import { BeforeAfterTable } from "@/components/case/BeforeAfterTable"
 import { CaseActions } from "@/components/case/CaseActions"
 import { InputTabs } from "@/components/case/InputTabs"
 import { ValidationPanel } from "@/components/case/ValidationPanel"
@@ -109,6 +110,7 @@ function CaseEditor({ data }: { data: Case }) {
       { onSuccess: (made) => navigate(`/cases/${made.id}`), onError: (e) => toast.error(errorMessage(e)) },
     )
 
+  const imported = !!(data.inputs as { design?: { machine?: { iron?: unknown } } }).design?.machine?.iron
   const status = caseStatus(data)
   const evaluation = editable ? null : data.evaluation
   const pane = (v: View, extra = "") => cn(view === v ? "block" : "hidden", "md:block", extra)
@@ -136,6 +138,8 @@ function CaseEditor({ data }: { data: Case }) {
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>
+
+      {data.origin === "dxf" && data.parent_case_id && <BeforeAfterTable caseId={data.id} evaluated={!editable} />}
 
       <div role="radiogroup" aria-label="Page section" className="inline-flex rounded-[6px] border border-border-strong p-0.5 md:hidden">
         {VIEWS.map(([v, label]) => (
@@ -167,7 +171,7 @@ function CaseEditor({ data }: { data: Case }) {
               {issues?.warnings.map((w, k) => <li key={k}>{w.loc.length > 0 ? `${issueKey(w.loc)}: ` : ""}{w.msg}</li>)}
             </ul>
           )}
-          <InputTabs form={form} update={update} errors={errors} margin={check.data?.margin} readOnly={!editable || running} evaluation={evaluation} />
+          <InputTabs form={form} update={update} errors={errors} margin={check.data?.margin} readOnly={!editable || running} evaluation={evaluation} imported={imported} />
         </section>
         <div className="min-w-0 space-y-6">
           <section aria-label="Motor diagram" className={pane("diagram")}>
