@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .iron import ImportedIron
+
 SCHEMA_VERSION = 1
 
 
@@ -42,6 +44,7 @@ class RadialSRMParams(_Frozen):
     lamination_thickness: float | None = None
     max_speed_rpm: float | None = None
     materials: RegionMaterials = RegionMaterials()
+    iron: ImportedIron | None = Field(None, exclude_if=lambda v: v is None)
 
     @property
     def stator_outer_radius(self) -> float:
