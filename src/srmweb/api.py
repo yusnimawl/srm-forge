@@ -11,26 +11,28 @@ from pathlib import Path
 from typing import Annotated
 
 import numpy as np
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import Field
+from pydantic import Field, ValidationError
 from scipy.io import savemat
 
 import srmcore
 import srmweb
 from srmapp import field
 from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
+from srmapp.sizing.estimates import active_mass
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
 from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
+from srmcore.topology.dxf_io import import_dxf, write_dxf
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
 from srmweb.config import Settings
@@ -38,8 +40,8 @@ from srmweb.frames import FieldContext, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull
 from srmweb.quick import LaneTimeout
-from srmweb.results import CaseOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, EditCase, EstimateOut,
+from srmweb.results import CaseOut, DxfImportOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
+from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, EditCase, EstimateOut,
                             EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
                             ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
@@ -71,6 +73,9 @@ def _summary(case: dict, evaluation: dict | None, validation: dict | None) -> di
         "poles": f"{ns}/{nr}" if isinstance(ns, int) and isinstance(nr, int) else None,
         **{k: (evaluation or {}).get(k) for k in _EVALUATED},
         "validated": bool(validation and validation.get("label"))}
+
+
+DXF_MAX_BYTES = 10 * 1024 * 1024
 
 
 def _file_name(label: str) -> str:
@@ -472,6 +477,67 @@ def create_app(settings: Settings,
             arrays |= {f"band.{n}": f.band.astype(np.uint32), f"b.{n}": f.b.astype(np.float32),
                        f"a.{n}": f.a.astype(np.float32)}
         return binary(result, arrays)
+
+    def case_machine(case: dict) -> RadialSRMParams | JSONResponse:
+        """The case's machine, or the 422 response for inputs that fail the case check."""
+        inputs, errors, warnings = check_case(case["inputs"])
+        return _invalid(errors, warnings) if inputs is None else inputs.design.machine
+
+    @router.get("/cases/{case_id}/dxf")
+    def dxf_export(case_id: str):
+        case = case_or_404(case_id)
+        machine = case_machine(case)
+        if isinstance(machine, JSONResponse):
+            return machine
+        return Response(write_dxf(machine), media_type="application/dxf",
+                        headers={"Content-Disposition": f'attachment; filename="{_file_name(case["label"])}.dxf"'})
+
+    @router.post("/cases/{case_id}/dxf", status_code=201, response_model=DxfImportOut)
+    def dxf_import(case_id: str, file: Annotated[UploadFile, File()]):
+        parent = case_or_404(case_id)
+        data = file.file.read(DXF_MAX_BYTES + 1)
+        if len(data) > DXF_MAX_BYTES:
+            raise HTTPException(413, "the DXF file is larger than 10 MB")
+        machine = case_machine(parent)
+        if isinstance(machine, JSONResponse):
+            return machine
+        iron, issues = import_dxf(data, machine)
+        found = [{"loc": ["iron"], "msg": f"[{i.rule}] {i.message}"} for i in issues]
+        if iron is None:
+            return _invalid([e for e, i in zip(found, issues) if i.severity == "error"],
+                            [e for e, i in zip(found, issues) if i.severity != "error"])
+        inputs = {**parent["inputs"], "design": {**parent["inputs"]["design"], "machine": {
+            **parent["inputs"]["design"]["machine"], "iron": iron.model_dump(mode="json")}}}
+        new = store.create_case(origin="dxf", inputs=inputs, label=f"DXF edit of {parent['label']}",
+                                parent_case_id=parent["id"], stale=True)
+        return DxfImportOut(case=case_out(store.get_case(new)), warnings=found)
+
+    @router.get("/cases/{case_id}/compare", response_model=CompareOut)
+    def compare(case_id: str):
+        case = case_or_404(case_id)
+        if case["parent_case_id"] is None:
+            raise HTTPException(404, "this case has no parent to compare with")
+        parent = case_or_404(case["parent_case_id"])
+
+        def column(c: dict) -> list[float | None]:
+            ev = store.case_result(c["id"], "evaluate")
+            key = (ev or {}).get("key")
+            if not key:
+                return [None] * 7
+            try:
+                mass = active_mass(reference_design(CaseInputs.model_validate(c["inputs"])).machine)
+            except (ValidationError, InputError):
+                return [None] * 7
+            # exact iron of the case's own design plus the copper of the winding the evaluation chose
+            total = mass.iron + ev["winding"]["copper_mass"] if ev.get("winding") else None
+            return [key["la"] * 1e3, key["lu"] * 1e3, key["peak_torque"], key["psi_max"],
+                    mass.stator_iron, mass.rotor_iron, total]
+
+        before, after = column(parent), column(case)
+        names = [("La", "mH"), ("Lu", "mH"), ("Peak torque", "N·m"), ("Flux linkage max", "Wb"),
+                 ("Stator iron", "kg"), ("Rotor iron", "kg"), ("Total mass", "kg")]
+        rows = [{"name": n, "unit": u, "before": b, "after": a} for (n, u), b, a in zip(names, before, after)]
+        return CompareOut(parent_id=parent["id"], parent_evaluated=before[0] is not None, rows=rows)
 
     @router.get("/cases/{case_id}/map.mat")
     def map_mat(case_id: str):

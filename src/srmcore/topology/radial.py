@@ -3,12 +3,14 @@
 Origin at the shaft centre. Stator pole k is centred at 2πk/Ns; rotor pole 0 is centred on +x.
 Boundaries run counter-clockwise starting with pole 0's face.
 """
+import dataclasses
 import math
 from dataclasses import dataclass
 
 from ..model.design import RadialSRMParams
 from ..model.errors import InputError, ValidationIssue
 from ..model.validator import MIN_WEB_WIDTH
+from .imported import check_iron, parametric_iron, to_segments
 from .primitives import (
     Arc, Line, Point, Segment, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, rotate,
 )
@@ -37,6 +39,11 @@ class RadialOutline:
     band_outer_radius: float
     coil_sides: tuple[CoilSide, ...]
     refinement_features: dict[str, tuple[Segment | Point, ...]]
+    # Imported iron only: the stator outer contour, the stator and rotor holes and the rotor bore.
+    stator_outer_boundary: tuple[Segment, ...] | None = None
+    stator_holes: tuple[tuple[Segment, ...], ...] = ()
+    rotor_inner_boundary: tuple[Segment, ...] | None = None
+    rotor_holes: tuple[tuple[Segment, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -191,7 +198,8 @@ def _coil_sides(p: RadialSRMParams) -> tuple[CoilSide, ...]:
     return tuple(sides)
 
 
-def build_outline(p: RadialSRMParams) -> RadialOutline:
+def parametric_outline(p: RadialSRMParams) -> RadialOutline:
+    """The outline of the parametric machine; `p.iron` is ignored."""
     stator_side = _attribute_pole_fit("stator", p.bore_radius, p.stator_pole_arc, p.stator_pole_taper,
                                       p.stator_yoke_inner_radius, p.stator_fillet_radius, True,
                                       2 * math.pi / p.n_stator_poles)
@@ -239,4 +247,43 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
         band_outer_radius=p.band_outer_radius,
         coil_sides=coil_sides,
         refinement_features=refinement_features,
+    )
+
+
+def _same_segment(a: Segment, b: Segment, tol: float = 1e-6) -> bool:
+    def close(u: Point, v: Point) -> bool:
+        return math.dist(u, v) <= tol
+
+    if type(a) is not type(b):
+        return False
+    if not ((close(a.start, b.start) and close(a.end, b.end)) or (close(a.start, b.end) and close(a.end, b.start))):
+        return False
+    return isinstance(a, Line) or close(a.center, b.center)
+
+
+def build_outline(p: RadialSRMParams) -> RadialOutline:
+    """The outline of the machine: parametric, or with the contours of `p.iron` swapped in."""
+    outline = parametric_outline(p)
+    if p.iron is None:
+        return outline
+    errors = [i for i in check_iron(p) if i.severity == "error"]
+    if errors:
+        raise InputError(errors)
+    iron = p.iron
+    base = parametric_iron(p)
+    stock = [s for loop in (base.stator_outer, base.stator_bore, base.rotor_outer, base.rotor_bore)
+             for s in to_segments(loop)]
+    loops = [to_segments(l) for l in (iron.stator_outer, iron.stator_bore, iron.rotor_outer, iron.rotor_bore)]
+    holes = tuple(to_segments(l) for l in iron.stator_holes + iron.rotor_holes)
+    detail = tuple(s for loop in loops for s in loop if not any(_same_segment(s, t) for t in stock))
+    detail += tuple(s for loop in holes for s in loop)
+    return dataclasses.replace(
+        outline,
+        stator_inner_boundary=loops[1],
+        rotor_outer_boundary=loops[2],
+        stator_outer_boundary=loops[0],
+        stator_holes=tuple(to_segments(l) for l in iron.stator_holes),
+        rotor_inner_boundary=loops[3],
+        rotor_holes=tuple(to_segments(l) for l in iron.rotor_holes),
+        refinement_features={**outline.refinement_features, "iron_detail": detail},
     )

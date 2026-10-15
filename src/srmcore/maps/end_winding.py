@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from ..model.design import RadialSRMParams
 from ..post.end_winding import end_turn_inductance
 from ..topology.primitives import Arc
-from ..topology.radial import build_outline
+from ..topology.radial import parametric_outline
 from .run import MapResult
 
 _ARC_SAMPLES = 512
@@ -40,7 +40,7 @@ def _polygon_area(boundary) -> float:
 
 def coil_geometry(machine: RadialSRMParams) -> CoilGeometry:
     p = machine
-    area = _polygon_area(build_outline(p).coil_sides[0].boundary)
+    area = _polygon_area(parametric_outline(p).coil_sides[0].boundary)
     r_in = p.bore_radius + p.coil_inner_clearance
     r_out = p.stator_yoke_inner_radius - 2 * p.stator_fillet_radius - p.slot_liner_thickness
     depth = r_out - r_in

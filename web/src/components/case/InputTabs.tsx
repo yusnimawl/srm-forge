@@ -50,7 +50,7 @@ function SectionIo({ tab, form, update, canImport }: TabProps & { tab: CaseTab; 
 }
 
 /** The five input tabs. A tab that holds a field with an error shows the error count; `readOnly` disables every input. */
-export function InputTabs({ readOnly, evaluation, ...p }: TabProps & { readOnly: boolean; evaluation: Evaluation | null }) {
+export function InputTabs({ readOnly, evaluation, imported, ...p }: TabProps & { readOnly: boolean; evaluation: Evaluation | null; imported?: boolean }) {
   const [tab, setTab] = useState<CaseTab>("requirement")
   const count = (id: string) => Object.keys(p.errors).filter((k) => tabOfKey(k) === id).length
   return (
@@ -70,7 +70,7 @@ export function InputTabs({ readOnly, evaluation, ...p }: TabProps & { readOnly:
       <SectionIo tab={tab} canImport={!readOnly} {...p} />
       <fieldset disabled={readOnly} className="min-w-0 border-0 px-4 pb-5 pt-1">
         <TabsContent value="requirement"><RequirementTab {...p} /></TabsContent>
-        <TabsContent value="dimension"><DimensionTab {...p} /></TabsContent>
+        <TabsContent value="dimension"><DimensionTab {...p} imported={imported} /></TabsContent>
         <TabsContent value="material"><MaterialTab {...p} /></TabsContent>
         <TabsContent value="winding"><WindingTab {...p} /></TabsContent>
         <TabsContent value="drive"><DriveTab {...p} evaluation={evaluation} /></TabsContent>

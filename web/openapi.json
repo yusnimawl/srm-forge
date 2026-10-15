@@ -23,6 +23,20 @@
         "title": "AnimateIn",
         "type": "object"
       },
+      "Body_dxf_import_api_cases__case_id__dxf_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_dxf_import_api_cases__case_id__dxf_post",
+        "type": "object"
+      },
       "BudgetOut": {
         "properties": {
           "rows": {
@@ -782,6 +796,81 @@
         "title": "CheckOut",
         "type": "object"
       },
+      "CompareOut": {
+        "properties": {
+          "parent_evaluated": {
+            "title": "Parent Evaluated",
+            "type": "boolean"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CompareRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parent_id",
+          "parent_evaluated",
+          "rows"
+        ],
+        "title": "CompareOut",
+        "type": "object"
+      },
+      "CompareRowOut": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "unit",
+          "before",
+          "after"
+        ],
+        "title": "CompareRowOut",
+        "type": "object"
+      },
       "Design": {
         "additionalProperties": false,
         "properties": {
@@ -840,6 +929,27 @@
           "bus_voltage_v"
         ],
         "title": "DriveSection",
+        "type": "object"
+      },
+      "DxfImportOut": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/CaseOut"
+          },
+          "warnings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "case",
+          "warnings"
+        ],
+        "title": "DxfImportOut",
         "type": "object"
       },
       "EdgeRefinement": {
@@ -1582,6 +1692,259 @@
         "title": "ImportCase",
         "type": "object"
       },
+      "ImportedIron": {
+        "additionalProperties": false,
+        "properties": {
+          "rotor_bore": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "arc": "#/components/schemas/IronArc",
+                  "line": "#/components/schemas/IronLine"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IronLine"
+                },
+                {
+                  "$ref": "#/components/schemas/IronArc"
+                }
+              ]
+            },
+            "title": "Rotor Bore",
+            "type": "array"
+          },
+          "rotor_holes": {
+            "default": [],
+            "items": {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "arc": "#/components/schemas/IronArc",
+                    "line": "#/components/schemas/IronLine"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IronLine"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IronArc"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Rotor Holes",
+            "type": "array"
+          },
+          "rotor_outer": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "arc": "#/components/schemas/IronArc",
+                  "line": "#/components/schemas/IronLine"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IronLine"
+                },
+                {
+                  "$ref": "#/components/schemas/IronArc"
+                }
+              ]
+            },
+            "title": "Rotor Outer",
+            "type": "array"
+          },
+          "stator_bore": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "arc": "#/components/schemas/IronArc",
+                  "line": "#/components/schemas/IronLine"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IronLine"
+                },
+                {
+                  "$ref": "#/components/schemas/IronArc"
+                }
+              ]
+            },
+            "title": "Stator Bore",
+            "type": "array"
+          },
+          "stator_holes": {
+            "default": [],
+            "items": {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "arc": "#/components/schemas/IronArc",
+                    "line": "#/components/schemas/IronLine"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IronLine"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IronArc"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Stator Holes",
+            "type": "array"
+          },
+          "stator_outer": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "arc": "#/components/schemas/IronArc",
+                  "line": "#/components/schemas/IronLine"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IronLine"
+                },
+                {
+                  "$ref": "#/components/schemas/IronArc"
+                }
+              ]
+            },
+            "title": "Stator Outer",
+            "type": "array"
+          }
+        },
+        "required": [
+          "stator_outer",
+          "stator_bore",
+          "rotor_outer",
+          "rotor_bore"
+        ],
+        "title": "ImportedIron",
+        "type": "object"
+      },
+      "IronArc": {
+        "additionalProperties": false,
+        "description": "Minor arc (< pi) from start to end around center.",
+        "properties": {
+          "center": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Center",
+            "type": "array"
+          },
+          "end": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "End",
+            "type": "array"
+          },
+          "kind": {
+            "const": "arc",
+            "default": "arc",
+            "title": "Kind",
+            "type": "string"
+          },
+          "start": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Start",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "center"
+        ],
+        "title": "IronArc",
+        "type": "object"
+      },
+      "IronLine": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "End",
+            "type": "array"
+          },
+          "kind": {
+            "const": "line",
+            "default": "line",
+            "title": "Kind",
+            "type": "string"
+          },
+          "start": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Start",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "IronLine",
+        "type": "object"
+      },
       "IssueOut": {
         "properties": {
           "loc": {
@@ -2268,6 +2631,16 @@
           "fill_factor": {
             "title": "Fill Factor",
             "type": "number"
+          },
+          "iron": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportedIron"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "lamination_thickness": {
             "anyOf": [
@@ -3433,7 +3806,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3681,6 +4054,129 @@
           }
         },
         "summary": "Animate Case"
+      }
+    },
+    "/api/cases/{case_id}/compare": {
+      "get": {
+        "operationId": "compare_api_cases__case_id__compare_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare"
+      }
+    },
+    "/api/cases/{case_id}/dxf": {
+      "get": {
+        "operationId": "dxf_export_api_cases__case_id__dxf_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dxf Export"
+      },
+      "post": {
+        "operationId": "dxf_import_api_cases__case_id__dxf_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_dxf_import_api_cases__case_id__dxf_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DxfImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dxf Import"
       }
     },
     "/api/cases/{case_id}/estimate": {

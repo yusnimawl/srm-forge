@@ -66,8 +66,12 @@ def outline_svg(machine: RadialSRMParams) -> dict:
     r = o.stator_outer_radius * _MM
     return {
         "view_box": [-r, -r, 2 * r, 2 * r],
-        "stator": _circle(o.stator_outer_radius) + " " + _path(o.stator_inner_boundary),
-        "rotor": _path(o.rotor_outer_boundary) + " " + _circle(o.shaft_radius),
+        "stator": " ".join([_path(o.stator_outer_boundary) if o.stator_outer_boundary
+                            else _circle(o.stator_outer_radius), _path(o.stator_inner_boundary),
+                            *map(_path, o.stator_holes)]),
+        "rotor": " ".join([_path(o.rotor_outer_boundary),
+                           _path(o.rotor_inner_boundary) if o.rotor_inner_boundary else _circle(o.shaft_radius),
+                           *map(_path, o.rotor_holes)]),
         "shaft": _circle(o.shaft_radius),
         "coils": [{"name": c.name, "phase": chr(ord("A") + c.phase),
                    "sign": "+" if c.sign > 0 else "-", "d": _path(c.boundary)}

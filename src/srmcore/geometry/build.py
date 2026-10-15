@@ -10,7 +10,7 @@ from ..topology.primitives import Line, Point, Segment, sample_segment
 from ..topology.radial import RadialOutline, build_outline
 
 STATOR_REGIONS = ("stator_iron", "slot_air", "airgap_stator")
-ROTOR_REGIONS = ("rotor_iron", "shaft", "airgap_rotor", "rotor_slot_air")
+ROTOR_REGIONS = ("rotor_iron", "shaft", "airgap_rotor", "rotor_slot_air", "rotor_hole_air")
 
 
 @dataclass(frozen=True)
@@ -20,8 +20,8 @@ class GeometryModel:
     region_size_key: dict[str, str]
     region_kind: dict[str, str]
     coils: dict[str, CoilInfo]
-    stator_outer_curve: int
-    outer_boundary_curve: int
+    stator_outer_curves: tuple[int, ...]
+    outer_boundary_curves: tuple[int, ...]
     band_outer_curve: int
     band_inner_curve: int
     refinement_points: dict[str, np.ndarray]
@@ -61,12 +61,28 @@ def _full_circle_on_boundary(surfaces: tuple[int, ...], radius: float, tol: floa
     raise RuntimeError(f"no full circle of radius {radius} on the boundary")
 
 
+def _circle_curves_on_boundary(surfaces: tuple[int, ...], radius: float, tol: float) -> tuple[int, ...]:
+    """Boundary curves of the surfaces that lie on the circle of the given radius."""
+    boundary = gmsh.model.getBoundary([(2, s) for s in surfaces], combined=False, oriented=False)
+    found = set()
+    for _, tag in boundary:
+        tag = abs(tag)
+        lo, hi = gmsh.model.getParametrizationBounds(1, tag)
+        radii = [np.hypot(*gmsh.model.getValue(1, tag, [lo[0] + f * (hi[0] - lo[0])])[:2])
+                 for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        if all(abs(r - radius) < tol for r in radii):
+            found.add(tag)
+    if not found:
+        raise RuntimeError(f"no boundary curve on the circle of radius {radius}")
+    return tuple(sorted(found))
+
+
 def _size_key(region: str) -> str:
     if region.startswith("coil_"):
         return "coil"
     if region.startswith("airgap_"):
         return "airgap"
-    if region in ("rotor_slot_air", "stator_outer_air"):
+    if region in ("rotor_slot_air", "stator_outer_air", "stator_hole_air", "rotor_hole_air"):
         return "slot_air"
     return region
 
@@ -74,7 +90,7 @@ def _size_key(region: str) -> str:
 def _region_kind(region: str) -> str:
     """The material role for a region name (spec §6): stator iron, rotor iron, shaft, coil, or air.
 
-    slot_air, rotor_slot_air, stator_outer_air and both airgap_* layers are all "air".
+    slot_air, rotor_slot_air, stator_outer_air, the imported-iron hole and notch regions and both airgap_* layers are all "air".
     """
     if region.startswith("coil_"):
         return "coil"
@@ -103,9 +119,24 @@ def build_geometry(outline: RadialOutline, feature_step: float,
     centres: list[int] = []
 
     # stator part
-    outer_loop = occ.addCurveLoop([occ.addCircle(0, 0, 0, outline.stator_outer_radius)])
+    def loop(segments: tuple[Segment, ...]) -> int:
+        # Fresh points and curves each time: a boolean consumes the entities of the surfaces it removes.
+        return occ.addCurveLoop(_curves(segments, _Points(), centres))
+
+    imported_stator = outline.stator_outer_boundary is not None
+    if imported_stator:
+        outer_loop = loop(outline.stator_outer_boundary)
+    else:
+        outer_loop = occ.addCurveLoop([occ.addCircle(0, 0, 0, outline.stator_outer_radius)])
     bore_curves = _curves(outline.stator_inner_boundary, points, centres)
-    stator_iron = occ.addPlaneSurface([outer_loop, occ.addCurveLoop(bore_curves)])
+    stator_iron = occ.addPlaneSurface([outer_loop, occ.addCurveLoop(bore_curves)]
+                                      + [loop(h) for h in outline.stator_holes])
+    stator_hole_air: list[tuple[int, int]] = []
+    if imported_stator:
+        # The notches between the outer contour and the outer circle, then the interior holes.
+        stator_hole_air, _ = occ.cut([(2, _disk(outline.stator_outer_radius))],
+                                     [(2, occ.addPlaneSurface([loop(outline.stator_outer_boundary)]))])
+        stator_hole_air = list(stator_hole_air) + [(2, occ.addPlaneSurface([loop(h)])) for h in outline.stator_holes]
     inside_bore = occ.addPlaneSurface([occ.addCurveLoop(bore_curves)])
     coils = [(c.name, occ.addPlaneSurface([occ.addCurveLoop(_curves(c.boundary, points, centres))]))
              for c in outline.coil_sides]
@@ -119,7 +150,8 @@ def build_geometry(outline: RadialOutline, feature_step: float,
         outer_air, _ = occ.cut([(2, _disk(outer_air_radius))], [(2, _disk(outline.stator_outer_radius))])
 
     # rotor part
-    rotor_area = occ.addPlaneSurface([occ.addCurveLoop(_curves(outline.rotor_outer_boundary, points, centres))])
+    rotor_area = occ.addPlaneSurface([loop(outline.rotor_outer_boundary)])
+    imported_rotor = outline.rotor_inner_boundary is not None
     shaft = _disk(outline.shaft_radius)
     band_in_disk = _disk(outline.band_inner_radius)
     rotor_od_disk = _disk(outline.rotor_outer_radius)
@@ -127,17 +159,27 @@ def build_geometry(outline: RadialOutline, feature_step: float,
     # air down to the star-shaped rotor outline is its own region (rotor_slot_air), so it doesn't
     # inherit the airgap's very fine size class.
     airgap_rotor, _ = occ.cut([(2, band_in_disk)], [(2, rotor_od_disk)], removeObject=True, removeTool=False)
-    rotor_slot_air, _ = occ.cut([(2, rotor_od_disk)], [(2, rotor_area)], removeObject=True, removeTool=False)
-    rotor_iron, _ = occ.cut([(2, rotor_area)], [(2, shaft)], removeObject=True, removeTool=False)
+    rotor_slot_air, _ = occ.cut([(2, rotor_od_disk)], [(2, rotor_area)], removeObject=True, removeTool=imported_rotor)
+    rotor_hole_air: list[tuple[int, int]] = []
+    if imported_rotor:
+        rotor_iron = [(2, occ.addPlaneSurface([loop(outline.rotor_outer_boundary), loop(outline.rotor_inner_boundary)]
+                                              + [loop(h) for h in outline.rotor_holes]))]
+        rotor_hole_air, _ = occ.cut([(2, occ.addPlaneSurface([loop(outline.rotor_inner_boundary)]))],
+                                    [(2, shaft)], removeObject=True, removeTool=False)
+        rotor_hole_air = list(rotor_hole_air) + [(2, occ.addPlaneSurface([loop(h)])) for h in outline.rotor_holes]
+    else:
+        rotor_iron, _ = occ.cut([(2, rotor_area)], [(2, shaft)], removeObject=True, removeTool=False)
 
     occ.remove([(0, c) for c in centres])
 
     named: list[tuple[str, list[tuple[int, int]]]] = (
         [("stator_iron", [(2, stator_iron)]), ("slot_air", slot_air), ("airgap_stator", gap_stator)]
+        + ([("stator_hole_air", stator_hole_air)] if stator_hole_air else [])
         + ([("stator_outer_air", outer_air)] if outer_air else [])
         + [(name, [(2, tag)]) for name, tag in coils]
         + [("rotor_iron", rotor_iron), ("shaft", [(2, shaft)]),
            ("airgap_rotor", airgap_rotor), ("rotor_slot_air", rotor_slot_air)]
+        + ([("rotor_hole_air", rotor_hole_air)] if rotor_hole_air else [])
     )
     objects = [dt for _, dts in named for dt in dts]
     _, out_map = occ.fragment(objects, [])
@@ -157,16 +199,18 @@ def build_geometry(outline: RadialOutline, feature_step: float,
 
     region_part = {n: ("rotor" if n in ROTOR_REGIONS else "stator") for n in region_surfaces}
     tol = (outline.band_outer_radius - outline.band_inner_radius) / 4
-    stator_outer = _full_circle_on_boundary(region_surfaces["stator_iron"], outline.stator_outer_radius, tol)
+    stator_outer = _circle_curves_on_boundary(
+        region_surfaces["stator_iron"] + region_surfaces.get("stator_hole_air", ()),
+        outline.stator_outer_radius, 1e-6 * outline.stator_outer_radius)
     outer_boundary = (stator_outer if outer_air_radius is None
-                      else _full_circle_on_boundary(region_surfaces["stator_outer_air"], outer_air_radius, tol))
+                      else (_full_circle_on_boundary(region_surfaces["stator_outer_air"], outer_air_radius, tol),))
     band_outer = _full_circle_on_boundary(region_surfaces["airgap_stator"], outline.band_outer_radius, tol)
     band_inner = _full_circle_on_boundary(region_surfaces["airgap_rotor"], outline.band_inner_radius, tol)
 
     for name, tags in region_surfaces.items():
         gmsh.model.addPhysicalGroup(2, list(tags), name=name)
-    gmsh.model.addPhysicalGroup(1, [stator_outer], name="stator_outer")
-    gmsh.model.addPhysicalGroup(1, [outer_boundary], name="outer_boundary")
+    gmsh.model.addPhysicalGroup(1, list(stator_outer), name="stator_outer")
+    gmsh.model.addPhysicalGroup(1, list(outer_boundary), name="outer_boundary")
     gmsh.model.addPhysicalGroup(1, [band_outer], name="band_outer")
     gmsh.model.addPhysicalGroup(1, [band_inner], name="band_inner")
 
@@ -185,7 +229,7 @@ def build_geometry(outline: RadialOutline, feature_step: float,
         region_size_key={n: _size_key(n) for n in region_surfaces},
         region_kind={n: _region_kind(n) for n in region_surfaces},
         coils=coils,
-        stator_outer_curve=stator_outer, outer_boundary_curve=outer_boundary,
+        stator_outer_curves=stator_outer, outer_boundary_curves=outer_boundary,
         band_outer_curve=band_outer, band_inner_curve=band_inner,
         refinement_points=refinement_points,
     )

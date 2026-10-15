@@ -38,10 +38,10 @@ Order chosen by the owner: physics first, with the DXF round trip early because 
 - Done when: the owner signs off on screenshots of every page.
 
 ### R2 — DXF round trip
-- [ ] Export stator and rotor laminations (and coil regions) as DXF with a fixed layer convention
-- [ ] Import an edited DXF; check closed loops, the air-gap circle, minimum web width; map layers to regions
-- [ ] Mesh and solve the imported shape with the same engine (moving band, maps, products)
-- [ ] Before/after comparison: ψ, torque, key numbers, mass
+- [x] Export stator and rotor laminations (and coil regions) as DXF with a fixed layer convention
+- [x] Import an edited DXF; check closed loops, the air-gap circle, minimum web width; map layers to regions
+- [x] Mesh and solve the imported shape with the same engine (moving band, maps, products)
+- [x] Before/after comparison: ψ, torque, key numbers, mass
 - Done when: export → edit in CAD (notches, V-grooves, holes) → import → map → comparison works end to end on the 8/6.
 - Open for the R2 spec: how imported shapes enter the cache identity, and whether coils may be edited or stay parametric.
 

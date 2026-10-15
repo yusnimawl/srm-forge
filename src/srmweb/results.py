@@ -201,3 +201,8 @@ class CaseOut(CaseSummaryOut):
     evaluation: EvaluationOut | None
     validation: ValidationOut | None
     jobs: list[JobOut]          # newest first
+
+
+class DxfImportOut(_Out):
+    case: CaseOut
+    warnings: list[dict[str, Any]]      # `{"loc", "msg"}`

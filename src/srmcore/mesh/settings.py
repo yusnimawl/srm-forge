@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from ..model.design import MeshSettings, RadialSRMParams
 from ..model.regions import REGION_SIZE_KEYS
+from ..model.validator import min_web_width
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,9 @@ def resolve_mesh_settings(p: RadialSRMParams, s: MeshSettings) -> ResolvedMeshSe
         # no dedicated refinement it gets forced sliver triangles. `gap` is a floor so this never
         # asks for elements finer than the airgap.
         refinement["slot_liner"] = (max(p.slot_liner_thickness * ps, gap), growth)
+    if p.iron is not None:
+        # Imported contours carry features (notches, holes, cut-outs) the parametric tags do not cover.
+        refinement["iron_detail"] = (max(min_web_width(p) / 2, gap), growth)
     for tag, ref in s.refinement.items():
         refinement[tag] = (ref.size, ref.growth)
     if s.airgap_circumferential_divisions is not None:

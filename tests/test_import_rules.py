@@ -24,6 +24,8 @@ THIRD_PARTY_OWNERS: dict[str, set[str]] = {
     "gmsh": {"geometry", "mesh"},
     "skfem": {"solvers"},
 }
+# third-party packages confined to single files
+THIRD_PARTY_FILES: dict[str, set[str]] = {"ezdxf": {"dxf_io.py"}}
 
 
 def _imported_modules(py_file: Path, src_root: Path) -> list[str]:
@@ -71,6 +73,8 @@ def find_violations(src_root: Path) -> list[str]:
             ):
                 label = owner if owner is not None else "top-level"
                 violations.append(f"{py_file.name} ({label}) imports {module}")
+            elif parts[0] in THIRD_PARTY_FILES and py_file.name not in THIRD_PARTY_FILES[parts[0]]:
+                violations.append(f"{py_file.name} imports {module}")
     return violations
 
 
@@ -92,8 +96,12 @@ def test_checker_detects_forbidden_internal_and_third_party(tmp_path):
     (root / "mesh").mkdir()
     (root / "mesh" / "ok.py").write_text("from srmcore.geometry import x\nimport gmsh\n", encoding="utf-8")
     (root / "cli.py").write_text("import gmsh\n", encoding="utf-8")
+    (root / "topology").mkdir()
+    (root / "topology" / "dxf_io.py").write_text("import ezdxf\n", encoding="utf-8")
+    (root / "topology" / "other.py").write_text("import ezdxf\n", encoding="utf-8")
     violations = find_violations(root)
-    assert len(violations) == 5
+    assert len(violations) == 6
+    assert any("other.py" in v and "ezdxf" in v for v in violations)
     model_violations = [v for v in violations if "model" in v and "srmcore.mesh" in v]
     assert len(model_violations) == 3  # ..mesh import, `from srmcore import mesh`, `from .. import mesh`
     assert any("physics" in v and "gmsh" in v for v in violations)

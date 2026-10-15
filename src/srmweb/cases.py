@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from srmapp.case import CaseInputs, map_cache_hit, map_request
 from srmcore.model.validator import validate_params
+from srmcore.topology.imported import check_iron
 from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
@@ -38,6 +39,11 @@ def check_case(raw) -> tuple[CaseInputs | None, list[dict], list[dict]]:
     errors, warnings = [], []
     for issue in validate_params(inputs.design.machine):
         out = {"loc": ["design", "machine", issue.parameter], "msg": f"[{issue.rule}] {issue.message}"}
+        (errors if issue.severity == "error" else warnings).append(out)
+    if errors:   # check_iron needs a machine that passes the parameter rules
+        return None, errors, warnings
+    for issue in check_iron(inputs.design.machine):
+        out = {"loc": ["design", "machine", "iron"], "msg": f"[{issue.rule}] {issue.message}"}
         (errors if issue.severity == "error" else warnings).append(out)
     if errors:
         return None, errors, warnings

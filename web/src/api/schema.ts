@@ -58,6 +58,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare */
+        get: operations["compare_api_cases__case_id__compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/dxf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dxf Export */
+        get: operations["dxf_export_api_cases__case_id__dxf_get"];
+        put?: never;
+        /** Dxf Import */
+        post: operations["dxf_import_api_cases__case_id__dxf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/estimate": {
         parameters: {
             query?: never;
@@ -487,6 +522,11 @@ export interface components {
              */
             frames: number;
         };
+        /** Body_dxf_import_api_cases__case_id__dxf_post */
+        Body_dxf_import_api_cases__case_id__dxf_post: {
+            /** File */
+            file: string;
+        };
         /** BudgetOut */
         BudgetOut: {
             /** Rows */
@@ -670,6 +710,26 @@ export interface components {
             /** Value */
             value: number | null;
         };
+        /** CompareOut */
+        CompareOut: {
+            /** Parent Evaluated */
+            parent_evaluated: boolean;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Rows */
+            rows: components["schemas"]["CompareRowOut"][];
+        };
+        /** CompareRowOut */
+        CompareRowOut: {
+            /** After */
+            after: number | null;
+            /** Before */
+            before: number | null;
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+        };
         /** Design */
         Design: {
             machine: components["schemas"]["RadialSRMParams"];
@@ -700,6 +760,14 @@ export interface components {
             bus_voltage_v: number;
             /** Phase Current A */
             phase_current_a?: number | null;
+        };
+        /** DxfImportOut */
+        DxfImportOut: {
+            case: components["schemas"]["CaseOut"];
+            /** Warnings */
+            warnings: {
+                [key: string]: unknown;
+            }[];
         };
         /** EdgeRefinement */
         EdgeRefinement: {
@@ -883,6 +951,71 @@ export interface components {
              */
             origin: "import";
             setup: components["schemas"]["SetupFile"];
+        };
+        /** ImportedIron */
+        ImportedIron: {
+            /** Rotor Bore */
+            rotor_bore: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[];
+            /**
+             * Rotor Holes
+             * @default []
+             */
+            rotor_holes: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[][];
+            /** Rotor Outer */
+            rotor_outer: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[];
+            /** Stator Bore */
+            stator_bore: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[];
+            /**
+             * Stator Holes
+             * @default []
+             */
+            stator_holes: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[][];
+            /** Stator Outer */
+            stator_outer: (components["schemas"]["IronLine"] | components["schemas"]["IronArc"])[];
+        };
+        /**
+         * IronArc
+         * @description Minor arc (< pi) from start to end around center.
+         */
+        IronArc: {
+            /** Center */
+            center: [
+                number,
+                number
+            ];
+            /** End */
+            end: [
+                number,
+                number
+            ];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "arc";
+            /** Start */
+            start: [
+                number,
+                number
+            ];
+        };
+        /** IronLine */
+        IronLine: {
+            /** End */
+            end: [
+                number,
+                number
+            ];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "line";
+            /** Start */
+            start: [
+                number,
+                number
+            ];
         };
         /** IssueOut */
         IssueOut: {
@@ -1075,6 +1208,7 @@ export interface components {
             coil_inner_clearance: number;
             /** Fill Factor */
             fill_factor: number;
+            iron?: components["schemas"]["ImportedIron"] | null;
             /** Lamination Thickness */
             lamination_thickness?: number | null;
             /**
@@ -1661,6 +1795,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_api_cases__case_id__compare_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dxf_export_api_cases__case_id__dxf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dxf_import_api_cases__case_id__dxf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_dxf_import_api_cases__case_id__dxf_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DxfImportOut"];
                 };
             };
             /** @description Validation Error */

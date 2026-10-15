@@ -155,9 +155,11 @@ def _ring(curve: int, used: np.ndarray, nodes: np.ndarray, n: int) -> np.ndarray
     return idx
 
 
-def _edges(curve: int, used: np.ndarray) -> np.ndarray:
-    types, _, node_tags = gmsh.model.mesh.getElements(1, curve)
-    blocks = [np.asarray(t, dtype=np.int64).reshape(-1, 2) for e, t in zip(types, node_tags) if e == LINE]
+def _edges(curves: tuple[int, ...], used: np.ndarray) -> np.ndarray:
+    blocks = []
+    for curve in curves:
+        types, _, node_tags = gmsh.model.mesh.getElements(1, curve)
+        blocks += [np.asarray(t, dtype=np.int64).reshape(-1, 2) for e, t in zip(types, node_tags) if e == LINE]
     return _local(used, np.vstack(blocks).ravel()).reshape(-1, 2)
 
 
@@ -177,7 +179,7 @@ def build_static_mesh(design: Design) -> StaticMesh:
         n = resolved.band_divisions
         stator_ring = _ring(geom.band_outer_curve, stator_used, stator.nodes, n)
         rotor_ring = _ring(geom.band_inner_curve, rotor_used, rotor.nodes, n)
-        outer_edges = _edges(geom.outer_boundary_curve, stator_used)
+        outer_edges = _edges(geom.outer_boundary_curves, stator_used)
     return StaticMesh(
         region_names=region_names,
         region_part={n: geom.region_part[n] for n in region_names},

@@ -23,8 +23,8 @@ def test_geometry_outer_air_ring(srm_8_6):
         assert area == pytest.approx(math.pi * ((o.stator_outer_radius + RING) ** 2 - o.stator_outer_radius**2), rel=1e-6)
         assert g.region_kind["stator_outer_air"] == "air" and g.region_part["stator_outer_air"] == "stator"
         assert g.region_size_key["stator_outer_air"] == "slot_air"
-        assert g.outer_boundary_curve != g.stator_outer_curve
-        xmin, *_ = gmsh.model.getBoundingBox(1, g.outer_boundary_curve)
+        assert g.outer_boundary_curves != g.stator_outer_curves
+        xmin, *_ = gmsh.model.getBoundingBox(1, g.outer_boundary_curves[0])
         assert -xmin == pytest.approx(o.stator_outer_radius + RING, rel=1e-4)
 
 
@@ -32,7 +32,7 @@ def test_without_ring_outer_boundary_is_stator_od(srm_8_6):
     with gmsh_model():
         g = build_geometry(build_outline(srm_8_6), feature_step=1e-4)
         assert "stator_outer_air" not in g.region_surfaces
-        assert g.outer_boundary_curve == g.stator_outer_curve
+        assert g.outer_boundary_curves == g.stator_outer_curves
 
 
 def test_mesh_outer_edges_move_to_the_ring():
