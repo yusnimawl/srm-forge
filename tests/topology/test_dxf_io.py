@@ -213,6 +213,20 @@ def test_flipped_extrusion_keeps_wcs_coordinates():
     assert {tuple(round(c * 1e3, 6) for c in q) for q in (arc.start, arc.end)} == {(45.0, 0.0), (50.0, 5.0)}
 
 
+def test_refusal_locations_are_wcs_millimetres():
+    flip = {"extrusion": (0, 0, -1)}
+    doc = _doc()
+    doc.modelspace().add_line((0, 0), (1, 1))
+    doc.modelspace().add_arc((-50, 0, 7), 5, 0, 90, dxfattribs=flip)
+    _, issues = read_loops(_bytes(doc))
+    assert [i.rule for i in issues] == ["dxf_flat"] and "near (50.0, 0.0) mm" in issues[0].message
+    doc = _doc()
+    doc.modelspace().add_line((0, 0), (1, 1))
+    doc.modelspace().add_lwpolyline([(-10, 5), (-20, 5), (-20, 15)], dxfattribs={**flip, "elevation": 3})
+    _, issues = read_loops(_bytes(doc))
+    assert [i.rule for i in issues] == ["dxf_flat"] and "near (10.0, 5.0) mm" in issues[0].message
+
+
 def test_tilted_extrusion_refused():
     doc = _doc()
     doc.modelspace().add_circle((0, 0), 5, dxfattribs={"extrusion": (1, 0, 0)})

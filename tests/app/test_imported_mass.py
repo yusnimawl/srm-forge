@@ -29,3 +29,9 @@ def test_rotor_holes_lower_mass():
     assert plain.rotor_iron - holed.rotor_iron == pytest.approx(want, rel=1e-9)
     assert holed.stator_iron == plain.stator_iron and holed.copper == plain.copper
 
+
+
+def test_parametric_iron_mass_is_exact():
+    p = make_8_6()
+    base = parametric_iron(p)
+    assert active_mass(p) == active_mass(p.model_copy(update={"iron": base}))

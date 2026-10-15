@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import Field
+from pydantic import Field, ValidationError
 from scipy.io import savemat
 
 import srmcore
@@ -493,9 +493,9 @@ def create_app(settings: Settings,
                         headers={"Content-Disposition": f'attachment; filename="{_file_name(case["label"])}.dxf"'})
 
     @router.post("/cases/{case_id}/dxf", status_code=201, response_model=DxfImportOut)
-    async def dxf_import(case_id: str, file: Annotated[UploadFile, File()]):
+    def dxf_import(case_id: str, file: Annotated[UploadFile, File()]):
         parent = case_or_404(case_id)
-        data = await file.read(DXF_MAX_BYTES + 1)
+        data = file.file.read(DXF_MAX_BYTES + 1)
         if len(data) > DXF_MAX_BYTES:
             raise HTTPException(413, "the DXF file is larger than 10 MB")
         machine = case_machine(parent)
@@ -524,9 +524,14 @@ def create_app(settings: Settings,
             key = (ev or {}).get("key")
             if not key:
                 return [None] * 7
-            mass = active_mass(reference_design(CaseInputs.model_validate(c["inputs"])).machine)
+            try:
+                mass = active_mass(reference_design(CaseInputs.model_validate(c["inputs"])).machine)
+            except (ValidationError, InputError):
+                return [None] * 7
+            # exact iron of the case's own design plus the copper of the winding the evaluation chose
+            total = mass.iron + ev["winding"]["copper_mass"] if ev.get("winding") else None
             return [key["la"] * 1e3, key["lu"] * 1e3, key["peak_torque"], key["psi_max"],
-                    mass.stator_iron, mass.rotor_iron, ev.get("mass_kg")]
+                    mass.stator_iron, mass.rotor_iron, total]
 
         before, after = column(parent), column(case)
         names = [("La", "mH"), ("Lu", "mH"), ("Peak torque", "N·m"), ("Flux linkage max", "Wb"),

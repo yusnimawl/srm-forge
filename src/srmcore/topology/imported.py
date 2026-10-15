@@ -35,15 +35,16 @@ def from_segments(segs: tuple[Segment, ...]) -> IronLoop:
 
 def parametric_iron(p: RadialSRMParams) -> ImportedIron:
     """The contours of the parametric machine (ignoring `p.iron`): stator outer circle and shaft circle as
-    four quarter arcs from angle 0, the salient stator bore and rotor outer outlines, and no holes."""
+    four quarter arcs from angle 0, all in canonical form, the salient stator bore and rotor outer outlines, and no holes."""
     from .radial import _full_circle, parametric_outline  # radial imports this module
 
     o = parametric_outline(p)
+    canon = lambda segs: _canonical(list(segs), p)  # noqa: E731
     return ImportedIron(
-        stator_outer=from_segments(_full_circle(p.stator_outer_radius, "")),
-        stator_bore=from_segments(o.stator_inner_boundary),
-        rotor_outer=from_segments(o.rotor_outer_boundary),
-        rotor_bore=from_segments(_full_circle(p.shaft_radius, "")),
+        stator_outer=canon(_full_circle(p.stator_outer_radius, "")),
+        stator_bore=canon(o.stator_inner_boundary),
+        rotor_outer=canon(o.rotor_outer_boundary),
+        rotor_bore=canon(_full_circle(p.shaft_radius, "")),
     )
 
 
@@ -66,14 +67,7 @@ def _rot(pts: np.ndarray, angle: float) -> np.ndarray:
     return pts @ np.array([[c, s], [-s, c]])
 
 
-def _sample_loop(segs) -> np.ndarray:
-    pts: list = []
-    for s in segs:
-        pts.extend(sample_segment(s, STEP)[:-1])
-    return np.array(pts)
-
-
-def _sample_loop_step(segs, step: float) -> np.ndarray:
+def _sample_loop(segs, step: float = STEP) -> np.ndarray:
     pts: list = []
     for s in segs:
         pts.extend(sample_segment(s, step)[:-1])
@@ -153,10 +147,47 @@ def _loop_issues(body: _Body) -> list[ValidationIssue]:
                 out.append(_issue("open_loop", f"The {body.name} {label} contour is open near {_at(s.end)}."))
             if math.dist(s.start, s.end) < TOL:
                 out.append(_issue("bad_segment", f"Zero-length edge in the {body.name} {label} contour at {_at(s.start)}."))
+            elif isinstance(s, Arc) and math.dist(s.start, s.end) >= 2 * math.dist(s.start, s.center) * math.sin(math.pi / 2 - 1e-6):
+                out.append(_issue("bad_segment", f"Arc in the {body.name} {label} contour near {_at(s.start)} sweeps "
+                                  f"180° or more; split it in two. {_REEXPORT}"))
             elif isinstance(s, Arc) and abs(math.dist(s.start, s.center) - math.dist(s.end, s.center)) > TOL:
                 out.append(_issue("bad_segment", f"Arc in the {body.name} {label} contour near {_at(s.start)} is not a "
                                   "minor arc of one circle (its ends are at different radii from its centre)."))
     return out
+
+
+MAX_SEGMENTS = 20_000
+_CANON_TOL = 2e-7  # the 0.1 µm rounding of the canonical form, twice (rounding after snapping is not idempotent)
+_REEXPORT = "Export and re-import the DXF to get canonical coordinates."
+
+
+def _trust_issues(p: RadialSRMParams, loops) -> list[ValidationIssue]:
+    """Refuse what the later checks cannot measure safely: too many segments, non-finite or far-away
+    coordinates."""
+    if sum(len(loop) for loop in loops) > MAX_SEGMENTS:
+        return [_issue("bad_segment", f"The iron has more than {MAX_SEGMENTS} edges; simplify the drawing.")]
+    reach = 1.5 * p.stator_outer_radius
+    for loop in loops:
+        for s in loop:
+            pts = (s.start, s.end) + ((s.center,) if isinstance(s, IronArc) else ())
+            for q in pts:
+                if not all(math.isfinite(c) for c in q):
+                    return [_issue("bad_segment", f"An edge has a non-finite coordinate (near {_at(s.start)}).")]
+                if math.hypot(*q) > reach:
+                    return [_issue("bad_segment", f"An edge near {_at(q)} is farther than 1.5 x the stator outer radius "
+                                   f"({reach * 1e3:.1f} mm) from the machine centre.")]
+    return []
+
+
+def _not_canonical(p: RadialSRMParams, loops) -> list[ValidationIssue]:
+    """Each loop must equal the form `iron_from_loops` produces (what meshing and the repeat checks rely on)."""
+    for loop in loops:
+        want = _canonical(list(to_segments(loop)), p)
+        if len(want) != len(loop) or any(
+                type(a) is not type(b) or max(math.dist(a.start, b.start), math.dist(a.end, b.end)) > _CANON_TOL
+                or (isinstance(a, IronArc) and math.dist(a.center, b.center) > _CANON_TOL) for a, b in zip(loop, want)):
+            return [_issue("bad_segment", f"The contour near {_at(loop[0].start)} is not in canonical form. {_REEXPORT}")]
+    return []
 
 
 def _crossings(bodies: list[_Body]) -> list[ValidationIssue]:
@@ -283,7 +314,7 @@ def _coil_overlap(p: RadialSRMParams, stator: _Body) -> list[ValidationIssue]:
     if len(near):
         return [_issue("coil_overlap", f"Iron near {_at(pts[near[0]])} is closer than half the slot-liner thickness "
                        f"({half * 1e3:.2f} mm) to a coil. Keep iron out of the coil region.")]
-    coil_pts = np.vstack([_sample_loop_step(b, 2e-3) for b in sides])
+    coil_pts = np.vstack([_sample_loop(b, 2e-3) for b in sides])
     # coils lie inside the outer contour, so a point is in iron when it is in none or an even number of the others
     inside = np.nonzero(~_parity(coil_pts, stator.pts[1:]))[0]
     inside = inside[_dist(coil_pts[inside], stator.segs) > TOL]
@@ -397,12 +428,18 @@ def check_iron(p: RadialSRMParams) -> list[ValidationIssue]:
     iron = p.iron
     if iron is None:
         return []
+    all_loops = [iron.stator_outer, iron.stator_bore, *iron.stator_holes,
+                 iron.rotor_outer, iron.rotor_bore, *iron.rotor_holes]
+    if issues := _trust_issues(p, all_loops):
+        return issues
     stator = _Body("stator", p.n_stator_poles, p, [iron.stator_outer, iron.stator_bore, *iron.stator_holes],
                    ["outer", "bore"] + ["hole"] * len(iron.stator_holes))
     rotor = _Body("rotor", p.n_rotor_poles, p, [iron.rotor_outer, iron.rotor_bore, *iron.rotor_holes],
                   ["outer", "bore"] + ["hole"] * len(iron.rotor_holes))
     issues = _loop_issues(stator) + _loop_issues(rotor)
     if issues:
+        return issues
+    if issues := _not_canonical(p, all_loops):
         return issues
     for b in (stator, rotor):
         b.pts = [_sample_loop(loop) for loop in b.loops]

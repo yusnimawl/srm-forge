@@ -97,12 +97,31 @@ def _polyline(pts, bulges, closed: bool, k: float) -> list[Segment]:
     return out
 
 
-def _where(e, k: float) -> str:
+def _first_point(e):
+    """A point of the entity as stored (in its own coordinate system), or None."""
     for name in ("start", "center", "insert", "location"):
         if e.dxf.hasattr(name):
-            v = e.dxf.get(name)
-            return f" near {_at((v[0] * k, v[1] * k))}"
-    return ""
+            return tuple(e.dxf.get(name))
+    t = e.dxftype()
+    if t == "LWPOLYLINE" and len(e):
+        x, y = e.get_points("xy")[0]
+        return (x, y, e.dxf.get("elevation", 0.0))
+    if t == "POLYLINE" and len(e.vertices):
+        return tuple(e.vertices[0].dxf.location)
+    if t == "SPLINE" and len(e.control_points):
+        return tuple(e.control_points[0])
+    return None
+
+
+def _where(e, k: float) -> str:
+    """" near (x, y) mm" in drawing (WCS) coordinates, or "" for an entity without any point."""
+    v = _first_point(e)
+    if v is None:
+        return ""
+    ext = e.dxf.get("extrusion", (0.0, 0.0, 1.0))
+    if ext[2] < 0 and abs(ext[0]) < 1e-9 and abs(ext[1]) < 1e-9:
+        v = tuple(e.ocs().to_wcs(v))
+    return f" near {_at((v[0] * k, v[1] * k))}"
 
 
 def _flatten(entities):

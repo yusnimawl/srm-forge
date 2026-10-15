@@ -9,7 +9,7 @@ from srmcore.model.design import Design, MeshSettings
 from srmcore.model.iron import IronArc, IronLine
 from srmcore.solvers.factory import make_solver
 from srmcore.topology.dxf_io import import_dxf, write_dxf
-from srmcore.topology.imported import parametric_iron
+from srmcore.topology.imported import _canonical, parametric_iron, to_segments
 
 pytest.importorskip("ngsolve")
 
@@ -25,6 +25,10 @@ def _design(iron):
 def _point(design, angle, current=I_MAX):
     static = build_machine_mesh(design)
     return solve_point(static, design, angle, {"A": current}, make_solver("ngsolve"))
+
+
+def _canon(loop):
+    return _canonical(list(to_segments(loop)), make_8_6())
 
 
 def _circle(cx, cy, r):
@@ -64,7 +68,7 @@ def test_no_edit_point_matches():
 def test_rotor_holes_leave_la_nearly_unchanged():
     p = make_8_6()
     r = (p.shaft_radius + p.rotor_yoke_outer_radius) / 2
-    holes = tuple(_circle(r * math.cos(k * math.pi / 3), r * math.sin(k * math.pi / 3), 2 * MM) for k in range(6))
+    holes = tuple(_canon(_circle(r * math.cos(k * math.pi / 3), r * math.sin(k * math.pi / 3), 2 * MM)) for k in range(6))
     base = parametric_iron(p)
     i = 0.05 * I_MAX
     la_plain = _point(_design(base), 0.0, i).psi[0] / i
@@ -75,7 +79,7 @@ def test_rotor_holes_leave_la_nearly_unchanged():
 def test_yoke_grooves_lower_psi():
     p = make_8_6()
     base = parametric_iron(p)
-    outer = _grooved_outer(p.stator_outer_radius, 8, 1 * MM, 1 * MM)
+    outer = _canon(_grooved_outer(p.stator_outer_radius, 8, 1 * MM, 1 * MM))
     plain = _point(_design(base), 0.0).psi[0]
     grooved = _point(_design(base.model_copy(update={"stator_outer": outer})), 0.0).psi[0]
     assert grooved < plain

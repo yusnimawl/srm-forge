@@ -7,10 +7,14 @@ from conftest import make_8_6
 from srmcore.mesh.api import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.iron import ImportedIron, IronArc, IronLine
-from srmcore.topology.imported import from_segments, parametric_iron, to_segments
-from srmcore.topology.radial import build_outline
+from srmcore.topology.imported import _canonical, from_segments, parametric_iron, to_segments
+from srmcore.topology.radial import _same_segment, build_outline
 
 MM = 1e-3
+
+
+def _canon(p, loop):
+    return _canonical(list(to_segments(loop)), p)
 
 
 def _circle(cx, cy, r):
@@ -60,9 +64,8 @@ def test_parametric_iron_matches_outline(reference_design):
     for got, want in ((to_segments(parametric_iron(p).stator_bore), o.stator_inner_boundary),
                       (to_segments(parametric_iron(p).rotor_outer), o.rotor_outer_boundary)):
         assert len(got) == len(want)
-        for a, b in zip(got, want):
-            assert type(a) is type(b)
-            assert a.start == pytest.approx(b.start, abs=1e-12) and a.end == pytest.approx(b.end, abs=1e-12)
+        for a in got:   # the iron is canonical (own start and direction), so segments match as sets
+            assert sum(_same_segment(a, b) for b in want) == 1
     assert from_segments(to_segments(parametric_iron(p).stator_bore)) == parametric_iron(p).stator_bore
 
 
@@ -79,7 +82,8 @@ def test_parametric_iron_reproduces_parametric_outline_regions():
 def test_rotor_hole_meshes():
     p = make_8_6()
     r = (p.shaft_radius + p.rotor_yoke_outer_radius) / 2
-    holes = tuple(_circle(r * math.cos(k * math.pi / 3), r * math.sin(k * math.pi / 3), 2 * MM) for k in range(6))
+    holes = tuple(_canon(p, _circle(r * math.cos(k * math.pi / 3), r * math.sin(k * math.pi / 3), 2 * MM))
+                  for k in range(6))
     base = parametric_iron(p)
     design = Design(machine=p.model_copy(update={"iron": base.model_copy(update={"rotor_holes": holes})}),
                     mesh=MeshSettings(preset="screening"))
@@ -94,7 +98,7 @@ def test_rotor_hole_meshes():
 def test_yoke_groove_keeps_od_dirichlet():
     p = make_8_6()
     depth, half = 1 * MM, 1 * MM
-    outer = _grooved_outer(p.stator_outer_radius, 8, depth, half)
+    outer = _canon(p, _grooved_outer(p.stator_outer_radius, 8, depth, half))
     base = parametric_iron(p)
     design = Design(machine=p.model_copy(update={"iron": base.model_copy(update={"stator_outer": outer})}),
                     mesh=MeshSettings(preset="screening"))

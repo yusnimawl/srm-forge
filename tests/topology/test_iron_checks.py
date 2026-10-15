@@ -6,7 +6,7 @@ from conftest import make_8_6
 
 from srmcore.model.errors import InputError
 from srmcore.model.iron import IronArc, IronLine
-from srmcore.topology.imported import check_iron, from_segments, iron_from_loops, parametric_iron, to_segments
+from srmcore.topology.imported import _canonical, check_iron, from_segments, iron_from_loops, parametric_iron, to_segments
 from srmcore.topology.primitives import Arc, Line, map_segment, rotate
 from srmcore.topology.radial import _coil_sides, build_outline
 
@@ -18,7 +18,14 @@ def _loops(p):
     return [to_segments(l) for l in (iron.stator_outer, iron.stator_bore, iron.rotor_outer, iron.rotor_bore)]
 
 
+def _canon(p, loop):
+    segs = [s if isinstance(s, (Line, Arc)) else to_segments((s,))[0] for s in loop]
+    return _canonical(segs, p)
+
+
 def _with(p, **kw):
+    """`p` with the given loops (canonicalised, so the check under test is the only one that can fire)."""
+    kw = {k: tuple(_canon(p, h) for h in v) if k.endswith("holes") else _canon(p, v) for k, v in kw.items()}
     return p.model_copy(update={"iron": parametric_iron(p).model_copy(update=kw)})
 
 
@@ -138,7 +145,7 @@ def test_iron_in_coil():
     r = p.stator_yoke_inner_radius
     segs = []
     for s in to_segments(parametric_iron(p).stator_bore):
-        if isinstance(s, Arc) and s.center == (0.0, 0.0) and abs(math.dist(s.start, s.center) - r) < 1e-9:
+        if isinstance(s, Arc) and s.center == (0.0, 0.0) and abs(math.dist(s.start, s.center) - r) < 1e-6:
             k = (r - 4 * MM) / r
             a, b = (s.start[0] * k, s.start[1] * k), (s.end[0] * k, s.end[1] * k)
             segs += [Line(s.start, a), Arc(a, b, (0.0, 0.0)), Line(b, s.end)]
@@ -215,6 +222,7 @@ def test_build_outline_raises():
     assert [i.rule for i in e.value.issues] == ["repeat"]
 
 
+@pytest.mark.slow
 def test_check_iron_is_fast(reference_design):
     import time
 
@@ -311,3 +319,49 @@ def test_chamfered_rotor_corners_pass():
         out[i] = (Line(f1, a), Arc(a, b, (0.0, 0.0)), Line(b, f2))
     flat = [x for item in out for x in (item if isinstance(item, tuple) else (item,))]
     assert check_iron(_with(p, rotor_outer=from_segments(tuple(flat)))) == []
+
+
+def _with_raw(p, **kw):
+    return p.model_copy(update={"iron": parametric_iron(p).model_copy(update=kw)})
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), 50.0])
+def test_untrusted_coordinates_are_refused_fast(bad):
+    import time
+
+    p = make_8_6()
+    loop = parametric_iron(p).rotor_outer
+    arc = next(i for i, s in enumerate(loop) if isinstance(s, IronLine))
+    seg = loop[arc]
+    moved = loop[:arc] + (seg.model_copy(update={"end": (bad, 0.0)}),) + loop[arc + 1:]
+    t = time.perf_counter()
+    issues = check_iron(_with_raw(p, rotor_outer=moved))
+    assert time.perf_counter() - t < 0.5
+    assert _rules(issues) == ["bad_segment"] and "mm" in issues[0].message
+
+
+def test_too_many_segments_refused():
+    p = make_8_6()
+    loop = parametric_iron(p).rotor_outer
+    many = tuple(IronLine(start=(1e-3, 0.0), end=(2e-3, 0.0)) for _ in range(20_001))
+    assert _rules(check_iron(_with_raw(p, rotor_outer=many))) == ["bad_segment"]
+
+
+def test_non_canonical_iron_refused():
+    p = make_8_6()
+    scaled = tuple(IronArc(start=(s.start[0] * (1 + 0.5e-6 / p.stator_outer_radius), s.start[1] * (1 + 0.5e-6 / p.stator_outer_radius)),
+                           end=(s.end[0] * (1 + 0.5e-6 / p.stator_outer_radius), s.end[1] * (1 + 0.5e-6 / p.stator_outer_radius)),
+                           center=s.center) for s in parametric_iron(p).stator_outer)
+    issues = check_iron(_with_raw(p, stator_outer=scaled))
+    assert _rules(issues) == ["bad_segment"] and "re-import the DXF" in issues[0].message
+    with pytest.raises(InputError):
+        build_outline(_with_raw(p, stator_outer=scaled))
+
+
+def test_semicircle_arc_refused():
+    p = make_8_6()
+    r = p.stator_outer_radius
+    half = (IronArc(start=(r, 0.0), end=(-r, 0.0), center=(0.0, 0.0)),
+            IronArc(start=(-r, 0.0), end=(r, 0.0), center=(0.0, 0.0)))
+    issues = check_iron(_with_raw(p, stator_outer=half))
+    assert _rules(issues) == ["bad_segment"] and "180" in issues[0].message

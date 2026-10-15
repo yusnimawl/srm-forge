@@ -1,13 +1,13 @@
-"""Closed-form estimates of active mass, winding resistance and peak current (v0 spec §4).
+"""Active mass, winding resistance and peak current (v0 spec §4).
 
-Poles are treated as parallel-sided bars of the chord width at the pole face, so iron areas are estimates
-(fillets, tapers and the slot corners are ignored). The end winding is a racetrack approximation."""
+Iron areas are exact: they come from the contours of the machine (the imported ones, or the parametric outline).
+The copper mass and the end winding are closed-form approximations (racetrack turn length)."""
 import math
 from dataclasses import dataclass
 
 from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
-from srmcore.topology.imported import iron_areas
+from srmcore.topology.imported import iron_areas, parametric_iron
 
 # Default peak current density in the conductor, A/m². Provisional: a thermal model replaces it.
 J_PEAK = 20e6
@@ -66,17 +66,9 @@ def peak_current(p: RadialSRMParams, j_peak: float = J_PEAK) -> float:
 
 
 def _iron_areas(p: RadialSRMParams) -> tuple[float, float]:
-    """Cross-section areas (m²) of stator and rotor iron, without the stacking factor: from the imported
-    contours when `p.iron` is set, else the closed-form estimate."""
-    if p.iron is not None:
-        return iron_areas(p.iron)
-    rb, ryi = p.bore_radius, p.stator_yoke_inner_radius
-    stator = (math.pi * (p.stator_outer_radius**2 - ryi**2)
-              + p.n_stator_poles * pole_chord(rb, p.stator_pole_arc) * (ryi - rb))
-    ro, rj = p.rotor_outer_radius, p.rotor_yoke_outer_radius
-    rotor = (math.pi * (rj**2 - p.shaft_radius**2)
-             + p.n_rotor_poles * pole_chord(ro, p.rotor_pole_arc) * (ro - rj))
-    return stator, rotor
+    """Cross-section areas (m²) of stator and rotor iron, without the stacking factor, from the contours of
+    `p.iron` or, without them, of the parametric outline."""
+    return iron_areas(p.iron or parametric_iron(p))
 
 
 def series_resistance(p: RadialSRMParams, turns: int, copper_area: float, temperature_c: float = 100.0) -> float:

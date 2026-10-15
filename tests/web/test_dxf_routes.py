@@ -14,7 +14,7 @@ from srmapp.sizing.estimates import active_mass
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.iron import IronArc, IronLine
 from srmcore.topology.dxf_io import import_dxf, write_dxf
-from srmcore.topology.imported import parametric_iron
+from srmcore.topology.imported import _canonical, parametric_iron, to_segments
 from srmweb.cases import check_case
 from srmweb.geometry import outline_svg
 from web_support import evaluation, make_client, store_search
@@ -45,10 +45,12 @@ def _circle(cx, cy, r):
 
 def _iron_machine(n=8, holes=0, hole_r=1 * MM):
     p = make_8_6()
-    kw = {"stator_outer": _grooved_outer(p.stator_outer_radius, n)}
+    canon = lambda loop: _canonical(list(to_segments(loop)), p)  # noqa: E731
+    kw = {"stator_outer": canon(_grooved_outer(p.stator_outer_radius, n))}
     if holes:
         r = p.stator_outer_radius - 4 * MM
-        kw["stator_holes"] = tuple(_circle(r * math.cos(k), r * math.sin(k), hole_r) for k in (2 * math.pi * j / 8 for j in range(holes)))
+        kw["stator_holes"] = tuple(canon(_circle(r * math.cos(k), r * math.sin(k), hole_r))
+                                   for k in (2 * math.pi * j / 8 for j in range(holes)))
     return p.model_copy(update={"iron": parametric_iron(p).model_copy(update=kw)})
 
 
@@ -159,8 +161,37 @@ def test_compare_evaluated(client):
     machine = CaseInputs.model_validate(parent["inputs"]).design.machine
     stator = active_mass(reference_design(CaseInputs.model_validate(parent["inputs"])).machine).stator_iron
     assert rows["Stator iron"]["before"] == pytest.approx(stator)
-    assert rows["Total mass"]["before"] == pytest.approx(1.0)
+    assert rows["Total mass"]["before"] == pytest.approx(
+        stator + rows["Rotor iron"]["before"] + evaluation("c0").winding.copper_mass)
     assert machine.iron is None
+
+
+def _evaluated_pair(client):
+    job_id = store_search(client, evaluation("c0"))
+    parent = client.post("/api/cases", json={"origin": "candidate", "job_id": job_id, "candidate_id": "c0"}).json()
+    export = client.get(f"/api/cases/{parent['id']}/dxf").content
+    child = _upload(client, parent["id"], export).json()["case"]
+    store = client.app.state.store
+    store.attach_evaluation(child["id"], None, store.case_result(parent["id"], "evaluate"))
+    return parent, child
+
+
+def test_unedited_reimport_compares_with_zero_iron_change(client):
+    _, child = _evaluated_pair(client)
+    rows = {r["name"]: r for r in client.get(f"/api/cases/{child['id']}/compare").json()["rows"]}
+    for name in ("Stator iron", "Rotor iron", "Total mass"):
+        assert rows[name]["after"] == pytest.approx(rows[name]["before"], rel=1e-6)
+    assert rows["Stator iron"]["after"] - rows["Stator iron"]["before"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_compare_old_format_inputs_gives_empty_column(client):
+    parent, child = _evaluated_pair(client)
+    store = client.app.state.store
+    with store._db() as con:
+        con.execute("UPDATE cases SET inputs = ? WHERE id = ?", ('{"old": 1}', child["id"]))
+    r = client.get(f"/api/cases/{child['id']}/compare")
+    assert r.status_code == 200
+    assert all(row["after"] is None for row in r.json()["rows"])
 
 
 def test_geometry_svg_has_one_path_per_hole():
