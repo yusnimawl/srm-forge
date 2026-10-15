@@ -113,33 +113,63 @@ def _flatten(entities):
             yield e
 
 
+class _Tilted(Exception):
+    """An entity whose plane is not parallel to the drawing plane."""
+
+
+def _ocs(e):
+    """(to_wcs function, mirrored) for an entity drawn in its own coordinate system."""
+    ext = e.dxf.get("extrusion", (0.0, 0.0, 1.0))
+    if abs(ext[0]) > 1e-9 or abs(ext[1]) > 1e-9 or abs(abs(ext[2]) - 1) > 1e-9:
+        raise _Tilted
+    if ext[2] > 0:
+        return (lambda v: (v[0], v[1], v[2])), False
+    ocs = e.ocs()
+    return (lambda v: tuple(ocs.to_wcs(v))), True
+
+
 def _entity(e, k: float):
-    """(segments, z values) of a supported entity, or None when it is not supported."""
+    """(segments, WCS z values) of a supported entity, or None when it is not supported."""
     t = e.dxftype()
     if t == "LINE":
         s, f = e.dxf.start, e.dxf.end
         return [Line((s.x * k, s.y * k), (f.x * k, f.y * k))], [s.z, f.z]
     if t in ("ARC", "CIRCLE"):
-        c, r = e.dxf.center, e.dxf.radius * k
+        wcs, mirrored = _ocs(e)
+        c, r = e.dxf.center, e.dxf.radius
         a0 = math.radians(e.dxf.start_angle) if t == "ARC" else 0.0
         sweep = math.radians((e.dxf.end_angle - e.dxf.start_angle) % 360) if t == "ARC" else 2 * math.pi
-        ctr = (c.x * k, c.y * k)
 
         def pt(a):
-            return (ctr[0] + r * math.cos(a), ctr[1] + r * math.sin(a))
+            w = wcs((c.x + r * math.cos(a), c.y + r * math.sin(a), c.z))
+            return (w[0] * k, w[1] * k)
 
-        return _arcs(ctr, r, a0, sweep, pt(a0), pt(a0) if t == "CIRCLE" else pt(a0 + sweep)), [c.z]
-    if t == "LWPOLYLINE":
-        pts = e.get_points("xyb")
-        z = e.dxf.get("elevation", 0.0)
-        return _polyline([(x, y) for x, y, _ in pts], [b for _, _, b in pts], e.closed, k), [getattr(z, "z", z)]
-    if t == "POLYLINE" and (e.is_2d_polyline or e.is_3d_polyline):
+        w0 = wcs((c.x, c.y, c.z))
+        ctr = (w0[0] * k, w0[1] * k)
+        p0 = pt(a0)
+        segs = _arcs(ctr, r * k, math.atan2(p0[1] - ctr[1], p0[0] - ctr[0]), -sweep if mirrored else sweep, p0,
+                     p0 if t == "CIRCLE" else pt(a0 + sweep))
+        return segs, [w0[2]]
+    if t == "LWPOLYLINE" or (t == "POLYLINE" and e.is_2d_polyline):
+        wcs, mirrored = _ocs(e)
+        if t == "LWPOLYLINE":
+            raw = [(x, y, b) for x, y, b in e.get_points("xyb")]
+            z = e.dxf.get("elevation", 0.0)
+            z = getattr(z, "z", z)
+            closed = e.closed
+        else:
+            raw = [(v.dxf.location.x, v.dxf.location.y, v.dxf.get("bulge", 0.0)) for v in e.vertices]
+            z = e.dxf.location.z if e.dxf.hasattr("location") else 0.0
+            closed = e.is_closed
+        w = [wcs((x, y, z)) for x, y, _ in raw]
+        bulges = [-b if mirrored else b for _, _, b in raw]
+        return _polyline(w, bulges, closed, k), [q[2] for q in w]
+    if t == "POLYLINE" and e.is_3d_polyline:
         v = [(x.dxf.location, x.dxf.get("bulge", 0.0)) for x in e.vertices]
         return _polyline([q for q, _ in v], [b for _, b in v], e.is_closed, k), [q.z for q, _ in v]
     if t == "SPLINE":
         pts = list(e.flattening(_SPLINE_CHORD / k))
-        return ([Line((a.x * k, a.y * k), (b.x * k, b.y * k)) for a, b in zip(pts, pts[1:])],
-                [q.z for q in e.control_points])
+        return [Line((a.x * k, a.y * k), (b.x * k, b.y * k)) for a, b in zip(pts, pts[1:])], [q.z for q in pts]
     return None
 
 
@@ -260,7 +290,11 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
         t = e.dxftype()
         if t in _IGNORED:
             continue
-        got = _entity(e, k)
+        try:
+            got = _entity(e, k)
+        except _Tilted:
+            return [], [_issue("dxf_flat", f"A {t}{_where(e, k)} lies in a tilted plane. Draw everything in the "
+                               "XY plane.")]
         if got is None:
             issues.append(_issue("dxf_entity", f"Unsupported DXF entity {t}{_where(e, k)}. Convert it to lines, "
                                  "arcs or a spline."))

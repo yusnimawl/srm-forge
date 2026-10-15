@@ -162,6 +162,12 @@ def test_unsupported_entity():
     assert "ELLIPSE" in issues[0].message
 
 
+def _seg_dist(q, a, b):
+    d = (b[0] - a[0], b[1] - a[1])
+    t = max(0.0, min(1.0, ((q[0] - a[0]) * d[0] + (q[1] - a[1]) * d[1]) / (d[0] ** 2 + d[1] ** 2)))
+    return math.dist(q, (a[0] + t * d[0], a[1] + t * d[1]))
+
+
 def test_spline_flattened():
     doc = _doc()
     msp = doc.modelspace()
@@ -173,11 +179,45 @@ def test_spline_flattened():
     assert issues == [] and len(loops) == 1
     assert len(loops[0]) > 10
     curve = [(t.x, t.y) for t in sp.flattening(1e-5)]
-    # every flattened vertex lies on the curve; a chord between curve samples is within 1 um of it
-    for s in loops[0]:
-        if isinstance(s, Line) and s.start[1] > 5.5 * MM:
-            q = (s.start[0] / MM, s.start[1] / MM)
-            assert min(math.dist(q, c) for c in curve) < 5e-3
+    chords = [s for s in loops[0] if isinstance(s, Line) and s.start[1] > 5.5 * MM]
+    assert len(chords) > 10
+    for s in chords:  # the chord midpoint is within 1 um (1e-3 mm) of the true curve
+        mid = ((s.start[0] + s.end[0]) / 2 / MM, (s.start[1] + s.end[1]) / 2 / MM)
+        assert min(_seg_dist(mid, a, b) for a, b in zip(curve, curve[1:])) <= 1e-3 + 1e-5
+
+
+def test_fit_point_spline_z_checked():
+    doc = _doc()
+    msp = doc.modelspace()
+    _square(msp, 0, 0, 10)
+    msp.add_spline(fit_points=[(20, 0, 4), (25, 5, 4), (30, 0, 4)])
+    _, issues = read_loops(_bytes(doc))
+    assert _errs(issues) == {"dxf_flat"}
+
+
+def test_flipped_extrusion_keeps_wcs_coordinates():
+    doc = _doc()
+    msp = doc.modelspace()
+    flip = {"extrusion": (0, 0, -1)}
+    # the square (10..20, 5..15) in WCS: OCS x is -WCS x
+    pts = [(-10, 5), (-20, 5), (-20, 15), (-10, 15)]
+    msp.add_lwpolyline(pts, close=True, dxfattribs=flip)
+    msp.add_arc((-50, 0), 5, 0, 90, dxfattribs=flip)   # WCS: centre (50, 0), from (45, 0) to (50, 5)
+    msp.add_line((45, 0), (50, 5))
+    loops, issues = read_loops(_bytes(doc))
+    assert issues == [] and len(loops) == 2
+    sq = next(l for l in loops if all(isinstance(s, Line) for s in l))
+    assert sorted({round(c * 1e3, 6) for s in sq for c in (s.start[0], s.end[0])}) == [10.0, 20.0]
+    arc = next(s for l in loops for s in l if isinstance(s, Arc))
+    assert arc.center == pytest.approx((0.05, 0.0), abs=1e-12)
+    assert {tuple(round(c * 1e3, 6) for c in q) for q in (arc.start, arc.end)} == {(45.0, 0.0), (50.0, 5.0)}
+
+
+def test_tilted_extrusion_refused():
+    doc = _doc()
+    doc.modelspace().add_circle((0, 0), 5, dxfattribs={"extrusion": (1, 0, 0)})
+    _, issues = read_loops(_bytes(doc))
+    assert _errs(issues) == {"dxf_flat"}
 
 
 def test_bulge_polyline():
