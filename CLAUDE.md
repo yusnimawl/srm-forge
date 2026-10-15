@@ -54,6 +54,12 @@ cd web; npx vitest run                              # frontend unit tests
 python -m srmweb.openapi web/openapi.json; cd web; npm run gen:api   # regenerate web/src/api/schema.ts after an API change
 ```
 
+Machine benchmark (see "Machine benchmark" below):
+
+```powershell
+bench\run.bat [--tier quick|standard|long]          # machine benchmark (bench/README.md)
+```
+
 On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 libxft2 libxinerama1`). There is no linter or formatter configured.
 
 ## Architecture rules (enforced by tests)
@@ -144,3 +150,7 @@ Analytic test problems (the current-sheet toroid and MMS on the unit square) liv
 - Layering: `srmweb` imports `srmapp` and `srmcore`, never the reverse; `srmweb` must not import gmsh, ngsolve, netgen or skfem (`tests/app/test_app_layering.py`).
 - `web/`: React 19, Vite, TypeScript, Tailwind v4, shadcn (Base UI). `src/api/schema.ts` is generated from the OpenAPI dump; do not edit it by hand.
 - Theme (Graphite): tokens live in `web/src/index.css`; the app is dark only (no light theme, no theme toggle); fonts are Geist and Geist Mono. `web/src/lib/noBlue.test.ts` fails on any blue colour literal or Tailwind blue/sky/indigo/cyan class in `web/src` (except `api/schema.ts`). The |B| colour map is inferno (`web/src/lib/inferno.ts`; `INFERNO_SCALE` for Plotly). The series palette is `LINE_COLORS`/`LINE_DASHES` in `web/src/lib/analysis.ts` (no blue; one dash pattern per case). All Plotly plots use the one theme `plotTheme` in `web/src/components/PlotlyPlot.tsx`.
+
+## Machine benchmark
+
+`bench/` is a standalone benchmark of the real engine (spec `docs/superpowers/specs/2026-10-14-srmbench-design.md`). It has its own pinned environment in `bench/.runtime/` (git-ignored, installed by `run.bat` or `run.sh`), and its tests in `bench/tests` run with `run --self-test`. It is never imported by `src/`, and it never imports `tests/`.

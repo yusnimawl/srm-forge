@@ -1,0 +1,195 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-14T09:00:00+07:00",
+ "label": "i7-13620h-laptop",
+ "lock_hash": "0123456789ab",
+ "machine": {
+  "arch": "AMD64",
+  "cpu_model": "13th Gen Intel(R) Core(TM) i7-13620H",
+  "glibc": null,
+  "logical_cpus": 16,
+  "os": "Windows",
+  "os_version": "10.0.26200",
+  "physical_cores": 10,
+  "python": "3.12.8",
+  "ram_gb": 31.7
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-14T09:00:00+07:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": null,
+    "per_min": 26.0,
+    "points": 8,
+    "seconds": 18.461538461538463,
+    "workers": 1
+   },
+   {
+    "peak_ram_gb": 0.82,
+    "per_min": 50.0,
+    "points": 16,
+    "seconds": 19.2,
+    "workers": 2
+   },
+   {
+    "peak_ram_gb": 0.83,
+    "per_min": 92.0,
+    "points": 32,
+    "seconds": 20.869565217391305,
+    "workers": 4
+   },
+   {
+    "peak_ram_gb": 0.85,
+    "per_min": 150.0,
+    "points": 64,
+    "seconds": 25.6,
+    "workers": 8
+   },
+   {
+    "peak_ram_gb": 0.85,
+    "per_min": 170.0,
+    "points": 80,
+    "seconds": 28.235294117647058,
+    "workers": 10
+   },
+   {
+    "peak_ram_gb": 0.86,
+    "per_min": 190.0,
+    "points": 128,
+    "seconds": 40.421052631578945,
+    "workers": 16
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3,
+     "torque": 0.0
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 98412,
+    "points": 1008,
+    "seconds": 12.3
+   },
+   "screening": {
+    "nodes": 30112,
+    "points": 360,
+    "seconds": 4.1
+   }
+  },
+  "recommended": {
+   "ram_cap": null,
+   "uncapped": 16,
+   "workers": 16
+  },
+  "screening_map": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "key_numbers": {
+    "la": 0.031,
+    "peak_torque": 1.9
+   },
+   "points": 360,
+   "seconds": 130.0,
+   "statuses": {
+    "la_lu": "pass"
+   },
+   "workers": 16
+  },
+  "single_solve": {
+   "full": {
+    "median": 6.6000000000000005,
+    "samples": [
+     6.6000000000000005,
+     6.732000000000001,
+     6.534000000000001
+    ]
+   },
+   "screening": {
+    "median": 2.2,
+    "samples": [
+     2.244,
+     2.2,
+     2.178,
+     2.2220000000000004,
+     2.2
+    ]
+   }
+  },
+  "sustained": {
+   "batches": [
+    {
+     "per_min": 190.0,
+     "t": 1.0
+    },
+    {
+     "per_min": 186.9125,
+     "t": 61.0
+    },
+    {
+     "per_min": 183.82500000000002,
+     "t": 121.0
+    },
+    {
+     "per_min": 180.7375,
+     "t": 181.0
+    },
+    {
+     "per_min": 177.65,
+     "t": 241.0
+    }
+   ],
+   "minutes": 5,
+   "throttle_pct": -6.5,
+   "workers": 16
+  }
+ },
+ "summary": {
+  "best_workers": 16,
+  "correctness": {
+   "details": [],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 967.2473684210526
+  },
+  "peak_ram_worker_gb": 0.86,
+  "projection_error_pct": null,
+  "recommended_workers": 16,
+  "screening_map_s": {
+   "measured": true,
+   "value": 130.0
+  },
+  "search_h": 6.448315789473684,
+  "single_solve_full_s": 6.6000000000000005,
+  "single_solve_s": 2.2,
+  "srmweb_workers": 16,
+  "throttle_pct": -6.5,
+  "throughput_per_min": 190.0
+ },
+ "tier": "standard",
+ "versions": {
+  "gmsh": "4.13.1",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2601",
+  "numpy": "2.1.3",
+  "psutil": "6.1.0",
+  "scipy": "1.14.1",
+  "srmcore": "0.4.0"
+ },
+ "warnings": []
+}

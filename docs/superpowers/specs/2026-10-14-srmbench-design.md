@@ -72,7 +72,7 @@ Both scripts do the same steps; everything goes under `bench/.runtime/` (`UV_CAC
 1. **Platform gate (in the shell, before any download).** Windows: `PROCESSOR_ARCHITECTURE` (and `PROCESSOR_ARCHITEW6432`) must be `AMD64`; the Windows build must be ≥ 17134. Linux: `uname -m` must be `x86_64`; glibc from `ldd --version` must be ≥ 2.28; musl is detected and refused. On failure: one plain message naming the problem and the supported list, exit code 2, nothing downloaded.
 2. **uv.** If `.runtime/uv/uv(.exe)` is missing: download the pinned uv release archive from GitHub (`curl.exe` on Windows; `curl` or `wget` on Linux), check its SHA-256 against `uv.version` (`certutil -hashfile` / `sha256sum`), unpack (`tar`). A hash mismatch stops with a message.
 3. **Python and venv.** `uv python install 3.12`, `uv venv .runtime/venv --python 3.12` (skipped when present and its lock hash stamp matches).
-4. **Packages.** `uv pip sync requirements.lock` then `uv pip install --no-deps ..` (srmcore, srmapp, srmweb from the checkout, non-editable). A stamp file holds the hash of `requirements.lock` plus the srmcore version; a mismatch reinstalls.
+4. **Packages.** `uv pip sync requirements.lock` then `uv pip install --no-deps -e ..` (srmcore, srmapp, srmweb from the checkout, editable, so the benchmark always runs the checked-out source). A stamp file holds the hashes of `requirements.lock` and `../pyproject.toml`; a mismatch reinstalls.
 5. **Linux system libraries.** After install, `python -c "import gmsh"`. If it fails with a missing shared library: with `apt-get` install `libglu1-mesa libxcursor1 libxft2 libxinerama1`; with `dnf`/`yum` install `mesa-libGLU libXcursor libXft libXinerama`; prefix `sudo` unless running as root; if neither root nor sudo is available, or the package manager is unknown, print the exact command and stop. Then re-check the import.
 6. **Run.** `.runtime/venv/.../python -m srmbench <args>`.
 7. **Cleanup (after Python exits, so no file is in use).** Python leaves a flag file in `.runtime/` saying what the user chose at the finish prompt; the script acts on it: delete `.runtime/` entirely, or keep it, or keep it and `uv pip install "..[web]"` so `srmweb` runs from this environment (and print that the web frontend build needs Node: `cd web; npm ci; npm run build`).
@@ -87,7 +87,7 @@ run.bat | ./run.sh [--tier quick|standard|long] [--label NAME] [--workers N]
                    [--report-only] [--self-test]
 ```
 
-- No `--tier`: a menu with the three tiers and their estimated time on this machine (from the preflight's quick single-solve timing scaled by the reference machine's tier times; shown as "about").
+- No `--tier`: a menu with the three tiers and their time on the reference laptop (quick about 3 min, standard about 15 min, long about 2.2 h; "slower machines take longer").
 - `--label`: the machine label (lowercase, `[a-z0-9-]`, max 40). Without it, asked once with the hostname as default and remembered in `.runtime/label`.
 - `--workers N`: cap the largest worker count (default: RAM- and CPU-capped as in §3).
 - `--yes`: no prompts (cloud and CI); with it, the finish defaults are `--keep` and `--no-push` unless given.
@@ -118,9 +118,9 @@ All timings are wall clock (`time.perf_counter`), cold (no map cache: `cache_dir
 | `sysinfo` | OS, version, arch, CPU model (`py-cpuinfo`), physical and logical cores, RAM, Python, glibc, versions of srmcore, numpy, scipy, gmsh, ngsolve, the lock hash | all |
 | `mesh` | `build_machine_mesh` time for the 8/6 at `screening` and `full`; node counts | all |
 | `single_solve` | 5 cold `solve_point` calls in the parent, 8/6 `screening`, phase A 20 A at the aligned angle; median and spread; plus 3 at `full` | all |
-| `correctness_points` | 3 points (aligned, mid, unaligned; 20 A) on the 8/6 `screening`: ψ and torque against `reference/points_8_6.json` (rel 1e-4) | all |
-| `batch` | throughput at W workers: `run_map` on a fixed mesh with a deterministic batch of 4 × W points from the 8/6 `screening` grid; solves per minute, excluding the parent mesh build | quick: W = physical cores and W = logical; standard and long: W = 1, 2, 4, … up to the cap, plus the physical and logical counts |
-| `peak_ram` | peak resident memory per worker process during the batches (`monitor.py`, 0.5 s sampling; Windows peak working set) | all |
+| `correctness_points` | 3 points (aligned, mid, unaligned; 20 A) on the 8/6 `screening`: ψ and torque against `reference/points_8_6.json` (ψ within 1e-3 relative; torque within 1e-3 × the largest reference torque, so the near-zero aligned and unaligned torques are not judged on cancellation noise; the same level the engine's goldens hold on Windows and Linux CI; a different mesh node count is reported) | all |
+| `batch` | throughput at W workers: `run_map` on a fixed mesh with the same 8 points per worker for every W (4 angles of the 8/6 `screening` grid, repeated W times, at I_max/2 and I_max); solves per minute, excluding the parent mesh build | quick: W = physical cores and W = logical; standard and long: W = 1, 2, 4, … up to the cap, plus the physical and logical counts |
+| `peak_ram` | peak resident memory per worker process during the batches (`monitor.py`, 0.5 s sampling; Windows peak working set); not recorded for W = 1, which runs in the benchmark's own process | all |
 | `screening_map` | `build_map` + `analyse_map`, 8/6 `screening` (40 × 8), at the recommended W; key numbers and check statuses against `reference/goldens_8_6.json` (rel 1e-3, statuses equal) | standard, long |
 | `sustained` | the `batch` at the recommended W repeated for 5 min (standard) or 20 min (long); throughput per minute; throttle = last minute / first minute − 1 | standard, long |
 | `full_maps` | `build_map` + `analyse_map` at `full` for the 8/6 and 12/8, then `build_overlap_map` + `fem_checks` (the `full` extras), at the recommended W | long |
@@ -135,8 +135,8 @@ A correctness failure does not stop the run; the result records it and the READM
 
 Every result carries projections, labelled "projected" when estimated and "measured" when the tier ran the step:
 
-- `screening` map (8/6) = mesh time + 320 points × (60 / batch throughput at the recommended W).
-- `full` map (8/6) = full mesh time + 960 points × (single solve `full` / single solve `screening`) × (60 / throughput).
+- `screening` map (8/6) = mesh time + (the `screening` grid's point count, `len(angle_grid) × len(current_grid)`) × (60 / batch throughput at the recommended W).
+- `full` map (8/6) = full mesh time + (the `full` grid's point count) × (single solve `full` / single solve `screening`) × (60 / throughput).
 - Search, 24 candidates = 24 × the `full` map projection. Labelled rough: the real search adds the stage-1 filter and the turns scan, and candidate sizes vary.
 - Recommended `SRMWEB_WORKERS` = the recommended W.
 
@@ -173,8 +173,8 @@ After the run (or after Ctrl+C), in order:
 
 1. The summary is printed (the table row and the projections).
 2. The README and charts are rebuilt locally.
-3. "Commit and push results? [y/N]" (`--push`/`--no-push`). On yes: `git pull --rebase --autostash`, rebuild the README again (so results pushed by other machines are included), `git add bench/results bench/README.md`, `git commit -m "bench: <label> <tier> <date>" -- bench/results bench/README.md` (only those paths), `git push`. Any git failure prints the reason and leaves the result file in place; the run itself still counts as done. Without git or a remote, the prompt is skipped with a note.
-4. "Delete the benchmark environment (about 1.5 GB)? You need to reinstall to run it again. [y/N]". On no: "Also install the rest of the SRM design tool into this environment so `srmweb` runs? [y/N]". The choice goes into the flag file for the shell script (§5 step 7).
+3. "Commit and push results? [y/N]" (`--push`/`--no-push`). On yes: the branch must have an upstream and no unpushed commits (`git rev-list --count @{u}..HEAD` = 0), otherwise nothing is done and the user is told to push their own work first, so publishing never pushes anything but the results. Then the generated files are restored from HEAD (`bench/README.md`, the charts; they are rebuilt next), `git pull --rebase` (no autostash: any other local change makes the pull refuse and nothing is committed), rebuild the README again (so results pushed by other machines are included), `git add bench/results bench/README.md`, `git commit -m "bench: <label> <tier> <date>" -- bench/results bench/README.md` (only those paths), and `git push` only when exactly that one commit is ahead. Any git failure prints the reason and leaves the result file in place; the run itself still counts as done. Without git or a remote, the prompt is skipped with a note.
+4. "Delete the benchmark environment (about <measured size of `.runtime`> GB, about 0.7 GB on Windows)? You need to reinstall to run it again. [y/N]". On no: "Also install the rest of the SRM design tool into this environment so `srmweb` runs? [y/N]". The choice goes into the flag file for the shell script (§5 step 7).
 
 ## 13. Testing
 
