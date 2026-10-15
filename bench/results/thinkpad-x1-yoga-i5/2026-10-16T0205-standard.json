@@ -1,0 +1,212 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-16T02:20:18+07:00",
+ "label": "thinkpad-x1-yoga-i5",
+ "lock_hash": "e541a4325f78",
+ "machine": {
+  "arch": "AMD64",
+  "cpu_model": "11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz",
+  "glibc": null,
+  "logical_cpus": 8,
+  "os": "Windows",
+  "os_version": "10.0.26300",
+  "physical_cores": 4,
+  "python": "3.12.14",
+  "ram_gb": 16.9
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-16T02:05:50+07:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": null,
+    "per_min": 17.287124556473213,
+    "points": 8,
+    "seconds": 27.766329699999915,
+    "workers": 1
+   },
+   {
+    "peak_ram_gb": 0.295727104,
+    "per_min": 22.859738471590433,
+    "points": 16,
+    "seconds": 41.995231099999955,
+    "workers": 2
+   },
+   {
+    "peak_ram_gb": 0.296910848,
+    "per_min": 33.84166808966169,
+    "points": 32,
+    "seconds": 56.7347920000002,
+    "workers": 4
+   },
+   {
+    "peak_ram_gb": 0.29853696,
+    "per_min": 40.60283562971661,
+    "points": 64,
+    "seconds": 94.57467539999993,
+    "workers": 8
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3201694676293525,
+     "torque": -0.001292294959329003
+    },
+    {
+     "angle": 0.2617993877991494,
+     "current": 20.0,
+     "psi": 0.19496833860173288,
+     "torque": -12.42983032877958
+    },
+    {
+     "angle": 0.5235987755982988,
+     "current": 20.0,
+     "psi": 0.07223179581078867,
+     "torque": 0.0002245800685044576
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 81984,
+    "points": 1008,
+    "seconds": 11.23220339999989
+   },
+   "screening": {
+    "nodes": 42935,
+    "points": 360,
+    "seconds": 8.42344439999988
+   }
+  },
+  "recommended": {
+   "ram_cap": 8,
+   "uncapped": 8,
+   "workers": 8
+  },
+  "screening_map": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "key_numbers": {
+    "aligned_angle": 0.0,
+    "i_max": 20.0,
+    "la": 0.032828907860257626,
+    "la_lu": 9.163537495426313,
+    "lu": 0.0035825583598739163,
+    "peak_torque": 12.424658850062755,
+    "psi_max": 0.3201694676293525,
+    "unaligned_angle": 0.5235987755982988
+   },
+   "points": 360,
+   "seconds": 261.6883413999999,
+   "statuses": {
+    "arkkio_vs_nodal": "pass",
+    "coenergy_torque": "pass",
+    "dpsi_di_positive": "pass",
+    "energy_identity": "pass",
+    "iron_b_peak": "pass",
+    "la_analytic": "pass",
+    "la_lu": "pass",
+    "loop_energy": "pass",
+    "lu_air_slot": "pass",
+    "psi_bound": "pass",
+    "psi_decreasing": "pass",
+    "sign_pattern": "pass",
+    "zero_mean_torque": "pass",
+    "zero_torque_aligned_unaligned": "pass"
+   },
+   "workers": 8
+  },
+  "single_solve": {
+   "full": {
+    "median": 7.3395934000000125,
+    "samples": [
+     6.930307399999947,
+     7.3395934000000125,
+     7.412319900000057
+    ]
+   },
+   "screening": {
+    "median": 3.0527042000001074,
+    "samples": [
+     3.0527042000001074,
+     3.0692665999999917,
+     3.010192400000051,
+     2.9841948000000684,
+     3.1642713999999614
+    ]
+   }
+  },
+  "sustained": {
+   "batches": [
+    {
+     "per_min": 47.73508644051563,
+     "t": 80.46899999999982
+    },
+    {
+     "per_min": 46.401144903782686,
+     "t": 163.2349999999999
+    },
+    {
+     "per_min": 47.763927088887755,
+     "t": 243.65699999999993
+    },
+    {
+     "per_min": 51.87444826745475,
+     "t": 317.70299999999975
+    }
+   ],
+   "minutes": 5,
+   "throttle_pct": 8.671528922645466,
+   "workers": 8
+  }
+ },
+ "summary": {
+  "best_throughput_per_min": 40.60283562971661,
+  "best_workers": 8,
+  "correctness": {
+   "details": [],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 3592.5486303646885
+  },
+  "peak_ram_worker_gb": 0.29853696,
+  "projection_error_pct": null,
+  "recommended_workers": 8,
+  "screening_map_s": {
+   "measured": true,
+   "value": 261.6883413999999
+  },
+  "search_h": 23.950324202431258,
+  "single_solve_full_s": 7.3395934000000125,
+  "single_solve_s": 3.0527042000001074,
+  "srmweb_workers": 8,
+  "throttle_pct": 8.671528922645466,
+  "throughput_per_min": 40.60283562971661
+ },
+ "tier": "standard",
+ "versions": {
+  "git_commit": "d15182d",
+  "gmsh": "4.15.2",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2608",
+  "numpy": "2.5.4",
+  "psutil": "7.2.2",
+  "scipy": "1.18.1",
+  "srmcore": "0.5.0"
+ },
+ "warnings": [
+  "The CPU is 33% busy with other work; close other programs for a representative timing."
+ ]
+}

@@ -159,6 +159,7 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | Machine | CPU | Cores | RAM (GB) | OS | Tier | Single solve (s) | Workers | Screening map (min) | Full map (min) | Search of 24 (h) | RAM per worker (GB) | Throttle (%) | Correct | Index single/all |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [i7-13620h-laptop](#machine-i7-13620h-laptop) | 13th Gen Intel(R) Core(TM) i7-13620H | 10C/16T | 17 | Windows 11 | standard | 3.4 | 10 | 4.1 | ~36 | ~14 | 0.29 | +0.8 | ✓ | 100/100 |
+| [thinkpad-x1-yoga-i5](#machine-thinkpad-x1-yoga-i5) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 17 | Windows 11 | standard | 3.1 | 8 | 4.4 | ~60 | ~24 | 0.30 | +8.7 | ✓ | 112/65 |
 
 `~` marks a projected value (a map not run, estimated from the batch throughput); the search is always projected. Correct: ✓ passed, ✗ failed, – not checked.
 
@@ -213,6 +214,57 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | 8 | 57.8 | 3.48 | 43 |
 | 10 | 61.7 | 3.71 | 37 |
 | 16 | 62.6 | 3.77 | 24 |
+
+</details>
+
+<details id="machine-thinkpad-x1-yoga-i5">
+<summary><b>thinkpad-x1-yoga-i5</b> – 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, standard, 2026-10-16</summary>
+
+- Machine: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz; 4 cores, 8 threads; 16.9 GB RAM; Windows 11 (10.0.26300, AMD64); Python 3.12.14
+- Versions: engine commit d15182d, gmsh 4.15.2, matplotlib 3.11.2, ngsolve 6.2.2608, numpy 2.5.4, psutil 7.2.2, scipy 1.18.1, srmcore 0.5.0; srmbench 1.0; lock e541a4325f78
+- Run: 2026-10-16T02:05:50+07:00 to 2026-10-16T02:20:18+07:00, tier standard, status complete
+- Result file: [2026-10-16T0205-standard.json](results/thinkpad-x1-yoga-i5/2026-10-16T0205-standard.json)
+- Warning: The CPU is 33% busy with other work; close other programs for a representative timing.
+
+**Mesh (8/6)**
+
+| Preset | Seconds | Nodes | Grid points |
+|---|---|---|---|
+| screening | 8.42 | 42 935 | 360 |
+| full | 11.23 | 81 984 | 1008 |
+
+**Single solve (8/6)**
+
+| Preset | Median (s) | Samples (s) |
+|---|---|---|
+| screening | 3.053 | 3.053, 3.069, 3.010, 2.984, 3.164 |
+| full | 7.340 | 6.930, 7.340, 7.412 |
+
+**Correctness points:** pass
+
+**Batches**
+
+| Workers | Points | Seconds | Solves per minute | Peak RAM per worker (GB) |
+|---|---|---|---|---|
+| 1 | 8 | 27.77 | 17.3 | – |
+| 2 | 16 | 42.00 | 22.9 | 0.30 |
+| 4 | 32 | 56.73 | 33.8 | 0.30 |
+| 8 | 64 | 94.57 | 40.6 | 0.30 |
+
+**Recommended workers:** 8 (uncapped choice 8, RAM cap 8)
+
+**Screening map 8/6:** 261.7 s, 360 points, 8 workers, correctness pass; key numbers: aligned_angle 0, i_max 20, la 0.0328289, la_lu 9.16354, lu 0.00358256, peak_torque 12.4247, psi_max 0.320169, unaligned_angle 0.523599
+
+**Sustained load:** 5 min at 8 workers, throttle +8.7 %; trace (time: solves per minute): 80 s: 47.7; 163 s: 46.4; 244 s: 47.8; 318 s: 51.9
+
+**Scaling**
+
+| Workers | Solves per minute | Speed-up over 1 worker(s) | Efficiency (%) |
+|---|---|---|---|
+| 1 | 17.3 | 1.00 | 100 |
+| 2 | 22.9 | 1.32 | 66 |
+| 4 | 33.8 | 1.96 | 49 |
+| 8 | 40.6 | 2.35 | 29 |
 
 </details>
 <!-- srmbench:results:end -->
