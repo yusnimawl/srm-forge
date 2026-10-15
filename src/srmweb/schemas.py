@@ -108,6 +108,19 @@ class EstimateOut(BaseModel):
     basis: Literal["history", "budget"]
 
 
+class CompareRowOut(BaseModel):
+    name: str
+    unit: str
+    before: float | None
+    after: float | None
+
+
+class CompareOut(BaseModel):
+    parent_id: str | None
+    parent_evaluated: bool
+    rows: list[CompareRowOut]
+
+
 class JobCreated(BaseModel):
     job_id: str
 
