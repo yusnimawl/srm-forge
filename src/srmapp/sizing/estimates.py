@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
+from srmcore.topology.imported import iron_areas
 
 # Default peak current density in the conductor, A/m². Provisional: a thermal model replaces it.
 J_PEAK = 20e6
@@ -65,7 +66,10 @@ def peak_current(p: RadialSRMParams, j_peak: float = J_PEAK) -> float:
 
 
 def _iron_areas(p: RadialSRMParams) -> tuple[float, float]:
-    """Cross-section areas (m²) of stator and rotor iron, without the stacking factor."""
+    """Cross-section areas (m²) of stator and rotor iron, without the stacking factor: from the imported
+    contours when `p.iron` is set, else the closed-form estimate."""
+    if p.iron is not None:
+        return iron_areas(p.iron)
     rb, ryi = p.bore_radius, p.stator_yoke_inner_radius
     stator = (math.pi * (p.stator_outer_radius**2 - ryi**2)
               + p.n_stator_poles * pole_chord(rb, p.stator_pole_arc) * (ryi - rb))
