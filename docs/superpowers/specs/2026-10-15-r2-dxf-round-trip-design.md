@@ -92,6 +92,21 @@ Warning (not a refusal): iron area changed by more than 10 % from the parent, a 
 - **Web:** route tests (export, import, 422 list, parent link, v2→v3 migration, setup round trip), vitest for the import dialog and the before/after table, and a visual check on `srmweb-smoke`.
 - **Done when:** on the 8/6, export; in Onshape add 8 yoke V-grooves, stator pole-side notches and 6 rotor lightening holes; import; evaluate; the before/after table shows; and validate on the `full` preset passes (2D-verified).
 
+## 11. Rulings from planning (2026-10-15)
+
+These amend the sections above where they differ.
+
+1. `iron` lives on `RadialSRMParams` (`Design.machine.iron`), not on `Design`. Every stage takes the machine parameters (`build_outline`, stage 1 mass, the outline SVG, setup files), so the imported iron reaches them without new plumbing. It is still omitted from JSON when None, and the design hash covers it.
+2. Stator outside edits only cut inward: the outer contour stays within the stator OD. A = 0 stays on the OD circle, and groove space is air (region `stator_hole_air`). The rotor bore may only open outward from the shaft circle; the shaft stays a circle and the pockets are air (`rotor_hole_air`). Stator holes and rotor holes are in those regions too. Before and after then share the same boundary condition.
+3. After rounding, vertices within 1 µm of the bore, rotor, stator-OD or shaft circle are projected onto it, and arc centres within 1 µm of the origin are moved to it. Without this, a CAD round trip leaves sub-micron rings next to those circles and the mesh gets slivers.
+4. No store schema bump: `cases.parent_case_id` already exists; the new origin is `dxf`. No setup-file version bump: the setup's `geometry.machine` carries `iron`, and an older tool refuses it through `extra="forbid"`.
+5. The iron checks also run in every case check (raw inputs and setup files are trust boundaries) and in `build_outline`, which raises `InputError` on a failed check.
+6. §9 no-edit test: an imported design has `iron` set, so its hash differs from the parametric one. The test asserts the outline matches and a solved point agrees (ψ within 1e-5 relative, torque within 1e-4 of peak); a second import of the re-exported file gives the same hash.
+7. Iron closer than half the slot-liner thickness to a coil is refused (rule `coil_overlap`).
+8. Imported edges that differ from the parametric outline, and all holes, get the refinement tag `iron_detail` at size max(min web width / 2, air-gap size).
+9. Before/after masses and key numbers come from a server route, `GET /api/cases/{id}/compare`.
+10. The bench gets ezdxf in its lock and new 0.5.0 reference points and goldens.
+
 ## 10. Out of scope
 
 - Per-phase maps for edits that do not repeat every pole pitch.
