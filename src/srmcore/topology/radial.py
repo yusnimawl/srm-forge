@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from ..model.design import RadialSRMParams
 from ..model.errors import InputError, ValidationIssue
 from ..model.validator import MIN_WEB_WIDTH
-from .imported import parametric_iron, to_segments
+from .imported import check_iron, parametric_iron, to_segments
 from .primitives import (
     Arc, Line, Point, Segment, fillet_line_circle, line_circle_intersection, map_segment, mirror_y, rotate,
 )
@@ -266,6 +266,9 @@ def build_outline(p: RadialSRMParams) -> RadialOutline:
     outline = parametric_outline(p)
     if p.iron is None:
         return outline
+    errors = [i for i in check_iron(p) if i.severity == "error"]
+    if errors:
+        raise InputError(errors)
     iron = p.iron
     base = parametric_iron(p)
     stock = [s for loop in (base.stator_outer, base.stator_bore, base.rotor_outer, base.rotor_bore)
