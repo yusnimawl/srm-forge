@@ -562,3 +562,26 @@ def iron_from_loops(loops: list[tuple[Segment, ...]], p: RadialSRMParams) -> tup
                         rotor_outer=canon(roles["ro"]), rotor_bore=canon(roles["rb"]), rotor_holes=holes(roles["rh"]))
     found = check_iron(p.model_copy(update={"iron": iron}))
     return (None if any(i.severity == "error" for i in found) else iron), found
+
+
+# --- areas -------------------------------------------------------------------------------------
+
+def _loop_area(loop: IronLoop) -> float:
+    """Area enclosed by a loop: the chord polygon plus the circular segment of each arc, exact."""
+    signed = 0.0
+    for s in to_segments(loop):
+        (x0, y0), (x1, y1) = s.start, s.end
+        signed += (x0 * y1 - x1 * y0) / 2
+        if isinstance(s, Arc):
+            r = math.dist(s.start, s.center)
+            theta = 2 * math.asin(min(1.0, math.dist(s.start, s.end) / (2 * r)))
+            ccw = ((x0 - s.center[0]) * (y1 - s.center[1]) - (y0 - s.center[1]) * (x1 - s.center[0])) > 0
+            signed += (1 if ccw else -1) * r * r / 2 * (theta - math.sin(theta))
+    return abs(signed)
+
+
+def iron_areas(iron: ImportedIron) -> tuple[float, float]:
+    """(stator, rotor) lamination areas in m², holes subtracted."""
+    stator = _loop_area(iron.stator_outer) - _loop_area(iron.stator_bore) - sum(_loop_area(h) for h in iron.stator_holes)
+    rotor = _loop_area(iron.rotor_outer) - _loop_area(iron.rotor_bore) - sum(_loop_area(h) for h in iron.rotor_holes)
+    return stator, rotor

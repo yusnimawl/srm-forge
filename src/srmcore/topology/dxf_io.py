@@ -1,0 +1,293 @@
+"""DXF export and import of the laminations. This is the only module that imports ezdxf.
+
+`read_loops` handles the file-level rules (`dxf_units`, `dxf_flat`, `dxf_entity`), chains the entities into
+closed loops (an open chain is reported as `open_loop`) and reports duplicate or overlapping edges (`overlap`).
+Loops are in metres. Everything else is checked by `iron_from_loops`.
+"""
+import io
+import math
+
+import ezdxf
+import numpy as np
+from ezdxf.math import bulge_to_arc
+from scipy.spatial import cKDTree
+
+from ..model.design import RadialSRMParams
+from ..model.errors import ValidationIssue
+from ..model.iron import ImportedIron, IronArc
+from .imported import TOL, _at, _issue, iron_areas, iron_from_loops, parametric_iron, to_segments
+from .primitives import Arc, Line, Segment
+
+# $INSUNITS code -> metres per drawing unit (0 = unitless, read as mm)
+_UNITS = {0: 1e-3, 1: 0.0254, 4: 1e-3, 6: 1.0}
+_IGNORED = {"TEXT", "MTEXT", "DIMENSION", "HATCH", "POINT"}
+_AREA_CHANGE = 0.10
+_SPLINE_CHORD = 1e-6   # m
+
+
+# --- write -------------------------------------------------------------------------------------
+
+def _is_circle(loop) -> bool:
+    return (len(loop) >= 2 and all(isinstance(s, IronArc) and math.hypot(*s.center) < TOL for s in loop)
+            and max(math.hypot(*s.start) for s in loop) - min(math.hypot(*s.start) for s in loop) < TOL)
+
+
+def _add_segments(msp, segs, layer: str) -> None:
+    mm = 1e3
+    for s in segs:
+        a, b = (s.start[0] * mm, s.start[1] * mm), (s.end[0] * mm, s.end[1] * mm)
+        if isinstance(s, Line):
+            msp.add_line(a, b, dxfattribs={"layer": layer})
+            continue
+        c = (s.center[0] * mm, s.center[1] * mm)
+        ccw = (a[0] - c[0]) * (b[1] - c[1]) - (a[1] - c[1]) * (b[0] - c[0]) > 0
+        p, q = (a, b) if ccw else (b, a)
+        msp.add_arc(c, math.dist(a, c), math.degrees(math.atan2(p[1] - c[1], p[0] - c[0])),
+                    math.degrees(math.atan2(q[1] - c[1], q[0] - c[0])), dxfattribs={"layer": layer})
+
+
+def write_dxf(p: RadialSRMParams) -> bytes:
+    """R2010 DXF in mm with layers STATOR, ROTOR and COILS; the iron of `p.iron` or the parametric iron."""
+    from .radial import _coil_sides  # radial imports this module
+
+    iron = p.iron or parametric_iron(p)
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for name in ("STATOR", "ROTOR", "COILS"):
+        doc.layers.add(name)
+    msp = doc.modelspace()
+    stator = (iron.stator_outer, iron.stator_bore, *iron.stator_holes)
+    rotor = (iron.rotor_outer, iron.rotor_bore, *iron.rotor_holes)
+    for layer, loops in (("STATOR", stator), ("ROTOR", rotor)):
+        for loop in loops:
+            if _is_circle(loop):
+                msp.add_circle((0, 0), math.hypot(*loop[0].start) * 1e3, dxfattribs={"layer": layer})
+            else:
+                _add_segments(msp, to_segments(loop), layer)
+    for side in _coil_sides(p):
+        _add_segments(msp, side.boundary, "COILS")
+    out = io.StringIO()
+    doc.write(out)
+    return out.getvalue().encode("utf-8")
+
+
+# --- read --------------------------------------------------------------------------------------
+
+def _arcs(c, r, a0: float, sweep: float, p0, p1) -> list[Segment]:
+    """Minor arcs from p0 to p1 around c, starting at angle a0 and turning by the signed sweep."""
+    n = 1 if abs(sweep) < math.pi - 1e-9 else math.ceil(abs(sweep) / (math.pi / 2) - 1e-9)
+    pts = [p0] + [(c[0] + r * math.cos(a0 + sweep * k / n), c[1] + r * math.sin(a0 + sweep * k / n))
+                  for k in range(1, n)] + [p1]
+    return [Arc(pts[k], pts[k + 1], c) for k in range(n)]
+
+
+def _polyline(pts, bulges, closed: bool, k: float) -> list[Segment]:
+    out: list[Segment] = []
+    m = len(pts)
+    for i in range(m if closed else m - 1):
+        p0, p1 = pts[i], pts[(i + 1) % m]
+        a, b = (p0[0] * k, p0[1] * k), (p1[0] * k, p1[1] * k)
+        if bulges[i]:
+            c, _, _, r = bulge_to_arc((p0[0], p0[1]), (p1[0], p1[1]), bulges[i])
+            c = (c.x * k, c.y * k)
+            out += _arcs(c, r * k, math.atan2(a[1] - c[1], a[0] - c[0]),
+                         math.copysign(4 * math.atan(abs(bulges[i])), bulges[i]), a, b)
+        else:
+            out.append(Line(a, b))
+    return out
+
+
+def _where(e, k: float) -> str:
+    for name in ("start", "center", "insert", "location"):
+        if e.dxf.hasattr(name):
+            v = e.dxf.get(name)
+            return f" near {_at((v[0] * k, v[1] * k))}"
+    return ""
+
+
+def _flatten(entities):
+    for e in entities:
+        if e.dxftype() == "INSERT":
+            yield from _flatten(e.virtual_entities())
+        else:
+            yield e
+
+
+def _entity(e, k: float):
+    """(segments, z values) of a supported entity, or None when it is not supported."""
+    t = e.dxftype()
+    if t == "LINE":
+        s, f = e.dxf.start, e.dxf.end
+        return [Line((s.x * k, s.y * k), (f.x * k, f.y * k))], [s.z, f.z]
+    if t in ("ARC", "CIRCLE"):
+        c, r = e.dxf.center, e.dxf.radius * k
+        a0 = math.radians(e.dxf.start_angle) if t == "ARC" else 0.0
+        sweep = math.radians((e.dxf.end_angle - e.dxf.start_angle) % 360) if t == "ARC" else 2 * math.pi
+        ctr = (c.x * k, c.y * k)
+
+        def pt(a):
+            return (ctr[0] + r * math.cos(a), ctr[1] + r * math.sin(a))
+
+        return _arcs(ctr, r, a0, sweep, pt(a0), pt(a0) if t == "CIRCLE" else pt(a0 + sweep)), [c.z]
+    if t == "LWPOLYLINE":
+        pts = e.get_points("xyb")
+        z = e.dxf.get("elevation", 0.0)
+        return _polyline([(x, y) for x, y, _ in pts], [b for _, _, b in pts], e.closed, k), [getattr(z, "z", z)]
+    if t == "POLYLINE" and (e.is_2d_polyline or e.is_3d_polyline):
+        v = [(x.dxf.location, x.dxf.get("bulge", 0.0)) for x in e.vertices]
+        return _polyline([q for q, _ in v], [b for _, b in v], e.is_closed, k), [q.z for q, _ in v]
+    if t == "SPLINE":
+        pts = list(e.flattening(_SPLINE_CHORD / k))
+        return ([Line((a.x * k, a.y * k), (b.x * k, b.y * k)) for a, b in zip(pts, pts[1:])],
+                [q.z for q in e.control_points])
+    return None
+
+
+def _arc_span(x: Arc) -> tuple[float, float]:
+    """(start angle, sweep) of the arc taken counter-clockwise."""
+    cx, cy = x.center
+    a0 = math.atan2(x.start[1] - cy, x.start[0] - cx)
+    a1 = math.atan2(x.end[1] - cy, x.end[0] - cx)
+    ccw = (x.start[0] - cx) * (x.end[1] - cy) - (x.start[1] - cy) * (x.end[0] - cx) > 0
+    return (a0, (a1 - a0) % (2 * math.pi)) if ccw else (a1, (a0 - a1) % (2 * math.pi))
+
+
+def _overlaps(segs: list[Segment]) -> list[ValidationIssue]:
+    def issue(mid):
+        return _issue("overlap", f"Duplicate or overlapping edges near {_at(mid)}. Delete the repeated edge.")
+
+    out: list[ValidationIssue] = []
+    lines = [s for s in segs if isinstance(s, Line) and math.dist(s.start, s.end) > TOL]
+    if len(lines) > 1:
+        a = np.array([s.start for s in lines])
+        d = np.array([s.end for s in lines]) - a
+        ln = np.hypot(d[:, 0], d[:, 1])
+        u = d / ln[:, None]
+        for i in range(len(lines) - 1):
+            j = np.arange(i + 1, len(lines))
+            rel_a, rel_b = a[j] - a[i], a[j] + d[j] - a[i]
+            ta, tb = rel_a @ u[i], rel_b @ u[i]
+            off_a = np.abs(u[i, 0] * rel_a[:, 1] - u[i, 1] * rel_a[:, 0])
+            off_b = np.abs(u[i, 0] * rel_b[:, 1] - u[i, 1] * rel_b[:, 0])
+            lo, hi = np.maximum(np.minimum(ta, tb), 0), np.minimum(np.maximum(ta, tb), ln[i])
+            for k in np.nonzero((off_a < TOL) & (off_b < TOL) & (hi - lo > TOL))[0]:
+                out.append(issue(a[i] + u[i] * (lo[k] + hi[k]) / 2))
+    arcs = [s for s in segs if isinstance(s, Arc)]
+    for i, s in enumerate(arcs):
+        r = math.dist(s.start, s.center)
+        for t in arcs[i + 1:]:
+            if math.dist(s.center, t.center) > TOL or abs(r - math.dist(t.start, t.center)) > TOL:
+                continue
+            (lo_s, w_s), (lo_t, w_t) = _arc_span(s), _arc_span(t)
+            best = (0.0, 0.0)
+            for d in ((lo_t - lo_s) % (2 * math.pi), (lo_t - lo_s) % (2 * math.pi) - 2 * math.pi):
+                ov = min(w_s, d + w_t) - max(0.0, d)
+                if ov > best[0]:
+                    best = (ov, lo_s + max(0.0, d) + ov / 2)
+            if best[0] * r > TOL:
+                out.append(issue((s.center[0] + r * math.cos(best[1]), s.center[1] + r * math.sin(best[1]))))
+    return out
+
+
+def _flip(s: Segment) -> Segment:
+    return Line(s.end, s.start) if isinstance(s, Line) else Arc(s.end, s.start, s.center)
+
+
+def _join(chain: list[Segment]) -> tuple[Segment, ...]:
+    """Make consecutive segments share their vertex exactly. An arc end is rebuilt from an angle and one radius,
+    so it can sit a fraction of a micrometre off the true vertex; a line end is exact and wins, otherwise the
+    midpoint is used."""
+    n = len(chain)
+    joint = []
+    for i in range(n):
+        a, b = chain[i], chain[(i + 1) % n]
+        if isinstance(a, Line):
+            joint.append(a.end)
+        elif isinstance(b, Line):
+            joint.append(b.start)
+        else:
+            joint.append(((a.end[0] + b.start[0]) / 2, (a.end[1] + b.start[1]) / 2))
+    return tuple(Line(joint[i - 1], joint[i]) if isinstance(s, Line) else Arc(joint[i - 1], joint[i], s.center)
+                 for i, s in enumerate(chain))
+
+
+def _chains(segs: list[Segment]) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
+    """Join the segments end to end: closed chains are loops, the others are reported as open."""
+    if not segs:
+        return [], []
+    ends = np.array([q for s in segs for q in (s.start, s.end)])
+    tree = cKDTree(ends)
+    used = [False] * len(segs)
+    loops: list[tuple[Segment, ...]] = []
+    issues: list[ValidationIssue] = []
+    for first in range(len(segs)):
+        if used[first]:
+            continue
+        used[first] = True
+        chain = [segs[first]]
+        while len(chain) == 1 or math.dist(chain[-1].end, chain[0].start) > TOL:
+            cand = [c for c in tree.query_ball_point(chain[-1].end, TOL) if not used[c // 2]]
+            if not cand:
+                break
+            c = min(cand, key=lambda c: math.dist(ends[c], chain[-1].end))
+            used[c // 2] = True
+            chain.append(segs[c // 2] if c % 2 == 0 else _flip(segs[c // 2]))
+            if len(chain) == 2 and math.dist(chain[0].end, chain[0].start) <= TOL:
+                break
+        if math.dist(chain[-1].end, chain[0].start) <= TOL and (len(chain) > 1 or isinstance(chain[0], Arc)):
+            loops.append(_join(chain))
+        else:
+            issues.append(_issue("open_loop", f"A contour is open near {_at(chain[-1].end)} (its other end is at "
+                                 f"{_at(chain[0].start)}). Close the loop so its ends meet within 1 µm."))
+    return loops, issues
+
+
+def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
+    """Closed loops (metres) of the geometry in a DXF and the file-level problems found."""
+    try:
+        doc = ezdxf.read(io.StringIO(data.decode("utf-8", errors="replace")))
+    except Exception as exc:  # ezdxf raises several unrelated types on a broken file
+        return [], [_issue("dxf_file", f"The file is not a readable ASCII DXF ({exc}).")]
+    code = doc.header.get("$INSUNITS", 0)
+    if code not in _UNITS:
+        return [], [_issue("dxf_units", f"The drawing units ($INSUNITS = {code}) are not supported. Export in mm, "
+                           "inch or m, or set the units to none (read as mm).")]
+    k = _UNITS[code]
+    segs: list[Segment] = []
+    issues: list[ValidationIssue] = []
+    z0: float | None = None
+    for e in _flatten(doc.modelspace()):
+        t = e.dxftype()
+        if t in _IGNORED:
+            continue
+        got = _entity(e, k)
+        if got is None:
+            issues.append(_issue("dxf_entity", f"Unsupported DXF entity {t}{_where(e, k)}. Convert it to lines, "
+                                 "arcs or a spline."))
+            continue
+        for z in got[1]:
+            z0 = z if z0 is None else z0
+            if abs(z - z0) > 1e-9:
+                return [], [_issue("dxf_flat", f"The drawing is not flat: a {t}{_where(e, k)} is at z = {z:g} while "
+                                   f"other entities are at z = {z0:g}. Project everything to one plane.")]
+        segs += [s for s in got[0] if math.dist(s.start, s.end) > TOL or isinstance(s, Arc)]
+    issues += _overlaps(segs)
+    loops, open_issues = _chains(segs)
+    return loops, issues + open_issues
+
+
+def import_dxf(data: bytes, p: RadialSRMParams) -> tuple[ImportedIron | None, list[ValidationIssue]]:
+    """`ImportedIron` from a DXF against the machine `p`, and every problem found (iron is None on an error)."""
+    loops, issues = read_loops(data)
+    if any(i.severity == "error" for i in issues):
+        return None, issues
+    iron, found = iron_from_loops(loops, p)
+    issues += found
+    if iron is not None:
+        old = sum(iron_areas(p.iron or parametric_iron(p)))
+        new = sum(iron_areas(iron))
+        if abs(new - old) > _AREA_CHANGE * old:
+            issues.append(ValidationIssue("iron", "iron_area", f"The iron area is {new * 1e4:.1f} cm², "
+                          f"{abs(new - old) / old * 100:.0f} % different from the current {old * 1e4:.1f} cm². "
+                          "Check that the file and its units are the right ones.", "warning"))
+    return iron, issues
