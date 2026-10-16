@@ -17,7 +17,7 @@ srmbench times the real workload of this tool on your machine: the Gmsh mesh, th
 - CPU: at least 2 logical CPUs.
 - Network for the first setup only: GitHub (the pinned `uv`), PyPI and python-build-standalone (packages and Python 3.12). Later runs need no network, except for publishing results.
 - Git: the repository must be cloned. The benchmark installs the engine from the checkout next to it (`..`), so a copied `bench/` folder alone does not work. The publish tests in the self-test build temporary repositories and need git 2.28 or newer.
-- Linux: Gmsh needs a few system libraries. On first run the script installs them with `apt-get` (`libglu1-mesa libxcursor1 libxft2 libxinerama1`) or `dnf`/`yum` (`mesa-libGLU libXcursor libXft libXinerama`), using `sudo` unless you are root. If there is no root, no `sudo` or an unknown package manager, it prints the exact command and stops.
+- Linux: Gmsh and NGSolve need a few system libraries. On first run the script installs them with `apt-get` (`libglu1-mesa libxcursor1 libxft2 libxinerama1 libquadmath0 libgfortran5 libopenblas0`) or `dnf`/`yum` (`mesa-libGLU libXcursor libXft libXinerama libquadmath libgfortran openblas`), using `sudo` unless you are root. If there is no root, no `sudo` or an unknown package manager, it prints the exact command and stops.
 
 Everything the script installs goes under `bench/.runtime/` (uv, Python, the virtual environment, the uv cache). Deleting that folder removes all of it. The scripts never touch the repository's own `.venv` or any system setting, apart from the Linux libraries above.
 

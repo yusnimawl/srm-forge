@@ -103,8 +103,8 @@ if [ "$CURRENT" -eq 0 ]; then
 fi
 
 # ---- Gmsh needs a few system libraries on Linux -------------------------------------------
-if ! "$PY" -c "import gmsh" 2>"$RT/gmsh-import.err"; then
-    echo "Gmsh cannot be loaded (missing system libraries):" >&2
+if ! "$PY" -c "import gmsh, ngsolve" 2>"$RT/gmsh-import.err"; then
+    echo "Gmsh or NGSolve cannot be loaded (missing system libraries):" >&2
     cat "$RT/gmsh-import.err" >&2
     SUDO=""
     if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
@@ -112,15 +112,15 @@ if ! "$PY" -c "import gmsh" 2>"$RT/gmsh-import.err"; then
     fi
     if command -v apt-get >/dev/null 2>&1; then
         UPDATE_CMD="apt-get update"
-        INSTALL_CMD="apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1"
+        INSTALL_CMD="apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1 libquadmath0 libgfortran5 libopenblas0"
     elif command -v dnf >/dev/null 2>&1; then
         UPDATE_CMD=""
-        INSTALL_CMD="dnf install -y mesa-libGLU libXcursor libXft libXinerama"
+        INSTALL_CMD="dnf install -y mesa-libGLU libXcursor libXft libXinerama libquadmath libgfortran openblas"
     elif command -v yum >/dev/null 2>&1; then
         UPDATE_CMD=""
-        INSTALL_CMD="yum install -y mesa-libGLU libXcursor libXft libXinerama"
+        INSTALL_CMD="yum install -y mesa-libGLU libXcursor libXft libXinerama libquadmath libgfortran openblas"
     else
-        setup_failed "No known package manager. Install the OpenGL/X11 libraries libGLU, libXcursor, libXft and libXinerama, then run this script again."
+        setup_failed "No known package manager. Install the OpenGL/X11 libraries libGLU, libXcursor, libXft and libXinerama and the Fortran/BLAS libraries libquadmath, libgfortran and libopenblas, then run this script again."
     fi
     if [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
         setup_failed "Run this as root, then run this script again: $INSTALL_CMD"
@@ -131,7 +131,7 @@ if ! "$PY" -c "import gmsh" 2>"$RT/gmsh-import.err"; then
     fi
     # shellcheck disable=SC2086
     $SUDO $INSTALL_CMD || setup_failed "Installing the system libraries failed. Run: ${SUDO:+$SUDO }$INSTALL_CMD"
-    "$PY" -c "import gmsh" || setup_failed "Gmsh still cannot be loaded after installing the system libraries."
+    "$PY" -c "import gmsh, ngsolve" || setup_failed "Gmsh or NGSolve still cannot be loaded after installing the system libraries."
 fi
 
 # ---- 6. Run ----------------------------------------------------------------------------
