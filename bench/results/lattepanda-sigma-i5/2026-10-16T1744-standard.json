@@ -1,0 +1,236 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-16T17:54:52+07:00",
+ "label": "lattepanda-sigma-i5",
+ "lock_hash": "6ff044847626",
+ "machine": {
+  "arch": "x86_64",
+  "cpu_model": "13th Gen Intel(R) Core(TM) i5-1340P",
+  "glibc": "2.43",
+  "logical_cpus": 16,
+  "os": "Linux",
+  "os_version": "#38-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 09:10:14 UTC 2026",
+  "physical_cores": 12,
+  "python": "3.12.14",
+  "ram_gb": 32.8
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-16T17:44:15+07:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": null,
+    "per_min": 32.20272111655679,
+    "points": 8,
+    "seconds": 14.90557267700001,
+    "workers": 1
+   },
+   {
+    "peak_ram_gb": 0.460767232,
+    "per_min": 53.13747105050815,
+    "points": 16,
+    "seconds": 18.066347175000146,
+    "workers": 2
+   },
+   {
+    "peak_ram_gb": 0.463286272,
+    "per_min": 91.05901471343748,
+    "points": 32,
+    "seconds": 21.08522704799998,
+    "workers": 4
+   },
+   {
+    "peak_ram_gb": 0.465178624,
+    "per_min": 120.61328702035513,
+    "points": 64,
+    "seconds": 31.837288368999907,
+    "workers": 8
+   },
+   {
+    "peak_ram_gb": 0.465416192,
+    "per_min": 137.65583129665293,
+    "points": 96,
+    "seconds": 41.843487091999805,
+    "workers": 12
+   },
+   {
+    "peak_ram_gb": 0.465793024,
+    "per_min": 146.67957818008207,
+    "points": 128,
+    "seconds": 52.359027038999784,
+    "workers": 16
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [
+     "mesh differs: 42914 nodes vs 42935"
+    ],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3201688847409646,
+     "torque": -0.001353331079654598
+    },
+    {
+     "angle": 0.2617993877991494,
+     "current": 20.0,
+     "psi": 0.19496953738755746,
+     "torque": -12.430250438802464
+    },
+    {
+     "angle": 0.5235987755982988,
+     "current": 20.0,
+     "psi": 0.07223180258571352,
+     "torque": 0.0002201660009644003
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 81968,
+    "points": 1008,
+    "seconds": 5.616824110999914
+   },
+   "screening": {
+    "nodes": 42914,
+    "points": 360,
+    "seconds": 3.780793829000004
+   }
+  },
+  "recommended": {
+   "ram_cap": 16,
+   "uncapped": 16,
+   "workers": 16
+  },
+  "screening_map": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "key_numbers": {
+    "aligned_angle": 0.0,
+    "i_max": 20.0,
+    "la": 0.0328289217077296,
+    "la_lu": 9.163540447823959,
+    "lu": 0.003582558716759459,
+    "peak_torque": 12.42464921985658,
+    "psi_max": 0.3201688847409646,
+    "unaligned_angle": 0.5235987755982988
+   },
+   "points": 360,
+   "seconds": 103.50511520000009,
+   "statuses": {
+    "arkkio_vs_nodal": "pass",
+    "coenergy_torque": "pass",
+    "dpsi_di_positive": "pass",
+    "energy_identity": "pass",
+    "iron_b_peak": "pass",
+    "la_analytic": "pass",
+    "la_lu": "pass",
+    "loop_energy": "pass",
+    "lu_air_slot": "pass",
+    "psi_bound": "pass",
+    "psi_decreasing": "pass",
+    "sign_pattern": "pass",
+    "zero_mean_torque": "pass",
+    "zero_torque_aligned_unaligned": "pass"
+   },
+   "workers": 16
+  },
+  "single_solve": {
+   "full": {
+    "median": 3.9232229579999967,
+    "samples": [
+     3.8760736640001596,
+     3.9419575189999705,
+     3.9232229579999967
+    ]
+   },
+   "screening": {
+    "median": 1.7644525759999397,
+    "samples": [
+     1.737234762000071,
+     1.7644525759999397,
+     1.7725574329999745,
+     1.7703896090001763,
+     1.7489603259998603
+    ]
+   }
+  },
+  "sustained": {
+   "batches": [
+    {
+     "per_min": 143.35597412041687,
+     "t": 53.581799026
+    },
+    {
+     "per_min": 145.41722114203392,
+     "t": 106.40193476799982
+    },
+    {
+     "per_min": 145.71055043879878,
+     "t": 159.11778412599983
+    },
+    {
+     "per_min": 145.31825130976424,
+     "t": 211.97621254499995
+    },
+    {
+     "per_min": 144.81114749393717,
+     "t": 265.01941399
+    },
+    {
+     "per_min": 146.5756679575681,
+     "t": 317.44342784599985
+    }
+   ],
+   "minutes": 5,
+   "throttle_pct": 2.245943259013905,
+   "workers": 16
+  }
+ },
+ "summary": {
+  "best_throughput_per_min": 146.67957818008207,
+  "best_workers": 16,
+  "correctness": {
+   "details": [
+    "correctness_points: mesh differs: 42914 nodes vs 42935"
+   ],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 922.4179330722783
+  },
+  "peak_ram_worker_gb": 0.465793024,
+  "projection_error_pct": null,
+  "recommended_workers": 16,
+  "screening_map_s": {
+   "measured": true,
+   "value": 103.50511520000009
+  },
+  "search_h": 6.149452887148522,
+  "single_solve_full_s": 3.9232229579999967,
+  "single_solve_s": 1.7644525759999397,
+  "srmweb_workers": 16,
+  "throttle_pct": 2.245943259013905,
+  "throughput_per_min": 146.67957818008207
+ },
+ "tier": "standard",
+ "versions": {
+  "git_commit": "6aa0228",
+  "gmsh": "4.15.2",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2608",
+  "numpy": "2.5.4",
+  "psutil": "7.2.2",
+  "scipy": "1.18.1",
+  "srmcore": "0.5.0"
+ },
+ "warnings": []
+}

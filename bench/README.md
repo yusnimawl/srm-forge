@@ -158,10 +158,65 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 
 | Machine | CPU | Cores | RAM (GB) | OS | Tier | Single solve (s) | Workers | Screening map (min) | Full map (min) | Search of 24 (h) | RAM per worker (GB) | Throttle (%) | Correct | Index single/all |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| [lattepanda-sigma-i5](#machine-lattepanda-sigma-i5) | 13th Gen Intel(R) Core(TM) i5-1340P | 12C/16T | 33 | Linux (glibc 2.43) | standard | 1.8 | 16 | 1.7 | ~15 | ~6.1 | 0.47 | +2.2 | ✓ | 195/234 |
 | [i7-13620h-laptop](#machine-i7-13620h-laptop) | 13th Gen Intel(R) Core(TM) i7-13620H | 10C/16T | 17 | Windows 11 | standard | 3.4 | 10 | 4.1 | ~36 | ~14 | 0.29 | +0.8 | ✓ | 100/100 |
 | [thinkpad-x1-yoga-i5](#machine-thinkpad-x1-yoga-i5) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 17 | Windows 11 | standard | 3.1 | 8 | 4.4 | ~60 | ~24 | 0.30 | +8.7 | ✓ | 112/65 |
 
 `~` marks a projected value (a map not run, estimated from the batch throughput); the search is always projected. Correct: ✓ passed, ✗ failed, – not checked.
+
+<details id="machine-lattepanda-sigma-i5">
+<summary><b>lattepanda-sigma-i5</b> – 13th Gen Intel(R) Core(TM) i5-1340P, standard, 2026-10-16</summary>
+
+- Machine: 13th Gen Intel(R) Core(TM) i5-1340P; 12 cores, 16 threads; 32.8 GB RAM; Linux (glibc 2.43) (#38-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 09:10:14 UTC 2026, x86_64); Python 3.12.14
+- Versions: engine commit 6aa0228, gmsh 4.15.2, matplotlib 3.11.2, ngsolve 6.2.2608, numpy 2.5.4, psutil 7.2.2, scipy 1.18.1, srmcore 0.5.0; srmbench 1.0; lock 6ff044847626
+- Run: 2026-10-16T17:44:15+07:00 to 2026-10-16T17:54:52+07:00, tier standard, status complete
+- Result file: [2026-10-16T1744-standard.json](results/lattepanda-sigma-i5/2026-10-16T1744-standard.json)
+
+**Mesh (8/6)**
+
+| Preset | Seconds | Nodes | Grid points |
+|---|---|---|---|
+| screening | 3.78 | 42 914 | 360 |
+| full | 5.62 | 81 968 | 1008 |
+
+**Single solve (8/6)**
+
+| Preset | Median (s) | Samples (s) |
+|---|---|---|
+| screening | 1.764 | 1.737, 1.764, 1.773, 1.770, 1.749 |
+| full | 3.923 | 3.876, 3.942, 3.923 |
+
+**Correctness points:** pass; mesh differs: 42914 nodes vs 42935
+
+**Batches**
+
+| Workers | Points | Seconds | Solves per minute | Peak RAM per worker (GB) |
+|---|---|---|---|---|
+| 1 | 8 | 14.91 | 32.2 | – |
+| 2 | 16 | 18.07 | 53.1 | 0.46 |
+| 4 | 32 | 21.09 | 91.1 | 0.46 |
+| 8 | 64 | 31.84 | 120.6 | 0.47 |
+| 12 | 96 | 41.84 | 137.7 | 0.47 |
+| 16 | 128 | 52.36 | 146.7 | 0.47 |
+
+**Recommended workers:** 16 (uncapped choice 16, RAM cap 16)
+
+**Screening map 8/6:** 103.5 s, 360 points, 16 workers, correctness pass; key numbers: aligned_angle 0, i_max 20, la 0.0328289, la_lu 9.16354, lu 0.00358256, peak_torque 12.4246, psi_max 0.320169, unaligned_angle 0.523599
+
+**Sustained load:** 5 min at 16 workers, throttle +2.2 %; trace (time: solves per minute): 54 s: 143.4; 106 s: 145.4; 159 s: 145.7; 212 s: 145.3; 265 s: 144.8; 317 s: 146.6
+
+**Scaling**
+
+| Workers | Solves per minute | Speed-up over 1 worker(s) | Efficiency (%) |
+|---|---|---|---|
+| 1 | 32.2 | 1.00 | 100 |
+| 2 | 53.1 | 1.65 | 83 |
+| 4 | 91.1 | 2.83 | 71 |
+| 8 | 120.6 | 3.75 | 47 |
+| 12 | 137.7 | 4.27 | 36 |
+| 16 | 146.7 | 4.55 | 28 |
+
+</details>
 
 <details id="machine-i7-13620h-laptop">
 <summary><b>i7-13620h-laptop</b> – 13th Gen Intel(R) Core(TM) i7-13620H, standard, 2026-10-15</summary>
