@@ -37,4 +37,17 @@ describe("JobStepper", () => {
   it("does not crash without progress", () => {
     expect(render(<JobStepper job={{ ...base, progress: null }} />).textContent).toContain("Elapsed")
   })
+  it("exposes step state to assistive tech", () => {
+    const c = render(
+      <JobStepper
+        job={{ ...base, progress: { steps: ["queued", "mesh", "mapping", "winding", "saved"], step: "mapping", points_done: 1, points_total: 10 } }}
+      />,
+    )
+    const items = Array.from(c.querySelectorAll("li"))
+    expect(items.map((li) => li.getAttribute("aria-current"))).toEqual([null, null, "step", null, null])
+    expect(items[0].querySelector("[data-sr-state]")?.textContent).toContain("done")
+    expect(items[2].querySelector("[data-sr-state]")?.textContent).toContain("active")
+    expect(items[3].querySelector("[data-sr-state]")?.textContent).toContain("waiting")
+    expect(items[2].querySelector("[aria-live=polite]")?.textContent).toContain("1 / 10 points")
+  })
 })

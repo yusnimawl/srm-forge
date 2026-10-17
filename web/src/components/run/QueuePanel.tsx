@@ -12,8 +12,9 @@ const etaOf = (j: JobOut): number | null => {
   return typeof e === "number" && Number.isFinite(e) ? e : null
 }
 
-/** Running jobs first (oldest start first), then queued jobs by lane and position. A queued job's start estimate is the
- *  time left of the running job in its lane; it is left out when that is unknown. */
+/** Running jobs first (oldest start first), then queued jobs by lane and position. Only the job at position 1 gets a
+ *  start estimate, the time left of the running job in its lane: a job carries no duration of its own, so the wait
+ *  behind deeper positions is unknown and left out, as is an unknown time left. */
 export function queueRows(jobs: JobOut[]): QueueRow[] {
   const running = jobs.filter((j) => j.status === "running")
   const queued = jobs.filter((j) => j.status === "queued")

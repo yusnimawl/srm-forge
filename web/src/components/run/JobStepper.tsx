@@ -23,7 +23,7 @@ export function JobStepper({ job }: { job: JobOut }) {
   return (
     <ol aria-label="Job steps" className="m-0 list-none p-0">
       {rows.map((r, i) => (
-        <li key={r.id} data-step={r.id} data-state={r.state} className="flex gap-3">
+        <li key={r.id} data-step={r.id} data-state={r.state} aria-current={r.state === "active" ? "step" : undefined} className="flex gap-3">
           <div className="flex flex-col items-center">
             <span
               aria-hidden
@@ -42,10 +42,15 @@ export function JobStepper({ job }: { job: JobOut }) {
           <div className="min-w-0 pb-3">
             <p className={cn("text-sm", r.state === "waiting" ? "text-muted-foreground" : "text-foreground")}>
               {r.label}
+              <span data-sr-state className="sr-only"> ({r.state})</span>
               {r.state === "failed" && <span className="text-destructive"> · failed</span>}
               {r.state === "cancelled" && <span className="text-muted-foreground"> · cancelled</span>}
             </p>
-            {r.detail && <p className="num break-words text-xs text-muted-foreground">{r.detail}</p>}
+            {r.detail && (
+              <p aria-live={r.state === "active" ? "polite" : undefined} className="num break-words text-xs text-muted-foreground">
+                {r.detail}
+              </p>
+            )}
           </div>
         </li>
       ))}
