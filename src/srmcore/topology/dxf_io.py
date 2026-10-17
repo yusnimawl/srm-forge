@@ -9,6 +9,7 @@ import math
 
 import ezdxf
 from ezdxf import recover
+from ezdxf.audit import AuditError
 from ezdxf.document import Drawing
 from ezdxf.lldxf.tagger import binary_tags_loader
 import numpy as np
@@ -26,7 +27,7 @@ _UNITS = {0: 1e-3, 1: 0.0254, 4: 1e-3, 6: 1.0}
 _IGNORED = {"TEXT", "MTEXT", "DIMENSION", "HATCH", "POINT"}
 _AREA_CHANGE = 0.10
 _SPLINE_CHORD = 1e-6   # m
-_DROPPED = ("Removed", "Deleted", "Replaced")   # auditor fixes that lose geometry
+_GEOMETRY = {"LINE", "ARC", "CIRCLE", "ELLIPSE", "SPLINE", "LWPOLYLINE", "POLYLINE", "INSERT"}
 _BINARY_SENTINEL = b"AutoCAD Binary DXF"
 
 
@@ -333,6 +334,20 @@ def _chains(segs: list[Segment]) -> tuple[list[tuple[Segment, ...]], list[Valida
     return loops, issues
 
 
+def _lost_geometry(data: bytes, doc) -> list[str]:
+    """Geometry entities of the file's model space that the recover reader dropped (or a repair removed): "TYPE
+    #handle" each. Cosmetic repairs (undefined linetypes, colour indices, unused knots) lose nothing."""
+    tool = recover.Recover.run(io.BytesIO(data))
+    present = {e.dxf.handle for e in doc.modelspace()}
+    lost = []
+    for tags in tool.section_dict.get("ENTITIES", []):
+        if tags.dxftype() in _GEOMETRY and tags.get_handle() not in present:
+            lost.append(f"{tags.dxftype()} #{tags.get_handle()}")
+    lost += [m for c, m in tool.fixes if c in (AuditError.REMOVED_INVALID_GRAPHIC_ENTITY,
+                                              AuditError.REMOVED_ENTITY_WITH_INVALID_OWNER_HANDLE)]
+    return lost
+
+
 def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
     """Closed loops (metres) of the geometry in a DXF and the file-level problems found."""
     try:
@@ -345,10 +360,10 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
         return [], [_issue("dxf_file", f"The file is not a readable DXF ({exc}).")]
     if auditor.errors:
         return [], [_issue("dxf_file", f"The file is damaged and cannot be repaired ({auditor.errors[0].message}).")]
-    dropped = [f.message for f in auditor.fixes if f.message.startswith(_DROPPED)]
-    if dropped:
-        return [], [_issue("dxf_file", f"The file has invalid content that was removed on reading: {dropped[0]} "
-                           f"({len(dropped)} in all). Fix or delete it in the CAD program and export again.")]
+    lost = _lost_geometry(data, doc) if not data.startswith(_BINARY_SENTINEL) else None
+    if lost:
+        return [], [_issue("dxf_file", f"The reader removed invalid geometry: {lost[0]} ({len(lost)} in all). "
+                           "Fix or delete it in the CAD program and export again.")]
     code = doc.header.get("$INSUNITS", 0)
     if code not in _UNITS:
         return [], [_issue("dxf_units", f"The drawing units ($INSUNITS = {code}) are not supported. Export in mm, "

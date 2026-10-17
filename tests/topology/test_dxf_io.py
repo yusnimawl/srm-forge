@@ -447,7 +447,21 @@ def test_removed_entity_is_an_error():
     msp.add_spline(fit_points=[(40, 40), (60, 40), (60, 60), (40, 60), (40, 40)])
     loops, issues = read_loops(_set_group(_bytes(doc).decode(), "SPLINE", " 71", "0").encode())
     assert loops == [] and _errs(issues) == {"dxf_file"}
-    assert "SPLINE" in issues[0].message and "removed" in issues[0].message
+    assert "SPLINE #" in issues[0].message and "removed" in issues[0].message
+
+
+def test_cosmetic_repairs_do_not_refuse():
+    doc = _doc()
+    _square(doc.modelspace(), 0, 0, 10)
+    for e in doc.modelspace():
+        e.dxf.linetype = "nosuch"
+    text = _bytes(doc).decode()
+    # an out-of-range colour index on every line
+    head, body = text.split("\nENTITIES\n")
+    text = head + "\nENTITIES\n" + body.replace("\n  8\n0\n", "\n  8\n0\n 62\n300\n")
+    assert "\n 62\n300\n" in text
+    loops, issues = read_loops(text.encode())
+    assert issues == [] and len(loops) == 1 and len(loops[0]) == 4
 
 
 def test_degenerate_ellipses_reported():
@@ -464,3 +478,7 @@ def test_negative_ratio_circular_ellipse_gives_arcs():
     doc.modelspace().add_ellipse((20, 0), (5, 0), 1.0)
     loops, issues = read_loops(_set_group(_bytes(doc).decode(), "ELLIPSE", " 40", "-1.0").encode())
     assert issues == [] and len(loops) == 1 and all(isinstance(s, Arc) for s in loops[0])
+    # the parameter runs clockwise for ratio -1: from (25, 0) mm the first arc turns towards negative y
+    assert loops[0][0].start == pytest.approx((0.025, 0.0), abs=1e-9)
+    assert loops[0][0].end[1] < 0
+    assert all(s.center == pytest.approx((0.02, 0.0), abs=1e-12) for s in loops[0])
