@@ -1,4 +1,5 @@
 """Inputs of one case: a design, its requirements and how it is wound and judged."""
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal
@@ -104,10 +105,13 @@ def evaluate_design(inputs: CaseInputs, *, case_id: str = "case", grid: StageTwo
 
 
 def validate_case(inputs: CaseInputs, *, solver: str = "ngsolve", workers: int | None = None,
-                  cache_dir=None) -> EmValidation:
-    """EM validation of the reference design's map (served from `cache_dir` after an evaluation)."""
+                  cache_dir=None, on_checks: Callable[[], None] | None = None) -> EmValidation:
+    """EM validation of the reference design's map (served from `cache_dir` after an evaluation).
+    `on_checks()` is called once the map is built and the checks start."""
     design, i_map, _ = map_request(inputs)
     result = build_map(design, i_map, solver=solver, workers=workers, cache_dir=cache_dir)
+    if on_checks is not None:
+        on_checks()
     return em_validate(design, result, solver=solver, workers=workers)
 
 

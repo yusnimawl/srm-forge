@@ -2072,6 +2072,14 @@
             "title": "Kind",
             "type": "string"
           },
+          "lane": {
+            "enum": [
+              "main",
+              "quick"
+            ],
+            "title": "Lane",
+            "type": "string"
+          },
           "progress": {
             "anyOf": [
               {
@@ -2083,6 +2091,17 @@
               }
             ],
             "title": "Progress"
+          },
+          "queue_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Position"
           },
           "resumable": {
             "title": "Resumable",
@@ -2110,6 +2129,7 @@
           "status",
           "active",
           "resumable",
+          "lane",
           "created"
         ],
         "title": "JobOut",
