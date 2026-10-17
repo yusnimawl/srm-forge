@@ -450,6 +450,19 @@ def test_removed_entity_is_an_error():
     assert "SPLINE #" in issues[0].message and "removed" in issues[0].message
 
 
+def test_removed_entity_in_binary_dxf_is_an_error(tmp_path):
+    doc = _doc()
+    msp = doc.modelspace()
+    _square(msp, 0, 0, 100)
+    sp = msp.add_spline(fit_points=[(40, 40), (60, 40), (60, 60), (40, 60), (40, 40)])
+    sp.dxf.__dict__["degree"] = 0   # bypass the writer's range check
+    path = tmp_path / "b.dxf"
+    doc.saveas(path, fmt="bin")
+    loops, issues = read_loops(path.read_bytes())
+    assert loops == [] and _errs(issues) == {"dxf_file"}
+    assert "SPLINE #" in issues[0].message
+
+
 def test_cosmetic_repairs_do_not_refuse():
     doc = _doc()
     _square(doc.modelspace(), 0, 0, 10)

@@ -334,18 +334,16 @@ def _chains(segs: list[Segment]) -> tuple[list[tuple[Segment, ...]], list[Valida
     return loops, issues
 
 
-def _lost_geometry(data: bytes, doc) -> list[str]:
-    """Geometry entities of the file's model space that the recover reader dropped (or a repair removed): "TYPE
-    #handle" each. Cosmetic repairs (undefined linetypes, colour indices, unused knots) lose nothing."""
-    tool = recover.Recover.run(io.BytesIO(data))
-    present = {e.dxf.handle for e in doc.modelspace()}
-    lost = []
-    for tags in tool.section_dict.get("ENTITIES", []):
-        if tags.dxftype() in _GEOMETRY and tags.get_handle() not in present:
-            lost.append(f"{tags.dxftype()} #{tags.get_handle()}")
-    lost += [m for c, m in tool.fixes if c in (AuditError.REMOVED_INVALID_GRAPHIC_ENTITY,
-                                              AuditError.REMOVED_ENTITY_WITH_INVALID_OWNER_HANDLE)]
-    return lost
+def _geometry_before(doc) -> list[str]:
+    return [f"{e.dxftype()} #{e.dxf.handle}" for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
+
+
+def _lost_geometry(doc, before: list[str], fixes=()) -> list[str]:
+    """Geometry entities ("TYPE #handle") listed in `before` that the audit removed from the model space, plus
+    the removal messages in `fixes`. Cosmetic repairs (undefined linetypes, colour indices, unused knots) lose
+    nothing."""
+    present = {f"{e.dxftype()} #{e.dxf.handle}" for e in doc.modelspace()}
+    return [x for x in before if x not in present] + list(fixes)
 
 
 def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
@@ -353,14 +351,20 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
     try:
         if data.startswith(_BINARY_SENTINEL):
             doc = Drawing.load(binary_tags_loader(data))
+            before, removed = _geometry_before(doc), []
             auditor = doc.audit()
         else:
+            tool = recover.Recover.run(io.BytesIO(data))
+            before = [f"{t.dxftype()} #{t.get_handle()}" for t in tool.section_dict.get("ENTITIES", [])
+                      if t.dxftype() in _GEOMETRY]
+            removed = [m for c, m in tool.fixes if c in (AuditError.REMOVED_INVALID_GRAPHIC_ENTITY,
+                                                         AuditError.REMOVED_ENTITY_WITH_INVALID_OWNER_HANDLE)]
             doc, auditor = recover.read(io.BytesIO(data))
     except Exception as exc:  # ezdxf raises several unrelated types on a broken file
         return [], [_issue("dxf_file", f"The file is not a readable DXF ({exc}).")]
     if auditor.errors:
         return [], [_issue("dxf_file", f"The file is damaged and cannot be repaired ({auditor.errors[0].message}).")]
-    lost = _lost_geometry(data, doc) if not data.startswith(_BINARY_SENTINEL) else None
+    lost = _lost_geometry(doc, before, removed)
     if lost:
         return [], [_issue("dxf_file", f"The reader removed invalid geometry: {lost[0]} ({len(lost)} in all). "
                            "Fix or delete it in the CAD program and export again.")]
