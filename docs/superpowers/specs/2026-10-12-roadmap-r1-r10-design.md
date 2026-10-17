@@ -53,6 +53,13 @@ Order chosen by the owner: physics first, with the DXF round trip early because 
 - [ ] Checked against published SRM loss data
 - Done when: efficiency at any operating point, compared with a published case and the error reported.
 
+### R3b — Run report (added 2026-10-18)
+- [ ] One self-contained HTML file per case (opens offline, can be emailed): inputs, outline, key numbers, map plots, before/after table for DXF cases, losses and efficiency from R3, validation checks and budget, and the flux animation playing inline
+- [ ] A print layout so the static parts save as PDF from the browser (a PDF cannot play the animation)
+- Done when: one click on an evaluated case gives the file, and it renders the same with the server stopped.
+
+Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shaped loading spinner, job queue panel and step-by-step job progress (spec `2026-10-18-ui-polish-queue-design.md`).
+
 ### R4 — End effects
 - [ ] 3D magnetostatic spot checks (NGSolve) on a few designs across stack-length/diameter ratios
 - [ ] An end-effect correction (as a function of geometry) calibrated against the 3D runs and the measured TEAM 24 and Krishnan 6/4 data
@@ -111,3 +118,24 @@ Order chosen by the owner: physics first, with the DXF round trip early because 
 - End effects are handled before the recommender (R4 before R7).
 - Fabrication package added as R10.
 - Naming: R1–R10 from now on.
+
+## 5. Where to run each step: laptop or Claude cloud (2026-10-18)
+
+The owner has a US$100 credit for Claude cloud sessions. A cloud session is Ubuntu on 4 vCPU and 16 GB with no GUI; a command stops after 2 minutes by default and a background command after 30 more. The credit buys model work, not compute: a session that waits 40 minutes on a map spends the credit on waiting. So cloud fits work that is mostly writing and reviewing code, with only short test runs; long solves belong on the laptop (61.7 solves/min on 10 workers) or the LattePanda, which run them for free.
+
+| Item | Where | Why |
+|---|---|---|
+| UI polish (logo, spinner, queue) | Cloud | Pure code and vitest; the visual check stays local |
+| R3 copper loss, drive tail | Cloud | Analytic code and fast tests |
+| R3 iron loss | Split | Model code and literature digging in the cloud; the check against published loss data runs maps, so locally |
+| R3b run report | Cloud | Templates and front-end code |
+| R4 end effects | Local | 3D NGSolve runs take hours and need RAM |
+| R5 thermal and stress | Split | Solver and UI code in the cloud; calibration runs locally |
+| R6 what-if tab | Cloud | Mostly UI; sweeps reuse cached maps |
+| R7 recommender | Split | Spike code in the cloud; the budgeted comparison runs (many maps) locally |
+| R8 control SIL | Cloud | C and Python simulation code with fast tests; the biggest code item, so the best use of the credit |
+| R9 ripple optimisation | Split | Optimiser code in the cloud; long optimisation runs locally |
+| R10 fabrication package | Cloud | Documents, drawings, checks |
+| Validation campaigns, slow suite, benchmarks, FEMM, Onshape | Local | CPU-hours, Windows tools or CAD |
+
+Recommendation: spend the credit on R8 first (largest amount of code, little compute), then R3b, R6 and R10. Run each as a subagent-driven plan in a cloud session started from the plan file, while the laptop runs the long jobs of the current physics step in parallel; the two streams meet on main through pull requests.
