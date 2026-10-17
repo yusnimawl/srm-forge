@@ -447,7 +447,7 @@ def test_removed_entity_is_an_error():
     msp.add_spline(fit_points=[(40, 40), (60, 40), (60, 60), (40, 60), (40, 40)])
     loops, issues = read_loops(_set_group(_bytes(doc).decode(), "SPLINE", " 71", "0").encode())
     assert loops == [] and _errs(issues) == {"dxf_file"}
-    assert "SPLINE #" in issues[0].message and "removed" in issues[0].message
+    assert "1 SPLINE (#" in issues[0].message and "removed" in issues[0].message
 
 
 def test_removed_entity_in_binary_dxf_is_an_error(tmp_path):
@@ -460,7 +460,7 @@ def test_removed_entity_in_binary_dxf_is_an_error(tmp_path):
     doc.saveas(path, fmt="bin")
     loops, issues = read_loops(path.read_bytes())
     assert loops == [] and _errs(issues) == {"dxf_file"}
-    assert "SPLINE #" in issues[0].message
+    assert "1 SPLINE (#" in issues[0].message
 
 
 def test_cosmetic_repairs_do_not_refuse():
@@ -495,3 +495,37 @@ def test_negative_ratio_circular_ellipse_gives_arcs():
     assert loops[0][0].start == pytest.approx((0.025, 0.0), abs=1e-9)
     assert loops[0][0].end[1] < 0
     assert all(s.center == pytest.approx((0.02, 0.0), abs=1e-12) for s in loops[0])
+
+
+def test_r12_without_entity_handles_imports():
+    doc = ezdxf.new("R12")
+    doc.header["$INSUNITS"] = 4
+    _square(doc.modelspace(), 0, 0, 10)
+    head, body = _bytes(doc).decode().split("\nENTITIES\n")
+    body, tail = body.split("\nENDSEC\n", 1)
+    lines = body.split("\n")
+    kept, k = [], 0
+    while k < len(lines):
+        if lines[k].strip() == "5" and k % 2 == 0:
+            k += 2
+            continue
+        kept.append(lines[k])
+        k += 1
+    text = head + "\nENTITIES\n" + "\n".join(kept) + "\nENDSEC\n" + tail
+    assert text.split("\nENTITIES\n")[1].split("\nENDSEC\n")[0].count("\n  5\n") == 0
+    loops, issues = read_loops(text.encode())
+    assert issues == [] and len(loops) == 1
+
+
+def test_duplicate_entity_handles_refused():
+    # ezdxf keeps one entity per handle and drops the rest, so the drawing lost geometry
+    doc = _doc()
+    _square(doc.modelspace(), 0, 0, 10)
+    h = [e.dxf.handle for e in doc.modelspace()]
+    text = _bytes(doc).decode()
+    head, body = text.split("\nENTITIES\n")
+    for x in h[1:]:
+        body = body.replace(f"\n  5\n{x}\n", f"\n  5\n{h[0]}\n")
+    assert body.count(f"\n  5\n{h[0]}\n") == 4
+    loops, issues = read_loops((head + "\nENTITIES\n" + body).encode())
+    assert loops == [] and _errs(issues) == {"dxf_file"} and "3 LINE" in issues[0].message

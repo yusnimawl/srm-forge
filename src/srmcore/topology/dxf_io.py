@@ -5,12 +5,14 @@ closed loops (an open chain is reported as `open_loop`) and reports duplicate or
 Loops are in metres. Everything else is checked by `iron_from_loops`.
 """
 import io
+from collections import Counter
 import math
 
 import ezdxf
 from ezdxf import recover
 from ezdxf.audit import AuditError
 from ezdxf.document import Drawing
+from ezdxf.lldxf.const import DXFValueError
 from ezdxf.lldxf.tagger import binary_tags_loader
 import numpy as np
 from ezdxf.math import bulge_to_arc
@@ -334,16 +336,25 @@ def _chains(segs: list[Segment]) -> tuple[list[tuple[Segment, ...]], list[Valida
     return loops, issues
 
 
-def _geometry_before(doc) -> list[str]:
-    return [f"{e.dxftype()} #{e.dxf.handle}" for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
+def _raw_handle(tags) -> str | None:
+    try:
+        return tags.get_handle()
+    except DXFValueError:  # entities without a group-5 handle are legal in R12
+        return None
 
 
-def _lost_geometry(doc, before: list[str], fixes=()) -> list[str]:
-    """Geometry entities ("TYPE #handle") listed in `before` that the audit removed from the model space, plus
-    the removal messages in `fixes`. Cosmetic repairs (undefined linetypes, colour indices, unused knots) lose
-    nothing."""
-    present = {f"{e.dxftype()} #{e.dxf.handle}" for e in doc.modelspace()}
-    return [x for x in before if x not in present] + list(fixes)
+def _lost_geometry(before: list[tuple[str, str | None]], doc, fixes=()) -> list[str]:
+    """Geometry the reader dropped: per entity type, how many of the (type, handle) pairs in `before` are missing
+    from the model space after the audit ("3 LINE (#2F)", naming the missing handles where the file had them),
+    plus the removal messages in `fixes`. Cosmetic repairs (undefined linetypes, colour indices, unused knots)
+    lose nothing."""
+    after = [(e.dxftype(), e.dxf.handle) for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
+    lost = []
+    for t, n in (Counter(t for t, _ in before) - Counter(t for t, _ in after)).items():
+        present = {h for u, h in after if u == t}
+        missing = sorted({h for u, h in before if u == t and h is not None and h not in present})
+        lost.append(f"{n} {t}" + (f" ({', '.join('#' + h for h in missing)})" if missing else ""))
+    return lost + list(fixes)
 
 
 def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
@@ -351,11 +362,12 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
     try:
         if data.startswith(_BINARY_SENTINEL):
             doc = Drawing.load(binary_tags_loader(data))
-            before, removed = _geometry_before(doc), []
+            before = [(e.dxftype(), e.dxf.handle) for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
+            removed = []
             auditor = doc.audit()
         else:
             tool = recover.Recover.run(io.BytesIO(data))
-            before = [f"{t.dxftype()} #{t.get_handle()}" for t in tool.section_dict.get("ENTITIES", [])
+            before = [(t.dxftype(), _raw_handle(t)) for t in tool.section_dict.get("ENTITIES", [])
                       if t.dxftype() in _GEOMETRY]
             removed = [m for c, m in tool.fixes if c in (AuditError.REMOVED_INVALID_GRAPHIC_ENTITY,
                                                          AuditError.REMOVED_ENTITY_WITH_INVALID_OWNER_HANDLE)]
@@ -364,9 +376,9 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
         return [], [_issue("dxf_file", f"The file is not a readable DXF ({exc}).")]
     if auditor.errors:
         return [], [_issue("dxf_file", f"The file is damaged and cannot be repaired ({auditor.errors[0].message}).")]
-    lost = _lost_geometry(doc, before, removed)
+    lost = _lost_geometry(before, doc, removed)
     if lost:
-        return [], [_issue("dxf_file", f"The reader removed invalid geometry: {lost[0]} ({len(lost)} in all). "
+        return [], [_issue("dxf_file", f"The reader removed invalid geometry: {'; '.join(lost)}. "
                            "Fix or delete it in the CAD program and export again.")]
     code = doc.header.get("$INSUNITS", 0)
     if code not in _UNITS:
