@@ -48,7 +48,7 @@ New modules:
 
 Every check runs and every problem is reported together: rule, location in mm in the DXF's own coordinates, and how to fix it. Any failure refuses the import and nothing is created.
 
-1. **File.** Units from `$INSUNITS`: mm, or none (read as mm); inch and m are converted; any other unit is refused. Every entity must sit at the same z (any value); otherwise the file is refused, naming one entity at another z. Supported: LINE, ARC, CIRCLE, LWPOLYLINE and POLYLINE (bulges become arcs), SPLINE (flattened), INSERT (exploded). TEXT, MTEXT, DIMENSION, HATCH and POINT are ignored. Any other entity is refused by type.
+1. **File.** Units from `$INSUNITS`: mm, or none (read as mm); inch and m are converted; any other unit is refused. Every entity must sit at the same z (any value); otherwise the file is refused, naming one entity at another z. Supported: LINE, ARC, CIRCLE, LWPOLYLINE and POLYLINE (bulges become arcs), SPLINE and ELLIPSE (flattened; a circular ELLIPSE becomes arcs), INSERT (exploded). TEXT, MTEXT, DIMENSION, HATCH and POINT are ignored. Any other entity is refused by type.
 2. **Closed loops.** Endpoints join within 1 µm. Open ends, duplicate or overlapping edges and self-intersections are each reported with coordinates.
 3. **Centre and rotor angle.** The machine centre is at the origin, and the rotor sits at the exported angle (a rotor pole on phase A, angle 0). A shifted or rotated drawing is refused with the offset or angle found.
 4. **Bodies.** Loops nest into exactly one stator lamination and one rotor lamination, each one connected piece, plus holes. Loops that match a parametric coil side within 1 µm are dropped first (exported coils coming back). Any other loop is refused as stray.
@@ -106,6 +106,7 @@ These amend the sections above where they differ.
 8. Imported edges that differ from the parametric outline, and all holes, get the refinement tag `iron_detail` at size max(min web width / 2, air-gap size).
 9. Before/after masses and key numbers come from a server route, `GET /api/cases/{id}/compare`.
 10. The bench gets ezdxf in its lock and new 0.5.0 reference points and goldens.
+11. ELLIPSE is accepted (flattened to ≤ 1 µm, or arcs when circular); DXF files are read with ezdxf's recover reader, so binary DXF and any line ending work.
 
 ## 10. Out of scope
 

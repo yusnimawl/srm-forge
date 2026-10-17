@@ -1,6 +1,6 @@
 """DXF export and import of the laminations. This is the only module that imports ezdxf.
 
-`read_loops` handles the file-level rules (`dxf_units`, `dxf_flat`, `dxf_entity`), chains the entities into
+`read_loops` reads the bytes with ezdxf's recover reader (ASCII or binary DXF, any line ending or encoding) and handles the file-level rules (`dxf_units`, `dxf_flat`, `dxf_entity`), chains the entities into
 closed loops (an open chain is reported as `open_loop`) and reports duplicate or overlapping edges (`overlap`).
 Loops are in metres. Everything else is checked by `iron_from_loops`.
 """
@@ -8,6 +8,9 @@ import io
 import math
 
 import ezdxf
+from ezdxf import recover
+from ezdxf.document import Drawing
+from ezdxf.lldxf.tagger import binary_tags_loader
 import numpy as np
 from ezdxf.math import bulge_to_arc
 from scipy.spatial import cKDTree
@@ -23,6 +26,7 @@ _UNITS = {0: 1e-3, 1: 0.0254, 4: 1e-3, 6: 1.0}
 _IGNORED = {"TEXT", "MTEXT", "DIMENSION", "HATCH", "POINT"}
 _AREA_CHANGE = 0.10
 _SPLINE_CHORD = 1e-6   # m
+_BINARY_SENTINEL = b"AutoCAD Binary DXF"
 
 
 # --- write -------------------------------------------------------------------------------------
@@ -147,6 +151,33 @@ def _ocs(e):
     return (lambda v: tuple(ocs.to_wcs(v))), True
 
 
+def _ellipse(e, k: float):
+    """(segments, WCS z values) of a full or partial ELLIPSE. Its centre and major axis are stored in WCS; the
+    extrusion only sets the direction in which the parameter runs. A circular one becomes minor arcs, any other
+    is flattened to lines within the chord error."""
+    ext = e.dxf.extrusion
+    if abs(ext[0]) > 1e-9 or abs(ext[1]) > 1e-9 or abs(abs(ext[2]) - 1) > 1e-9:
+        raise _Tilted
+    c, major = e.dxf.center, e.dxf.major_axis
+    t0, t1 = e.dxf.start_param, e.dxf.end_param
+    sweep = (t1 - t0) % (2 * math.pi)
+    if sweep < 1e-9 and abs(t1 - t0) > 1:
+        sweep = 2 * math.pi
+    if abs(e.dxf.ratio - 1) < 1e-9:
+        sign = 1.0 if ext[2] > 0 else -1.0
+        r = math.hypot(major.x, major.y)
+        a0 = math.atan2(major.y, major.x) + sign * t0
+
+        def pt(a):
+            return ((c.x + r * math.cos(a)) * k, (c.y + r * math.sin(a)) * k)
+
+        p0 = pt(a0)
+        return _arcs((c.x * k, c.y * k), r * k, a0, sign * sweep, p0, p0 if sweep > 2 * math.pi - 1e-9
+                     else pt(a0 + sign * sweep)), [c.z]
+    pts = list(e.flattening(_SPLINE_CHORD / k))
+    return [Line((a.x * k, a.y * k), (b.x * k, b.y * k)) for a, b in zip(pts, pts[1:])], [q.z for q in pts]
+
+
 def _entity(e, k: float):
     """(segments, WCS z values) of a supported entity, or None when it is not supported."""
     t = e.dxftype()
@@ -186,6 +217,8 @@ def _entity(e, k: float):
     if t == "POLYLINE" and e.is_3d_polyline:
         v = [(x.dxf.location, x.dxf.get("bulge", 0.0)) for x in e.vertices]
         return _polyline([q for q, _ in v], [b for _, b in v], e.is_closed, k), [q.z for q, _ in v]
+    if t == "ELLIPSE":
+        return _ellipse(e, k)
     if t == "SPLINE":
         pts = list(e.flattening(_SPLINE_CHORD / k))
         return [Line((a.x * k, a.y * k), (b.x * k, b.y * k)) for a, b in zip(pts, pts[1:])], [q.z for q in pts]
@@ -294,9 +327,15 @@ def _chains(segs: list[Segment]) -> tuple[list[tuple[Segment, ...]], list[Valida
 def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationIssue]]:
     """Closed loops (metres) of the geometry in a DXF and the file-level problems found."""
     try:
-        doc = ezdxf.read(io.StringIO(data.decode("utf-8", errors="replace")))
+        if data.startswith(_BINARY_SENTINEL):
+            doc = Drawing.load(binary_tags_loader(data))
+            auditor = doc.audit()
+        else:
+            doc, auditor = recover.read(io.BytesIO(data))
     except Exception as exc:  # ezdxf raises several unrelated types on a broken file
-        return [], [_issue("dxf_file", f"The file is not a readable ASCII DXF ({exc}).")]
+        return [], [_issue("dxf_file", f"The file is not a readable DXF ({exc}).")]
+    if auditor.errors:
+        return [], [_issue("dxf_file", f"The file is damaged and cannot be repaired ({auditor.errors[0].message}).")]
     code = doc.header.get("$INSUNITS", 0)
     if code not in _UNITS:
         return [], [_issue("dxf_units", f"The drawing units ($INSUNITS = {code}) are not supported. Export in mm, "
