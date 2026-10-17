@@ -6,7 +6,7 @@ import { api, apiBlob, type JobOut } from "@/api/client"
 import type { Case, Estimate } from "@/api/types"
 import { useJobActions } from "@/api/useJobActions"
 import { useJobEvents } from "@/api/useJobEvents"
-import { Bar, fmtElapsed, progressOf } from "@/components/run/RunProgress"
+import { JobStepper } from "@/components/run/JobStepper"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -25,14 +25,12 @@ const report = (e: unknown) => {
 
 const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation" }
 
-/** Live state of the case's running job: the map-points bar while evaluating, the message while validating. The page
- *  refetches the case when the job ends. */
+/** Live state of the case's job as a step list. The page refetches the case when the job ends. */
 function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
   const qc = useQueryClient()
   const actions = useJobActions()
   const { job: live } = useJobEvents(job.id)
   const cur = live ?? job
-  const p = progressOf(cur)
   const ended = !cur.active
   useEffect(() => {
     if (!ended) return
@@ -53,11 +51,7 @@ function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
           </Button>
         )}
       </div>
-      {!validating && <Bar label="Map points" done={p.points_done ?? 0} total={p.points_total ?? 0} />}
-      <p aria-live="polite" className="text-sm text-muted-foreground">
-        Elapsed <span className="num">{fmtElapsed(p.elapsed_s)}</span>
-        {p.message ? ` · ${p.message}` : ""}
-      </p>
+      <JobStepper job={cur} />
     </div>
   )
 }

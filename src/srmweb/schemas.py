@@ -155,6 +155,8 @@ class JobOut(BaseModel):
     status: str
     active: bool
     resumable: bool
+    lane: Literal["main", "quick"]
+    queue_position: int | None = None
     case_id: str | None = None
     progress: dict | None = None
     error: str | None = None

@@ -1,3 +1,4 @@
+import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useAnimate, useFrames } from "@/api/field"
@@ -56,7 +57,7 @@ function Playback({ jobId, mesh, onFrame, onActivate, pauseSignal }: {
   useEffect(() => () => onFrame(null), [onFrame])
   const series = useMemo(() => (frames ? probeSeries(frames, mesh.nRotorPoles) : []), [frames, mesh])
 
-  if (!job) return <p className="text-sm text-muted-foreground">Loading the animation...</p>
+  if (!job) return <SrmSpinner label="Loading the animation..." showLabel />
   if (job.active) {
     const p = progressOf(job)
     return (
@@ -75,7 +76,7 @@ function Playback({ jobId, mesh, onFrame, onActivate, pauseSignal }: {
     )
   }
   if (!done) return <p role="alert" className="text-sm text-destructive">{job.error ?? `The animation ${job.status}.`}</p>
-  if (q.isPending) return <p className="text-sm text-muted-foreground">Loading the frames...</p>
+  if (q.isPending) return <SrmSpinner label="Loading the frames..." showLabel />
   if (!frames || !shown) return <p role="alert" className="text-sm text-destructive">{errorMessage(q.error)}</p>
 
   return (

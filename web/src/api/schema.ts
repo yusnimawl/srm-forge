@@ -1054,10 +1054,17 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /**
+             * Lane
+             * @enum {string}
+             */
+            lane: "main" | "quick";
             /** Progress */
             progress?: {
                 [key: string]: unknown;
             } | null;
+            /** Queue Position */
+            queue_position?: number | null;
             /** Resumable */
             resumable: boolean;
             /** Started */

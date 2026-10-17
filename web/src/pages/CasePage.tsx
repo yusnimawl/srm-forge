@@ -1,3 +1,4 @@
+import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
@@ -28,7 +29,7 @@ export function CasePage() {
   const { caseId = "" } = useParams()
   const c = useQuery({ queryKey: ["case", caseId], queryFn: () => api<Case>(`/api/cases/${caseId}`) })
   if (c.isError) return <p className="text-destructive">Could not load the case: {errorMessage(c.error)}</p>
-  if (!c.data) return <p className="text-muted-foreground" aria-busy="true">Loading the case…</p>
+  if (!c.data) return <SrmSpinner label="Loading the case…" showLabel />
   return <CaseEditor key={c.data.id} data={c.data} />
 }
 
@@ -182,7 +183,7 @@ function CaseEditor({ data }: { data: Case }) {
             {evaluation ? (
               evaluation.status === "ok" ? (
                 <div className="space-y-6">
-                  <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
+                  <Suspense fallback={<SrmSpinner label="Loading charts…" showLabel />}>
                     <AnalysisTabs evaluation={evaluation} label={data.label || data.id} baseSpeedRpm={(data.inputs as { requirements?: { base_speed_rpm?: number } }).requirements?.base_speed_rpm} caseId={data.id} />
                   </Suspense>
                   {data.validation && <ValidationPanel validation={data.validation} winding={evaluation.winding} />}

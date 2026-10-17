@@ -38,7 +38,7 @@ from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
 from srmweb.config import Settings
 from srmweb.frames import FieldContext, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
-from srmweb.jobs import KINDS, JobRunner, QueueFull
+from srmweb.jobs import KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
 from srmweb.results import CaseOut, DxfImportOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, EditCase, EstimateOut,
@@ -97,7 +97,9 @@ def _job_out(job: dict, runner: JobRunner, live=...) -> JobOut:
     if live is not None:
         job = {**job, "progress": live[1]}
     return JobOut(**{k: job[k] for k in JobOut.model_fields if k in job},
-                  active=job["status"] in ACTIVE, resumable=job["status"] in RESUMABLE)
+                  active=job["status"] in ACTIVE, resumable=job["status"] in RESUMABLE,
+                  lane=lane_of(job["kind"]),
+                  queue_position=runner.queue_position(job["id"]) if job["status"] == "queued" else None)
 
 
 def _submit(runner: JobRunner, kind: str, request: dict) -> dict:

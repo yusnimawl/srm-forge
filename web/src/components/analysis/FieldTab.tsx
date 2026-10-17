@@ -1,3 +1,4 @@
+import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { useCallback, useMemo, useState } from "react"
 import { useFieldMesh, useFieldSnapshot } from "@/api/field"
 import { ApiError } from "@/api/client"
@@ -49,7 +50,7 @@ export default function FieldTab({ caseId }: { caseId: string }) {
   const shownBMax = source === "anim" && anim ? anim.bMax : undefined
   const renderMode = useMemo(canRender, [])
 
-  if (meshQ.isPending) return <p className="py-4 text-sm text-muted-foreground">Loading the field mesh...</p>
+  if (meshQ.isPending) return <SrmSpinner className="py-4" label="Loading the field mesh..." showLabel />
   if (!mesh) return <p role="alert" className="py-4 text-sm text-destructive">{detail(meshQ.error)}</p>
 
   const pitchDeg = 360 / mesh.nRotorPoles

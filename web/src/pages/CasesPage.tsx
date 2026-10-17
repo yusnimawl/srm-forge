@@ -1,3 +1,4 @@
+import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { lazy, Suspense, useState } from "react"
 import { useCaseDetails, useCaseList, useDeleteCase, usePatchCase } from "@/api/cases"
 import { CaseTable } from "@/components/cases/CaseTable"
@@ -61,7 +62,7 @@ export function CasesPage() {
       {shown.length > 0 && (
         <section aria-label="Performance of the shown cases" className="order-1 space-y-2 md:order-none">
           {main ? (
-            <Suspense fallback={<p className="text-sm text-muted-foreground">Loading charts…</p>}>
+            <Suspense fallback={<SrmSpinner label="Loading charts…" showLabel />}>
               <AnalysisTabs performanceOnly evaluation={main.evaluation} label={main.label} overlays={overlays} />
             </Suspense>
           ) : (

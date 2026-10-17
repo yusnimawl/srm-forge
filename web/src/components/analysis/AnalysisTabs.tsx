@@ -1,3 +1,4 @@
+import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { lazy, Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Overlay } from "@/lib/analysis"
@@ -54,7 +55,7 @@ export default function AnalysisTabs({
       </TabsContent>
       {showField && (
         <TabsContent value="field">
-          <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">Loading...</p>}>
+          <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
             <FieldTab key={caseId} caseId={caseId} />
           </Suspense>
         </TabsContent>
