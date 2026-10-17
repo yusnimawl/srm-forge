@@ -4,6 +4,7 @@ import { api, type JobOut } from "@/api/client"
 import { searchJobs } from "@/api/jobs"
 import { actionsFor, useJobActions } from "@/api/useJobActions"
 import { fmtElapsed, JobStatusBadge, progressOf } from "@/components/run/RunProgress"
+import { QueuePanel } from "@/components/run/QueuePanel"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -69,6 +70,7 @@ export function RunsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Runs</h1>
+      <QueuePanel jobs={jobs.data ?? []} />
       {jobs.isError && <p className="text-destructive">Could not load the runs.</p>}
       {jobs.isSuccess && list.length === 0 && (
         <div className="space-y-3 rounded-[10px] border border-border bg-card p-6 text-center">
