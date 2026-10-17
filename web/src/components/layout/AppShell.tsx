@@ -1,3 +1,4 @@
+import { SrmLogo } from "@/components/brand/SrmLogo"
 import { Fragment, type ComponentType } from "react"
 import { NavLink, Outlet } from "react-router"
 import { Layers, List, Search, Settings } from "lucide-react"
@@ -18,7 +19,7 @@ const base =
 function Brand({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span aria-hidden className="size-3.5 rounded-full border-2 border-primary" />
+      <SrmLogo size={22} title="SRM designer logo" />
       SRM designer
     </div>
   )
