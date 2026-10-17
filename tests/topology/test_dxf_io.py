@@ -529,3 +529,24 @@ def test_duplicate_entity_handles_refused():
     assert body.count(f"\n  5\n{h[0]}\n") == 4
     loops, issues = read_loops((head + "\nENTITIES\n" + body).encode())
     assert loops == [] and _errs(issues) == {"dxf_file"} and "3 LINE" in issues[0].message
+
+
+def _with_paper_geometry():
+    doc = _doc()
+    _square(doc.modelspace(), 0, 0, 10)
+    paper = doc.layouts.get("Layout1")
+    paper.add_line((0, 0), (200, 0))
+    paper.add_circle((50, 50), 20)
+    return doc
+
+
+def test_paper_layout_geometry_ignored():
+    loops, issues = read_loops(_bytes(_with_paper_geometry()))
+    assert issues == [] and len(loops) == 1
+
+
+def test_paper_layout_geometry_ignored_binary(tmp_path):
+    path = tmp_path / "p.dxf"
+    _with_paper_geometry().saveas(path, fmt="bin")
+    loops, issues = read_loops(path.read_bytes())
+    assert issues == [] and len(loops) == 1

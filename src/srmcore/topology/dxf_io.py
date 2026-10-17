@@ -343,12 +343,17 @@ def _raw_handle(tags) -> str | None:
         return None
 
 
+def _drawn(doc) -> list[tuple[str, str]]:
+    """(type, handle) of the geometry entities in the model space and every paper layout."""
+    return [(e.dxftype(), e.dxf.handle) for layout in doc.layouts for e in layout if e.dxftype() in _GEOMETRY]
+
+
 def _lost_geometry(before: list[tuple[str, str | None]], doc, fixes=()) -> list[str]:
     """Geometry the reader dropped: per entity type, how many of the (type, handle) pairs in `before` are missing
-    from the model space after the audit ("3 LINE (#2F)", naming the missing handles where the file had them),
-    plus the removal messages in `fixes`. Cosmetic repairs (undefined linetypes, colour indices, unused knots)
-    lose nothing."""
-    after = [(e.dxftype(), e.dxf.handle) for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
+    from the model space and paper layouts after the audit ("3 LINE (#2F)", naming the missing handles where the
+    file had them), plus the removal messages in `fixes`. Cosmetic repairs (undefined linetypes, colour indices,
+    unused knots) lose nothing."""
+    after = _drawn(doc)
     lost = []
     for t, n in (Counter(t for t, _ in before) - Counter(t for t, _ in after)).items():
         present = {h for u, h in after if u == t}
@@ -362,8 +367,7 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
     try:
         if data.startswith(_BINARY_SENTINEL):
             doc = Drawing.load(binary_tags_loader(data))
-            before = [(e.dxftype(), e.dxf.handle) for e in doc.modelspace() if e.dxftype() in _GEOMETRY]
-            removed = []
+            before, removed = _drawn(doc), []
             auditor = doc.audit()
         else:
             tool = recover.Recover.run(io.BytesIO(data))
