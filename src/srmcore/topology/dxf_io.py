@@ -26,6 +26,7 @@ _UNITS = {0: 1e-3, 1: 0.0254, 4: 1e-3, 6: 1.0}
 _IGNORED = {"TEXT", "MTEXT", "DIMENSION", "HATCH", "POINT"}
 _AREA_CHANGE = 0.10
 _SPLINE_CHORD = 1e-6   # m
+_DROPPED = ("Removed", "Deleted", "Replaced")   # auditor fixes that lose geometry
 _BINARY_SENTINEL = b"AutoCAD Binary DXF"
 
 
@@ -123,7 +124,7 @@ def _where(e, k: float) -> str:
     if v is None:
         return ""
     ext = e.dxf.get("extrusion", (0.0, 0.0, 1.0))
-    if ext[2] < 0 and abs(ext[0]) < 1e-9 and abs(ext[1]) < 1e-9:
+    if e.dxftype() != "ELLIPSE" and ext[2] < 0 and abs(ext[0]) < 1e-9 and abs(ext[1]) < 1e-9:
         v = tuple(e.ocs().to_wcs(v))
     return f" near {_at((v[0] * k, v[1] * k))}"
 
@@ -134,6 +135,10 @@ def _flatten(entities):
             yield from _flatten(e.virtual_entities())
         else:
             yield e
+
+
+class _Degenerate(Exception):
+    """An entity without extent."""
 
 
 class _Tilted(Exception):
@@ -163,8 +168,12 @@ def _ellipse(e, k: float):
     sweep = (t1 - t0) % (2 * math.pi)
     if sweep < 1e-9 and abs(t1 - t0) > 1:
         sweep = 2 * math.pi
-    if abs(e.dxf.ratio - 1) < 1e-9:
-        sign = 1.0 if ext[2] > 0 else -1.0
+    if sweep < 1e-9:
+        raise _Degenerate
+    if math.hypot(major.x, major.y) < TOL / k:
+        raise _Degenerate
+    if abs(abs(e.dxf.ratio) - 1) < 1e-9:
+        sign = (1.0 if ext[2] > 0 else -1.0) * (1.0 if e.dxf.ratio > 0 else -1.0)
         r = math.hypot(major.x, major.y)
         a0 = math.atan2(major.y, major.x) + sign * t0
 
@@ -336,6 +345,10 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
         return [], [_issue("dxf_file", f"The file is not a readable DXF ({exc}).")]
     if auditor.errors:
         return [], [_issue("dxf_file", f"The file is damaged and cannot be repaired ({auditor.errors[0].message}).")]
+    dropped = [f.message for f in auditor.fixes if f.message.startswith(_DROPPED)]
+    if dropped:
+        return [], [_issue("dxf_file", f"The file has invalid content that was removed on reading: {dropped[0]} "
+                           f"({len(dropped)} in all). Fix or delete it in the CAD program and export again.")]
     code = doc.header.get("$INSUNITS", 0)
     if code not in _UNITS:
         return [], [_issue("dxf_units", f"The drawing units ($INSUNITS = {code}) are not supported. Export in mm, "
@@ -350,6 +363,10 @@ def read_loops(data: bytes) -> tuple[list[tuple[Segment, ...]], list[ValidationI
             continue
         try:
             got = _entity(e, k)
+        except _Degenerate:
+            issues.append(_issue("dxf_entity", f"A degenerate {t}{_where(e, k)} (zero size or zero sweep). "
+                                 "Delete it."))
+            continue
         except _Tilted:
             return [], [_issue("dxf_flat", f"A {t}{_where(e, k)} lies in a tilted plane. Draw everything in the "
                                "XY plane.")]

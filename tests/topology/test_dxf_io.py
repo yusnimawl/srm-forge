@@ -317,11 +317,11 @@ def _reference_8_6():
 def test_onshape_file_reads_closed_loops():
     loops, issues = read_loops(FIXTURE.read_bytes())
     assert not {i.rule for i in issues} & {"dxf_file", "dxf_entity"}
-    assert len(loops) >= 4
+    assert len(loops) == 34   # 18 iron loops (4 outer/bore, 8 yoke holes, 6 rotor holes) and 16 coil sides
 
 
 def test_onshape_file_reports_untrimmed_arc():
-    # the stator OD arc 316.34..43.64 deg runs straight over the V notch at 0 deg, so the notch lines dangle
+    # the stator OD arc 316.34..43.66 deg runs straight over the V notch at 0 deg, so the notch lines dangle
     iron, issues = import_dxf(FIXTURE.read_bytes(), _reference_8_6())
     assert iron is None
     assert [(i.rule, i.severity) for i in issues] == [("open_loop", "error")] * 2
@@ -343,12 +343,18 @@ def test_onshape_file_with_arc_trimmed_imports_holes():
 
 def test_binary_dxf_is_read(tmp_path):
     doc = _doc()
-    _square(doc.modelspace(), 0, 0, 10)
+    msp = doc.modelspace()
+    _square(msp, 0, 0, 10)
+    msp.add_arc((30, 0), 5, 0, 90)
+    msp.add_line((35, 0), (30, 5))
+    msp.add_ellipse((60, 0), (10, 0), 0.5)
     path = tmp_path / "b.dxf"
     doc.saveas(path, fmt="bin")
     assert path.read_bytes().startswith(b"AutoCAD Binary DXF")
     loops, issues = read_loops(path.read_bytes())
-    assert issues == [] and len(loops) == 1 and len(loops[0]) == 4
+    assert issues == [] and len(loops) == 3
+    assert sorted(len(l) > 4 for l in loops) == [False, False, True]
+    assert sum(isinstance(s, Arc) for l in loops for s in l) == 1
 
 
 def test_garbage_is_dxf_file():
@@ -418,3 +424,43 @@ def test_tilted_ellipse_refused():
     doc.modelspace().add_ellipse((0, 0, 0), (10, 0, 0), 0.5, dxfattribs={"extrusion": (1, 0, 0)})
     _, issues = read_loops(_bytes(doc))
     assert _errs(issues) == {"dxf_flat"}
+
+
+def test_crlf_line_endings():
+    doc = _doc()
+    _square(doc.modelspace(), 0, 0, 10)
+    loops, issues = read_loops(_bytes(doc).replace(b"\n", b"\r\n"))
+    assert issues == [] and len(loops) == 1
+
+
+def _set_group(text: str, after: str, code: str, value: str) -> str:
+    """Replace the value of the first group `code` that follows the first `after` line in a DXF text."""
+    k = text.index(f"\n{code}\n", text.index(f"\n{after}\n"))
+    e = text.index("\n", k + len(code) + 2)
+    return f"{text[:k]}\n{code}\n{value}{text[e:]}"
+
+
+def test_removed_entity_is_an_error():
+    doc = _doc()
+    msp = doc.modelspace()
+    _square(msp, 0, 0, 100)
+    msp.add_spline(fit_points=[(40, 40), (60, 40), (60, 60), (40, 60), (40, 40)])
+    loops, issues = read_loops(_set_group(_bytes(doc).decode(), "SPLINE", " 71", "0").encode())
+    assert loops == [] and _errs(issues) == {"dxf_file"}
+    assert "SPLINE" in issues[0].message and "removed" in issues[0].message
+
+
+def test_degenerate_ellipses_reported():
+    for ratio in (0.5, 1.0):
+        doc = _doc()
+        _square(doc.modelspace(), 0, 0, 10)
+        doc.modelspace().add_ellipse((30, 0), (5, 0), ratio, start_param=1.0, end_param=1.0)
+        _, issues = read_loops(_bytes(doc))
+        assert [i.rule for i in issues] == ["dxf_entity"] and "ELLIPSE near (30.0, 0.0) mm" in issues[0].message
+
+
+def test_negative_ratio_circular_ellipse_gives_arcs():
+    doc = _doc()
+    doc.modelspace().add_ellipse((20, 0), (5, 0), 1.0)
+    loops, issues = read_loops(_set_group(_bytes(doc).decode(), "ELLIPSE", " 40", "-1.0").encode())
+    assert issues == [] and len(loops) == 1 and all(isinstance(s, Arc) for s in loops[0])
