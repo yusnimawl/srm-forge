@@ -251,3 +251,25 @@ def test_real_animate_job_steps(tmp_path, monkeypatch):
               case_id="c", current_a=1.0)
     jobs.run_animate_job(req, rep, _ctx(tmp_path, quick))
     assert rep.seen == ["queued", "frames"]
+
+
+@pytest.mark.parametrize(
+    ("kind", "step"),
+    [("evaluate", "winding"), ("search", "designs"), ("search", "pareto"), ("evaluate", "mesh")],
+)
+def test_eta_none_outside_point_counted_steps(tmp_path, monkeypatch, kind, step):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    rep = Reporter(Store(tmp_path / "a.db"), "j", kind)
+    now[0] = 120.0
+    rep.progress(step=step, points_done=100, points_total=100)
+    assert rep.snapshot()[1]["eta_s"] is None
+
+
+def test_eta_computed_in_frames_step(tmp_path, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    rep = Reporter(Store(tmp_path / "a.db"), "j", "animate")
+    now[0] = 120.0
+    rep.progress(step="frames", points_done=10, points_total=20)
+    assert rep.snapshot()[1]["eta_s"] == pytest.approx(20.0)

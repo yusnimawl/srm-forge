@@ -59,4 +59,9 @@ describe("stepStates", () => {
     expect(stepStates(job({}, { steps: undefined, step: undefined }))).toEqual([])
     expect(stepStates(job({ progress: null }))).toEqual([])
   })
+  it("marks no step active or failed when the current step is missing or unknown", () => {
+    expect(states(job({ status: "failed" }, { step: undefined }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
+    expect(states(job({ status: "failed" }, { step: "nope" }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
+    expect(states(job({ status: "done" }, { step: undefined }))).toEqual(["done", "done", "done", "done", "done"])
+  })
 })

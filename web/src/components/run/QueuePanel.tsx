@@ -5,6 +5,12 @@ import { fmtAbout } from "@/lib/steps"
 
 const LANE_LABEL = { main: "main lane", quick: "quick lane" } as const
 
+/** Search jobs have a run page; every other kind belongs to a case. A case job without a case falls back to the run list. */
+export function jobHref(job: JobOut): string {
+  if (job.kind === "search") return `/runs/${job.id}`
+  return job.case_id ? `/cases/${job.case_id}` : "/runs"
+}
+
 export type QueueRow = { job: JobOut; place: string; startsIn: string | null }
 
 const etaOf = (j: JobOut): number | null => {
@@ -45,7 +51,7 @@ export function QueuePanel({ jobs }: { jobs: JobOut[] }) {
       <ul className="m-0 list-none space-y-2 p-0">
         {rows.map(({ job, place, startsIn }) => (
           <li key={job.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <Link to={`/runs/${job.id}`} className="num min-w-0 break-all underline-offset-2 hover:underline">
+            <Link to={jobHref(job)} className="num min-w-0 break-all underline-offset-2 hover:underline">
               {job.id}
             </Link>
             <span className="text-muted-foreground">{job.kind}</span>

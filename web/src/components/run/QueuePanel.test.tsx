@@ -1,19 +1,28 @@
 import { MemoryRouter } from "react-router"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import type { JobOut } from "@/api/client"
-import { QueuePanel, queueRows } from "./QueuePanel"
+import { QueuePanel, jobHref, queueRows } from "./QueuePanel"
 
 import { act } from "react"
-import { createRoot } from "react-dom/client"
+import { createRoot, type Root } from "react-dom/client"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+const roots: Root[] = []
 
 function render(el: React.ReactElement): HTMLElement {
   const container = document.createElement("div")
   document.body.appendChild(container)
-  act(() => createRoot(container).render(el))
+  const root = createRoot(container)
+  roots.push(root)
+  act(() => root.render(el))
   return container
 }
+
+afterEach(() => {
+  for (const root of roots.splice(0)) act(() => root.unmount())
+  document.body.replaceChildren()
+})
 
 const job = (id: string, over: Partial<JobOut>): JobOut => ({
   id, kind: "evaluate", status: "queued", active: true, resumable: false, created: "2026-10-18T10:00:00",
@@ -48,5 +57,22 @@ describe("QueuePanel", () => {
   })
   it("renders nothing when no job is active", () => {
     expect(render(<MemoryRouter><QueuePanel jobs={[JOBS[4]]} /></MemoryRouter>).firstChild).toBeNull()
+  })
+})
+
+describe("job links", () => {
+  it("links search jobs to the run page and other kinds to their case", () => {
+    expect(jobHref(job("s1", { kind: "search" }))).toBe("/runs/s1")
+    expect(jobHref(job("e1", { kind: "evaluate", case_id: "c9" }))).toBe("/cases/c9")
+    expect(jobHref(job("a1", { kind: "animate", case_id: "c9" }))).toBe("/cases/c9")
+    expect(jobHref(job("e2", { kind: "validate", case_id: null }))).toBe("/runs")
+  })
+  it("renders the hrefs", () => {
+    const c = render(
+      <MemoryRouter>
+        <QueuePanel jobs={[job("s1", { kind: "search" }), job("e1", { case_id: "c9" })]} />
+      </MemoryRouter>,
+    )
+    expect(Array.from(c.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/runs/s1", "/cases/c9"])
   })
 })

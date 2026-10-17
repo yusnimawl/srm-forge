@@ -19,7 +19,7 @@ const base =
 function Brand({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <SrmLogo size={22} title="SRM designer logo" />
+      <SrmLogo size={22} decorative />
       SRM designer
     </div>
   )

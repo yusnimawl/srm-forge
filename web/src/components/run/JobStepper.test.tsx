@@ -1,18 +1,27 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import type { JobOut } from "@/api/client"
 import { JobStepper } from "./JobStepper"
 
 import { act } from "react"
-import { createRoot } from "react-dom/client"
+import { createRoot, type Root } from "react-dom/client"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+const roots: Root[] = []
 
 function render(el: React.ReactElement): HTMLElement {
   const container = document.createElement("div")
   document.body.appendChild(container)
-  act(() => createRoot(container).render(el))
+  const root = createRoot(container)
+  roots.push(root)
+  act(() => root.render(el))
   return container
 }
+
+afterEach(() => {
+  for (const root of roots.splice(0)) act(() => root.unmount())
+  document.body.replaceChildren()
+})
 
 const base: JobOut = {
   id: "j1", kind: "evaluate", status: "running", active: true, resumable: false, created: "2026-10-18T10:00:00",

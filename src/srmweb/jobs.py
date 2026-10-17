@@ -41,7 +41,7 @@ STEPS: dict[str, tuple[str, ...]] = {
     "search": ("queued", "sampling", "designs", "pareto", "saved"),
 }
 _ETA_MIN_FRACTION = 0.05
-_NO_ETA_STEPS = ("designs",)   # the point counts restart with every design
+_ETA_STEPS = ("mapping", "frames")   # the steps whose point counts are the work done
 
 
 def initial_progress(kind: str) -> dict:
@@ -86,9 +86,9 @@ class Reporter:
             return self._version, dict(self._fields, elapsed_s=elapsed, eta_s=self._eta(elapsed))
 
     def _eta(self, elapsed: float) -> float | None:
-        """Time left at the average pace so far, once 5 % of the points are done."""
+        """Time left at the average pace so far, once 5 % of the points are done; only in the point-counted steps."""
         done, total = self._fields["points_done"], self._fields["points_total"]
-        if total <= 0 or done < _ETA_MIN_FRACTION * total or self._fields["step"] in _NO_ETA_STEPS:
+        if total <= 0 or done < _ETA_MIN_FRACTION * total or self._fields["step"] not in _ETA_STEPS:
             return None
         return elapsed / done * (total - done)
 

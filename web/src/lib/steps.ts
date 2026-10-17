@@ -57,11 +57,11 @@ function stepIds(job: JobOut): string[] {
 }
 
 /** One row per step of the job: finished steps done, the current one active (or failed / cancelled when the job
- *  ended in it), the rest waiting. A done job has every step done. Empty for a job without a step list. */
+ *  ended in it), the rest waiting. A done job has every step done. Empty for a job without a step list. When the current step is missing or unknown no row is active, failed or cancelled. */
 export function stepStates(job: JobOut): StepRow[] {
   const ids = stepIds(job)
   const labels = LABELS[job.kind] ?? {}
-  const current = Math.max(0, ids.indexOf(String(job.progress?.step ?? "")))
+  const current = ids.indexOf(String(job.progress?.step ?? ""))
   const stop: StepState | null =
     job.status === "failed" ? "failed" : job.status === "cancelled" || job.status === "interrupted" ? "cancelled" : null
   return ids.map((id, i) => {

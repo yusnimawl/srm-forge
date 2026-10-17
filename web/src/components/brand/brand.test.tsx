@@ -41,6 +41,13 @@ afterEach(() => {
 })
 
 describe("SrmLogo", () => {
+  it("is hidden from assistive tech when decorative", () => {
+    const { container } = render(<SrmLogo decorative />)
+    const svg = container.querySelector("svg")!
+    expect(svg.getAttribute("aria-hidden")).toBe("true")
+    expect(svg.getAttribute("role")).toBeNull()
+    expect(container.querySelector("title")).toBeNull()
+  })
   it("has an accessible title", () => {
     const { container } = render(<SrmLogo title="SRM designer" />)
     const svg = container.querySelector("svg")!
