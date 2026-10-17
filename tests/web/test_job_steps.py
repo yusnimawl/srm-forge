@@ -1,8 +1,10 @@
 import threading
+import types
 import time
 
 import pytest
 
+from srmapp.case import LIMIT_FIELDS
 from srmweb import jobs
 from srmweb.api import _job_out
 from srmweb.config import Settings
@@ -54,7 +56,8 @@ def test_step_ids_per_kind():
 def test_queued_job_has_steps_and_queued_step(make, kind):
     gate = threading.Event()
     store, runner = make(lambda k, r, rep, ctx: gate.wait(5) and {})
-    runner.submit("search", {})   # occupies the lane (or not) so the next job may wait
+    blocker = runner.submit("animate" if kind == "animate" else "search", {})
+    _wait(store, blocker, {"running"})
     j = runner.submit(kind, {})
     progress = _job_out(store.get_job(j), runner).progress
     assert progress["steps"] == SEQUENCES[kind]
@@ -170,3 +173,81 @@ def test_eta_is_elapsed_per_point_times_points_left(tmp_path, monkeypatch):
     assert rep.snapshot()[1]["eta_s"] == pytest.approx(20.0 / 10 * 90)
     rep.progress(points_done=100)
     assert rep.snapshot()[1]["eta_s"] == 0.0
+
+
+class _Recorder(Reporter):
+    """A reporter that remembers each distinct step it passes through."""
+
+    def __init__(self, tmp_path):
+        super().__init__(Store(tmp_path / "r.db"), "j", "")
+        self.seen = ["queued"]
+
+    def progress(self, **fields):
+        super().progress(**fields)
+        step = self.snapshot()[1]["step"]
+        if not self.seen or self.seen[-1] != step:
+            self.seen.append(step)
+
+
+def _ns(**kw):
+    return types.SimpleNamespace(**kw)
+
+
+def _ctx(tmp_path, quick=None):
+    return jobs.JobContext(_settings(tmp_path), quick)
+
+
+def test_real_evaluate_job_steps(tmp_path, monkeypatch):
+    def fake(inputs, *, progress, on_scan, **kw):
+        progress(1, 3)
+        progress(3, 3)
+        on_scan()
+        return _ns(status="ok")
+
+    monkeypatch.setattr(jobs, "evaluate_design", fake)
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
+    rep = _Recorder(tmp_path)
+    req = _ns(case_id="c", grid=None,
+              inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
+    assert rep.seen == ["queued", "mesh", "mapping", "winding"]
+
+
+def test_real_validate_job_steps(tmp_path, monkeypatch):
+    def fake(inputs, *, on_checks, **kw):
+        on_checks()
+        return {}
+
+    monkeypatch.setattr(jobs, "validate_case", fake)
+    monkeypatch.setattr(jobs, "to_json", lambda v: {})
+    rep = _Recorder(tmp_path)
+    jobs.run_validate_job(_ns(inputs=None), rep, _ctx(tmp_path))
+    assert rep.seen == ["queued", "map", "checks"]
+
+
+def test_real_search_job_steps(tmp_path, monkeypatch):
+    def fake(requirements, ss, *, progress, point_progress, **kw):
+        point_progress(1, 2, 5, 40)
+        progress(1, 2)
+        point_progress(2, 2, 5, 40)
+        progress(2, 2)
+        return None
+
+    monkeypatch.setattr(jobs, "run_search", fake)
+    monkeypatch.setattr(jobs, "SearchSettings", lambda **kw: None)
+    monkeypatch.setattr(jobs, "search_result_json", lambda r: {})
+    rep = _Recorder(tmp_path)
+    settings = _ns(n_candidates=1, seed=0, shortlist=1, preset="screening", stator="a", rotor="a", **{f: None for f in LIMIT_FIELDS})
+    jobs.run_search_job(_ns(requirements=None, settings=settings, grid=None), rep, _ctx(tmp_path))
+    assert rep.seen == ["queued", "sampling", "designs", "pareto"]
+
+
+def test_real_animate_job_steps(tmp_path, monkeypatch):
+    frame = _ns(psi=1.0, torque=0.0, status="ok", probes={"yoke": 0.5})
+    quick = _ns(run=lambda fn, *a: frame)
+    monkeypatch.setattr(jobs, "reference_design", lambda inputs: None)
+    rep = _Recorder(tmp_path)
+    req = _ns(inputs=_ns(design=_ns(machine=_ns(n_rotor_poles=6))), frames=3, coil_current=1.0, k=1.0,
+              case_id="c", current_a=1.0)
+    jobs.run_animate_job(req, rep, _ctx(tmp_path, quick))
+    assert rep.seen == ["queued", "frames"]
