@@ -1,0 +1,17 @@
+# Glossary
+
+**B_harm method** — Fourier decomposition of flux density per section + Steinmetz loss per harmonic (Melo Method 1) (Ch 3)
+**Classical eddy loss** — k·⟨(dB/dt)²⟩, k = e²/(4·k_cir·ρ·d) (Ch 1)
+**Dual-frequency method** — P/f = K_e·a(B)·f + K_h·b(B); separates hysteresis and eddy from two frequencies (Ch 2, 4)
+**Excess loss** — Fiorillo–Novikov k_exc·⟨|dB/dt|^1.5⟩ (Ch 1)
+**FIP (Flux Integral Path)** — whole-machine loss from 12× the flux path of one pole and the time integral of its B (Ch 4)
+**Flux flow Q** — a·c·mean(B) over a pole cross-section (Ch 4)
+**k_cir** — constant 1–3 in the eddy coefficient for non-uniform inner-path emf (Ch 1)
+**Leplus model** — five-section polynomial B–H hysteresis loop (Ch 1)
+**NNNN–SSSS / NNSN–SSNS** — pole polarity patterns of an 8/6 with series windings; second gives higher iron loss (Ch 2)
+**Skin depth δ** — √(2/(ωσμ)); governs lamination flux penetration (Ch 3)
+**Specific loss** — loss per kg in a zone (Ch 1, 2)
+**Steinmetz α** — flux exponent; α(B)=0.38B³−0.02B²−0.33B+1.44 for 50W470 (Ch 2)
+**Stroke angle** — Melo: θ_S = 2π(1/Nr − 1/Ns) = 30° for 6/4; Torrent: phase delay ε = 2π/(m·Nr) (Ch 1, 3)
+**θ_h (hysteresis angle)** — lag between B and H in the elliptical loop; 20° max used (Ch 3)
+**Zone** — region of the magnetic circuit with a distinct B(t) waveform (Ch 1)
