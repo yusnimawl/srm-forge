@@ -63,7 +63,7 @@ def test_ranges_carried_to_model():
     data = m19_loss_data()
     model = fit_loss(data, density=7650.0, thickness=0.00036)
     assert model.b_range == data.b_range and model.frequency_range == data.frequency_range
-    assert loss_model("10JNEX900").b_range == (0.2, 1.0)
+    assert loss_model("10JNEX900").b_range == (0.2, 1.3)
 
 
 def test_loss_data_validation():
@@ -83,3 +83,9 @@ def test_loss_data_validation():
         cls(**{**base, "b_range": (1.5, 0.1)})
     with pytest.raises(ValueError, match="frequency_range"):
         cls(**{**base, "frequency_range": (1000.0, 50.0)})
+
+
+def test_fit_with_high_b_points():
+    model = loss_model("10JNEX900")
+    assert model.fit_error < 0.15
+    assert model.b_range == (0.2, 1.3)

@@ -31,6 +31,12 @@
       {"b": 0.5, "f": 50.0, "w_per_kg": 0.129},
       {"b": 0.7, "f": 50.0, "w_per_kg": 0.248},
       {"b": 1.0, "f": 50.0, "w_per_kg": 0.506},
+      {"b": 1.1, "f": 50.0, "w_per_kg": 0.649},
+      {"b": 1.2, "f": 50.0, "w_per_kg": 0.843},
+      {"b": 1.3, "f": 50.0, "w_per_kg": 1.079},
+      {"b": 1.1, "f": 60.0, "w_per_kg": 0.799},
+      {"b": 1.2, "f": 60.0, "w_per_kg": 1.026},
+      {"b": 1.3, "f": 60.0, "w_per_kg": 1.27},
       {"b": 0.2, "f": 100.0, "w_per_kg": 0.0559},
       {"b": 0.3, "f": 100.0, "w_per_kg": 0.118},
       {"b": 0.5, "f": 100.0, "w_per_kg": 0.301},
@@ -70,10 +76,10 @@
       {"b": 0.5, "f": 20000.0, "w_per_kg": 495},
       {"b": 0.7, "f": 20000.0, "w_per_kg": 881}
     ],
-    "provenance": {"source": "JFE Super Core catalogue f2e-001 'High-Frequency Core Loss Curves', sinusoidal flux, 25 cm Epstein frame, 0.10 mm; values read from the vector curves and checked against the f1e-002 sample table (within 6 %)", "page": "4", "date": "2026-10-17", "method": "read from vector paths of the published core loss curves (docs/r3-sources.md section 1a); points with B below 0.2 T are left out because the three-term Bertotti form misses them by more than 15 %", "typical": true},
+    "provenance": {"source": "JFE Super Core catalogue f2e-001 'High-Frequency Core Loss Curves', sinusoidal flux, 25 cm Epstein frame, 0.10 mm; values read from the vector curves and checked against the f1e-002 sample table (within 6 %)", "page": "4 and 8", "date": "2026-10-17", "method": "read from vector paths of the published core loss curves (docs/r3-sources.md section 1a); the 1.1, 1.2 and 1.3 T points at 50 and 60 Hz are read from the p. 8 core loss curves (f2e-001); points with B below 0.2 T are left out because the three-term Bertotti form misses them by more than 15 %, and the over-prediction below 0.2 T is accepted by the owner (flagged by the low-B share)", "typical": true},
     "confidence": "B",
     "frequency_range": [50.0, 20000.0],
-    "b_range": [0.2, 1.0],
+    "b_range": [0.2, 1.3],
     "conductivity": 1219512.1951219512,
     "conductivity_source": "JFE f1e-002 p. 5 sample characteristics table, specific resistance 0.82 uOhm m (grade A, typical in-house value)"
   }

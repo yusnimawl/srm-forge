@@ -38,6 +38,8 @@ class ElementLoss:
     classical: np.ndarray
     excess: np.ndarray
     beyond_fit_range: bool
+    high_b_share: float = 0.0   # share of the weighted loss from elements with peak |B| above b_range[1]
+    low_b_share: float = 0.0    # same for peak |B| below b_range[0]
 
     @property
     def total(self) -> np.ndarray:
@@ -150,10 +152,12 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
 
     total = hysteresis + classical + excess
     peak = np.linalg.norm(b, axis=2).max(axis=0)
-    beyond = bool(peak.max(initial=0.0) > model.b_range[1])
     shared = total if weights is None else total * weights
-    if shared.sum() > 0 and shared[peak < model.b_range[0]].sum() > SHARE_LIMIT * shared.sum():
-        beyond = True
+    high_share = low_share = 0.0
+    if shared.sum() > 0:
+        high_share = float(shared[peak > model.b_range[1]].sum() / shared.sum())
+        low_share = float(shared[peak < model.b_range[0]].sum() / shared.sum())
+    beyond = high_share > SHARE_LIMIT or low_share > SHARE_LIMIT
     spectrum = np.abs(np.fft.rfft(comp, axis=0)) ** 2
     orders = np.arange(spectrum.shape[0])
     harmonic_classical = (orders**2)[:, None, None] * spectrum
@@ -163,4 +167,5 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
         freq = orders / period_s
         high = freq > model.frequency_range[1]
         beyond = beyond or bool(high[1] and share[1] > 0) or bool(np.any(high[2:] & (share[2:] > SHARE_LIMIT)))
-    return ElementLoss(hysteresis=hysteresis, classical=classical, excess=excess, beyond_fit_range=beyond)
+    return ElementLoss(hysteresis=hysteresis, classical=classical, excess=excess, beyond_fit_range=beyond,
+                       high_b_share=high_share, low_b_share=low_share)

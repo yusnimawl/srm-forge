@@ -170,3 +170,21 @@ def test_weights_none_matches_uniform(model):
 def test_weights_wrong_shape(model):
     with pytest.raises(ValueError, match="weights"):
         waveform_loss(radial(sine(1.0), n_el=3), np.tile(CENTROID, (3, 1)), 0.02, model, weights=np.ones(2))
+
+
+def _two_groups(model, b_big, n_big, n_small=1, small=0.8):
+    b = np.concatenate([radial(sine(small), n_el=n_small), radial(sine(b_big), n_el=n_big)], axis=1)
+    return b, np.tile(CENTROID, (n_small + n_big, 1))
+
+
+def test_single_high_element_does_not_flag(model):
+    b, c = _two_groups(model, 1.5, 1, n_small=200)
+    r = waveform_loss(b, c, 0.02, model, weights=np.concatenate([np.ones(200), [1e-3]]))
+    assert r.high_b_share < 0.05 and not r.beyond_fit_range
+
+
+def test_high_b_share_flags(model):
+    b, c = _two_groups(model, 1.5, 20, n_small=2)
+    r = waveform_loss(b, c, 0.02, model)
+    assert r.high_b_share > 0.05 and r.beyond_fit_range
+    assert r.low_b_share == 0.0
