@@ -20,7 +20,7 @@ const QUEUE_FULL = "Queue full — wait for a run to finish"
 // Errors shown under a field; every other key goes to the summary.
 const FIELD_KEYS = new Set([
   ...["peak_power_w", "peak_torque_nm", "base_speed_rpm", "max_speed_rpm", "bus_voltage_v", "max_outer_diameter_m",
-    "max_mass_kg", "max_slot_fill", "phase_current_a"].map((k) => `requirements.${k}`),
+    "max_mass_kg", "max_slot_fill", "phase_current_a", "winding_temperature_c"].map((k) => `requirements.${k}`),
   ...["n_candidates", "shortlist", "seed", "stator", "rotor", "preset"].map((k) => `settings.${k}`),
 ])
 
@@ -136,6 +136,7 @@ export function NewSearchPage() {
           {num("maxOuterDiameterMm", "requirements.max_outer_diameter_m", "max-od", "Max outer diameter", "mm", "Empty means no limit.")}
           {num("maxMassKg", "requirements.max_mass_kg", "max-mass", "Max mass", "kg", "Empty means no limit.")}
           {num("maxSlotFill", "requirements.max_slot_fill", "slot-fill", "Max slot fill", "ratio", "Outer wire area over coil-side area, up to 0.9.")}
+          {num("windingTemperatureC", "requirements.winding_temperature_c", "winding-temp", "Winding temperature", "°C", "Copper temperature for the resistance and the AC loss.")}
         </CardContent>
       </Card>
 

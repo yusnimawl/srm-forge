@@ -23,7 +23,7 @@ const report = (e: unknown) => {
   if (!(e instanceof NotSaved)) toast.error(requestMessage(e))
 }
 
-const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation" }
+const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation", losses: "Losses" }
 
 /** Live state of the case's job as a step list. The page refetches the case when the job ends. */
 function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { CaseInputs } from "@/api/types"
-import { toForm, toInputs, validationByField, withWires } from "./caseForm"
+import { tabOfKey, toForm, toInputs, validationByField, withWires } from "./caseForm"
 
 const inputs = {
   requirements: {
     peak_power_w: 10000, peak_torque_nm: 32, base_speed_rpm: 3000, max_speed_rpm: 9000, bus_voltage_v: 400,
-    max_outer_diameter_m: 0.2, max_mass_kg: null, max_slot_fill: 0.6, phase_current_a: 60,
+    max_outer_diameter_m: 0.2, max_mass_kg: null, max_slot_fill: 0.6, phase_current_a: 60, winding_temperature_c: 100,
     wires: [{ kind: "round", diameter: 0.0012, outer_diameter: 0.00128 }],
   },
   design: {
@@ -36,6 +36,16 @@ const close = (a: unknown, b: unknown, path = ""): void => {
 }
 
 describe("caseForm", () => {
+  it("edits the winding temperature and defaults a draft without one to 120", () => {
+    expect(toForm(inputs).requirements.windingTemperatureC).toBe("100")
+    const f = toForm({ ...inputs, requirements: { ...inputs.requirements, winding_temperature_c: undefined } } as unknown as CaseInputs)
+    expect(f.requirements.windingTemperatureC).toBe("120")
+    const g = { ...f, requirements: { ...f.requirements, windingTemperatureC: "90" } }
+    expect((toInputs(g).requirements as unknown as Record<string, unknown>).winding_temperature_c).toBe(90)
+  })
+  it("files a temperature error under the requirement tab", () => {
+    expect(tabOfKey("requirements.winding_temperature_c")).toBe("requirement")
+  })
   it("round-trips the inputs through the form", () => close(inputs, toInputs(toForm(inputs))))
 
   it("shows arcs in degrees and sends radians", () => {

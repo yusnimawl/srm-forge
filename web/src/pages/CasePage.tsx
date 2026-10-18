@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { issueKey, tabOfKey, toForm, toInputs, useDebounced, validationByField, type CaseForm, type IssuesResponse } from "@/lib/caseForm"
 import { caseStatus } from "@/lib/cases"
+import { madeWithText } from "@/lib/chips"
 import { errorMessage } from "@/lib/errorMessage"
 import { cn } from "@/lib/utils"
 
@@ -136,6 +137,7 @@ function CaseEditor({ data }: { data: Case }) {
           engineVersion={data.validation?.label ? data.validation.engine_version : null}
           evaluation={evaluation}
         />
+        {evaluation && <p className="text-xs text-muted-foreground">{madeWithText(evaluation.srmapp_version)}</p>}
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>

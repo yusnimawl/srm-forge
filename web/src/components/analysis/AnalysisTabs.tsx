@@ -8,6 +8,7 @@ import MapTab from "./MapTab"
 import PerformanceTab from "./PerformanceTab"
 import WaveformsTab from "./WaveformsTab"
 
+const LossesTab = lazy(() => import("./LossesTab"))
 const FieldTab = lazy(() => import("./FieldTab"))
 
 /** Overlays (at most 6 cases) draw on the Performance and Design factors charts; `label` names the main case in their legends.
@@ -37,6 +38,7 @@ export default function AnalysisTabs({
         {evaluation.envelope?.waveforms && <TabsTrigger value="waveforms">Waveforms</TabsTrigger>}
         <TabsTrigger value="map">Map</TabsTrigger>
         <TabsTrigger value="factors">Design factors</TabsTrigger>
+        {showField && <TabsTrigger value="losses">Losses</TabsTrigger>}
         {showField && <TabsTrigger value="field">Field</TabsTrigger>}
       </TabsList>
       <TabsContent value="performance">
@@ -53,6 +55,13 @@ export default function AnalysisTabs({
       <TabsContent value="factors">
         <DesignFactorsTab evaluation={evaluation} overlays={overlays} label={label} />
       </TabsContent>
+      {showField && (
+        <TabsContent value="losses">
+          <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
+            <LossesTab key={caseId} caseId={caseId} />
+          </Suspense>
+        </TabsContent>
+      )}
       {showField && (
         <TabsContent value="field">
           <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>

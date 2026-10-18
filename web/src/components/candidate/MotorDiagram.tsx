@@ -4,7 +4,7 @@ import { LINE_COLORS } from "@/lib/analysis"
 import { errorMessage } from "@/lib/errorMessage"
 
 type Coil = { name: string; phase: string; sign: "+" | "-"; d: string }
-type Geometry = { view_box: [number, number, number, number]; stator: string; rotor: string; shaft: string; coils: Coil[] }
+export type Geometry = { view_box: [number, number, number, number]; stator: string; rotor: string; shaft: string; coils: Coil[] }
 
 // Coils take their phase's series colour; the minus side of a coil is paler.
 const PHASE_COLOR: Record<string, string> = { A: LINE_COLORS[0], B: LINE_COLORS[1], C: LINE_COLORS[2], D: LINE_COLORS[3] }

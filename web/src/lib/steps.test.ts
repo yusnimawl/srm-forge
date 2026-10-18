@@ -75,3 +75,11 @@ describe("stepStates", () => {
     expect(states(job({ status: "done" }, { step: undefined }))).toEqual(["done", "done", "done", "done", "done"])
   })
 })
+
+describe("losses job steps", () => {
+  it("labels the five steps", () => {
+    const j = job({ kind: "losses" }, { steps: ["queued", "strokes", "fields", "losses", "saved"], step: "fields", points_done: 10, points_total: 60 })
+    expect(stepStates(j).map((r) => r.label)).toEqual(["Queued", "Stroke choices", "Field solves", "Losses", "Saved"])
+    expect(stepStates(j)[2].detail).toContain("10 / 60")
+  })
+})

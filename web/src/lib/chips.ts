@@ -16,3 +16,18 @@ export function jLimitChip(jLimit: number | null | undefined): { text: string; t
   const tail = known ? `assumes j_limit ${Number((jLimit / 1e6).toPrecision(3))} A/mm²` : "j_limit not recorded"
   return { text: `Peak only · ${tail}`, tone: "warn" }
 }
+
+/** The chips of a losses result: the winding temperature the copper loss assumes, what the loss leaves out, and the
+ *  label (losses are never validated). */
+export function lossChips(windingTemperatureC: number | null | undefined): { text: string; tone: ChipTone }[] {
+  const known = windingTemperatureC != null && Number.isFinite(windingTemperatureC)
+  return [
+    { text: known ? `Winding ${windingTemperatureC} °C` : "Winding temperature not recorded", tone: "warn" },
+    { text: "Excludes friction and windage", tone: "warn" },
+    verifiedChip(null),
+  ]
+}
+
+/** Which srmapp version made an evaluation; evaluations stored before 0.6.0 did not record it. */
+export const madeWithText = (srmappVersion: string | null | undefined): string =>
+  srmappVersion ? `made with srmapp ${srmappVersion}` : "made before 0.6.0"

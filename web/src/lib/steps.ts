@@ -7,6 +7,7 @@ const LABELS: Record<string, Record<string, string>> = {
   evaluate: { queued: "Queued", mesh: "Mesh built", mapping: "Mapping", winding: "Choosing the winding", saved: "Saved" },
   validate: { queued: "Queued", map: "Map (cache)", checks: "Checks and budget", saved: "Saved" },
   animate: { queued: "Queued", frames: "Frames", saved: "Saved" },
+  losses: { queued: "Queued", strokes: "Stroke choices", fields: "Field solves", losses: "Losses", saved: "Saved" },
   search: { queued: "Queued", sampling: "Sampling", designs: "Designs", pareto: "Pareto set", saved: "Saved" },
 }
 
@@ -35,7 +36,7 @@ function detailOf(job: JobOut, id: string, active: boolean): string | undefined 
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
-  if (id === "frames" && done !== null && total) return `${done} / ${total}`
+  if ((id === "frames" || id === "fields" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
   if (id === "designs") {
     const dd = num(p.designs_done)
     const dt = num(p.designs_total)
