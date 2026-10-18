@@ -65,7 +65,7 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
 - **DC:** `series_resistance` at the case's `winding_temperature_c` (`Requirements.winding_temperature_c`, default 120 °C; the existing mean turn length already includes the end turns).
 - **AC (wire mode only):**
   - Skin effect in each strand: the round-wire Bessel factor per current harmonic.
-  - Proximity: P = π·l·d⁴·ω²·B²/(128·ρ) per strand per harmonic, with B the coil-region field from §5 averaged over each coil side.
+  - Proximity: P = π·l·d⁴·ω²·B²/(128·ρ) per strand per harmonic, with B the coil-region field from §5 taken per coil element and per component: the harmonics are taken per element, and the area-weighted mean of |Bx,h|² + |By,h|² is used (averaging |B| would rectify reversing fields).
   - In density mode (no wire) AC is not computed and the result says so.
 - **Operating point:** for each (speed, torque) the stroke with the lowest copper loss that gives the torque. Search over on, off and the current limit on the envelope's grid.
 - **Efficiency map:** speeds × torque levels below the envelope, default 6 × 5. η = P / (P + P_cu,DC + P_cu,AC + P_iron). Points between the grid are not interpolated in the stored result; the plot contours the computed points.
