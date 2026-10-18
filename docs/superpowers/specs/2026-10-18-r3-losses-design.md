@@ -29,7 +29,7 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
 
 `srmcore/post/iron_loss.py`, pure numpy, no solver imports.
 
-- Input: B(t) per element over one rotor pole pitch, uniform in angle, both in-plane components. The stator elements are taken in the stator frame and the rotor elements in the rotor frame. The components are radial and tangential about the machine centre at the element centroid.
+- Input: B(t) per element, uniform in angle over the element's own period (one rotor pole pitch for stator elements, k pitches for rotor elements, below), both in-plane components. The stator elements are taken in the stator frame and the rotor elements in the rotor frame. The components are radial and tangential about the machine centre at the element centroid.
 - Per component, then summed:
   - **Hysteresis:** the waveform is cut into reversals (turning points with a small hysteresis band against noise). Each half-cycle of swing ΔB adds ½·k_h·(ΔB/2)^α per period, so minor loops add their own share. A DC bias factor (1 + K_DC·|B_dc|^ALPHA_DC) on each loop, with B_dc its mean; K_DC = 1.4664, ALPHA_DC = 3.7955 (grade C). This term is flagged as the least certain.
   - **Classical eddy:** (σd²/12)·⟨(dB/dt)²⟩ with central differences on the periodic waveform.
