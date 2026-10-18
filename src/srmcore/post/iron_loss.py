@@ -109,17 +109,24 @@ def _components(b: np.ndarray, centroids: np.ndarray) -> np.ndarray:
     return np.stack([np.einsum("tek,ek->te", b, ur), np.einsum("tek,ek->te", b, ut)], axis=2)
 
 
-def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: LossModel) -> ElementLoss:
+def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: LossModel,
+                  weights: np.ndarray | None = None) -> ElementLoss:
     """Loss per element (W/kg) of B over one period; b is (n_t, n_el, 2), uniform in time.
 
     `beyond_fit_range` is True when the model is used outside the range it was fitted on: the
     fundamental, or a harmonic carrying more than 5 % of the classical loss, is above
     `frequency_range[1]`; or the largest element peak |B| (vector norm over time) exceeds `b_range[1]`; or
-    more than 5 % of the total loss comes from elements whose peak |B| is below `b_range[0]`. The shares are
-    per unit mass and unweighted by element area.
+    more than 5 % of the total loss comes from elements whose peak |B| is below `b_range[0]`. The harmonic
+    shares are per unit mass. `weights` (n_el, e.g. element areas) weights each element's W/kg in the low-B
+    share; without it every element counts equally. Call once per material with all of that material's iron
+    elements, so the share is a share of that material's loss.
     """
     b = np.asarray(b, dtype=float)
     n_t, n_el = b.shape[0], b.shape[1]
+    if weights is not None:
+        weights = np.asarray(weights, dtype=float)
+        if weights.shape != (n_el,):
+            raise ValueError(f"weights must have shape ({n_el},), got {weights.shape}")
     if not (math.isfinite(period_s) and period_s > 0):
         raise ValueError(f"period_s must be positive and finite, got {period_s}")
     if n_t < 3:
@@ -144,7 +151,8 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
     total = hysteresis + classical + excess
     peak = np.linalg.norm(b, axis=2).max(axis=0)
     beyond = bool(peak.max(initial=0.0) > model.b_range[1])
-    if total.sum() > 0 and total[peak < model.b_range[0]].sum() > SHARE_LIMIT * total.sum():
+    shared = total if weights is None else total * weights
+    if shared.sum() > 0 and shared[peak < model.b_range[0]].sum() > SHARE_LIMIT * shared.sum():
         beyond = True
     spectrum = np.abs(np.fft.rfft(comp, axis=0)) ** 2
     orders = np.arange(spectrum.shape[0])

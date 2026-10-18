@@ -142,3 +142,31 @@ def test_reversals_band_merges_ripple():
 def test_reversals_sinusoid():
     rev = reversals(sine(1.0))
     assert len(rev) == 2 and all(math.isclose(s, 2.0) and abs(m) < 1e-9 for s, m in rev)
+
+
+def _mixed(model):
+    """Two heavy low-B elements and many light high-B ones, in loss terms comparable."""
+    low = radial(sine(model.b_range[0] * 0.5), n_el=2)
+    high = radial(sine(model.b_range[0] * 3), n_el=40)
+    return np.concatenate([low, high], axis=1), np.tile(CENTROID, (42, 1))
+
+
+def test_weights_change_low_b_flag(model):
+    b, c = _mixed(model)
+    assert not waveform_loss(b, c, 0.02, model).beyond_fit_range
+    heavy = np.concatenate([np.full(2, 1000.0), np.full(40, 1.0)])
+    assert waveform_loss(b, c, 0.02, model, weights=heavy).beyond_fit_range
+    assert not waveform_loss(b, c, 0.02, model, weights=np.ones(42)).beyond_fit_range
+
+
+def test_weights_none_matches_uniform(model):
+    b, c = _mixed(model)
+    a = waveform_loss(b, c, 0.02, model)
+    u = waveform_loss(b, c, 0.02, model, weights=np.ones(42))
+    assert a.beyond_fit_range == u.beyond_fit_range
+    assert np.array_equal(a.hysteresis, u.hysteresis)
+
+
+def test_weights_wrong_shape(model):
+    with pytest.raises(ValueError, match="weights"):
+        waveform_loss(radial(sine(1.0), n_el=3), np.tile(CENTROID, (3, 1)), 0.02, model, weights=np.ones(2))

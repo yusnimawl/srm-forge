@@ -21,8 +21,8 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
   - `points`: sinusoidal specific loss W/kg at (B peak T, f Hz);
   - `provenance` (source, page, method, date, `typical`);
   - `confidence` grade A/B/C with the same meaning as for B-H;
-  - `frequency_range`, the measured range.
-- 10JNEX900 from the JFE curves in `docs/sources/materials/` (f2e-001 and f1e-002), traced with `tools/digitise_bh.py` or read from tables. M19 from a cited datasheet (for Materu). Other materials stay without `loss`; a losses job on such a case is refused with the material named.
+  - `frequency_range` and `b_range`, the measured ranges; every data point lies inside both.
+- 10JNEX900 from the JFE curves in `docs/sources/materials/` (f2e-001 and f1e-002), traced with `tools/digitise_bh.py` or read from tables. M19 from a cited datasheet (for Materu); M19 ships no loss data (test fixture only; EMERF licence). Other materials stay without `loss`; a losses job on such a case is refused with the material named.
 - `materials.loss` fits k_h, α (hysteresis k_h·f·B^α), k_e (excess) at load; k_c (classical) is computed from the conductivity and the thickness, σd²/12 per unit volume, not fitted. The fit is least squares on log loss, and the worst relative fit error is kept with the coefficients (`LossModel`). Points outside `frequency_range` are never extrapolated silently (§4).
 
 ## 4. Iron loss
@@ -31,10 +31,12 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
 
 - Input: B(t) per element over one rotor pole pitch, uniform in angle, both in-plane components. The stator elements are taken in the stator frame and the rotor elements in the rotor frame. The components are radial and tangential about the machine centre at the element centroid.
 - Per component, then summed:
-  - **Hysteresis:** the waveform is cut into reversals (turning points with a small hysteresis band against noise). Each half-cycle of swing ΔB adds ½·k_h·(ΔB/2)^α per period, so minor loops add their own share. A DC bias factor (1 + k_dc·B_dc²) on each loop, with B_dc its mean. The factor's source and value are fixed in the plan from the literature search; this term is flagged as the least certain.
+  - **Hysteresis:** the waveform is cut into reversals (turning points with a small hysteresis band against noise). Each half-cycle of swing ΔB adds ½·k_h·(ΔB/2)^α per period, so minor loops add their own share. A DC bias factor (1 + K_DC·|B_dc|^ALPHA_DC) on each loop, with B_dc its mean; K_DC = 1.4664, ALPHA_DC = 3.7955 (grade C). This term is flagged as the least certain.
   - **Classical eddy:** (σd²/12)·⟨(dB/dt)²⟩ with central differences on the periodic waveform.
   - **Excess:** k_e·⟨|dB/dt|^1.5⟩·C, with C the sinusoid normalisation so a sinusoid reproduces the fit.
-- A period whose fundamental or any harmonic carrying more than 5 % of the eddy loss sits above the measured `frequency_range` is flagged `beyond_fit_range`; the value is still reported.
+- A period is flagged `beyond_fit_range` (the value is still reported) when: the fundamental or any harmonic carrying more than 5 % of the eddy loss sits above `frequency_range[1]`; or an element's peak |B| exceeds `b_range[1]`; or more than 5 % of the (area-weighted) loss comes from elements with peak |B| below `b_range[0]`.
+- B is the lamination B: the FE B divided by the material's stacking factor.
+- Rotor elements have their own period k·tau, not tau: the field in the rotor frame repeats after the symmetry angle k·tau of the field (3·tau for the 8/6, 2·tau for the 6/4, doubled if the winding polarity alternates), so the rotor waveforms are taken over k·tau and the rotor period is k·tau/omega. Stator elements are periodic over tau.
 - Output: W per element, summed into stator pole, stator yoke, rotor pole, rotor yoke, with hysteresis, eddy and excess kept apart. The stacking factor and the stack length scale the 2D loss density to W.
 - Region split: element regions come from the static mesh; pole and yoke are separated by the radius of the pole root.
 
@@ -60,7 +62,7 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
 
 `srmapp/losses.py`:
 
-- **DC:** `series_resistance` at the case's `winding_temperature_c` (new `CaseInputs` limit, default 120 °C; the existing mean turn length already includes the end turns).
+- **DC:** `series_resistance` at the case's `winding_temperature_c` (`Requirements.winding_temperature_c`, default 120 °C; the existing mean turn length already includes the end turns).
 - **AC (wire mode only):**
   - Skin effect in each strand: the round-wire Bessel factor per current harmonic.
   - Proximity: P = π·l·d⁴·ω²·B²/(128·ρ) per strand per harmonic, with B the coil-region field from §5 averaged over each coil side.
@@ -83,7 +85,7 @@ Efficiency at any operating point of an evaluated case, with copper loss (DC and
   - B(t) of an element picked on the mesh.
 - Chips: "Winding 120 °C", "Excludes friction and windage", and "Unvalidated" until the check passes.
 - Losses join the case's key numbers when present.
-- `winding_temperature_c` appears in the case limits form and in setup files. The setup schema version goes up by one, and older files import with the default.
+- `winding_temperature_c` lives on `Requirements` and appears in the case limits form and in setup files through the requirements. The setup schema version does not change; older files import with the default.
 
 ## 9. Tests and done
 

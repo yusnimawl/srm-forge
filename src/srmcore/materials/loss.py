@@ -8,6 +8,10 @@ density; k_h, alpha and k_e are fitted to log(p) with alpha in [1.2, 3.0] and k_
 The fit is valid inside frequency_range and b_range only. Below b_range the model over-predicts
 (measured for 10JNEX900: +15 % at 0.1 T and 1 kHz, up to +80 % at 0.02 T); callers flag use outside
 both ranges.
+
+Below frequency_range[0] the model is not flagged: hysteresis dominates there and is linear in f, so
+the extrapolation is benign. `iron_loss` flags only a spectrum above frequency_range[1] and a field
+outside b_range.
 """
 import math
 from dataclasses import dataclass
