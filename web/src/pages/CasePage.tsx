@@ -9,6 +9,7 @@ import type { Case, CaseInputs } from "@/api/types"
 import { MotorDiagram } from "@/components/candidate/MotorDiagram"
 import { BeforeAfterTable } from "@/components/case/BeforeAfterTable"
 import { CaseActions } from "@/components/case/CaseActions"
+import { LossKeyNumbers } from "@/components/case/LossKeyNumbers"
 import { InputTabs } from "@/components/case/InputTabs"
 import { ValidationPanel } from "@/components/case/ValidationPanel"
 import { CaseStatusBadge } from "@/components/cases/CaseTable"
@@ -138,6 +139,7 @@ function CaseEditor({ data }: { data: Case }) {
           evaluation={evaluation}
         />
         {evaluation && <p className="text-xs text-muted-foreground">{madeWithText(evaluation.srmapp_version)}</p>}
+        {evaluation?.status === "ok" && <LossKeyNumbers caseId={data.id} />}
         <CaseActions data={data} editable={editable} ready={ready} savedText={savedText} flush={flush} />
         {!editable && <p className="text-sm text-muted-foreground">Evaluated cases are read-only. Edit makes a new draft.</p>}
       </header>

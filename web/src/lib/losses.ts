@@ -1,4 +1,5 @@
 import type { components } from "@/api/schema"
+import { fmt } from "./format"
 
 export type LossesResult = components["schemas"]["LossesOut"]
 export type OperatingLoss = components["schemas"]["OperatingLossOut"]
@@ -17,21 +18,66 @@ export function contourData(r: LossesResult): { x: number[]; y: number[]; z: (nu
   return { x, y, z }
 }
 
-const IRON_PARTS = ["hysteresis", "classical", "excess"] as const
+const REGION_ORDER = ["stator_pole", "stator_yoke", "rotor_pole", "rotor_yoke"]
 
-/** Loss components in W per operating point, with the total; unreached points are null in `totals` and 0 elsewhere.
- *  AC copper counts as 0 where it was not computed. */
-export function splitBars(r: LossesResult): { series: { name: string; values: number[] }[]; totals: (number | null)[] } {
-  const iron = (p: OperatingLoss, part: (typeof IRON_PARTS)[number]) =>
-    Object.values(p.iron).reduce((s, reg) => s + (reg[part] ?? 0), 0)
-  const rows = r.points.map((p) =>
-    p.reached ? [p.copper_dc_w ?? 0, p.copper_ac_w ?? 0, ...IRON_PARTS.map((k) => iron(p, k))] : [0, 0, 0, 0, 0],
-  )
-  const names = ["Copper DC", "Copper AC", "Iron hysteresis", "Iron classical", "Iron excess"]
+export type LossSeries = { name: string; values: (number | null)[]; hover?: string[] }
+
+/** Loss components in W per operating point: copper DC, copper AC (0 where it was not computed) and the iron loss of
+ *  each region, whose `hover` text gives its hysteresis, classical and excess parts. Unreached points are null in
+ *  every series and in `totals`. */
+export function splitBars(r: LossesResult): { series: LossSeries[]; totals: (number | null)[] } {
+  const seen = new Set(r.points.flatMap((p) => Object.keys(p.iron)))
+  const regions = [...REGION_ORDER.filter((k) => seen.has(k)), ...[...seen].filter((k) => !REGION_ORDER.includes(k))]
+  const w = (v: number | null | undefined) => (v == null ? 0 : v)
+  const per = (f: (p: OperatingLoss) => number) => r.points.map((p) => (p.reached ? f(p) : null))
+  const series: LossSeries[] = [
+    { name: "Copper DC", values: per((p) => w(p.copper_dc_w)) },
+    { name: "Copper AC", values: per((p) => w(p.copper_ac_w)) },
+    ...regions.map((k) => ({
+      name: `Iron ${k.replaceAll("_", " ")}`,
+      values: per((p) => {
+        const l = p.iron[k]
+        return l ? w(l.hysteresis) + w(l.classical) + w(l.excess) : 0
+      }),
+      hover: r.points.map((p) => {
+        const l = p.iron[k]
+        return p.reached && l ? `hysteresis ${fmt(l.hysteresis, 3)} W, classical ${fmt(l.classical, 3)} W, excess ${fmt(l.excess, 3)} W` : ""
+      }),
+    })),
+  ]
+  return { series, totals: r.points.map((p, k) => (p.reached ? series.reduce((sum, c) => sum + w(c.values[k]), 0) : null)) }
+}
+
+/** The two losses numbers of a result: best efficiency, and total loss at the rated point. Null where no point
+ *  qualifies. */
+export function lossKeyNumbers(r: LossesResult): {
+  best: { efficiency: number; label: string } | null
+  rated: { totalW: number; label: string } | null
+} {
+  const best = bestPoint(r)
+  const rated = ratedPoint(r)
+  const total = rated >= 0 ? splitBars(r).totals[rated] : null
   return {
-    series: names.map((name, c) => ({ name, values: rows.map((row) => row[c]) })),
-    totals: r.points.map((p, k) => (p.reached ? rows[k].reduce((a, b) => a + b, 0) : null)),
+    best: best >= 0 ? { efficiency: r.points[best].efficiency ?? NaN, label: pointLabel(r.points[best]) } : null,
+    rated: rated >= 0 && total != null ? { totalW: total, label: pointLabel(r.points[rated]) } : null,
   }
+}
+
+/** The top reached torque level per speed, as the contour's envelope edge: points at reached speeds only. */
+export function envelopeEdge(r: LossesResult): { x: number[]; y: number[] } {
+  const nt = r.torque_fractions.length
+  const x: number[] = []
+  const y: number[] = []
+  r.speeds_rpm.forEach((s, i) => {
+    for (let j = nt - 1; j >= 0; j--) {
+      if (r.points[i * nt + j]?.reached) {
+        x.push(s ?? NaN)
+        y.push(r.torque_fractions[j] ?? NaN)
+        break
+      }
+    }
+  })
+  return { x, y }
 }
 
 /** Index of the reached point with the highest efficiency, or -1 when none was reached. */

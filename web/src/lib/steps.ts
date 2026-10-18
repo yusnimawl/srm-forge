@@ -28,7 +28,7 @@ function detailOf(job: JobOut, id: string, active: boolean): string | undefined 
   const p = job.progress ?? {}
   const done = num(p.points_done)
   const total = num(p.points_total)
-  if (id === "mapping" && done !== null && total) {
+  if ((id === "mapping" || id === "fields") && done !== null && total) {
     const parts = [`${done} / ${total} points`]
     const elapsed = num(p.elapsed_s)
     if (elapsed !== null) parts.push(`${fmtSpan(elapsed)} elapsed`)
@@ -36,7 +36,7 @@ function detailOf(job: JobOut, id: string, active: boolean): string | undefined 
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
-  if ((id === "frames" || id === "fields" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
+  if ((id === "frames" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
   if (id === "designs") {
     const dd = num(p.designs_done)
     const dt = num(p.designs_total)

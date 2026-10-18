@@ -54,7 +54,7 @@ function mount(routes: Record<string, () => Promise<Response>>) {
         </QueryClientProvider>,
       )
     })
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)) })
   }
   return { host, calls, render }
 }
@@ -110,12 +110,57 @@ describe("LossesTab", () => {
     await act(async () => {
       svg.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 150, clientY: 50 }))
     })
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)) })
     const call = m.calls.find((u) => u.includes("/losses/b"))!
     const q = new URL(call, "http://x").searchParams
     expect(q.get("point")).toBe("1")
     expect(Number(q.get("x"))).toBeCloseTo(0.025, 9)
     expect(Number(q.get("y"))).toBeCloseTo(0.025, 9)
     expect(m.host.querySelector("[data-testid=line-plot]")?.textContent).toContain("B (T)")
+  })
+})
+
+describe("LossesTab grid and job", () => {
+  it("posts the grid from the inputs", async () => {
+    const m = mount({
+      "/losses/estimate": () => json({ basis: "budget", per_solve_s: 3, seconds: 100, solves: 10 }),
+      "/losses": () => json({ detail: "no losses for this case" }, 404),
+      "/api/cases/c": () => json(caseBody),
+    })
+    await m.render()
+    const set = async (id: string, v: string) => {
+      const el = m.host.querySelector<HTMLInputElement>(`#${id}`)!
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v)
+        el.dispatchEvent(new Event("input", { bubbles: true }))
+      })
+    }
+    await set("losses-speeds", "4")
+    await set("losses-torques", "3")
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockClear()
+    const btn = Array.from(m.host.querySelectorAll("button")).find((b) => b.textContent === "Run losses")!
+    await act(async () => { btn.click() })
+    const post = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")
+    expect(post?.[0]).toContain("/losses")
+    expect(JSON.parse((post![1] as RequestInit).body as string)).toEqual({ n_speeds: 4, n_torques: 3 })
+  })
+
+  it("shows one line, not a stepper, while a losses job runs", async () => {
+    const m = mount({
+      "/losses": () => json({ detail: "none" }, 404),
+      "/api/cases/c": () => json({ ...caseBody, jobs: [{ id: "j", kind: "losses", active: true }] }),
+    })
+    await m.render()
+    expect(m.host.textContent).toContain("Losses job running — progress above.")
+    expect(m.host.querySelector("[aria-label='Job steps']")).toBeNull()
+  })
+
+  it("hides the point and B(t) sections when nothing was reached", async () => {
+    const none = { ...losses(2), points: losses(2).points.map((p) => ({ ...p, reached: false })) }
+    const m = mount({ "/losses": () => json(none), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    expect(m.host.textContent).toContain("No operating point was reached.")
+    expect(m.host.querySelector("svg[aria-label='Pick an iron element']")).toBeNull()
   })
 })

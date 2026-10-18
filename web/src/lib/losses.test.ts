@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { components } from "@/api/schema"
-import { bestPoint, contourData, ratedPoint, splitBars, svgToMetres } from "./losses"
+import { bestPoint, contourData, envelopeEdge, lossKeyNumbers, ratedPoint, splitBars, svgToMetres } from "./losses"
 
 type R = components["schemas"]["LossesOut"]
 type P = components["schemas"]["OperatingLossOut"]
@@ -38,13 +38,14 @@ describe("contourData", () => {
 })
 
 describe("splitBars", () => {
-  it("components sum to the total loss of every reached point", () => {
+  it("splits by region and the components sum to the total loss of every reached point", () => {
     const r = result()
     const b = splitBars(r)
-    expect(b.series.map((s) => s.name)).toEqual(["Copper DC", "Copper AC", "Iron hysteresis", "Iron classical", "Iron excess"])
+    expect(b.series.map((s) => s.name)).toEqual(["Copper DC", "Copper AC", "Iron stator pole", "Iron stator yoke"])
     r.points.forEach((p, k) => {
       if (!p.reached) {
         expect(b.totals[k]).toBeNull()
+        b.series.forEach((s) => expect(s.values[k]).toBeNull())
         return
       }
       const sum = b.series.reduce((s, c) => s + (c.values[k] ?? 0), 0)
@@ -52,10 +53,27 @@ describe("splitBars", () => {
       expect(b.totals[k]).toBeCloseTo(p.copper_dc_w! + p.copper_ac_w! + p.iron_w!, 9)
     })
   })
+  it("keeps the hysteresis, classical and excess split as hover text", () => {
+    const h = splitBars(result()).series[2].hover!
+    expect(h[0]).toBe("hysteresis 1 W, classical 0.1 W, excess 0.05 W")
+    expect(h[5]).toBe("")
+  })
   it("counts missing AC copper as zero", () => {
     const b = splitBars(result(null))
     expect(b.series[1].values[0]).toBe(0)
     expect(b.totals[0]).toBeCloseTo(10 + 2.3, 9)
+  })
+})
+
+describe("lossKeyNumbers and envelopeEdge", () => {
+  it("gives the best efficiency and the rated-point loss", () => {
+    const k = lossKeyNumbers(result())
+    expect(k.best?.efficiency).toBe(0.9)
+    expect(k.rated?.totalW).toBeCloseTo(14.3, 9)
+    expect(lossKeyNumbers({ ...result(), points: result().points.map((p) => ({ ...p, reached: false })) })).toEqual({ best: null, rated: null })
+  })
+  it("takes the top reached torque level per speed", () => {
+    expect(envelopeEdge(result())).toEqual({ x: [1000, 2000], y: [1, 0.6] })
   })
 })
 

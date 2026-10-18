@@ -20,19 +20,22 @@ export const useLosses = (caseId: string) =>
     },
   })
 
-export const useLossesEstimate = (caseId: string, enabled: boolean) =>
+export type LossesGrid = { n_speeds: number; n_torques: number }
+
+export const useLossesEstimate = (caseId: string, grid: LossesGrid | null) =>
   useQuery({
-    queryKey: ["losses-estimate", caseId],
-    queryFn: () => api<LossesEstimate>(`/api/cases/${caseId}/losses/estimate`),
-    enabled,
+    queryKey: ["losses-estimate", caseId, grid],
+    queryFn: () => api<LossesEstimate>(`/api/cases/${caseId}/losses/estimate?n_speeds=${grid!.n_speeds}&n_torques=${grid!.n_torques}`),
+    enabled: grid !== null,
     retry: false,
   })
 
-/** Starts the losses job with the default grid; resolves with the job id and refreshes the case (its job list). */
+/** Starts the losses job on a speed x torque-level grid; resolves with the job id and refreshes the case (its job list). */
 export const useRunLosses = (caseId: string) => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api<{ job_id: string }>(`/api/cases/${caseId}/losses`, { method: "POST" }),
+    mutationFn: (grid: LossesGrid) =>
+      api<{ job_id: string }>(`/api/cases/${caseId}/losses`, { method: "POST", body: JSON.stringify(grid) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["case", caseId] }),
   })
 }
