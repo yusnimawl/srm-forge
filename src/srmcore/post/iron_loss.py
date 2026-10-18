@@ -120,8 +120,9 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
     `frequency_range[1]`; or the largest element peak |B| (vector norm over time) exceeds `b_range[1]`; or
     more than 5 % of the total loss comes from elements whose peak |B| is below `b_range[0]`. The harmonic
     shares are per unit mass. `weights` (n_el, e.g. element areas) weights each element's W/kg in the low-B
-    share; without it every element counts equally. Call once per material with all of that material's iron
-    elements, so the share is a share of that material's loss.
+    share; without it every element counts equally. Call once per material and per side (stator or rotor) with
+    all of that side's iron elements, so the share is a share of that side's loss: the two sides have different
+    periods and cannot share one call.
     """
     b = np.asarray(b, dtype=float)
     n_t, n_el = b.shape[0], b.shape[1]

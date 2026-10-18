@@ -156,9 +156,18 @@ def _solve_job(job):
     return r.status, (None if r.status is SolveStatus.NONCONVERGED else r.field.b)
 
 
+def _key(design, angles, currents, solver) -> str:
+    return provenance_hash(provenance(design, angles, np.asarray(currents).ravel(),
+                                      f"stroke{np.shape(currents)}", solver))
+
+
+def stroke_key(design: Design, angles: np.ndarray, currents: np.ndarray, solver: str = "ngsolve") -> str:
+    """File stem of the cached fields of `stroke_fields` with these arguments (`<cache_dir>/strokes/<key>.npz`)."""
+    return _key(design, np.asarray(angles, dtype=float), np.asarray(currents, dtype=float), make_solver(solver))
+
+
 def _cache_path(cache_dir, design, angles, currents, solver) -> Path:
-    prov = provenance(design, angles, currents.ravel(), f"stroke{currents.shape}", solver)
-    return Path(cache_dir) / "strokes" / f"{provenance_hash(prov)}.npz"
+    return Path(cache_dir) / "strokes" / f"{_key(design, angles, currents, solver)}.npz"
 
 
 def _raw_fields(static, design, angles, currents, solver, workers, progress, cancel):
