@@ -23,7 +23,7 @@ export function fmtAbout(seconds: number): string {
   return seconds < 60 ? "under 1 min" : `about ${Math.round(seconds / 60)} min`
 }
 
-function detailOf(job: JobOut, id: string): string | undefined {
+function detailOf(job: JobOut, id: string, active: boolean): string | undefined {
   const p = job.progress ?? {}
   const done = num(p.points_done)
   const total = num(p.points_total)
@@ -47,7 +47,7 @@ function detailOf(job: JobOut, id: string): string | undefined {
   }
   // steps that report no counts (mesh, winding, checks) still show the job's running time
   const elapsed = num(p.elapsed_s)
-  if (elapsed !== null && id !== "queued" && id !== "saved") return `${fmtSpan(elapsed)} elapsed`
+  if (active && elapsed !== null && id !== "queued" && id !== "saved") return `${fmtSpan(elapsed)} elapsed`
   return undefined
 }
 
@@ -72,7 +72,7 @@ export function stepStates(job: JobOut): StepRow[] {
     if (job.status === "done" || i < current) state = "done"
     else if (i === current) state = stop ?? "active"
     else state = "waiting"
-    const detail = state === "active" || state === "failed" || state === "cancelled" ? detailOf(job, id) : undefined
+    const detail = state === "active" || state === "failed" || state === "cancelled" ? detailOf(job, id, state === "active") : undefined
     return { id, label: labels[id] ?? id, state, ...(detail ? { detail } : {}) }
   })
 }

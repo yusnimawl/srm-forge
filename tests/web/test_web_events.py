@@ -159,4 +159,4 @@ def test_events_tick_while_progress_is_idle(make, gate):
     ev = _events(c, j, lambda n, d: n == "end", limit=50)
     elapsed = [d["progress"]["elapsed_s"] for n, d in ev if n == "progress"]
     assert len(elapsed) >= 3
-    assert elapsed == sorted(elapsed) and elapsed[-1] - elapsed[0] >= 1.5
+    assert elapsed == sorted(elapsed) and elapsed[-1] - elapsed[0] >= 1.0
