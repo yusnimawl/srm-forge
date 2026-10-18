@@ -4,6 +4,10 @@ p(B, f) = k_h f B^alpha + k_c (f B)^2 + k_e (f B)^1.5   [W/kg, B peak in T, f in
 
 k_c = pi^2 sigma d^2 / (6 rho_m) is computed from the conductivity, the lamination thickness and the
 density; k_h, alpha and k_e are fitted to log(p) with alpha in [1.2, 3.0] and k_h, k_e >= 0.
+
+The fit is valid inside frequency_range and b_range only. Below b_range the model over-predicts
+(measured for 10JNEX900: +15 % at 0.1 T and 1 kHz, up to +80 % at 0.02 T); callers flag use outside
+both ranges.
 """
 import math
 from dataclasses import dataclass
@@ -33,6 +37,7 @@ class LossModel:
     conductivity: float
     fit_error: float                       # max relative error over the data points
     frequency_range: tuple[float, float]
+    b_range: tuple[float, float]
     confidence: str
 
     def sinusoid(self, b: float, f: float) -> float:
@@ -72,7 +77,7 @@ def fit_loss(data: LossData, *, density: float, thickness: float) -> LossModel:
     fit_error = float(np.max(np.abs(fit - w) / w))
     return LossModel(k_h=k_h, alpha=alpha, k_c=k_c, k_e=k_e, density=density, thickness=thickness,
                      conductivity=data.conductivity, fit_error=fit_error,
-                     frequency_range=data.frequency_range, confidence=data.confidence)
+                     frequency_range=data.frequency_range, b_range=data.b_range, confidence=data.confidence)
 
 
 @lru_cache(maxsize=None)

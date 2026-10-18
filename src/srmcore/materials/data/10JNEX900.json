@@ -73,6 +73,7 @@
     "provenance": {"source": "JFE Super Core catalogue f2e-001 'High-Frequency Core Loss Curves', sinusoidal flux, 25 cm Epstein frame, 0.10 mm; values read from the vector curves and checked against the f1e-002 sample table (within 6 %)", "page": "4", "date": "2026-10-17", "method": "read from vector paths of the published core loss curves (docs/r3-sources.md section 1a); points with B below 0.2 T are left out because the three-term Bertotti form misses them by more than 15 %", "typical": true},
     "confidence": "B",
     "frequency_range": [50.0, 20000.0],
+    "b_range": [0.2, 1.0],
     "conductivity": 1219512.1951219512,
     "conductivity_source": "JFE f1e-002 p. 5 sample characteristics table, specific resistance 0.82 uOhm m (grade A, typical in-house value)"
   }

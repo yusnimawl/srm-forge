@@ -48,6 +48,7 @@ class LossData(_Frozen):
     provenance: Provenance
     confidence: Literal["A", "B", "C"]
     frequency_range: tuple[float, float]
+    b_range: tuple[float, float]   # peak flux density span (T) the table and the fit cover
     conductivity: float = Field(gt=0)   # S/m
     conductivity_source: str
 
@@ -57,9 +58,14 @@ class LossData(_Frozen):
             raise ValueError(f"loss data needs at least 6 points, got {len(self.points)}")
         if len({p.f for p in self.points}) < 2:
             raise ValueError("loss data needs at least 2 distinct frequencies")
-        lo, hi = self.frequency_range
-        if not 0 < lo < hi:
-            raise ValueError("frequency_range must satisfy 0 < low < high")
+        for name, (lo, hi) in (("frequency_range", self.frequency_range), ("b_range", self.b_range)):
+            if not 0 < lo < hi:
+                raise ValueError(f"{name} must satisfy 0 < low < high")
+        for p in self.points:
+            if not self.b_range[0] <= p.b <= self.b_range[1]:
+                raise ValueError(f"point b={p.b} T lies outside b_range {self.b_range}")
+            if not self.frequency_range[0] <= p.f <= self.frequency_range[1]:
+                raise ValueError(f"point f={p.f} Hz lies outside frequency_range {self.frequency_range}")
         return self
 
 

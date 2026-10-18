@@ -50,11 +50,36 @@ def test_missing_loss_data():
 def test_existing_materials_unchanged():
     for name in available_materials():
         mat = load_material(name)
-        if mat.kind == "soft_magnetic" and name != "10JNEX900":
-            assert mat.loss is None
+        if mat.kind != "soft_magnetic":
+            continue
+        if mat.loss is None:
+            with pytest.raises(MissingLossData, match=name):
+                loss_model(name)
+        else:
+            assert loss_model(name).fit_error < 0.15
+
+
+def test_ranges_carried_to_model():
+    data = m19_loss_data()
+    model = fit_loss(data, density=7650.0, thickness=0.00036)
+    assert model.b_range == data.b_range and model.frequency_range == data.frequency_range
+    assert loss_model("10JNEX900").b_range == (0.2, 1.0)
 
 
 def test_loss_data_validation():
     data = m19_loss_data()
-    with pytest.raises(ValueError):
-        type(data)(**{**data.model_dump(), "points": data.points[:5]})
+    base = data.model_dump()
+    cls = type(data)
+    with pytest.raises(ValueError, match="at least 6"):
+        cls(**{**base, "points": data.points[:5]})
+    one_f = tuple(p for p in data.points if p.f == 50.0)
+    with pytest.raises(ValueError, match="distinct frequencies"):
+        cls(**{**base, "points": one_f})
+    with pytest.raises(ValueError, match="b_range"):
+        cls(**{**base, "b_range": (0.5, 1.5)})
+    with pytest.raises(ValueError, match="frequency_range"):
+        cls(**{**base, "frequency_range": (100.0, 1000.0)})
+    with pytest.raises(ValueError, match="b_range"):
+        cls(**{**base, "b_range": (1.5, 0.1)})
+    with pytest.raises(ValueError, match="frequency_range"):
+        cls(**{**base, "frequency_range": (1000.0, 50.0)})

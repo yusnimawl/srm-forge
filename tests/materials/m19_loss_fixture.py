@@ -2,7 +2,8 @@
 
 Source: EMERF, Lamination Steels 3rd ed., AK Steel Di-Max M-19, 0.014 in (29 gauge, 0.36 mm),
 typical as-sheared total AC core loss, page 5 of the MIT OCW 6.685 problem set 3 excerpt
-(docs/r3-sources.md section 2a). A representative subset of the table.
+(docs/r3-sources.md section 2a). Subset: the table rows at 0.1, 0.4, 0.7, 1.0, 1.2 and 1.5 T crossed
+with the columns at 50, 100, 200, 400 and 1000 Hz, skipping the cells the table leaves empty.
 """
 from srmcore.materials.schema import LossData, LossPoint, Provenance
 
@@ -26,7 +27,8 @@ def m19_loss_data() -> LossData:
                    "MIT OCW 6.685 ps03 data excerpt",
             page="5", date="2026-10-17", method="tabulated W/kg (subset)", typical=True),
         confidence="C",
-        frequency_range=(50.0, 2000.0),
+        frequency_range=(50.0, 1000.0),
+        b_range=(0.1, 1.5),
         conductivity=1.0 / RESISTIVITY_OHM_M,
         conductivity_source="ASTM A677 typical resistivity 45 to 55 uOhm cm, midpoint 50 (secondary, typical)",
     )
