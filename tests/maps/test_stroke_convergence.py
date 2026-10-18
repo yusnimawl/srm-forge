@@ -25,7 +25,7 @@ def _total_loss(static, n: int) -> float:
     total = 0.0
     for side in (fields.stator, fields.rotor):
         # Lamination flux density: the finite-element B is averaged over steel and insulation.
-        b = side.b / load_material(DESIGN.machine.materials.stator).stacking_factor
+        b = side.b / load_material(str(side.material[0])).stacking_factor
         loss = waveform_loss(b, side.centroids, side.period_s(OMEGA), MODEL, weights=side.areas)
         total += float((loss.total * MODEL.density * side.areas * DESIGN.machine.stack_length).sum())
     return total
