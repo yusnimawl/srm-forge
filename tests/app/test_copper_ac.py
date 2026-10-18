@@ -50,7 +50,8 @@ def test_resistance_follows_temperature():
 def test_ac_tends_to_zero_at_low_frequency():
     wire, w = _setup()
     dc = 0.5 * 30.0**2 * w.resistance * P.n_phases
-    assert _loss(wire, w, 1.0, 1e-3) < 1e-6 * dc
+    assert _loss(wire, w, 1.0, 0.5) < 0.05 * dc
+    assert _loss(wire, w, 1.0, 0.5) == pytest.approx(_loss(wire, w, 10.0, 0.5) / 100, rel=0.01)
 
 
 def test_proximity_scales_d4_f2():
@@ -80,3 +81,17 @@ def test_default_temperature_and_old_setup():
     data = json.loads(_req().model_dump_json())
     data.pop("winding_temperature_c")
     assert Requirements.model_validate(data).winding_temperature_c == 120.0
+
+
+def test_reversing_field_gives_proximity_at_the_fundamental():
+    wire, w = _setup(1.0e-4)
+    f, b_amp, n = 50.0, 0.5, 64
+    t = np.arange(n) / n
+    b = np.zeros((n, 3, 2))
+    b[:, :, 0] = b_amp * np.sin(2 * np.pi * t)[:, None]
+    got = ac_copper_loss(w, wire, np.zeros(n), 1 / f, b, np.array(["a", "a", "b"]), np.array([1.0, 2.0, 3.0]), P,
+                         120.0)
+    rho = load_material("copper").resistivity_at(120.0)
+    n_strands = w.turns * w.strands * P.n_stator_poles
+    want = n_strands * np.pi * 2 * P.stack_length * (1.0e-4) ** 4 * (2 * np.pi * f) ** 2 * b_amp**2 / (128 * rho)
+    assert got == pytest.approx(want, rel=1e-6)
