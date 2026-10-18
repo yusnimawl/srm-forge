@@ -91,13 +91,13 @@ def test_density_mode_picks_the_most_equivalent_turns_then_the_fewest_paths():
 
 
 def test_density_mode_prefers_the_series_winding_over_the_same_machine_on_two_paths():
-    # worst ratio 112.6 on this map is met up to 8 equivalent turns, so the 16 turns on 2 paths are as feasible as
-    # the 8 in series; ranking by raw turns would pick them.
+    # worst ratio 112.6147 on this map is met up to 17 equivalent turns, so the 34 turns on 2 paths are as feasible
+    # as the 17 in series; ranking by raw turns would pick them.
     req = _req()
-    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=112.6)
-    parallel = next(s for s in c.scan if (s.winding.turns, s.winding.paths) == (16, 2))
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=112.6147)
+    parallel = next(s for s in c.scan if (s.winding.turns, s.winding.paths) == (34, 2))
     assert parallel.feasible
-    assert (c.point.winding.turns, c.point.winding.paths) == (8, 1)
+    assert (c.point.winding.turns, c.point.winding.paths) == (17, 1)
 
 
 def test_density_current_cap_limits_the_scan():

@@ -94,7 +94,7 @@ def test_stage_two_scans_within_the_stage_one_cap_by_default():
 def test_scan_limit_note_follows_the_equivalent_turns():
     e, _ = _evaluate(_req())
     assert e.winding.turns == 30 and e.winding.paths == 1 and "limit" in e.error
-    e, _ = _evaluate(_req(), margin=3.47)        # feasible up to 21 turns in series; 30 turns on 2 paths is only 15
+    e, _ = _evaluate(_req(), margin=3.5147)     # feasible up to 21 turns in series; 30 turns on 2 paths is only 15
     assert next(s for s in e.scan if (s.winding.turns, s.winding.paths) == (30, 2)).feasible
     assert (e.winding.turns, e.winding.paths) == (21, 1) and "limit" not in e.error
 
