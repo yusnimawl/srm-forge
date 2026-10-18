@@ -20,6 +20,7 @@ import { bestPoint, contourData, envelopeEdge, pointLabel, splitBars, svgToMetre
 import { parseNum } from "@/lib/searchForm"
 import { fmtAbout } from "@/lib/steps"
 
+const ANGLE_CONVERGENCE_PLACEHOLDER = 0.02
 const HEADING = "text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground"
 
 /** Click an iron element of the outline; reports the position in metres in the stator frame at rotor angle 0. */
@@ -146,8 +147,23 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
             <dt className="text-muted-foreground">Copper AC</dt>
             <dd className="num">{sp.copper_ac_w == null ? "AC not computed (no wire chosen)" : `${fmt(sp.copper_ac_w, 3)} W`}</dd>
             <dt className="text-muted-foreground">Iron</dt>
-            <dd className="num">{fmt(sp.iron_w, 3)} W</dd>
+            <dd className="num">
+              {fmt(sp.iron_w, 3)} W
+              {sp.iron_uncertainty_rel != null && <> ± {fmt(sp.iron_uncertainty_rel * 100, 2)} %</>}
+            </dd>
           </dl>
+        )}
+        {sp?.reached && sp.beyond_fit_range && (
+          <div role="note" className="text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Beyond the fit range of the loss data</p>
+            {r.notes.filter((n) => n.includes("range of the loss data")).map((n) => <p key={n}>{n}</p>)}
+          </div>
+        )}
+        {r.angle_convergence_rel != null && (
+          <p className="text-xs text-muted-foreground">
+            Angle convergence {fmt(r.angle_convergence_rel * 100, 2)} %
+            {r.angle_convergence_rel === ANGLE_CONVERGENCE_PLACEHOLDER ? " (placeholder until measured)" : ""}
+          </p>
         )}
       </section>
       <section className="space-y-2">

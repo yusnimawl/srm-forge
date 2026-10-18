@@ -65,3 +65,24 @@ Different machine (4-phase 8/6, 50W470) and material from this repo's 8/6 (10JNE
 | Rotor | TBD | 23.2 |
 
 Reading: TBD.
+
+## Preliminary screening run (laptop, 2026-10-19)
+
+Preliminary. Screening mesh, two rows only (T4.1 and T5.5), M19 0.36 mm as the stand-in for Materu's steel. These
+numbers do not replace the TBD table above.
+
+| Row | turn-on | Peak meas / comp (A) | Iron meas / comp (W) | Error | Iron uncertainty | Cu meas / comp (W) |
+|---|---|---|---|---|---|---|
+| T4.1 | nominal | 1.07 / 0.76 | 5.6 / 4.41 | -21 % | +-39 % | 2.0 / 1.1 |
+| T4.1 | 3.5 deg earlier | 1.07 / 1.07 | 5.6 / 4.25 | -24 % | +-39 % | 2.0 / 2.0 |
+| T5.5 | nominal | 5.66 / 4.07 | 22.9 / 7.37 | -68 % | +-41 % | 40.8 / 21.4 |
+| T5.5 | 4.5 deg earlier | 5.66 / 5.66 | 22.9 / 6.67 | -71 % | +-42 % | 40.8 / 50.2 |
+
+Region shares of the repo 8/6 (10JNEX900), same run: stator yoke 40.7 %, stator teeth 30.0 %, rotor 29.2 %, against
+Yan et al. 52.9 / 23.9 / 23.2 % (qualitative; different machine and material).
+
+- The specification section 9 check (reference mesh, all rows) is still to run on the laptop.
+- The iron shortfall at T5.5 is outside the stated uncertainty and is not explained yet.
+- Candidate causes, none confirmed: the material stand-in; Materu's measured iron loss is a subtraction with an
+  assumed 6 % stray term; the real lamination thickness is unknown (the classical term uses 0.36 mm); the M5d 2D flux
+  deficit.

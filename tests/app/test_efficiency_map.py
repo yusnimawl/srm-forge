@@ -150,3 +150,39 @@ def test_stroke_losses_given_stroke_and_model_override(tmp_path):
                                 model=dataclasses.replace(losses.loss_model("10JNEX900"), k_h=0.0, k_e=0.0))
     assert all(r.hysteresis == 0.0 and r.excess == 0.0 for r in none.iron.values())
     assert 0 < none.iron_w < base.iron_w
+
+
+def test_no_lamination_thickness_keeps_the_data_thickness(case, tmp_path):
+    inputs, evaluation = case
+    design = Design(machine=make_8_6(materials=IRON, lamination_thickness=None), mesh=MeshSettings(preset="screening"))
+    t = losses.loss_model("10JNEX900").thickness
+    assert losses.design_model(losses.loss_model("10JNEX900"), None).thickness == t
+    with mock.patch("srmapp.losses.build_map", side_effect=_fake_map):
+        out = efficiency_map(inputs.model_copy(update={"design": design}), evaluation, n_speeds=1, n_torques=1,
+                             n_angles=N_ANGLES, cache_dir=tmp_path)
+    assert any("design has no lamination thickness" in n and "using the loss data's" in n for n in out.notes)
+
+
+def test_design_thickness_scales_the_classical_term_by_the_square(tmp_path):
+    t = losses.loss_model("10JNEX900").thickness
+    notes = losses.thickness_notes_for(Design(machine=make_8_6(materials=IRON, lamination_thickness=2 * t),
+                                              mesh=MeshSettings(preset="screening")))
+    assert len(notes) == 1 and "loss data measured at" in notes[0] and "classical eddy scaled to the design's" in notes[0]
+    static = build_machine_mesh(DESIGN)
+    angles = losses.stroke_angles(static, 2 * math.pi / DESIGN.machine.n_rotor_poles, N_ANGLES)
+    currents = np.zeros((len(angles), DESIGN.machine.n_phases))
+    currents[:, 0] = 40.0 * np.sin(np.linspace(0.0, math.pi, len(angles)))
+    classical = []
+    for d in (t, 2 * t):
+        design = Design(machine=make_8_6(materials=IRON, lamination_thickness=d), mesh=MeshSettings(preset="screening"))
+        sl = losses.stroke_losses(static, design, angles, currents, 3000.0, workers=1, cache_dir=tmp_path)
+        classical.append(sum(r.classical for r in sl.iron.values()))
+    assert classical[1] == pytest.approx(4 * classical[0], rel=1e-9)
+
+
+def test_range_notes_one_per_cause():
+    side = lambda high=0.0, low=0.0, beyond=False: losses._Side({}, 0.1, "A", high, low, beyond)
+    assert losses.range_notes([side()]) == []
+    assert losses.range_notes([side(high=0.1, beyond=True)]) == [losses._EXTRAPOLATION_NOTE]
+    assert losses.range_notes([side(low=0.1, beyond=True), side(low=0.2, beyond=True)]) == [losses._LOW_B_NOTE]
+    assert losses.range_notes([side(beyond=True)]) == [losses._FREQUENCY_NOTE]

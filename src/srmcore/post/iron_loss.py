@@ -117,8 +117,9 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
 
     `beyond_fit_range` is True when the model is used outside the range it was fitted on: the
     fundamental, or a harmonic carrying more than 5 % of the classical loss, is above
-    `frequency_range[1]`; or the largest element peak |B| (vector norm over time) exceeds `b_range[1]`; or
-    more than 5 % of the total loss comes from elements whose peak |B| is below `b_range[0]`. The harmonic
+    `frequency_range[1]`; or more than 5 % of the total loss comes from elements whose peak |B| (vector norm over
+    time) exceeds `b_range[1]`; or more than 5 % of the total loss comes from elements whose peak |B| is below
+    `b_range[0]`. The harmonic
     shares are per unit mass. `weights` (n_el, e.g. element areas) weights each element's W/kg in the low-B
     share; without it every element counts equally. Call once per material and per side (stator or rotor) with
     all of that side's iron elements, so the share is a share of that side's loss: the two sides have different

@@ -197,7 +197,6 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
     currents = np.asarray(currents, dtype=float)
     if currents.shape != (len(angles), p.n_phases):
         raise ValueError(f"currents must have shape ({len(angles)}, {p.n_phases}), got {currents.shape}")
-    tau = 2 * math.pi / p.n_rotor_poles
     adapter = make_solver(solver)
     path = None if cache_dir is None else _cache_path(cache_dir, design, angles, currents, adapter)
     loaded = None

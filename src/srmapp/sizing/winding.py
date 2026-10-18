@@ -19,7 +19,7 @@ class Winding:
     strands: int           # parallel conductors per turn
     copper_area: float     # m², one turn, all strands
     current: float         # A, peak phase current
-    resistance: float      # Ω, one phase at 100 °C, its paths in parallel
+    resistance: float      # Ω, one phase at the requirement's winding temperature, its paths in parallel
     copper_mass: float     # kg, all coils
     wire: int | None       # index into Requirements.wires; None in density mode
     paths: int = 1         # parallel paths per phase

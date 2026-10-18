@@ -94,6 +94,20 @@ describe("LossesTab", () => {
     expect(t).toContain("AC not computed (no wire chosen)")
   })
 
+  it("shows the iron uncertainty, the beyond-range marker with its reason and the angle convergence", async () => {
+    const r = losses(2)
+    r.points = r.points.map((p) => ({ ...p, beyond_fit_range: true }))
+    r.notes = ["more than 5 % of the iron loss of a side comes from iron below the flux density range of the loss data", "other"]
+    r.angle_convergence_rel = 0.02
+    const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    const t = m.host.textContent ?? ""
+    expect(t).toContain("± 10 %")
+    expect(t).toContain("Beyond the fit range of the loss data")
+    expect(t).toContain("flux density range of the loss data")
+    expect(t).toContain("Angle convergence 2 % (placeholder until measured)")
+  })
+
   it("loads B(t) at the picked element in metres", async () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
       { left: 0, top: 0, width: 200, height: 200, right: 200, bottom: 200, x: 0, y: 0, toJSON: () => ({}) })

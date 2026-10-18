@@ -86,6 +86,16 @@ def _file_name(label: str) -> str:
     return re.sub(r"[^A-Za-z0-9 ._()+-]", "", label.replace("/", "-")).strip() or "case"
 
 
+def _evaluated_since_0_6(evaluation: dict) -> bool:
+    """False for an evaluation without a recorded srmapp version or made by one below 0.6.0 (its winding
+    resistance was made at 100 °C without the drive tail)."""
+    version = evaluation.get("srmapp_version")
+    try:
+        return version is not None and tuple(int(x) for x in version.split(".")[:2]) >= (0, 6)
+    except ValueError:
+        return False
+
+
 def _invalid(errors: list[dict], warnings: list[dict]) -> JSONResponse:
     return JSONResponse({"errors": errors, "warnings": warnings}, status_code=422)
 
@@ -406,6 +416,10 @@ def create_app(settings: Settings,
         inputs = evaluated_inputs(case_id)
         if isinstance(inputs, JSONResponse):
             return inputs
+        if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
+            raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
+        if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
+            raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
         try:
             check_loss_data(inputs.design)
         except MissingLossData as exc:

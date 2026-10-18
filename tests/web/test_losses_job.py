@@ -195,3 +195,18 @@ def test_losses_estimate(client):
     client.app.state.store.add_map_time("screening", 160.0)
     e = client.get(f"/api/cases/{case}/losses/estimate", params={"n_speeds": 2, "n_torques": 2}).json()
     assert e["basis"] == "history" and e["seconds"] == pytest.approx(2 * 2 * 60 * 160.0 / 320)
+
+
+def test_losses_refused_for_evaluation_before_0_6(client, calls):
+    case = _case(client)
+    store = client.app.state.store
+    body = store.case_result(case, "evaluate")
+    for version in (None, "0.5.0"):
+        body.pop("srmapp_version", None)
+        if version:
+            body["srmapp_version"] = version
+        with store._db() as con:
+            con.execute("UPDATE results SET body = ? WHERE case_id = ? AND kind = 'evaluate'",
+                        (json.dumps(body), case))
+        r = client.post(f"/api/cases/{case}/losses", json={})
+        assert r.status_code == 409 and "re-evaluate" in r.json()["detail"]

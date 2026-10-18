@@ -22,7 +22,7 @@ from srmcore.materials import LossModel, loss_model
 from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design
-from srmcore.post.iron_loss import waveform_loss
+from srmcore.post.iron_loss import SHARE_LIMIT, waveform_loss
 
 from . import __version__, field
 from .case import CaseInputs, map_request
@@ -41,7 +41,12 @@ LOSS_GRADE_ALLOWANCE = {"A": 0.0, "B": 0.10, "C": 0.25}   # provisional, as for 
 # The envelope and the stroke search compute the same torque with different operation orders.
 _TORQUE_TOL = 1e-9
 _EXTRAPOLATION_NOTE = ("some iron has a peak flux density above the range of the loss data: its loss is extrapolated, "
-                       "and the iron uncertainty adds the share of the loss from that iron times the fit error")
+                       "and the iron uncertainty only adds the share of the loss from that iron times the fit error; "
+                       "it does not bound the error of the loss above the range (1.3 T for the library data)")
+_LOW_B_NOTE = ("more than 5 % of the iron loss of a side comes from iron below the flux density range of the loss "
+               "data: the model over-predicts there")
+_FREQUENCY_NOTE = ("the flux waveform has a fundamental or harmonic above the frequency range of the loss data: "
+                   "the loss model is extrapolated in frequency")
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,32 @@ class LossResult:
     notes: tuple[str, ...]
 
 
+def range_notes(sides: list[_Side]) -> list[str]:
+    """One note per cause of leaving the fit range that is present on any side."""
+    notes = []
+    if any(s.high_b_share > 0 for s in sides):
+        notes.append(_EXTRAPOLATION_NOTE)
+    if any(s.low_b_share > SHARE_LIMIT for s in sides):
+        notes.append(_LOW_B_NOTE)
+    if any(s.beyond and s.high_b_share <= SHARE_LIMIT and s.low_b_share <= SHARE_LIMIT for s in sides):
+        notes.append(_FREQUENCY_NOTE)
+    return notes
+
+
+def thickness_notes_for(design: Design) -> list[str]:
+    """Notes on a lamination thickness that differs from the loss data's (or is missing)."""
+    d = design.machine.lamination_thickness
+    notes = []
+    for name in sorted({design.machine.materials.stator, design.machine.materials.rotor}):
+        t = loss_model(name).thickness
+        if d is None:
+            notes.append(f"{name}: design has no lamination thickness; using the loss data's {t * 1e3:.3g} mm")
+        elif not math.isclose(t, d, rel_tol=1e-9):
+            notes.append(f"{name}: loss data measured at {t * 1e3:.3g} mm; classical eddy scaled to the design's "
+                         f"{d * 1e3:.3g} mm")
+    return notes
+
+
 def check_loss_data(design: Design) -> None:
     """Raises MissingLossData when the stator or the rotor material has no loss model."""
     for name in {design.machine.materials.stator, design.machine.materials.rotor}:
@@ -113,13 +144,23 @@ class _Side:
     fit_error: float
     grade: str
     high_b_share: float
+    low_b_share: float
     beyond: bool
 
 
-def _side_loss(side: IronWaveforms, omega: float, stack_length: float, model: LossModel | None = None) -> _Side:
+def design_model(model: LossModel, thickness: float | None) -> LossModel:
+    """`model` with the classical eddy term of a lamination of `thickness` (k_c and the eddy term scale as d²);
+    unchanged when the design gives no thickness."""
+    if thickness is None:
+        return model
+    return dataclasses.replace(model, thickness=thickness, k_c=model.k_c * (thickness / model.thickness) ** 2)
+
+
+def _side_loss(side: IronWaveforms, omega: float, stack_length: float, model: LossModel | None = None,
+               thickness: float | None = None) -> _Side:
     name = str(side.material[0])
     material = load_material(name)
-    model = loss_model(name) if model is None else model
+    model = design_model(loss_model(name) if model is None else model, thickness)
     el = waveform_loss(side.b / material.stacking_factor, side.centroids, side.period_s(omega), model, side.areas)
     mass = side.areas * stack_length * material.stacking_factor * material.density
     regions = {}
@@ -127,7 +168,7 @@ def _side_loss(side: IronWaveforms, omega: float, stack_length: float, model: Lo
         m = side.region == region
         regions[str(region)] = RegionLoss(*(float(np.sum(w[m] * mass[m]))
                                             for w in (el.hysteresis, el.classical, el.excess)))
-    return _Side(regions, model.fit_error, model.confidence, el.high_b_share, el.beyond_fit_range)
+    return _Side(regions, model.fit_error, model.confidence, el.high_b_share, el.low_b_share, el.beyond_fit_range)
 
 
 @dataclass(frozen=True)
@@ -146,8 +187,9 @@ def stroke_losses(static, design: Design, angles: np.ndarray, coil_currents: np.
     fields = stroke_fields(static, design, angles, coil_currents, solver=solver, workers=workers,
                            cache_dir=cache_dir, progress=progress, cancel=cancel)
     omega = rpm * 2 * math.pi / 60
-    sides = (_side_loss(fields.stator, omega, design.machine.stack_length, model),
-             _side_loss(fields.rotor, omega, design.machine.stack_length, model))
+    d = design.machine.lamination_thickness
+    sides = (_side_loss(fields.stator, omega, design.machine.stack_length, model, d),
+             _side_loss(fields.rotor, omega, design.machine.stack_length, model, d))
     iron = {k: v for s in sides for k, v in s.regions.items()}
     return StrokeLoss(fields, sides, iron, sum(r.hysteresis + r.classical + r.excess for r in iron.values()))
 
@@ -172,6 +214,7 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
     loss data, ValueError for an evaluation without a winding, and InterruptedError when `cancel` fires."""
     design = inputs.design
     check_loss_data(design)
+    thickness_notes = thickness_notes_for(design)
     w = evaluation.winding
     if evaluation.status != "ok" or w is None:
         raise ValueError(f"the evaluation has no winding (status {evaluation.status!r})")
@@ -240,13 +283,8 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
     _progress(progress, "losses", len(grid), len(grid))
 
     notes = []
-    if any(s.high_b_share > 0 for s in side_flags):
-        notes.append(_EXTRAPOLATION_NOTE)
-    for name in sorted({design.machine.materials.stator, design.machine.materials.rotor}):
-        model = loss_model(name)
-        if not math.isclose(model.thickness, design.machine.lamination_thickness, rel_tol=1e-9):
-            notes.append(f"{name}: the loss model uses the material's lamination thickness "
-                         f"{model.thickness * 1e3:.3g} mm, the design has {design.machine.lamination_thickness * 1e3:.3g} mm")
+    notes.extend(range_notes(side_flags))
+    notes.extend(thickness_notes)
     if wire is None:
         notes.append("density mode: no wire, so the AC copper loss is not computed")
     return LossResult(tuple(points), tuple(float(s) for s in speeds), fractions, req.winding_temperature_c,
