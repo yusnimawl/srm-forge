@@ -1,3 +1,4 @@
+import dataclasses
 import math
 from unittest import mock
 
@@ -131,3 +132,21 @@ def test_phase_currents_are_delayed_by_a_stroke_angle_per_phase():
     np.testing.assert_allclose(cur[:, 0], np.interp(angles, np.arange(180) * tau / 180, table, period=tau))
     np.testing.assert_allclose(cur[12:, 1], cur[:-12, 0], atol=1e-12)         # delayed by tau / q = 12 samples
 
+
+
+def test_stroke_losses_given_stroke_and_model_override(tmp_path):
+    static = build_machine_mesh(DESIGN)
+    tau = 2 * math.pi / DESIGN.machine.n_rotor_poles
+    angles = losses.stroke_angles(static, tau, N_ANGLES)
+    currents = np.zeros((len(angles), DESIGN.machine.n_phases))
+    currents[:, 0] = 40.0 * np.sin(np.linspace(0.0, math.pi, len(angles)))
+    base = losses.stroke_losses(static, DESIGN, angles, currents, 3000.0, workers=1, cache_dir=tmp_path)
+    assert base.iron_w > 0
+    assert base.iron_w == pytest.approx(sum(r.hysteresis + r.classical + r.excess for r in base.iron.values()))
+    same = losses.stroke_losses(static, DESIGN, angles, currents, 3000.0, workers=1, cache_dir=tmp_path,
+                                model=losses.loss_model("10JNEX900"))
+    assert same.iron_w == pytest.approx(base.iron_w)
+    none = losses.stroke_losses(static, DESIGN, angles, currents, 3000.0, workers=1, cache_dir=tmp_path,
+                                model=dataclasses.replace(losses.loss_model("10JNEX900"), k_h=0.0, k_e=0.0))
+    assert all(r.hysteresis == 0.0 and r.excess == 0.0 for r in none.iron.values())
+    assert 0 < none.iron_w < base.iron_w

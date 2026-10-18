@@ -17,8 +17,8 @@ from scipy.interpolate import PchipInterpolator
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.run import MapResult
-from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, IronWaveforms, iron_waveforms, stroke_angles, stroke_fields, stroke_key
-from srmcore.materials import loss_model
+from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, IronWaveforms, StrokeFields, iron_waveforms, stroke_angles, stroke_fields, stroke_key
+from srmcore.materials import LossModel, loss_model
 from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design
@@ -116,10 +116,10 @@ class _Side:
     beyond: bool
 
 
-def _side_loss(side: IronWaveforms, omega: float, stack_length: float) -> _Side:
+def _side_loss(side: IronWaveforms, omega: float, stack_length: float, model: LossModel | None = None) -> _Side:
     name = str(side.material[0])
     material = load_material(name)
-    model = loss_model(name)
+    model = loss_model(name) if model is None else model
     el = waveform_loss(side.b / material.stacking_factor, side.centroids, side.period_s(omega), model, side.areas)
     mass = side.areas * stack_length * material.stacking_factor * material.density
     regions = {}
@@ -128,6 +128,28 @@ def _side_loss(side: IronWaveforms, omega: float, stack_length: float) -> _Side:
         regions[str(region)] = RegionLoss(*(float(np.sum(w[m] * mass[m]))
                                             for w in (el.hysteresis, el.classical, el.excess)))
     return _Side(regions, model.fit_error, model.confidence, el.high_b_share, el.beyond_fit_range)
+
+
+@dataclass(frozen=True)
+class StrokeLoss:
+    fields: StrokeFields
+    sides: tuple[_Side, _Side]             # stator, rotor
+    iron: dict[str, RegionLoss]            # W per region
+    iron_w: float
+
+
+def stroke_losses(static, design: Design, angles: np.ndarray, coil_currents: np.ndarray, rpm: float, *,
+                  solver: str = "ngsolve", workers: int | None = None, cache_dir=None, progress=None, cancel=None,
+                  model: LossModel | None = None) -> StrokeLoss:
+    """Iron loss of a given stroke: the fields at the rotor `angles` (one pole pitch) with the coil currents
+    `coil_currents` (n_angles, n_phases), at `rpm`. `model` replaces the loss model of the iron materials."""
+    fields = stroke_fields(static, design, angles, coil_currents, solver=solver, workers=workers,
+                           cache_dir=cache_dir, progress=progress, cancel=cancel)
+    omega = rpm * 2 * math.pi / 60
+    sides = (_side_loss(fields.stator, omega, design.machine.stack_length, model),
+             _side_loss(fields.rotor, omega, design.machine.stack_length, model))
+    iron = {k: v for s in sides for k, v in s.regions.items()}
+    return StrokeLoss(fields, sides, iron, sum(r.hysteresis + r.classical + r.excess for r in iron.values()))
 
 
 def _uncertainty(sides: list[_Side]) -> float:
@@ -190,7 +212,6 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         _progress(progress, "fields", solved[0] + done, reached * len(angles))
 
     wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
-    stack = machine.stack_length
     points, side_flags = [], []
     for done, ((i, f), trace) in enumerate(zip(grid, strokes), 1):
         rpm, torque = float(speeds[i]), f * float(env.torque[i])
@@ -201,12 +222,10 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         phase = phase_current_samples(trace.current, angles, tau, q)
         coil = phase * scale
         omega = rpm * 2 * math.pi / 60
-        fields = stroke_fields(static, ref, angles, coil, solver=solver, workers=workers, cache_dir=cache_dir,
-                               progress=field_progress, cancel=cancel)
+        sl = stroke_losses(static, ref, angles, coil, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
+                           progress=field_progress, cancel=cancel)
+        fields, sides, iron, iron_w = sl.fields, list(sl.sides), sl.iron, sl.iron_w
         solved[0] += len(angles)
-        sides = [_side_loss(fields.stator, omega, stack), _side_loss(fields.rotor, omega, stack)]
-        iron = {k: v for s in sides for k, v in s.regions.items()}
-        iron_w = sum(r.hysteresis + r.classical + r.excess for r in iron.values())
         ac = None if wire is None else ac_copper_loss(w, wire, phase[:, 0], tau / omega, fields.b_coil,
                                                       fields.coil_side, fields.coil_areas, machine,
                                                       req.winding_temperature_c)
