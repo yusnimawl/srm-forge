@@ -16,6 +16,7 @@ SEQUENCES = {
     "validate": ["queued", "map", "checks", "saved"],
     "animate": ["queued", "frames", "saved"],
     "search": ["queued", "sampling", "designs", "pareto", "saved"],
+    "losses": ["queued", "strokes", "fields", "losses", "saved"],
 }
 
 

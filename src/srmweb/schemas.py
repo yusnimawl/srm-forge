@@ -79,6 +79,18 @@ class ValidateRequest(BaseModel):
     inputs: CaseInputs
 
 
+class LossesBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    n_speeds: int = Field(6, ge=2, le=12)
+    n_torques: int = Field(5, ge=1, le=10)
+
+
+class LossesRequest(LossesBody):
+    case_id: str
+    inputs: CaseInputs
+
+
 class EvaluateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -105,6 +117,13 @@ class IssuesOut(BaseModel):
 class EstimateOut(BaseModel):
     new_map: bool
     seconds: float      # a new map (when new_map) plus the winding choice
+    basis: Literal["history", "budget"]
+
+
+class LossesEstimateOut(BaseModel):
+    solves: int          # field solves: operating points x stroke angles
+    per_solve_s: float
+    seconds: float
     basis: Literal["history", "budget"]
 
 

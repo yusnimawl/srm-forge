@@ -9,6 +9,7 @@ import dataclasses
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from scipy.interpolate import PchipInterpolator
@@ -16,14 +17,15 @@ from scipy.interpolate import PchipInterpolator
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.run import MapResult
-from srmcore.maps.stroke import IronWaveforms, stroke_angles, stroke_fields, stroke_key
+from srmcore.maps.stroke import (DEFAULT_STROKE_ANGLES, IronWaveforms, rotor_pitches, stroke_angles,
+                                 stroke_fields, stroke_key)
 from srmcore.materials import loss_model
 from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design
 from srmcore.post.iron_loss import waveform_loss
 
-from . import __version__
+from . import __version__, field
 from .case import CaseInputs, map_request
 from .copper import ac_copper_loss
 from .drive.envelope import N_CURRENT, envelope, min_copper_stroke
@@ -32,6 +34,7 @@ from .sizing.generator import REFERENCE_TURNS
 from .turns import rescale_turns, turns_scale
 
 NAN = float("nan")
+N_ANGLES = DEFAULT_STROKE_ANGLES
 # Largest relative change of the iron loss between the default angle count and twice that. The limit stands in
 # until the slow convergence test has measured it.
 ANGLE_CONVERGENCE_REL = 0.02
@@ -139,7 +142,7 @@ def _progress(progress, step: str, done: int, total: int) -> None:
 
 
 def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int = 6, n_torques: int = 5,
-                   n_angles: int = 60, solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
+                   n_angles: int = N_ANGLES, solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
                    progress: Callable[[str, int, int], None] | None = None,
                    cancel: Callable[[], bool] | None = None) -> LossResult:
     """Losses and efficiency at `n_speeds` speeds (linspace(max/n, max, n) of the requirements) and torque levels
@@ -230,3 +233,67 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         notes.append("density mode: no wire, so the AC copper loss is not computed")
     return LossResult(tuple(points), tuple(float(s) for s in speeds), fractions, req.winding_temperature_c,
                       len(angles), ANGLE_CONVERGENCE_REL, __version__, tuple(notes))
+
+
+def locate(tri_nodes: np.ndarray, point: np.ndarray) -> tuple[int, bool]:
+    """Index of the triangle (rows of `tri_nodes`, (m, 3, 2)) that contains `point` and True; when none does, the
+    triangle with the nearest centroid and False."""
+    a, b, c = tri_nodes[:, 0], tri_nodes[:, 1], tri_nodes[:, 2]
+    d = (b[:, 1] - c[:, 1]) * (a[:, 0] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (a[:, 1] - c[:, 1])
+    x, y = point[0] - c[:, 0], point[1] - c[:, 1]
+    l1 = ((b[:, 1] - c[:, 1]) * x + (c[:, 0] - b[:, 0]) * y) / d
+    l2 = ((c[:, 1] - a[:, 1]) * x + (a[:, 0] - c[:, 0]) * y) / d
+    inside = np.flatnonzero(np.minimum(np.minimum(l1, l2), 1.0 - l1 - l2) >= 0.0)
+    if inside.size:
+        return int(inside[0]), True
+    return int(np.argmin(np.hypot(*(tri_nodes.mean(axis=1) - point).T))), False
+
+
+def _rot(phi: float) -> np.ndarray:
+    """Matrix R with v @ R the row vector v rotated counter-clockwise by phi."""
+    c, s = math.cos(phi), math.sin(phi)
+    return np.array([[c, s], [-s, c]])
+
+
+def b_waveform(design: Design, key: str, n_angles: int, rpm: float, x: float, y: float, *,
+               cache_dir) -> dict:
+    """Lamination flux density over one period at the iron element containing (x, y) (metres, the stator frame with
+    the rotor at angle 0; the nearest element when the point is outside the iron). The fields are the cached stroke
+    `key` of `efficiency_map` run with `n_angles` and `design` (the reference-turns design). Returns t (s), b_r and
+    b_t (T, radial and tangential about the axis, as the loss model sees them: finite-element B divided by the
+    stacking factor), the region and the side. Raises FileNotFoundError when the cache file is gone."""
+    path = Path(cache_dir) / "strokes" / f"{key}.npz"
+    with np.load(path) as f:
+        b_stator, b_rotor = f["stator"], f["rotor"]
+    static = field._static(design.to_json())
+    p = design.machine
+    tau = 2 * math.pi / p.n_rotor_poles
+    angles = stroke_angles(static, tau, n_angles)
+    if len(angles) != b_stator.shape[0]:
+        raise ValueError(f"the cached stroke has {b_stator.shape[0]} angles, {n_angles} requested give {len(angles)}")
+    kind = np.array([static.region_kind[n] for n in static.region_names])
+    s_nodes = static.stator.nodes[static.stator.triangles[kind[static.stator.region_ids] == "stator_iron"]]
+    r_nodes = static.rotor.nodes[static.rotor.triangles[kind[static.rotor.region_ids] == "rotor_iron"]]
+    point = np.array([x, y], dtype=float)
+    (i_s, in_s), (i_r, in_r) = locate(s_nodes, point), locate(r_nodes, point)
+    near_s = np.hypot(*(s_nodes[i_s].mean(axis=0) - point)) <= np.hypot(*(r_nodes[i_r].mean(axis=0) - point))
+    stator = in_s or (not in_r and near_s)
+    omega = rpm * 2 * math.pi / 60
+    if stator:
+        centre, b, pitches, name = s_nodes[i_s].mean(axis=0), b_stator[:, i_s], 1, p.materials.stator
+        region = "stator_pole" if np.hypot(*centre) < p.stator_yoke_inner_radius else "stator_yoke"
+    else:
+        centre, pitches, name = r_nodes[i_r].mean(axis=0), rotor_pitches(static, design), p.materials.rotor
+        region = "rotor_pole" if np.hypot(*centre) > p.rotor_yoke_outer_radius else "rotor_yoke"
+        blocks = []
+        for j in range(pitches):
+            src = i_r if j == 0 else locate(r_nodes, centre @ _rot(j * tau))[0]
+            frame = np.stack([b_rotor[k, src] @ _rot(-(a % (2 * math.pi))) for k, a in enumerate(angles)])
+            blocks.append(frame @ _rot(-j * tau))
+        b = np.concatenate(blocks)
+    b = b / load_material(name).stacking_factor
+    radial = centre / np.hypot(*centre)
+    n = b.shape[0]
+    period = pitches * tau / omega
+    return dict(t=np.arange(n) * period / n, b_r=b @ radial, b_t=b @ np.array([-radial[1], radial[0]]),
+                region=region, side="stator" if stator else "rotor")

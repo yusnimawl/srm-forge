@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import numpy as np
-from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -25,25 +25,28 @@ import srmcore
 import srmweb
 from srmapp import field
 from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
+from srmapp.losses import N_ANGLES, check_loss_data
 from srmapp.sizing.estimates import active_mass
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
+from srmcore.materials.loss import MissingLossData
 from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
 from srmcore.topology.dxf_io import import_dxf, write_dxf
 from srmweb.auth import Sessions, auth_router, require_auth
-from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
+from srmweb.cases import check_case, estimate as estimate_case, losses_estimate, resolved_margin
 from srmweb.config import Settings
-from srmweb.frames import FieldContext, frame_task, mesh_task, pack
+from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
-from srmweb.results import CaseOut, DxfImportOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
+from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, LossesOut, MaterialOut,
+                            ReferenceOut, SearchResultOut)
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, EditCase, EstimateOut,
-                            EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
-                            ValidateIn, ValidateRequest)
+                            EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, LossesBody,
+                            LossesEstimateOut, LossesRequest, ReferenceCase, ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
                           setup_from_case, setup_loc)
 from srmweb.serialize import to_json
@@ -387,6 +390,63 @@ def create_app(settings: Settings,
             return _invalid(errors, warnings)
         return estimate_case(inputs, store, settings.cache_dir)
 
+    def evaluated_inputs(case_id: str) -> CaseInputs | JSONResponse:
+        """The inputs of an evaluated case with a winding; 409 for a draft or a stale case, 422 for inputs that fail
+        the case check."""
+        case = case_or_404(case_id)
+        evaluation = None if case["stale"] else store.case_result(case_id, "evaluate")
+        if evaluation is None or evaluation.get("status") != "ok" or not evaluation.get("winding"):
+            raise HTTPException(409, "evaluate this case first")
+        inputs, errors, warnings = check_case(case["inputs"])
+        return _invalid(errors, warnings) if inputs is None else inputs
+
+    @router.post("/cases/{case_id}/losses", status_code=201, response_model=JobCreated)
+    def losses_job(case_id: str, body: LossesBody | None = None):
+        inputs = evaluated_inputs(case_id)
+        if isinstance(inputs, JSONResponse):
+            return inputs
+        try:
+            check_loss_data(inputs.design)
+        except MissingLossData as exc:
+            return _invalid([{"loc": ["design", "machine", "materials"], "msg": str(exc)}], [])
+        idle_or_409(case_id)
+        body = body or LossesBody()
+        request = LossesRequest(case_id=case_id, inputs=inputs, **body.model_dump())
+        return {"job_id": _submit(runner, "losses", request.model_dump(mode="json"))["id"]}
+
+    @router.get("/cases/{case_id}/losses", response_model=LossesOut)
+    def get_losses(case_id: str):
+        case_or_404(case_id)
+        result = store.case_result(case_id, "losses")
+        if result is None or result.get("cancelled"):
+            raise HTTPException(404, "no losses for this case")
+        return result
+
+    @router.get("/cases/{case_id}/losses/estimate", response_model=LossesEstimateOut)
+    def losses_estimate_route(case_id: str, n_speeds: Annotated[int, Query(ge=2, le=12)] = 6,
+                              n_torques: Annotated[int, Query(ge=1, le=10)] = 5):
+        inputs, errors, warnings = check_case(case_or_404(case_id)["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        return losses_estimate(inputs, store, n_speeds, n_torques)
+
+    @router.get("/cases/{case_id}/losses/b", response_model=BWaveformOut)
+    def losses_b(case_id: str, point: int, x: float, y: float):
+        """B(t) in the lamination at the iron element nearest (x, y) metres (stator frame, rotor at angle 0) for
+        operating point `point`, from the cached stroke."""
+        case = case_or_404(case_id)
+        result = store.case_result(case_id, "losses")
+        if result is None or result.get("cancelled") or not 0 <= point < len(result["points"]):
+            raise HTTPException(404, "no such operating point")
+        op = result["points"][point]
+        if not op["reached"] or not op["stroke_key"]:
+            raise HTTPException(404, "this operating point was not reached")
+        if not (settings.cache_dir / "strokes" / f"{op['stroke_key']}.npz").is_file():
+            raise HTTPException(410, "the stroke fields were cleared; run the losses again")
+        design = reference_design(CaseInputs.model_validate(case["inputs"]))
+        return to_json(quick_run(b_task, design, op["stroke_key"], N_ANGLES, op["speed_rpm"], x, y,
+                                 settings.cache_dir))
+
     @router.get("/cases/{case_id}/setup", response_model=SetupFile,
                 response_model_exclude=NO_MACHINE_MATERIALS | {"search": True})
     def case_setup(case_id: str, response: Response):
@@ -565,7 +625,9 @@ def create_app(settings: Settings,
     def cache_files():
         if not settings.cache_dir.is_dir():
             return []
-        return [*settings.cache_dir.glob("*.h5"), *(f for f in (settings.cache_dir / "fields").glob("*.npz") if not f.name.endswith(".tmp.npz"))]
+        return [*settings.cache_dir.glob("*.h5"),
+                *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")
+                  if not f.name.endswith(".tmp.npz"))]
 
     @router.get("/settings/cache")
     def cache_info():

@@ -117,6 +117,7 @@ class EvaluationOut(_Out):
     i_rms_a: F = None
     j_rms: F = None
     j_limit: F = None
+    srmapp_version: str | None = None   # null for evaluations stored before it was recorded
     map: MapArraysOut | None = None
     curves: MapCurvesOut | None = None
 
@@ -159,6 +160,49 @@ class ValidationOut(_Out):
     engine_version: str
     material_grades: dict[str, str]
     reference_turns: int = REFERENCE_TURNS   # the turns per pole its absolute key numbers refer to
+
+
+class RegionLossOut(_Out):
+    hysteresis: F
+    classical: F
+    excess: F
+
+
+class OperatingLossOut(_Out):
+    speed_rpm: F
+    torque_nm: F
+    reached: bool
+    power_w: F
+    copper_dc_w: F
+    copper_ac_w: F
+    iron: dict[str, RegionLossOut]
+    iron_w: F
+    efficiency: F
+    iron_uncertainty_rel: F
+    beyond_fit_range: bool
+    theta_on: F
+    theta_off: F
+    current_limit: F
+    stroke_key: str
+
+
+class LossesOut(_Out):
+    points: list[OperatingLossOut]
+    speeds_rpm: Vec
+    torque_fractions: Vec
+    winding_temperature_c: F
+    n_angles: int
+    angle_convergence_rel: F
+    srmapp_version: str
+    notes: list[str]
+
+
+class BWaveformOut(_Out):
+    t: Vec
+    b_r: Vec
+    b_t: Vec
+    region: str
+    side: Literal["stator", "rotor"]
 
 
 class MaterialOut(_Out):

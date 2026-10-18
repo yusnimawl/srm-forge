@@ -88,6 +88,7 @@ export function toSearchRequest(v: SearchFormValues): SearchRequest {
       max_slot_fill: num(v.maxSlotFill),
       wires: wireMode ? v.wires.map(wireToSI) : [],
       phase_current_a: wireMode ? optional(v.phaseCurrentA) : null,
+      winding_temperature_c: 120,
     },
     settings: {
       n_candidates: num(v.nCandidates),

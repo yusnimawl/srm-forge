@@ -7,12 +7,15 @@ import re
 from pydantic import ValidationError
 
 from srmapp.case import CaseInputs, map_cache_hit, map_request
+from srmapp.losses import N_ANGLES
+from srmcore.maps.grids import GRID_SIZES
 from srmcore.model.validator import validate_params
 from srmcore.topology.imported import check_iron
 from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
+MAP_SPEED_BUDGET_S = {"screening": 430.0, "full": 2640.0}   # speed budget of a map, when none has been timed
 SCAN_BUDGET_S = {"auto": 450.0, "fixed": 15.0}    # winding-choice time when none has been timed
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 
@@ -90,3 +93,16 @@ def estimate(inputs: CaseInputs, store: Store, cache_dir) -> dict:
         seconds += sum(times) / len(times) if times else budget
         timed &= bool(times)
     return {"new_map": new_map, "seconds": seconds, "basis": "history" if timed else "budget"}
+
+
+def losses_estimate(inputs: CaseInputs, store: Store, n_speeds: int, n_torques: int) -> dict:
+    """Seconds an efficiency map takes: one field solve per stroke angle at every operating point, at the time a
+    map point took in the latest timed map of the preset (else its speed budget over its point count). The loss model
+    itself is fast and not counted."""
+    preset = inputs.design.mesh.preset
+    n_angles, n_currents = GRID_SIZES[preset]
+    times = store.recent_map_times(preset)
+    per_solve = (times[0] if times else MAP_SPEED_BUDGET_S[preset]) / (n_angles * n_currents)
+    solves = n_speeds * n_torques * N_ANGLES
+    return {"solves": solves, "per_solve_s": per_solve, "seconds": solves * per_solve,
+            "basis": "history" if times else "budget"}
