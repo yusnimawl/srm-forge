@@ -113,7 +113,7 @@ def test_density_mode_evaluation_fills_the_metrics():
     assert e.status == "ok" and e.winding is not None and e.winding.wire is None
     m = e.design.machine
     assert m.turns_per_pole == e.winding.turns
-    assert est.phase_resistance(m) == pytest.approx(e.winding.resistance * e.winding.paths**2)
+    assert est.phase_resistance(m, 120.0) == pytest.approx(e.winding.resistance * e.winding.paths**2)
     assert e.mass_kg == pytest.approx(stage.mass.iron + e.winding.copper_mass)
     assert len(e.scan) == 60          # 30 turn counts x paths 1 and 2
     assert e.peak_power_w > 0
@@ -130,7 +130,7 @@ def test_wire_mode_evaluation_uses_the_inverter_current():
     assert e.winding.current_density <= 40e6 * (1 + 1e-9)
     assert 0 < e.i_rms_a and e.j_rms <= 20e6 * (1 + 1e-9)
     assert e.j_rms == pytest.approx(e.i_rms_a / (e.winding.paths * e.winding.copper_area))
-    assert est.phase_resistance(e.design.machine) == pytest.approx(e.winding.resistance * e.winding.paths**2)
+    assert est.phase_resistance(e.design.machine, 120.0) == pytest.approx(e.winding.resistance * e.winding.paths**2)
 
 
 def test_margin_reaches_the_turns_choice():

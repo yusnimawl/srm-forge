@@ -23,6 +23,7 @@ class Requirements(BaseModel):
     wires: tuple[Wire, ...] = ()                                   # wire mode when non-empty
     phase_current_a: float | None = Field(default=None, gt=0)      # inverter peak phase current, A
     max_slot_fill: float = Field(default=0.6, gt=0, le=0.9)        # outer wire area / coil-side area
+    winding_temperature_c: float = Field(default=120.0, ge=-40, le=250)   # copper temperature for resistance and AC loss
 
     @field_validator("max_outer_diameter_m")
     @classmethod

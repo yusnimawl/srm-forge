@@ -41,9 +41,9 @@ def path_counts(p: RadialSRMParams) -> list[int]:
     return [a for a in range(1, poles + 1) if poles % a == 0]
 
 
-def _winding(p: RadialSRMParams, turns: int, strands: int, copper_area: float, current: float,
+def _winding(p: RadialSRMParams, req: Requirements, turns: int, strands: int, copper_area: float, current: float,
              wire: int | None, paths: int) -> Winding:
-    return Winding(turns, strands, copper_area, current, series_resistance(p, turns, copper_area) / paths**2,
+    return Winding(turns, strands, copper_area, current, series_resistance(p, turns, copper_area, req.winding_temperature_c) / paths**2,
                    copper_mass(p, turns, copper_area), wire, paths)
 
 
@@ -59,7 +59,7 @@ def wire_windings(p: RadialSRMParams, req: Requirements, wire: int, j_peak_max: 
             strands = math.floor(room / turns + _EPS)
             area = strands * w.copper_area
             if req.phase_current_a / paths / area <= j_peak_max * (1 + _EPS):
-                out.append(_winding(p, turns, strands, area, req.phase_current_a, wire, paths))
+                out.append(_winding(p, req, turns, strands, area, req.phase_current_a, wire, paths))
     return out
 
 
@@ -75,7 +75,7 @@ def density_windings(p: RadialSRMParams, req: Requirements, j_peak: float,
             area = copper / turns
             current = j_peak * area * paths
             if req.phase_current_a is None or current <= req.phase_current_a * (1 + _EPS):
-                out.append(_winding(p, turns, 1, area, current, None, paths))
+                out.append(_winding(p, req, turns, 1, area, current, None, paths))
     return out
 
 
@@ -98,7 +98,7 @@ def fixed_winding(p: RadialSRMParams, req: Requirements, turns: int, strands: in
         if req.phase_current_a is not None and current > req.phase_current_a * (1 + _EPS):
             raise ValueError(f"turns {turns} on {paths} paths carry {current:.1f} A at the peak current density, "
                              f"above the phase current limit {req.phase_current_a:g} A")
-        return _winding(p, turns, 1, area, current, None, paths)
+        return _winding(p, req, turns, 1, area, current, None, paths)
     if not req.wire_mode:
         raise ValueError("wire needs wires in the requirements")
     if not 0 <= wire < len(req.wires):
@@ -107,7 +107,7 @@ def fixed_winding(p: RadialSRMParams, req: Requirements, turns: int, strands: in
     if turns * strands * w.outer_area > req.max_slot_fill * coil_side_area(p) * (1 + _EPS):
         raise ValueError(f"turns {turns} x strands {strands} of wire {wire} do not fit "
                          f"max_slot_fill {req.max_slot_fill} of the coil side")
-    return _winding(p, turns, strands, strands * w.copper_area, req.phase_current_a, wire, paths)
+    return _winding(p, req, turns, strands, strands * w.copper_area, req.phase_current_a, wire, paths)
 
 
 def max_mmf(p: RadialSRMParams, req: Requirements, j_peak: float, j_peak_max: float) -> float:
