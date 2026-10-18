@@ -3,8 +3,7 @@
 The stator is periodic over one rotor pole pitch tau. A rotor element sees the stator field move past it, and
 its own period is `rotor_pitches` pitches: the field at t + tau on a rotor point phi equals the field at t on the
 point phi + tau, rotated by tau. So the rotor waveform over several pitches is assembled from one pitch of solves
-by locating the rotated centroid in the rotor mesh. All elements share the time axis of `rotor_pitches` pitches
-(stator waveforms are repeated), so one period serves a loss evaluation of the whole iron."""
+by locating the rotated centroid in the rotor mesh. The stator waveforms keep one pitch as their period."""
 import math
 import os
 from collections.abc import Callable
@@ -31,24 +30,33 @@ _NEAREST = 12
 
 
 @dataclass(frozen=True, eq=False)
-class StrokeFields:
-    """B per element over `rotor_pitches` rotor pole pitches, n_t samples per pitch (time-uniform when the
-    angles are). Stator elements are in the stator frame, rotor elements in the rotor frame."""
-    angles: np.ndarray            # (n_t,) rotor angle of each sample, rad
+class IronWaveforms:
+    """B per iron element of the stator or the rotor over one period, in the part's own frame. Samples are
+    uniform in time up to the snapping of the angles to the band pitch."""
+    b: np.ndarray                 # (n_samples, n_el, 2) T
+    pitches: int                  # period in rotor pole pitches
     pitch: float                  # rotor pole pitch tau, rad
-    rotor_pitches: int            # period of a rotor element, in pitches
-    b_iron: np.ndarray            # (n_t, n_iron, 2) T
-    centroids: np.ndarray         # (n_iron, 2) m, in the element's own frame
-    areas: np.ndarray             # (n_iron,) m²
-    region: np.ndarray            # (n_iron,) "stator_pole", "stator_yoke", "rotor_pole" or "rotor_yoke"
-    material: np.ndarray          # (n_iron,) material name
+    centroids: np.ndarray         # (n_el, 2) m
+    areas: np.ndarray             # (n_el,) m²
+    region: np.ndarray            # (n_el,) "stator_pole" and "stator_yoke", or "rotor_pole" and "rotor_yoke"
+    material: np.ndarray          # (n_el,) material name
+
+    def period_s(self, omega: float) -> float:
+        """Period of the waveforms at rotor speed `omega` (rad/s)."""
+        return self.pitches * self.pitch / omega
+
+
+@dataclass(frozen=True, eq=False)
+class StrokeFields:
+    """Fields over a stroke: the stator iron over one rotor pole pitch (n_t samples), the rotor iron over
+    `rotor.pitches` pitches (n_t * pitches samples), the coil elements over one pitch. B is the finite-element
+    (stack-averaged) flux density."""
+    angles: np.ndarray            # (n_t,) rotor angle of each sample of the first pitch, rad
+    stator: IronWaveforms
+    rotor: IronWaveforms
     b_coil: np.ndarray            # (n_t, n_coil, 2) T, stator frame
     coil_side: np.ndarray         # (n_coil,) coil region name
     coil_areas: np.ndarray        # (n_coil,) m²
-
-    def period_s(self, omega: float) -> float:
-        """Period of every waveform at rotor speed `omega` (rad/s)."""
-        return self.rotor_pitches * self.pitch / omega
 
 
 def stroke_angles(static: StaticMesh, period: float, n: int = DEFAULT_STROKE_ANGLES) -> np.ndarray:
@@ -99,6 +107,8 @@ def _pole_data(static: StaticMesh, n_poles: int) -> tuple[np.ndarray, np.ndarray
         phase[info.pole] = ord(info.phase) - ord("A")
         if offset > 0:
             polarity[info.pole] = info.sign
+    if np.any(polarity == 0):
+        raise ValueError("a stator pole has no coil side on its counter-clockwise flank")
     return phase, polarity
 
 
@@ -172,7 +182,7 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
                   cancel: Callable[[], bool] | None = None) -> StrokeFields:
     """B(t) over a stroke. `angles` (n_t,) cover one rotor pole pitch [0, tau) and `currents` (n_t, n_phases)
     are the coil currents per phase at those angles (see `phase_currents`). Raises MapFailed naming the angle
-    of a point that did not converge. With `cache_dir`, the solved fields are stored under `strokes/`."""
+    of a point that did not converge and InterruptedError when `cancel` fires. With `cache_dir`, the solved fields are stored under `strokes/`."""
     p = design.machine
     angles = np.asarray(angles, dtype=float)
     currents = np.asarray(currents, dtype=float)
@@ -181,33 +191,39 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
     tau = 2 * math.pi / p.n_rotor_poles
     adapter = make_solver(solver)
     path = None if cache_dir is None else _cache_path(cache_dir, design, angles, currents, adapter)
-    raw = None
+    loaded = None
     if path is not None and path.exists():
         try:
             with np.load(path) as f:
-                raw = f["b"]
+                loaded = f["stator"], f["coil"], f["rotor"]
         except (OSError, ValueError, KeyError):
-            raw = None
-    if raw is None:
-        raw = _raw_fields(static, design, angles, currents, solver,
-                          default_workers(workers, len(angles)), progress, cancel)
-        if path is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npz")
-            np.savez(tmp, b=raw)
-            os.replace(tmp, path)
+            loaded = None
 
-    n_s_tri = len(static.stator.triangles)
+    n_s_tri, n_r_tri = len(static.stator.triangles), len(static.rotor.triangles)
     kind_s = np.array([static.region_kind[n] for n in static.region_names])[static.stator.region_ids]
     kind_r = np.array([static.region_kind[n] for n in static.region_names])[static.rotor.region_ids]
     s_iron, r_iron, s_coil = kind_s == "stator_iron", kind_r == "rotor_iron", kind_s == "coil"
+    if loaded is None:
+        raw = _raw_fields(static, design, angles, currents, solver,
+                          default_workers(workers, len(angles)), progress, cancel)
+        loaded = (raw[:, :n_s_tri][:, s_iron], raw[:, :n_s_tri][:, s_coil],
+                  raw[:, n_s_tri:n_s_tri + n_r_tri][:, r_iron])
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npz")
+            try:
+                np.savez_compressed(tmp, stator=loaded[0], coil=loaded[1], rotor=loaded[2])
+                os.replace(tmp, path)
+            finally:
+                tmp.unlink(missing_ok=True)
+    b_stator, b_coil, b_rotor_global = loaded
     cs, as_ = _triangle_geometry(static.stator.nodes, static.stator.triangles)
     cr, ar = _triangle_geometry(static.rotor.nodes, static.rotor.triangles)
 
     # Rotor-frame B at the first pitch: the global vector rotated back by the rotor angle.
-    b_rotor = np.empty((len(angles), int(r_iron.sum()), 2))
+    b_rotor = np.empty_like(b_rotor_global)
     for k, a in enumerate(angles):
-        b_rotor[k] = raw[k, n_s_tri:n_s_tri + len(static.rotor.triangles)][r_iron] @ _rot(-(a % (2 * math.pi)))
+        b_rotor[k] = b_rotor_global[k] @ _rot(-(a % (2 * math.pi)))
     k_pitch = rotor_pitches(static, design)
     rotor_c = cr[r_iron]
     tree = cKDTree(rotor_c)
@@ -216,21 +232,17 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
     for j in range(1, k_pitch):
         src = _locate(tree, tri_nodes, rotor_c @ _rot(j * tau))
         blocks.append(b_rotor[:, src] @ _rot(-j * tau))
-    b_rotor_full = np.concatenate(blocks, axis=0)
 
-    b_stator = raw[:, :n_s_tri][:, s_iron]
-    b_coil = raw[:, :n_s_tri][:, s_coil]
-    tile = (k_pitch, 1, 1)
-    b_iron = np.concatenate([np.tile(b_stator, tile), b_rotor_full], axis=1)
     n_s, n_r = int(s_iron.sum()), int(r_iron.sum())
     radius_s = np.hypot(*cs[s_iron].T)
     radius_r = np.hypot(*cr[r_iron].T)
-    region = np.concatenate([np.where(radius_s < p.stator_yoke_inner_radius, "stator_pole", "stator_yoke"),
-                             np.where(radius_r > p.rotor_yoke_outer_radius, "rotor_pole", "rotor_yoke")])
-    material = np.array([p.materials.stator] * n_s + [p.materials.rotor] * n_r)
     names = np.array(static.region_names)[static.stator.region_ids]
     return StrokeFields(
-        angles=np.concatenate([angles + j * tau for j in range(k_pitch)]), pitch=tau, rotor_pitches=k_pitch,
-        b_iron=b_iron, centroids=np.vstack([cs[s_iron], rotor_c]), areas=np.concatenate([as_[s_iron], ar[r_iron]]),
-        region=region, material=material, b_coil=np.tile(b_coil, tile), coil_side=names[s_coil],
-        coil_areas=as_[s_coil])
+        angles=angles,
+        stator=IronWaveforms(b_stator, 1, tau, cs[s_iron], as_[s_iron],
+                             np.where(radius_s < p.stator_yoke_inner_radius, "stator_pole", "stator_yoke"),
+                             np.array([p.materials.stator] * n_s)),
+        rotor=IronWaveforms(np.concatenate(blocks, axis=0), k_pitch, tau, rotor_c, ar[r_iron],
+                            np.where(radius_r > p.rotor_yoke_outer_radius, "rotor_pole", "rotor_yoke"),
+                            np.array([p.materials.rotor] * n_r)),
+        b_coil=b_coil, coil_side=names[s_coil], coil_areas=as_[s_coil])

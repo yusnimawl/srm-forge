@@ -7,6 +7,7 @@ import pytest
 from conftest import make_8_6
 from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, phase_currents, stroke_angles, stroke_fields
 from srmcore.materials import loss_model
+from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
 from srmcore.model.design import Design, MeshSettings
 from srmcore.post.iron_loss import waveform_loss
@@ -21,10 +22,13 @@ def _total_loss(static, n: int) -> float:
     angles = stroke_angles(static, TAU, n)
     i_a = 12.0 * np.clip(np.sin(math.pi * (angles / TAU - 0.1) / 0.5), 0.0, None) ** 2
     fields = stroke_fields(static, DESIGN, angles, phase_currents(i_a, DESIGN.machine.n_phases))
-    period = fields.period_s(OMEGA)
-    loss = waveform_loss(fields.b_iron, fields.centroids, period, MODEL, weights=fields.areas)
-    mass = MODEL.density * fields.areas * DESIGN.machine.stack_length
-    return float((loss.total * mass).sum())
+    total = 0.0
+    for side in (fields.stator, fields.rotor):
+        # Lamination flux density: the finite-element B is averaged over steel and insulation.
+        b = side.b / load_material(DESIGN.machine.materials.stator).stacking_factor
+        loss = waveform_loss(b, side.centroids, side.period_s(OMEGA), MODEL, weights=side.areas)
+        total += float((loss.total * MODEL.density * side.areas * DESIGN.machine.stack_length).sum())
+    return total
 
 
 @pytest.mark.slow
