@@ -17,6 +17,7 @@ N_THETA = 181                 # angle points over one rotor pole pitch
 N_CURRENT = 121               # current points over 0..current limit
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
 OFF_RANGE = (0.45, 1.25)       # turn-off search range, fraction of the pitch from the table start (above 1 wraps)
+OFF_ALIGNED_END = 0.995        # the turn-off grid has n_off points up to here, and continues at the same spacing
 N_ON, N_OFF = 80, 80
 _EPS = 1e-9
 
@@ -38,7 +39,8 @@ class Waveforms:
 class Envelope:
     """Per-speed best stroke. `torque` is the revolution average over all phases. `work_torque` is ∫T dθ and
     `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation. `i_rms` is the phase RMS current
-    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid).
+    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid). `theta_off` may exceed one pitch: the
+    flux tail runs past alignment, and `theta_off` is then measured from the start of the table.
 
     `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
     stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the
@@ -166,12 +168,24 @@ def _theta(t: _Tables, index: int) -> float:
     return float(t.theta[index % n] + (index // n) * t.theta[-1])
 
 
+def _stroke_pairs(n_theta: int, n_on: int, n_off: int) -> tuple[np.ndarray, np.ndarray]:
+    """Table indices (on, off) of every candidate stroke with off after on. The turn-off axis has `n_off` points up to
+    OFF_ALIGNED_END and goes on at that spacing to OFF_RANGE[1], so it holds every point of an axis that stops at
+    alignment."""
+    top = n_theta - 1
+    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
+    step = (OFF_ALIGNED_END - OFF_RANGE[0]) / (n_off - 1)
+    n_pts = int(math.floor((OFF_RANGE[1] - OFF_RANGE[0]) / step + 1e-9)) + 1
+    off_axis = np.unique(np.round((OFF_RANGE[0] + step * np.arange(n_pts)) * top).astype(int))
+    on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
+    keep = off > on
+    return on[keep], off[keep]
+
+
 def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
              speeds_rpm, *, current_limit: float | None = None, rms_limit: float | None = None,
-             n_theta: int = N_THETA, n_on: int = N_ON, n_off: int = N_OFF,
-             _off_range: tuple[float, float] = OFF_RANGE) -> Envelope:
-    """`_off_range` overrides OFF_RANGE (tests restrict it to the table to compare with a stroke that ends at
-    alignment). `current_limit` (A) is the hysteresis limit, at most the map's top current (the default). `rms_limit` (A)
+             n_theta: int = N_THETA, n_on: int = N_ON, n_off: int = N_OFF) -> Envelope:
+    """`current_limit` (A) is the hysteresis limit, at most the map's top current (the default). `rms_limit` (A)
     caps the phase RMS current over a rotor pole pitch: strokes above it are not used."""
     require_complete(result)
     if result.excited != "A":
@@ -184,12 +198,7 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
         raise ValueError(f"current limit {i_top} A is outside the map's range (0, {top_current}] A")
     period = 2 * math.pi / machine.n_rotor_poles
     t = _tables(result, period, i_top, n_theta)
-    top = n_theta - 1
-    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
-    off_axis = np.unique(np.round(np.linspace(*_off_range, n_off) * top).astype(int))
-    on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
-    keep = off > on
-    on, off = on[keep], off[keep]
+    on, off = _stroke_pairs(n_theta, n_on, n_off)
     speeds = np.asarray(speeds_rpm, float)
     rows = []
     n = n_theta - 1
@@ -243,14 +252,11 @@ def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: 
     require_complete(result)
     if result.excited != "A":
         raise ValueError("the envelope needs the phase A map (excited='A')")
+    if not torque_nm > 0:
+        raise ValueError(f"torque {torque_nm} N·m must be positive")
     top_current = float(result.currents[-1])
     period = 2 * math.pi / machine.n_rotor_poles
-    top = n_theta - 1
-    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
-    off_axis = np.unique(np.round(np.linspace(*OFF_RANGE, n_off) * top).astype(int))
-    on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
-    keep = off > on
-    on, off = on[keep], off[keep]
+    on, off = _stroke_pairs(n_theta, n_on, n_off)
     omega = rpm * 2 * math.pi / 60
     per_rev = machine.n_phases * machine.n_rotor_poles / (2 * math.pi)
     best = None

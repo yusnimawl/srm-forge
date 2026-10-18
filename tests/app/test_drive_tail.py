@@ -8,7 +8,10 @@ from srmapp.drive.envelope import _simulate, _tables, envelope, min_copper_strok
 
 MACHINE = make_8_6()
 SPEEDS = np.array([100.0, 500.0, 1500.0, 3000.0, 6000.0, 12000.0])
-OLD_OFF_RANGE = (0.45, 0.995)       # the stroke ends at alignment
+# Best torques (N·m) of the rule in which every stroke ends at alignment (the drive model before the flux tail),
+# on this map with 400 V and 0.1 ohm at SPEEDS, and with 100 V and 0.1 ohm at 12000 and 40000 rpm.
+OLD_TORQUE = np.array([1.52771013, 1.52683981, 1.52131823, 1.51281672, 1.46507874, 1.33394455])
+OLD_TORQUE_100V = np.array([0.57598647, 0.06004658])
 
 
 def _map():
@@ -20,13 +23,18 @@ def _env(volts=400.0, r=0.1, **kw):
 
 
 def test_tail_never_lowers_torque():
-    # n_off=200 puts a turn-off on every table index, so the new grid contains the old one
-    new, old = _env(n_off=200), _env(_off_range=OLD_OFF_RANGE)
-    assert np.all(new.torque >= old.torque * (1 - 1e-3))
+    assert np.all(_env().torque >= OLD_TORQUE * (1 - 1e-3))
 
 
 def test_low_speed_unchanged():
-    assert _env().torque[0] == pytest.approx(_env(_off_range=OLD_OFF_RANGE).torque[0], rel=0.005)
+    assert _env().torque[0] == pytest.approx(OLD_TORQUE[0], rel=0.005)
+
+
+def test_off_axis_contains_the_old_axis():
+    top = module.N_THETA - 1
+    old = set(np.round(np.linspace(0.45, 0.995, module.N_OFF) * top).astype(int))
+    on, off = module._stroke_pairs(module.N_THETA, module.N_ON, module.N_OFF)
+    assert old <= set(off) and off.max() > 1.2 * top and off.max() <= 1.25 * top and np.all(off > on)
 
 
 def test_tail_must_end_before_next_on():
@@ -39,11 +47,9 @@ def test_tail_must_end_before_next_on():
 
 
 def test_high_speed_gains():
-    fast = np.array([40000.0])
-    new = envelope(_map(), MACHINE, 100.0, 0.1, fast, n_off=200)
-    old = envelope(_map(), MACHINE, 100.0, 0.1, fast, _off_range=OLD_OFF_RANGE)
-    assert new.torque[0] > 1.005 * old.torque[0]
-    assert new.theta_off[0] > module.OFF_RANGE[0] * 2 * np.pi / MACHINE.n_rotor_poles
+    new = envelope(_map(), MACHINE, 100.0, 0.1, np.array([12000.0, 40000.0]))
+    assert new.torque[0] > 1.5 * OLD_TORQUE_100V[0]            # 0.58 -> 1.06 N·m
+    assert new.torque[1] >= OLD_TORQUE_100V[1] * (1 - 1e-3)
 
 
 def test_waveforms_stay_one_period_and_integrate():
@@ -65,3 +71,9 @@ def test_min_copper_stroke():
     assert s.current.shape == s.psi.shape == (module.N_THETA - 1,)
     assert s.theta_off > s.theta_on
     assert min_copper_stroke(_map(), MACHINE, 400.0, 0.1, SPEEDS[1], 2 * env.torque[1]) is None
+
+
+@pytest.mark.parametrize("torque", [0.0, -1.0])
+def test_min_copper_stroke_rejects_non_positive_torque(torque):
+    with pytest.raises(ValueError, match="torque"):
+        min_copper_stroke(_map(), MACHINE, 400.0, 0.1, 500.0, torque)

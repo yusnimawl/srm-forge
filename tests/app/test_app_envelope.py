@@ -45,6 +45,7 @@ def test_more_bus_voltage_helps_at_high_speed():
 
 def test_resistance_costs_torque_and_gives_copper_loss():
     lossless, lossy = _env(r=0.0), _env(r=0.5)
+    # resistance speeds the flux decay, so a later turn-off becomes valid and can raise torque slightly
     assert np.all(lossy.torque <= lossless.torque * (1 + 1e-3) + 1e-9)
     assert np.all(lossy.copper_loss > 0)
     assert np.all(lossy.efficiency < 1.0)
@@ -144,6 +145,6 @@ def test_non_positive_rms_limit_is_rejected(limit):
         _env_rms(limit)
 
 
-def test_default_on_off_grid_is_80_by_80():
+def test_default_on_off_grid_has_80_on_points_and_80_off_points_up_to_alignment():
     from srmapp.drive import envelope as module
     assert (module.N_ON, module.N_OFF) == (80, 80)

@@ -91,13 +91,19 @@ def test_density_mode_picks_the_most_equivalent_turns_then_the_fewest_paths():
 
 
 def test_density_mode_prefers_the_series_winding_over_the_same_machine_on_two_paths():
-    # worst ratio 112.6147 on this map is met up to 17 equivalent turns, so the 34 turns on 2 paths are as feasible
-    # as the 17 in series; ranking by raw turns would pick them.
+    # the ratios depend on the equivalent turns only; with the margin between the ratios of 17 and 17.5 equivalent
+    # turns, every winding of that many equivalent turns is as feasible on two paths as in series, and ranking by
+    # raw turns would pick the two-path one.
     req = _req()
-    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=112.6147)
-    parallel = next(s for s in c.scan if (s.winding.turns, s.winding.paths) == (34, 2))
-    assert parallel.feasible
-    assert (c.point.winding.turns, c.point.winding.paths) == (17, 1)
+    scan = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=1.0).scan
+    ratio = {(s.winding.turns, s.winding.paths): min(s.torque_ratio, s.power_ratio) for s in scan}
+    margin = 0.5 * (ratio[17, 1] + ratio[35, 2])
+    assert ratio[35, 2] < margin < ratio[17, 1]
+    c = choose_turns(_map_for(req), MACHINE, req, max_turns=40, margin=margin)
+    feasible = [s for s in c.scan if s.feasible]
+    assert _equivalent(c.point) == max(_equivalent(s) for s in feasible) == 17
+    assert (34, 2) in [(s.winding.turns, s.winding.paths) for s in feasible]      # raw turns would rank differently
+    assert c.point.winding.paths == min(s.winding.paths for s in feasible if _equivalent(s) == _equivalent(c.point))
 
 
 def test_density_current_cap_limits_the_scan():
