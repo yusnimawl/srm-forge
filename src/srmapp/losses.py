@@ -17,8 +17,7 @@ from scipy.interpolate import PchipInterpolator
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.run import MapResult
-from srmcore.maps.stroke import (DEFAULT_STROKE_ANGLES, IronWaveforms, rotor_pitches, stroke_angles,
-                                 stroke_fields, stroke_key)
+from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, IronWaveforms, iron_waveforms, stroke_angles, stroke_fields, stroke_key
 from srmcore.materials import loss_model
 from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
@@ -249,12 +248,6 @@ def locate(tri_nodes: np.ndarray, point: np.ndarray) -> tuple[int, bool]:
     return int(np.argmin(np.hypot(*(tri_nodes.mean(axis=1) - point).T))), False
 
 
-def _rot(phi: float) -> np.ndarray:
-    """Matrix R with v @ R the row vector v rotated counter-clockwise by phi."""
-    c, s = math.cos(phi), math.sin(phi)
-    return np.array([[c, s], [-s, c]])
-
-
 def b_waveform(design: Design, key: str, n_angles: int, rpm: float, x: float, y: float, *,
                cache_dir) -> dict:
     """Lamination flux density over one period at the iron element containing (x, y) (metres, the stator frame with
@@ -262,38 +255,26 @@ def b_waveform(design: Design, key: str, n_angles: int, rpm: float, x: float, y:
     `key` of `efficiency_map` run with `n_angles` and `design` (the reference-turns design). Returns t (s), b_r and
     b_t (T, radial and tangential about the axis, as the loss model sees them: finite-element B divided by the
     stacking factor), the region and the side. Raises FileNotFoundError when the cache file is gone."""
-    path = Path(cache_dir) / "strokes" / f"{key}.npz"
-    with np.load(path) as f:
+    with np.load(Path(cache_dir) / "strokes" / f"{key}.npz") as f:
         b_stator, b_rotor = f["stator"], f["rotor"]
-    static = field._static(design.to_json())
-    p = design.machine
-    tau = 2 * math.pi / p.n_rotor_poles
-    angles = stroke_angles(static, tau, n_angles)
+    static = field.static_mesh(design.to_json())
+    angles = stroke_angles(static, 2 * math.pi / design.machine.n_rotor_poles, n_angles)
     if len(angles) != b_stator.shape[0]:
         raise ValueError(f"the cached stroke has {b_stator.shape[0]} angles, {n_angles} requested give {len(angles)}")
-    kind = np.array([static.region_kind[n] for n in static.region_names])
-    s_nodes = static.stator.nodes[static.stator.triangles[kind[static.stator.region_ids] == "stator_iron"]]
-    r_nodes = static.rotor.nodes[static.rotor.triangles[kind[static.rotor.region_ids] == "rotor_iron"]]
+    sides = dict(zip(("stator", "rotor"), iron_waveforms(static, design, angles, b_stator, b_rotor)))
     point = np.array([x, y], dtype=float)
-    (i_s, in_s), (i_r, in_r) = locate(s_nodes, point), locate(r_nodes, point)
-    near_s = np.hypot(*(s_nodes[i_s].mean(axis=0) - point)) <= np.hypot(*(r_nodes[i_r].mean(axis=0) - point))
-    stator = in_s or (not in_r and near_s)
-    omega = rpm * 2 * math.pi / 60
-    if stator:
-        centre, b, pitches, name = s_nodes[i_s].mean(axis=0), b_stator[:, i_s], 1, p.materials.stator
-        region = "stator_pole" if np.hypot(*centre) < p.stator_yoke_inner_radius else "stator_yoke"
-    else:
-        centre, pitches, name = r_nodes[i_r].mean(axis=0), rotor_pitches(static, design), p.materials.rotor
-        region = "rotor_pole" if np.hypot(*centre) > p.rotor_yoke_outer_radius else "rotor_yoke"
-        blocks = []
-        for j in range(pitches):
-            src = i_r if j == 0 else locate(r_nodes, centre @ _rot(j * tau))[0]
-            frame = np.stack([b_rotor[k, src] @ _rot(-(a % (2 * math.pi))) for k, a in enumerate(angles)])
-            blocks.append(frame @ _rot(-j * tau))
-        b = np.concatenate(blocks)
-    b = b / load_material(name).stacking_factor
+    found = {}
+    for name, part, iron in (("stator", static.stator, "stator_iron"), ("rotor", static.rotor, "rotor_iron")):
+        kind = np.array([static.region_kind[n] for n in static.region_names])[part.region_ids]
+        nodes = part.nodes[part.triangles[kind == iron]]
+        e, inside = locate(nodes, point)
+        found[name] = (e, inside, np.hypot(*(nodes[e].mean(axis=0) - point)))
+    side = min(found, key=lambda n: (not found[n][1], found[n][2]))
+    e = found[side][0]
+    w = sides[side]
+    b = w.b[:, e] / load_material(str(w.material[e])).stacking_factor
+    centre = w.centroids[e]
     radial = centre / np.hypot(*centre)
     n = b.shape[0]
-    period = pitches * tau / omega
-    return dict(t=np.arange(n) * period / n, b_r=b @ radial, b_t=b @ np.array([-radial[1], radial[0]]),
-                region=region, side="stator" if stator else "rotor")
+    return dict(t=np.arange(n) * w.period_s(rpm * 2 * math.pi / 60) / n, b_r=b @ radial,
+                b_t=b @ np.array([-radial[1], radial[0]]), region=str(w.region[e]), side=side)

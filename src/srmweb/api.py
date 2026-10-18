@@ -444,8 +444,15 @@ def create_app(settings: Settings,
         if not (settings.cache_dir / "strokes" / f"{op['stroke_key']}.npz").is_file():
             raise HTTPException(410, "the stroke fields were cleared; run the losses again")
         design = reference_design(CaseInputs.model_validate(case["inputs"]))
-        return to_json(quick_run(b_task, design, op["stroke_key"], N_ANGLES, op["speed_rpm"], x, y,
-                                 settings.cache_dir))
+        try:
+            return to_json(runner.quick.run(b_task, design, op["stroke_key"], N_ANGLES, op["speed_rpm"], x, y,
+                                            settings.cache_dir))
+        except FileNotFoundError as exc:
+            raise HTTPException(410, "the stroke fields were cleared; run the losses again") from exc
+        except LaneTimeout as exc:
+            raise HTTPException(504, "the lookup took longer than 120 s") from exc
+        except Exception as exc:
+            raise HTTPException(500, f"{type(exc).__name__}: {exc}") from exc
 
     @router.get("/cases/{case_id}/setup", response_model=SetupFile,
                 response_model_exclude=NO_MACHINE_MATERIALS | {"search": True})

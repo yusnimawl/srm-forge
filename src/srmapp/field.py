@@ -76,7 +76,7 @@ def _save(path: Path, **arrays) -> None:
 
 
 @lru_cache(maxsize=2)
-def _static(design_json: str) -> StaticMesh:
+def static_mesh(design_json: str) -> StaticMesh:
     return build_machine_mesh(Design.from_json(design_json))
 
 
@@ -130,7 +130,7 @@ def field_mesh(design: Design, *, solver: str = "ngsolve", cache_dir=None) -> Fi
     path = _fields_dir(cache_dir) / f"mesh{PROBE_VERSION}_{field_key(design, solver)}.npz" if cache_dir is not None else None
     if path is not None and path.exists():
         return _load_mesh(path)
-    mesh = _mesh_from_static(design, _static(design.to_json()))
+    mesh = _mesh_from_static(design, static_mesh(design.to_json()))
     if path is not None:
         _save(path, nodes=mesh.nodes, n_stator_nodes=mesh.n_stator_nodes, triangles=mesh.triangles,
               region=mesh.region, regions=json.dumps([r.__dict__ for r in mesh.regions]),
@@ -172,7 +172,7 @@ def field_frame(design: Design, angle: float, coil_current: float, *, solver: st
                                                       cache_dir=cache_dir)) is not None:
         return hit
     mesh = field_mesh(design, solver=solver, cache_dir=cache_dir)
-    static = _static(design.to_json())
+    static = static_mesh(design.to_json())
     p = solve_point(static, design, angle, {"A": coil_current}, make_solver(solver, threads=1), keep_field=True)
     b = np.hypot(p.field.b[:, 0], p.field.b[:, 1])
     m = len(mesh.triangles)

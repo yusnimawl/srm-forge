@@ -191,7 +191,7 @@ def test_losses_estimate(client):
     case = _case(client)
     e = client.get(f"/api/cases/{case}/losses/estimate").json()
     assert e["solves"] == 6 * 5 * 60 and e["basis"] == "budget"
-    assert e["seconds"] == pytest.approx(e["solves"] * 430.0 / (40 * 8))
+    assert e["seconds"] == pytest.approx(e["solves"] * 228.0 / (40 * 8))
     client.app.state.store.add_map_time("screening", 160.0)
     e = client.get(f"/api/cases/{case}/losses/estimate", params={"n_speeds": 2, "n_torques": 2}).json()
     assert e["basis"] == "history" and e["seconds"] == pytest.approx(2 * 2 * 60 * 160.0 / 320)

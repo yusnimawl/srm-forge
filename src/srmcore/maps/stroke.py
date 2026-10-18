@@ -226,9 +226,25 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
             finally:
                 tmp.unlink(missing_ok=True)
     b_stator, b_coil, b_rotor_global = loaded
+    stator, rotor = iron_waveforms(static, design, angles, b_stator, b_rotor_global)
+    _, as_ = _triangle_geometry(static.stator.nodes, static.stator.triangles)
+    names = np.array(static.region_names)[static.stator.region_ids]
+    return StrokeFields(angles=angles, stator=stator, rotor=rotor, b_coil=b_coil, coil_side=names[s_coil],
+                        coil_areas=as_[s_coil])
+
+
+def iron_waveforms(static: StaticMesh, design: Design, angles: np.ndarray, b_stator: np.ndarray,
+                   b_rotor_global: np.ndarray) -> tuple[IronWaveforms, IronWaveforms]:
+    """The stator and rotor `IronWaveforms` from the solved B of the iron elements: `b_stator` (n_t, n_stator_iron, 2)
+    in the stator frame and `b_rotor_global` (n_t, n_rotor_iron, 2) in the stator frame at the rotor angles
+    `angles`. The rotor B is rotated into the rotor frame and extended over its period."""
+    p = design.machine
+    tau = 2 * math.pi / p.n_rotor_poles
+    kind_s = np.array([static.region_kind[n] for n in static.region_names])[static.stator.region_ids]
+    kind_r = np.array([static.region_kind[n] for n in static.region_names])[static.rotor.region_ids]
+    s_iron, r_iron = kind_s == "stator_iron", kind_r == "rotor_iron"
     cs, as_ = _triangle_geometry(static.stator.nodes, static.stator.triangles)
     cr, ar = _triangle_geometry(static.rotor.nodes, static.rotor.triangles)
-
     # Rotor-frame B at the first pitch: the global vector rotated back by the rotor angle.
     b_rotor = np.empty_like(b_rotor_global)
     for k, a in enumerate(angles):
@@ -245,13 +261,9 @@ def stroke_fields(static: StaticMesh, design: Design, angles: np.ndarray, curren
     n_s, n_r = int(s_iron.sum()), int(r_iron.sum())
     radius_s = np.hypot(*cs[s_iron].T)
     radius_r = np.hypot(*cr[r_iron].T)
-    names = np.array(static.region_names)[static.stator.region_ids]
-    return StrokeFields(
-        angles=angles,
-        stator=IronWaveforms(b_stator, 1, tau, cs[s_iron], as_[s_iron],
-                             np.where(radius_s < p.stator_yoke_inner_radius, "stator_pole", "stator_yoke"),
-                             np.array([p.materials.stator] * n_s)),
-        rotor=IronWaveforms(np.concatenate(blocks, axis=0), k_pitch, tau, rotor_c, ar[r_iron],
-                            np.where(radius_r > p.rotor_yoke_outer_radius, "rotor_pole", "rotor_yoke"),
-                            np.array([p.materials.rotor] * n_r)),
-        b_coil=b_coil, coil_side=names[s_coil], coil_areas=as_[s_coil])
+    return (IronWaveforms(b_stator, 1, tau, cs[s_iron], as_[s_iron],
+                          np.where(radius_s < p.stator_yoke_inner_radius, "stator_pole", "stator_yoke"),
+                          np.array([p.materials.stator] * n_s)),
+            IronWaveforms(np.concatenate(blocks, axis=0), k_pitch, tau, rotor_c, ar[r_iron],
+                          np.where(radius_r > p.rotor_yoke_outer_radius, "rotor_pole", "rotor_yoke"),
+                          np.array([p.materials.rotor] * n_r)))
