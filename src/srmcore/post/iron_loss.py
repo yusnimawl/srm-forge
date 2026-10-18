@@ -51,10 +51,13 @@ def _turning_points(b: np.ndarray, band: float) -> np.ndarray:
     b = b[keep]
     if b.size > 1 and b[0] == b[-1]:
         b = b[:-1]
-    if b.size < 3:
+    if b.size < 2:
         return np.empty(0)
-    prev, nxt = np.roll(b, 1), np.roll(b, -1)
-    ext = b[((b > prev) & (b > nxt)) | ((b < prev) & (b < nxt))]
+    if b.size == 2:
+        ext = b
+    else:
+        prev, nxt = np.roll(b, 1), np.roll(b, -1)
+        ext = b[((b > prev) & (b > nxt)) | ((b < prev) & (b < nxt))]
     if ext.size < 2:
         return np.empty(0)
     ext = np.roll(ext, -int(np.argmax(ext)))
@@ -111,11 +114,17 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
 
     `beyond_fit_range` is True when the model is used outside the range it was fitted on: the
     fundamental, or a harmonic carrying more than 5 % of the classical loss, is above
-    `frequency_range[1]`; or the largest component peak |B| exceeds `b_range[1]`; or more than 5 % of the
-    total loss comes from elements whose peak |B| is below `b_range[0]`.
+    `frequency_range[1]`; or the largest element peak |B| (vector norm over time) exceeds `b_range[1]`; or
+    more than 5 % of the total loss comes from elements whose peak |B| is below `b_range[0]`. The shares are
+    per unit mass and unweighted by element area.
     """
     b = np.asarray(b, dtype=float)
     n_t, n_el = b.shape[0], b.shape[1]
+    if not (math.isfinite(period_s) and period_s > 0):
+        raise ValueError(f"period_s must be positive and finite, got {period_s}")
+    if n_t < 3:
+        raise ValueError(f"need at least 3 time samples for central differences, got {n_t}")
+    # A centroid at the origin gives zero loss (radial direction undefined); it cannot occur in laminated iron.
     comp = _components(b, np.asarray(centroids, dtype=float))
     dt = period_s / n_t
     db = (np.roll(comp, -1, axis=0) - np.roll(comp, 1, axis=0)) / (2.0 * dt)
@@ -133,7 +142,7 @@ def waveform_loss(b: np.ndarray, centroids: np.ndarray, period_s: float, model: 
     hysteresis /= period_s
 
     total = hysteresis + classical + excess
-    peak = np.abs(comp).max(axis=(0, 2))
+    peak = np.linalg.norm(b, axis=2).max(axis=0)
     beyond = bool(peak.max(initial=0.0) > model.b_range[1])
     if total.sum() > 0 and total[peak < model.b_range[0]].sum() > SHARE_LIMIT * total.sum():
         beyond = True
