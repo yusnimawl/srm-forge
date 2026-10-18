@@ -45,6 +45,9 @@ function detailOf(job: JobOut, id: string): string | undefined {
       return parts.join(" · ")
     }
   }
+  // steps that report no counts (mesh, winding, checks) still show the job's running time
+  const elapsed = num(p.elapsed_s)
+  if (elapsed !== null && id !== "queued" && id !== "saved") return `${fmtSpan(elapsed)} elapsed`
   return undefined
 }
 

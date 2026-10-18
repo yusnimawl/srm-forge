@@ -143,3 +143,20 @@ def test_events_queued_then_running_then_end(make):
             g.set()
     assert [(n, d["status"]) for n, d in ev] == [
         ("progress", "queued"), ("progress", "running"), ("end", "done")]
+
+
+def test_events_tick_while_progress_is_idle(make, gate):
+    """The clock keeps moving in a step that reports no new counts."""
+    def fn(kind, req, rep, ctx):
+        rep.progress(points_done=1)
+        gate.wait(10)
+        return {}
+
+    c = make(fn)
+    j = c.post("/api/jobs", json=BODY).json()["id"]
+    _wait_points(c, j, 1)
+    threading.Timer(2.6, gate.set).start()
+    ev = _events(c, j, lambda n, d: n == "end", limit=50)
+    elapsed = [d["progress"]["elapsed_s"] for n, d in ev if n == "progress"]
+    assert len(elapsed) >= 3
+    assert elapsed == sorted(elapsed) and elapsed[-1] - elapsed[0] >= 1.5

@@ -63,7 +63,7 @@ export function RunsPage() {
   const jobs = useQuery({
     queryKey: ["jobs"],
     queryFn: () => api<JobOut[]>("/api/jobs"),
-    refetchInterval: (q) => (q.state.data?.some((j) => j.active) ? 5000 : false),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.active) ? 1000 : false),
   })
   const list = searchJobs(jobs.data ?? [])
 

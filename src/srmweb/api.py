@@ -180,7 +180,8 @@ def create_app(settings: Settings,
                 if job["status"] not in ACTIVE:
                     yield _sse("end", out)
                     return
-                key = (job["status"], live[0] if live else None)
+                # the whole second of the elapsed time is part of the key, so the clock ticks between progress reports
+                key = (job["status"], live[0] if live else None, int(live[1]["elapsed_s"]) if live else None)
                 if key != seen:
                     seen = key
                     yield _sse("progress", out)

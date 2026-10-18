@@ -39,6 +39,11 @@ describe("stepStates", () => {
       stepStates(job({ kind: "search" }, { steps: ["queued", "sampling", "designs", "pareto", "saved"], step: "designs" })).map((r) => r.label),
     ).toEqual(["Queued", "Sampling", "Designs", "Pareto set", "Saved"])
   })
+  it("a step without counts shows the elapsed time", () => {
+    const r = stepStates(job({}, { step: "winding", elapsed_s: 125 }))[3]
+    expect(r.state).toBe("active")
+    expect(r.detail).toBe("2 min elapsed")
+  })
   it("mapping detail with points, elapsed and time left", () => {
     const r = stepStates(job({}, { points_done: 412, points_total: 960, elapsed_s: 420, eta_s: 540 }))[2]
     expect(r.detail).toBe("412 / 960 points · 7 min elapsed · about 9 min left")
