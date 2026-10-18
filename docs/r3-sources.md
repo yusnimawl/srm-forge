@@ -200,3 +200,7 @@ Selection rule from the spec: a published FEA iron-loss breakdown per region (st
 Also looked at, but not a per-region breakdown: Urgera 2024 (Newcastle thesis, section 3 above), a 12/8 SRM with measured iron loss obtained by subtraction (Table 8.6, p. 180): the measured iron loss is far above the commercial FEA prediction even with a build factor of 1.8 (for example 32.4 W measured against 2.57 W predicted at 150 rpm, 118 W against 21.13 W at 1600 rpm). It is a useful warning about the size of the measurement-versus-model gap, but it reports totals only. Dong C. Y. et al., "Iron loss analysis of switched reluctance motor", Electric Machines and Control 19(7), 2015, pp. 58-65 (12/8 SRM, yoke and pole of stator and rotor by time-stepping FEA; Chinese-language journal, full text not retrieved).
 
 Owner pick: pending.
+
+## Owner pick: per-region cross-check (2026-10-18)
+
+Yan et al., IET Electr. Power Appl. 14(11), 2020, Table 3 (4-phase 8/6, 50W470, NNNN-SSSS): stator yoke 52.9 %, stator teeth 23.9 %, rotor 23.2 % of the iron loss. Compare region shares only; the paper's dimension labels are inconsistent, so absolute watts are not used.
