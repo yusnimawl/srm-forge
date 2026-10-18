@@ -29,6 +29,7 @@ def m19_loss_data() -> LossData:
         confidence="C",
         frequency_range=(50.0, 1000.0),
         b_range=(0.1, 1.5),
+        thickness=0.00036,
         conductivity=1.0 / RESISTIVITY_OHM_M,
         conductivity_source="ASTM A677 typical resistivity 45 to 55 uOhm cm, midpoint 50 (secondary, typical)",
     )

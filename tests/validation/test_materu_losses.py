@@ -16,10 +16,10 @@ def test_materu_rows_and_yan_shares_are_finite(tmp_path):
     rows = check.materu_rows(cache_dir=tmp_path)
     assert len(rows) == 10
     for r in rows:
-        for key in ("computed_iron_w", "error_pct", "iron_uncertainty_pct", "computed_peak", "computed_rms",
+        for key in ("iron_w", "error_pct", "iron_uncertainty_pct", "computed_peak", "computed_rms",
                     "computed_copper_w"):
-            assert math.isfinite(r[key]), (r["table"], r["index"], key)
-        assert r["computed_iron_w"] > 0
+            assert math.isfinite(r["nominal"][key]), (r["table"], r["index"], key)
+        assert r["nominal"]["iron_w"] > 0
     shares = check.yan_shares(cache_dir=tmp_path)["shares_pct"]
     assert all(math.isfinite(v) for v in shares.values())
     assert sum(shares.values()) == pytest.approx(100.0)

@@ -49,6 +49,7 @@ class LossData(_Frozen):
     confidence: Literal["A", "B", "C"]
     frequency_range: tuple[float, float]
     b_range: tuple[float, float]   # peak flux density span (T) the table and the fit cover
+    thickness: float = Field(gt=0)   # m, lamination thickness the table was measured at
     conductivity: float = Field(gt=0)   # S/m
     conductivity_source: str
 

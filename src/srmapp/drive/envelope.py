@@ -242,6 +242,7 @@ class StrokeTrace:
     torque_avg: float
     i_rms: float
     copper_dc_w: float
+    valid: bool = True
 
 
 def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
@@ -273,6 +274,35 @@ def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: 
     if best is None:
         return None
     i2, t, limit, o, f, tq = best
-    cur, psi, *_ = _stroke_waveforms(t, omega, bus_voltage, resistance, o, f)
-    return StrokeTrace(_theta(t, o), _theta(t, f), limit, cur, psi, tq,
-                       math.sqrt(i2 / period), machine.n_phases * resistance * i2 / period)
+    return _trace(t, machine, omega, bus_voltage, resistance, limit, o, f, tq, i2, True)
+
+
+def _trace(t: _Tables, machine: RadialSRMParams, omega: float, volts: float, resistance: float, limit: float,
+           on: int, off: int, torque: float, i2: float, valid: bool) -> StrokeTrace:
+    period = t.theta[-1]
+    cur, psi, *_ = _stroke_waveforms(t, omega, volts, resistance, on, off)
+    return StrokeTrace(_theta(t, on), _theta(t, off), limit, cur, psi, torque, math.sqrt(i2 / period),
+                       machine.n_phases * resistance * i2 / period, valid)
+
+
+def fixed_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float, rpm: float,
+                 theta_on: float, theta_off: float, current_limit: float, *, n_theta: int = N_THETA) -> StrokeTrace:
+    """The single pulse from `theta_on` to `theta_off` (rad on the table, 0 = aligned; `theta_off` may exceed one rotor
+    pole pitch) with the hysteresis limit `current_limit` (A, at most the map's top current), snapped to the table
+    angles. `valid` is False when the flux has not died away before the next turn-on."""
+    require_complete(result)
+    if result.excited != "A":
+        raise ValueError("the envelope needs the phase A map (excited='A')")
+    if not 0 < current_limit <= float(result.currents[-1]) * (1 + 1e-6):
+        raise ValueError(f"current limit {current_limit} A is outside the map's range (0, {result.currents[-1]}] A")
+    period = 2 * math.pi / machine.n_rotor_poles
+    n = n_theta - 1
+    on, off = round(theta_on / period * n), round(theta_off / period * n)
+    if not 0 <= on < off:
+        raise ValueError(f"the pulse needs 0 <= theta_on < theta_off, got {theta_on} and {theta_off} rad")
+    t = _tables(result, period, current_limit, n_theta)
+    omega = rpm * 2 * math.pi / 60
+    w_t, _, i2, valid = _simulate(t, omega, bus_voltage, resistance, np.array([on]), np.array([off]))
+    per_rev = machine.n_phases * machine.n_rotor_poles / (2 * math.pi)
+    return _trace(t, machine, omega, bus_voltage, resistance, current_limit, on, off, per_rev * w_t[0], i2[0],
+                  bool(valid[0]))

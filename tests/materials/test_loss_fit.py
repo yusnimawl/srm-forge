@@ -23,7 +23,7 @@ def test_fit_reproduces_points_10jnex900():
 
 def test_fit_reproduces_points_m19():
     data = m19_loss_data()
-    model = fit_loss(data, density=7650.0, thickness=0.00036)
+    model = fit_loss(data, density=7650.0)
     _check_points(data, model)
     assert model.fit_error < 0.15
     assert model.confidence == "C"
@@ -61,7 +61,7 @@ def test_existing_materials_unchanged():
 
 def test_ranges_carried_to_model():
     data = m19_loss_data()
-    model = fit_loss(data, density=7650.0, thickness=0.00036)
+    model = fit_loss(data, density=7650.0)
     assert model.b_range == data.b_range and model.frequency_range == data.frequency_range
     assert loss_model("10JNEX900").b_range == (0.2, 1.3)
 

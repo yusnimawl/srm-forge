@@ -4,7 +4,7 @@ from conftest import make_8_6
 from map_fixtures import synthetic_map
 
 from srmapp.drive import envelope as module
-from srmapp.drive.envelope import _simulate, _tables, envelope, min_copper_stroke
+from srmapp.drive.envelope import _simulate, _tables, envelope, min_copper_stroke, fixed_stroke
 
 MACHINE = make_8_6()
 SPEEDS = np.array([100.0, 500.0, 1500.0, 3000.0, 6000.0, 12000.0])
@@ -77,3 +77,15 @@ def test_min_copper_stroke():
 def test_min_copper_stroke_rejects_non_positive_torque(torque):
     with pytest.raises(ValueError, match="torque"):
         min_copper_stroke(_map(), MACHINE, 400.0, 0.1, 500.0, torque)
+
+
+def test_fixed_stroke_reproduces_min_copper_stroke():
+    result = _map()
+    best = min_copper_stroke(result, MACHINE, 400.0, 0.1, 1500.0, 0.5)
+    assert best is not None
+    again = fixed_stroke(result, MACHINE, 400.0, 0.1, 1500.0, best.theta_on, best.theta_off, best.current_limit)
+    assert again.valid and again.theta_on == best.theta_on and again.theta_off == best.theta_off
+    assert again.torque_avg == pytest.approx(best.torque_avg) and again.i_rms == pytest.approx(best.i_rms)
+    assert np.allclose(again.current, best.current)
+    with pytest.raises(ValueError):
+        fixed_stroke(result, MACHINE, 400.0, 0.1, 1500.0, 1.0, 0.5, best.current_limit)

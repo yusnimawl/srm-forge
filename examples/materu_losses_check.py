@@ -4,9 +4,11 @@ docs/r3-sources.md section 4) and a region-share cross-check on the 8/6 against 
 Materu's points are single-pulse strokes at 180 V d.c. with fixed advance and conduction angles, a hysteresis current
 limit at the measured peak current, and the measured speed. The angles are taken as mechanical, the advance as
 measured before the onset of pole overlap (aligned - (stator arc + rotor arc)/2). The 6/4 is the Krishnan machine
-(tests/krishnan_6_4.py, 2D plus the analytic end winding at image factor 1.5) with the M19 loss fit standing in for
+(tests/krishnan_6_4.py, 2D plus the analytic end winding at image factor 1.5) with the M19 loss fit (0.36 mm data fitted at 0.36 mm) standing in for
 Materu's "E140" steel, so the iron error includes that material gap. Copper loss is 3 R I_rms^2 from the computed
-current beside the same formula on the measured rms current.
+current beside the same formula on the measured rms current. The computed current can fall short of the measured
+one, so each row is also run with the pulse (conduction angle kept) turned on the smallest number of degrees earlier
+that reaches the measured peak current.
 
 Run from the repo root (hours at `reference`):
   $env:PYTHONPATH="tests"; python -u examples\\materu_losses_check.py [--preset screening|full|reference]
@@ -21,8 +23,8 @@ import numpy as np
 
 import krishnan_6_4 as k64
 from materials.m19_loss_fixture import m19_loss_data
-from srmapp.drive.envelope import _simulate, _stroke_waveforms, _tables, envelope, min_copper_stroke
-from srmapp.losses import _uncertainty, phase_current_samples, stroke_losses
+from srmapp.drive.envelope import envelope, fixed_stroke, min_copper_stroke
+from srmapp.losses import iron_uncertainty, phase_current_samples, stroke_losses
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, stroke_angles
@@ -33,6 +35,7 @@ from srmcore.mesh import build_machine_mesh
 BUS_V, R_PHASE = 180.0, 3.4
 IMAGE_FACTOR = 1.5
 I_MAX = 6.0                      # above the largest measured peak current, 5.66 A
+SHIFT_STEP_DEG, SHIFT_MAX_DEG = 0.5, 30.0
 N_THETA = 721                    # table angles over one rotor pole pitch (0.125 deg)
 FLAT = dict(advance=0.0, conduction=18.05)
 PEAKY = dict(advance=11.95, conduction=25.27)
@@ -48,21 +51,28 @@ YAN_SHARES = {"stator yoke": 52.9, "stator teeth": 23.9, "rotor": 23.2}
 YAN_RPM, YAN_BUS_V, YAN_R, YAN_I_MAX = 3000.0, 300.0, 0.3, 20.0
 
 
-def stroke_for_angles(result, machine, rpm, advance_deg, conduction_deg, i_limit):
-    """(phase current over one pitch on the table angles, computed peak A, rms A, valid) of the single pulse that
-    starts `advance_deg` before the onset of pole overlap and lasts `conduction_deg`, with the hysteresis limit
-    `i_limit`. `valid` is False when the flux has not died away before the next turn-on."""
-    period = 2 * math.pi / machine.n_rotor_poles
-    onset = math.degrees(period - 0.5 * (machine.stator_pole_arc + machine.rotor_pole_arc))
-    n = N_THETA - 1
-    on = round((onset - advance_deg) / math.degrees(period) * n)
-    off = on + round(conduction_deg / math.degrees(period) * n)
-    t = _tables(result, period, i_limit, N_THETA)
-    omega = rpm * 2 * math.pi / 60
-    args = (t, omega, BUS_V, R_PHASE)
-    _, _, i2, valid = _simulate(*args, np.array([on]), np.array([off]))
-    cur = _stroke_waveforms(*args, on, off)[0]
-    return cur, float(cur.max()), math.sqrt(i2[0] / period), bool(valid[0])
+def pulse(result, machine, rpm, advance_deg, conduction_deg, i_limit):
+    """The single pulse that starts `advance_deg` before the onset of pole overlap and lasts `conduction_deg`, with
+    the hysteresis limit `i_limit`."""
+    period = math.degrees(2 * math.pi / machine.n_rotor_poles)
+    onset = period - math.degrees(0.5 * (machine.stator_pole_arc + machine.rotor_pole_arc))
+    on = onset - advance_deg
+    return fixed_stroke(result, machine, BUS_V, R_PHASE, rpm, math.radians(on), math.radians(on + conduction_deg),
+                        i_limit, n_theta=N_THETA)
+
+
+def shift_to_measured_peak(result, machine, rpm, advance_deg, conduction_deg, peak):
+    """The smallest extra advance (deg, in steps of SHIFT_STEP_DEG up to SHIFT_MAX_DEG, conduction angle kept) whose
+    stroke reaches the measured peak current; None when none does."""
+    for k in range(int(SHIFT_MAX_DEG / SHIFT_STEP_DEG) + 1):
+        shift = k * SHIFT_STEP_DEG
+        try:
+            trace = pulse(result, machine, rpm, advance_deg + shift, conduction_deg, peak)
+        except ValueError:
+            return None
+        if trace.current.max() >= 0.995 * peak:
+            return shift
+    return None
 
 
 def _corrected_map(design, i_max, solver, workers, cache_dir):
@@ -70,12 +80,26 @@ def _corrected_map(design, i_max, solver, workers, cache_dir):
     return with_end_winding(result, end_winding_inductance(design.machine, image_factor=IMAGE_FACTOR))
 
 
+def _evaluate(result, static, d, model, angles, tau, rpm, angle_set, shift, peak, iron, solver, workers, cache_dir):
+    """Computed currents and losses of one pulse, `shift` degrees earlier than the nominal turn-on."""
+    machine = d.machine
+    trace = pulse(result, machine, rpm, angle_set["advance"] + shift, angle_set["conduction"], peak)
+    phase = phase_current_samples(trace.current, angles, tau, machine.n_phases)
+    with k64.waivers():
+        sl = stroke_losses(static, d, angles, phase, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
+                           model=model)
+    return dict(computed_peak=float(trace.current.max()), computed_rms=trace.i_rms, valid=trace.valid,
+                iron_w=sl.iron_w, error_pct=100 * (sl.iron_w - iron) / iron,
+                iron_uncertainty_pct=100 * iron_uncertainty(list(sl.sides)), computed_copper_w=trace.copper_dc_w,
+                regions={k: v.hysteresis + v.classical + v.excess for k, v in sl.iron.items()})
+
+
 def materu_rows(preset="reference", rows=None, workers=None, cache_dir=None, solver="ngsolve", log=print):
     d = k64.design(preset=preset)
     machine = d.machine
     tau = 2 * math.pi / machine.n_rotor_poles
     material = load_material("M19")
-    model = fit_loss(m19_loss_data(), density=material.density, thickness=material.thickness)
+    model = fit_loss(m19_loss_data(), density=material.density)
     with k64.waivers():
         result = _corrected_map(d, I_MAX, solver, workers, cache_dir)
         static = build_machine_mesh(d)
@@ -85,22 +109,19 @@ def materu_rows(preset="reference", rows=None, workers=None, cache_dir=None, sol
         for index, (peak, rms, iron, copper, rpm) in enumerate(points):
             if rows is not None and (table, index) not in rows:
                 continue
-            cur, c_peak, c_rms, valid = stroke_for_angles(result, machine, rpm, angle_set["advance"],
-                                                          angle_set["conduction"], peak)
-            phase = phase_current_samples(cur, angles, tau, machine.n_phases)
-            with k64.waivers():
-                sl = stroke_losses(static, d, angles, phase, rpm, solver=solver, workers=workers,
-                                   cache_dir=cache_dir, model=model)
             row = dict(table=table, index=index, rpm=rpm, measured_peak=peak, measured_rms=rms,
-                       computed_peak=c_peak, computed_rms=c_rms, valid=valid,
-                       measured_iron_w=iron, computed_iron_w=sl.iron_w,
-                       error_pct=100 * (sl.iron_w - iron) / iron,
-                       iron_uncertainty_pct=100 * _uncertainty(list(sl.sides)),
-                       measured_copper_w=copper, copper_from_measured_rms_w=3 * R_PHASE * rms**2,
-                       computed_copper_w=3 * R_PHASE * c_rms**2,
-                       regions={k: v.hysteresis + v.classical + v.excess for k, v in sl.iron.items()})
+                       measured_iron_w=iron, measured_copper_w=copper,
+                       copper_from_measured_rms_w=3 * R_PHASE * rms**2)
+            row["nominal"] = _evaluate(result, static, d, model, angles, tau, rpm, angle_set, 0.0, peak, iron,
+                                       solver, workers, cache_dir)
+            shift = shift_to_measured_peak(result, machine, rpm, angle_set["advance"], angle_set["conduction"], peak)
+            row["shift_deg"] = shift
+            row["shifted"] = (None if not shift else
+                              _evaluate(result, static, d, model, angles, tau, rpm, angle_set, shift, peak, iron,
+                                        solver, workers, cache_dir))
             out.append(row)
-            log(f"T{table}.{index + 1}: {rpm:.0f} rpm, iron {sl.iron_w:.2f} W vs {iron} W ({row['error_pct']:+.0f} %)")
+            n = row["nominal"]
+            log(f"T{table}.{index + 1}: {rpm:.0f} rpm, iron {n['iron_w']:.2f} W vs {iron} W ({n['error_pct']:+.0f} %)")
     return out
 
 
@@ -156,15 +177,19 @@ def main():
     print(f"\nMaterial stand-in: M19 fit (grade C) for Materu's E140; the iron error includes that gap. Preset {preset}.")
     print("M5d 2D flux deficit after end winding (small at 1-6 A, large at 10 A+): "
           + ", ".join(f"{k} {100 * v:+.1f} %" for k, v in M5D_FLUX_DEFICIT.items()))
-    print("\n| Row | rpm | peak meas/comp (A) | rms meas/comp (A) | iron meas (W) | iron comp (W) | error | +/- | "
+    print("\n| Row | turn-on | rpm | peak meas/comp (A) | rms meas/comp (A) | iron meas (W) | iron comp (W) | error | +/- | "
           "Cu meas (W) | Cu from meas rms (W) | Cu comp (W) | valid |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in out["rows"]:
-        print(f"| T{r['table']}.{r['index'] + 1} | {r['rpm']:.0f} | {r['measured_peak']:.2f} / {r['computed_peak']:.2f} | "
-              f"{r['measured_rms']:.3f} / {r['computed_rms']:.3f} | {r['measured_iron_w']:.1f} | "
-              f"{r['computed_iron_w']:.2f} | {r['error_pct']:+.0f} % | {r['iron_uncertainty_pct']:.0f} % | "
-              f"{r['measured_copper_w']:.1f} | {r['copper_from_measured_rms_w']:.1f} | "
-              f"{r['computed_copper_w']:.1f} | {r['valid']} |")
+        for label, c in (("nominal", r["nominal"]),
+                         (f"{r['shift_deg']} deg earlier" if r["shift_deg"] else "no shift reaches the peak", r["shifted"])):
+            if c is None:
+                continue
+            print(f"| T{r['table']}.{r['index'] + 1} | {label} | {r['rpm']:.0f} | {r['measured_peak']:.2f} / "
+                  f"{c['computed_peak']:.2f} | {r['measured_rms']:.3f} / {c['computed_rms']:.3f} | "
+                  f"{r['measured_iron_w']:.1f} | {c['iron_w']:.2f} | {c['error_pct']:+.0f} % | "
+                  f"{c['iron_uncertainty_pct']:.0f} % | {r['measured_copper_w']:.1f} | "
+                  f"{r['copper_from_measured_rms_w']:.1f} | {c['computed_copper_w']:.1f} | {c['valid']} |")
     if not skip_yan:
         y = yan_shares(preset, workers, cache_dir)
         out["yan"] = y

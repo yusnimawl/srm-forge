@@ -56,7 +56,8 @@ def _bertotti(params, b, f, k_c):
     return k_h * f * b**alpha + k_c * fb**2 + k_e * fb**1.5
 
 
-def fit_loss(data: LossData, *, density: float, thickness: float) -> LossModel:
+def fit_loss(data: LossData, *, density: float) -> LossModel:
+    thickness = data.thickness
     b = np.array([p.b for p in data.points])
     f = np.array([p.f for p in data.points])
     w = np.array([p.w_per_kg for p in data.points])
@@ -90,6 +91,4 @@ def loss_model(name: str) -> LossModel:
     loss = getattr(material, "loss", None)
     if loss is None:
         raise MissingLossData(f"material {name!r} has no loss data")
-    if material.thickness is None:
-        raise MissingLossData(f"material {name!r} has no lamination thickness for the loss fit")
-    return fit_loss(loss, density=material.density, thickness=material.thickness)
+    return fit_loss(loss, density=material.density)

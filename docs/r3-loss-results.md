@@ -19,11 +19,16 @@ Sources: `docs/r3-sources.md` section 4 (Materu, Tables 4 and 5) and section 5 (
 - **Angles.** Mechanical degrees. The advance is measured before the onset of pole overlap, which is the aligned
   position minus (stator arc + rotor arc)/2 = 30 deg (24 deg and 36 deg arcs); turn-on = onset - advance and
   turn-off = turn-on + conduction. Materu's text does not say whether the angles are mechanical or electrical.
-- **Material.** Materu's "E140" steel has no published loss curve. The M19 fit (grade C, test-only data) stands in, so the
+- **Material.** M19 0.36 mm data, fitted at 0.36 mm (the loss data carry the thickness they were measured at). Materu's "E140" steel has no published loss curve. The M19 fit (grade C, test-only data) stands in, so the
   iron error includes this material gap, of unknown size.
 - **Operating point.** The control is not described for the measured points; single-pulse operation with the speed set by
   the load is an inference. The computed peak and rms current are printed beside the measured ones, so a mismatch of the
   operating point shows up separately from the loss model.
+- **Turn-on offset.** The nominal angles give computed currents about 30 % below the measured ones (the back-EMF limits
+  the current at the stated turn-on). Each row is also run with the pulse (conduction angle kept) turned on the
+  smallest number of degrees earlier that reaches the measured peak current. That a few degrees of real turn-on
+  advance is the cause is a guess; the source does not confirm it. The `valid` column says whether the flux is back to
+  zero before the next turn-on.
 - **Measured iron loss** is a difference (total loss minus copper, friction and windage, and an assumed 6 % stray loss);
   the dissertation quotes cutting-stress increases of up to 25 %, and the Table 5 values are not monotonic. Its
   uncertainty is large and not stated.
@@ -33,18 +38,18 @@ Sources: `docs/r3-sources.md` section 4 (Materu, Tables 4 and 5) and section 5 (
 
 ## Materu check
 
-| Row | rpm | Peak meas / comp (A) | rms meas / comp (A) | Iron meas (W) | Iron comp (W) | Error | Iron uncertainty | Cu meas (W) | Cu from meas rms (W) | Cu comp (W) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| T4.1 | 955 | 1.07 / TBD | 0.446 / TBD | 5.6 | TBD | TBD | TBD | 2.0 | TBD | TBD |
-| T4.2 | 729 | 1.54 / TBD | 0.629 / TBD | 9.6 | TBD | TBD | TBD | 4.0 | TBD | TBD |
-| T4.3 | 615 | 1.83 / TBD | 0.768 / TBD | 10.4 | TBD | TBD | TBD | 6.0 | TBD | TBD |
-| T4.4 | 550 | 2.13 / TBD | 0.888 / TBD | 10.5 | TBD | TBD | TBD | 8.0 | TBD | TBD |
-| T4.5 | 486 | 2.54 / TBD | 1.051 / TBD | 10.70 | TBD | TBD | TBD | 11.3 | TBD | TBD |
-| T5.1 | 2324 | 2.67 / TBD | 0.870 / TBD | 20.6 | TBD | TBD | TBD | 7.7 | TBD | TBD |
-| T5.2 | 1806 | 3.28 / TBD | 1.067 / TBD | 11.3 | TBD | TBD | TBD | 11.6 | TBD | TBD |
-| T5.3 | 1458 | 4.04 / TBD | 1.356 / TBD | 7.3 | TBD | TBD | TBD | 18.8 | TBD | TBD |
-| T5.4 | 1150 | 4.94 / TBD | 1.712 / TBD | 15.5 | TBD | TBD | TBD | 29.9 | TBD | TBD |
-| T5.5 | 1004 | 5.66 / TBD | 2.000 / TBD | 22.9 | TBD | TBD | TBD | 40.8 | TBD | TBD |
+| Row | turn-on | rpm | Peak meas / comp (A) | rms meas / comp (A) | Iron meas (W) | Iron comp (W) | Error | Iron uncertainty | Cu meas (W) | Cu from meas rms (W) | Cu comp (W) | valid |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| T4.1 | nominal / shifted | 955 | 1.07 / TBD | 0.446 / TBD | 5.6 | TBD | TBD | TBD | 2.0 | TBD | TBD | TBD |
+| T4.2 | nominal / shifted | 729 | 1.54 / TBD | 0.629 / TBD | 9.6 | TBD | TBD | TBD | 4.0 | TBD | TBD | TBD |
+| T4.3 | nominal / shifted | 615 | 1.83 / TBD | 0.768 / TBD | 10.4 | TBD | TBD | TBD | 6.0 | TBD | TBD | TBD |
+| T4.4 | nominal / shifted | 550 | 2.13 / TBD | 0.888 / TBD | 10.5 | TBD | TBD | TBD | 8.0 | TBD | TBD | TBD |
+| T4.5 | nominal / shifted | 486 | 2.54 / TBD | 1.051 / TBD | 10.70 | TBD | TBD | TBD | 11.3 | TBD | TBD | TBD |
+| T5.1 | nominal / shifted | 2324 | 2.67 / TBD | 0.870 / TBD | 20.6 | TBD | TBD | TBD | 7.7 | TBD | TBD | TBD |
+| T5.2 | nominal / shifted | 1806 | 3.28 / TBD | 1.067 / TBD | 11.3 | TBD | TBD | TBD | 11.6 | TBD | TBD | TBD |
+| T5.3 | nominal / shifted | 1458 | 4.04 / TBD | 1.356 / TBD | 7.3 | TBD | TBD | TBD | 18.8 | TBD | TBD | TBD |
+| T5.4 | nominal / shifted | 1150 | 4.94 / TBD | 1.712 / TBD | 15.5 | TBD | TBD | TBD | 29.9 | TBD | TBD | TBD |
+| T5.5 | nominal / shifted | 1004 | 5.66 / TBD | 2.000 / TBD | 22.9 | TBD | TBD | TBD | 40.8 | TBD | TBD | TBD |
 
 Reading: TBD.
 

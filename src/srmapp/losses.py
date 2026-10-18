@@ -152,7 +152,7 @@ def stroke_losses(static, design: Design, angles: np.ndarray, coil_currents: np.
     return StrokeLoss(fields, sides, iron, sum(r.hysteresis + r.classical + r.excess for r in iron.values()))
 
 
-def _uncertainty(sides: list[_Side]) -> float:
+def iron_uncertainty(sides: list[_Side]) -> float:
     return max(s.fit_error * (1.0 + s.high_b_share) + LOSS_GRADE_ALLOWANCE[s.grade] + ANGLE_CONVERGENCE_REL
                for s in sides)
 
@@ -232,7 +232,7 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         power = trace.torque_avg * omega
         points.append(OperatingLoss(
             rpm, torque, True, power, trace.copper_dc_w, ac, iron, iron_w,
-            power / (power + trace.copper_dc_w + (ac or 0.0) + iron_w), _uncertainty(sides),
+            power / (power + trace.copper_dc_w + (ac or 0.0) + iron_w), iron_uncertainty(sides),
             any(s.beyond for s in sides), trace.theta_on, trace.theta_off, trace.current_limit,
             stroke_key(ref, angles, coil, solver)))
         side_flags.extend(sides)
