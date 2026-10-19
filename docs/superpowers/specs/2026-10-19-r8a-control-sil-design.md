@@ -150,3 +150,6 @@ srmweb and `web/` get the next minor version at merge; srmcore is unchanged (no 
 - Custom controllers run only on a loopback host, enforced where the job runs as well as at the route.
 - The hysteresis command is the per-phase torque at the window centre.
 - Versions are not bumped on the branch; srmsil follows the srmweb version and the bump is made at merge.
+- R8b note: the simulator's static gate queue (65536 entries, about 2.6 MB) must shrink for an MCU emulator.
+- R8b note: the generated `srm_motor_tables.h` defines the i(theta, T) table `static const` per translation unit
+  (about 46 KB each); firmware should include it in one .c file or switch to an extern definition.

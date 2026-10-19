@@ -60,7 +60,7 @@ def _cache_key(sources: list[Path], include_dirs: list[Path]) -> str:
     for s in sources:
         h.update(Path(s).read_bytes())
     for d in include_dirs:
-        for hdr in sorted(Path(d).glob("*.h")):
+        for hdr in sorted(Path(d).rglob("*.h")):
             h.update(hdr.read_bytes())
     return h.hexdigest()
 

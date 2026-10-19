@@ -7,6 +7,7 @@ import json
 import math
 import multiprocessing as mp
 import tempfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -31,6 +32,10 @@ class SimError(Exception):
     def __init__(self, log: str):
         super().__init__(log)
         self.log = log
+
+
+class SimCancelled(SimError):
+    """The caller's cancel callback fired while the child was running."""
 
 
 @dataclass(frozen=True)
@@ -154,10 +159,11 @@ def _child_main(lib_path: Path, m: MotorData, scenario: Scenario, out: Path) -> 
 
 
 def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, timeout_s: float = 300.0,
-        on_compiled: Callable[[], None] | None = None) -> SimResult:
+        on_compiled: Callable[[], None] | None = None, cancel: Callable[[], bool] | None = None) -> SimResult:
     """Compile the controller and run the scenario in a spawned child, so controller faults cannot reach this process.
 
-    `on_compiled` is called once the library is built, before the child starts."""
+    `on_compiled` is called once the library is built, before the child starts. `cancel` is polled while the child
+    runs; when it returns True the child is killed and `SimCancelled` is raised."""
     cdir = controller_dir(controller)
     common = _CTRL_DIR / "common" if controller in REFERENCE else None
     log: list[str] = []
@@ -174,7 +180,11 @@ def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, t
         p = mp.get_context("spawn").Process(target=_child_main, args=(lib, m, scenario, out), daemon=True)
         p.start()
         try:
-            p.join(timeout_s)
+            deadline = time.monotonic() + timeout_s
+            while p.is_alive() and time.monotonic() < deadline:
+                p.join(0.2)
+                if cancel and cancel():
+                    raise SimCancelled("cancelled")
             timed_out = p.is_alive()
         finally:
             if p.is_alive():
@@ -200,10 +210,11 @@ def save(result: SimResult, path: Path) -> None:
     path = Path(path)
     s = result.summary
     tmp = path.with_suffix(".tmp.npz")
-    np.savez(tmp, i_rms=s.i_rms, **{f"trace_{k}": v for k, v in result.traces.items()})
+    np.savez_compressed(tmp, i_rms=s.i_rms, **{f"trace_{k}": (v.astype(np.float32) if k != "t" and v.dtype == np.float64 else v)
+                                               for k, v in result.traces.items()})
     meta = {"scenario": result.scenario.model_dump(mode="json"), "controller": result.controller,
             "source_hash": result.source_hash, "compile_log": result.compile_log,
-            "summary": {k: (None if isinstance(v, float) and math.isnan(v) else v)
+            "summary": {k: (None if isinstance(v, float) and not math.isfinite(v) else v)
                         for k, v in vars(s).items() if k != "i_rms"}}
     path.with_suffix(".json").write_text(json.dumps(meta, allow_nan=False))
     tmp.replace(path)

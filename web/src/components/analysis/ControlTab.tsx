@@ -10,7 +10,7 @@ import { JobStepper } from "@/components/run/JobStepper"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { defaultScenario, scenarioErrors, type ControlSummary, type Scenario } from "@/lib/control"
+import { defaultIsrHz, defaultScenario, scenarioErrors, type ControlSummary, type Scenario } from "@/lib/control"
 import { errorMessage } from "@/lib/errorMessage"
 
 const ControlScopes = lazy(() => import("./ControlScopes"))
@@ -51,11 +51,14 @@ function Summary({ s }: { s: ControlSummary }) {
     ["Torque ripple", pct(s.ripple_pct)],
     ["RMS current", s.i_rms.map((v) => v.toFixed(2)).join(" / ") + " A"],
     ["Copper loss", fix(s.copper_loss, 1, "W")],
+    ["Input power", fix(s.power_in, 1, "W")],
+    ["Mechanical power", fix(s.power_mech, 1, "W")],
+    ["Energy round trip error", s.roundtrip_error == null ? "n/a" : `${(s.roundtrip_error * 100).toFixed(2)} %`],
     ["Beyond the map", `${beyond.toFixed(2)} %`],
   ]
   return (
     <div className="space-y-2">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm @2xl:grid-cols-5">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm @2xl:grid-cols-4">
         {rows.map(([k, v]) => (
           <div key={k}>
             <dt className="text-muted-foreground">{k}</dt>
@@ -120,7 +123,7 @@ function RunView({ caseId, jobId, onBusy }: { caseId: string; jobId: string; onB
 }
 
 /** Runs a controller against an evaluated case's motor model and shows the scopes. */
-export default function ControlTab({ caseId, busVoltage }: { caseId: string; busVoltage?: number }) {
+export default function ControlTab({ caseId, busVoltage, peakTorque, baseSpeedRpm }: { caseId: string; busVoltage?: number; peakTorque?: number | null; baseSpeedRpm?: number }) {
   const controllers = useControllers()
   const run = useRunControl(caseId)
   const check = useTargetCheck(caseId)
@@ -128,7 +131,7 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
   const [choice, setChoice] = useState("hysteresis")
   const [folder, setFolder] = useState("")
   const [params, setParams] = useState<Record<string, string>>({})
-  const [sc, setSc] = useState<Scenario>(() => defaultScenario(busVoltage))
+  const [sc, setSc] = useState<Scenario>(() => ({ ...defaultScenario(busVoltage, peakTorque, baseSpeedRpm), isr_hz: defaultIsrHz("hysteresis") }))
   const [jobId, setJobId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [custom, setCustom] = useState<{ name: string; value: string }[]>([])
@@ -182,7 +185,7 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
         <div className="grid gap-3 @2xl:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="ctl-controller">Controller</Label>
-            <select id="ctl-controller" className={SELECT} value={choice} onChange={(e) => { setChoice(e.target.value); setParams({}) }}>
+            <select id="ctl-controller" className={SELECT} value={choice} onChange={(e) => { setChoice(e.target.value); setParams({}); patch({ isr_hz: defaultIsrHz(e.target.value) }) }}>
               {(controllers.data ?? []).map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
               <option value={CUSTOM}>Custom folder…</option>
             </select>
@@ -264,6 +267,7 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
             <NumField id="ctl-bus" label="Bus voltage (V)" value={sc.bus_voltage ?? busVoltage ?? null} onChange={(v) => patch({ bus_voltage: v })} error={errors.bus_voltage} />
             <NumField id="ctl-dt" label="Time step (µs)" value={sc.dt} scale={1e6} onChange={(v) => patch({ dt: v })} error={errors.dt} />
             <NumField id="ctl-pwm" label="PWM frequency (Hz)" value={sc.pwm_hz} onChange={(v) => patch({ pwm_hz: v })} error={errors.pwm_hz} />
+            <NumField key={`isr-${choice}`} id="ctl-isr" label="ISR rate (kHz, empty = PWM rate)" value={sc.isr_hz ?? null} scale={1e-3} onChange={(v) => patch({ isr_hz: Number.isNaN(v) ? null : v })} error={errors.isr_hz} />
             <NumField id="ctl-dead" label="Dead time (µs)" value={sc.converter.dead_time} scale={1e6} onChange={(v) => sub("converter", { dead_time: v })} error={errors["converter.dead_time"]} />
             <NumField id="ctl-vsw" label="Switch drop (V)" value={sc.converter.v_switch} onChange={(v) => sub("converter", { v_switch: v })} error={errors["converter.v_switch"]} />
             <NumField id="ctl-cpr" label="Encoder counts / rev" value={sc.sensors.encoder_cpr} onChange={(v) => sub("sensors", { encoder_cpr: v })} error={errors["sensors.encoder_cpr"]} />

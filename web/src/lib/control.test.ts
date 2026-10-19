@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { defaultScenario, MAX_STEPS, rpmToRadS, scenarioErrors, scopesFromWire } from "./control"
+import { defaultIsrHz, defaultScenario, MAX_STEPS, rpmToRadS, scenarioErrors, scopesFromWire } from "./control"
 
 /** Packs arrays like srmweb/frames.py: u32 header length, JSON header, 8-byte aligned data. */
 function pack(meta: unknown, arrays: Record<string, Float32Array>): ArrayBuffer {
@@ -49,4 +49,18 @@ describe("scenarioErrors", () => {
 
 describe("units", () => {
   it("converts rpm to rad/s", () => expect(rpmToRadS(60)).toBeCloseTo(2 * Math.PI))
+})
+
+describe("defaults from the case", () => {
+  it("commands 30 % of the peak torque at the base speed", () => {
+    const s = defaultScenario(48, 4.37, 3000)
+    expect(s.command_value).toBe(1.3)
+    expect(s.speed_rpm).toBe(3000)
+    expect(defaultScenario(48).command_value).toBe(0)
+    expect(defaultScenario(48).speed_rpm).toBe(1000)
+  })
+  it("uses a 50 kHz ISR for hysteresis only", () => {
+    expect(defaultIsrHz("hysteresis")).toBe(50000)
+    expect(defaultIsrHz("tsf")).toBeNull()
+  })
 })

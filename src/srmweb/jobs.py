@@ -344,8 +344,12 @@ def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) ->
                   np.asarray(req.motor.torque), req.motor.resistance, req.motor.n_phases,
                   req.motor.n_rotor_poles, req.motor.bus_voltage)
     reporter.progress(step="compile", message="compiling the controller")
-    res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir,
-                      on_compiled=lambda: reporter.progress(step="simulate", message="simulating"))
+    try:
+        res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir,
+                          on_compiled=lambda: reporter.progress(step="simulate", message="simulating"),
+                          cancel=reporter.cancelled)
+    except sil_run.SimCancelled:
+        return {"cancelled": True}
     run_file = ctx.settings.cache_dir / "sil" / "runs" / f"{reporter.job_id}.npz"
     run_file.parent.mkdir(parents=True, exist_ok=True)
     sil_run.save(res, run_file)

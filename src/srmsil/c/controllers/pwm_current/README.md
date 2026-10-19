@@ -33,3 +33,5 @@ goes through a PI loop on the speed estimate that produces the torque command.
   `speed_kp` 0.01, `speed_ki` 0.0625, `speed_filter_hz` 500. The controllers only motor (torque >= 0), so a speed
   overshoot is not braked.
 - `resolver_pole_pairs` must divide the rotor pole count; otherwise (or with `isr_hz` <= 0) every switch stays off.
+
+Firmware note: the generated `srm_motor_tables.h` defines its i(theta, T) table `static const` per translation unit (about 46 KB each); include it in one .c file or switch to an extern definition.

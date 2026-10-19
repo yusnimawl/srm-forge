@@ -80,7 +80,7 @@ void srm_ref_init(const srm_hal_t *hal)
     primed = false;
 
     float p = hal->encoder_cpr > 0 ? 1.0f : resolver_pole_pairs;
-    ok = hal->isr_hz > 0.0f && p >= 1.0f && p == floorf(p) && SRM_N_ROTOR_POLES % (int)p == 0;
+    ok = hal->isr_hz > 0.0f && p >= 1.0f && p <= (float)SRM_N_ROTOR_POLES && p == floorf(p) && SRM_N_ROTOR_POLES % (int)p == 0;
     angle_period = ok ? TWO_PI_F / p : TWO_PI_F;
 
     /* The window may cross the 0/360 degree wrap (an advanced turn-on is a negative theta_on). */

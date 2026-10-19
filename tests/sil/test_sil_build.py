@@ -65,3 +65,15 @@ def test_target_check_pass_and_fail(tmp_path):
     r = build.target_check([bad], [])
     assert not r.ok
     assert "unused" in r.log
+
+
+def test_cache_key_sees_nested_headers(tmp_path):
+    inc = tmp_path / "inc"
+    (inc / "sub").mkdir(parents=True)
+    h = inc / "sub" / "k.h"
+    src = tmp_path / "add.c"
+    src.write_text('#include "sub/k.h"\n' + ADD_C)
+    h.write_text("#define K 1\n")
+    a = build.compile_host([src], [inc], tmp_path / "out")
+    h.write_text("#define K 2\n")
+    assert build.compile_host([src], [inc], tmp_path / "out") != a

@@ -10,6 +10,7 @@ export type ControlSummary = {
   power_in: number | null
   power_mech: number | null
   beyond_map_fraction: number | null
+  roundtrip_error: number | null
 }
 export type ControlMeta = {
   summary: ControlSummary
@@ -38,14 +39,18 @@ export function scopesFromWire(buf: ArrayBuffer): { meta: ControlMeta; channels:
   return { meta, channels }
 }
 
-export function defaultScenario(busVoltage?: number | null): Scenario {
+/** The ISR rate (Hz) a controller starts with: the hysteresis band is only tight at a fast ISR. */
+export const defaultIsrHz = (controller: string) => (controller === "hysteresis" ? 50_000 : null)
+
+/** A scenario that shows something on the first run: 30 % of the case's peak torque at its base speed. */
+export function defaultScenario(busVoltage?: number | null, peakTorque?: number | null, baseSpeedRpm?: number | null): Scenario {
   return {
     mode: "fixed",
-    speed_rpm: 1000,
+    speed_rpm: baseSpeedRpm && baseSpeedRpm > 0 ? baseSpeedRpm : 1000,
     duration: 0.02,
     dt: 0.5e-6,
     command_mode: "torque",
-    command_value: 0,
+    command_value: peakTorque && peakTorque > 0 ? +(0.3 * peakTorque).toPrecision(2) : 0,
     inertia: 1e-3,
     friction: 0,
     load: 0,

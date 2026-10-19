@@ -55,7 +55,7 @@ async function mount() {
   const root = createRoot(host)
   roots.push(root)
   await act(async () => {
-    root.render(<QueryClientProvider client={qc}><ControlTab caseId="c1" busVoltage={48} /></QueryClientProvider>)
+    root.render(<QueryClientProvider client={qc}><ControlTab caseId="c1" busVoltage={48} peakTorque={2} baseSpeedRpm={1500} /></QueryClientProvider>)
   })
   await waitFor(() => expect(document.getElementById('ctl-p-band')).not.toBeNull())
 }
@@ -96,7 +96,20 @@ describe("ControlTab", () => {
     expect(posts).toHaveLength(1)
     const body = posts[0].body as { controller: string; scenario: { speed_rpm: number; duration: number; bus_voltage: number; params: object } }
     expect(body.controller).toBe("hysteresis")
-    expect(body.scenario).toMatchObject({ speed_rpm: 1000, duration: 0.02, bus_voltage: 48, params: {} })
+    expect(body.scenario).toMatchObject({ speed_rpm: 1500, command_value: 0.6, duration: 0.02, bus_voltage: 48, params: {} })
+  })
+
+  it("posts a 50 kHz ISR for hysteresis, the PWM rate for others, and the ISR field is editable", async () => {
+    await mount()
+    await act(async () => { button("Run").click() })
+    expect((posts[0].body as { scenario: { isr_hz: number | null } }).scenario.isr_hz).toBe(50000)
+    expect((document.getElementById("ctl-isr") as HTMLInputElement).value).toBe("50")
+    const select = document.getElementById("ctl-controller") as HTMLSelectElement
+    await act(async () => {
+      select.value = "tsf"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect((document.getElementById("ctl-isr") as HTMLInputElement).value).toBe("")
   })
 
   it("shows the compiler log of a failed job", async () => {

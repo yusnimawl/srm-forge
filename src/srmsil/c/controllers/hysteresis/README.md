@@ -34,3 +34,5 @@ the rise during one ISR period plus the compute delay.
 - `resolver_pole_pairs` must divide the rotor pole count; otherwise (or with `isr_hz` <= 0) every switch stays off.
 - The torque command is the per-phase torque at the window centre, so overlapping conduction windows (a window
   longer than one stroke) raise the mean torque above the command.
+
+Firmware note: the generated `srm_motor_tables.h` defines its i(theta, T) table `static const` per translation unit (about 46 KB each); include it in one .c file or switch to an extern definition.

@@ -196,3 +196,9 @@ def test_turn_off_delay(cache):
     both = (res.traces["gate_u"][0] == 1) & (res.traces["gate_l"][0] == 1)
     last_on = np.flatnonzero(both[:-1] & ~both[1:])[0]
     assert (last_on - cmd_step) * dt == pytest.approx(2e-6, abs=dt * 1.01)
+
+
+def test_non_finite_scenario_rejected():
+    for bad in ("inf", "nan"):
+        with pytest.raises(ValueError):
+            Scenario(speed_rpm=float(bad))

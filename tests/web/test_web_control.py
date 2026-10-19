@@ -13,6 +13,7 @@ from srmweb.jobs import JobRunner
 from web_support import analytic_evaluation, store_search, unpack
 
 CRASH = str(Path(__file__).parents[1] / "sil" / "controllers" / "crash")
+HANG = str(Path(__file__).parents[1] / "sil" / "controllers" / "hang")
 SHORT = {"duration": 0.005}
 
 
@@ -152,3 +153,17 @@ def test_target_check_refused_off_loopback(tmp_path):
         c.post("/api/login", json={"token": "t0k"})
         r = c.post("/api/control/target-check", json={"controller": CRASH, "case_id": _case(c)})
         assert r.status_code == 403
+
+
+def test_cancel_running_control_job(client):
+    jid = _control(client, _case(client), HANG).json()["job_id"]
+    for _ in range(2400):
+        if (client.get(f"/api/jobs/{jid}").json().get("progress") or {}).get("step") == "simulate":
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("never reached the simulate step")
+    assert client.post(f"/api/jobs/{jid}/cancel").status_code == 202
+    t0 = time.monotonic()
+    assert _wait(client, jid)["status"] == "cancelled"
+    assert time.monotonic() - t0 < 10

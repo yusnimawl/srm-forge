@@ -27,7 +27,9 @@ void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi,
 {
     double period = tab->theta_step * (double)tab->n_theta;
     if (!(psi > 0.0)) psi = 0.0;
+    if (!isfinite(psi)) psi = 0.0;
     double th = fmod(theta_phase, period);
+    if (!isfinite(th)) th = 0.0;
     if (th < 0.0) th += period;
     double u = th / tab->theta_step;
     int64_t j = (int64_t)u;

@@ -68,7 +68,7 @@ export default function AnalysisTabs({
       {showField && (
         <TabsContent value="control">
           <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
-            <ControlTab key={caseId} caseId={caseId} busVoltage={busVoltage} />
+            <ControlTab key={caseId} caseId={caseId} busVoltage={busVoltage} peakTorque={evaluation.key?.peak_torque} baseSpeedRpm={baseSpeedRpm} />
           </Suspense>
         </TabsContent>
       )}

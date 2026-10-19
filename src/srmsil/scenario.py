@@ -10,7 +10,7 @@ MAX_STEPS = 50_000_000
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
 
 
 class ConverterSettings(_Model):

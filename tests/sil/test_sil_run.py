@@ -1,4 +1,6 @@
 import math
+import multiprocessing as mp
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -6,7 +8,7 @@ import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
-from srmsil.run import REFERENCE, SimError, _child_main, controller_dir, decimate, load, run, save
+from srmsil.run import REFERENCE, SimCancelled, SimError, _child_main, controller_dir, decimate, load, run, save
 from srmsil.scenario import Scenario
 
 CTRL = Path(__file__).parent / "controllers"
@@ -64,7 +66,9 @@ def test_save_load_roundtrip(tmp_path):
     assert b.summary.mean_torque == a.summary.mean_torque
     assert np.array_equal(b.summary.i_rms, a.summary.i_rms)
     assert b.traces.keys() == a.traces.keys()
-    assert all(np.array_equal(a.traces[k], b.traces[k]) for k in a.traces)
+    for k in a.traces:
+        want = a.traces[k] if k == "t" or a.traces[k].dtype != np.float64 else a.traces[k].astype(np.float32)
+        assert np.array_equal(want, b.traces[k]), k
 
 
 def test_decimate_keeps_extremes():
@@ -95,3 +99,24 @@ def test_nan_summary_roundtrip(tmp_path):
     a = replace(a, summary=replace(a.summary, ripple_pct=math.nan))
     save(a, tmp_path / "n.npz")
     assert math.isnan(load(tmp_path / "n.npz").summary.ripple_pct)
+
+
+def test_non_finite_summary_roundtrip(tmp_path):
+    a = go(tmp_path, duration=0.001)
+    a = replace(a, summary=replace(a.summary, ripple_pct=math.inf, power_in=-math.inf))
+    save(a, tmp_path / "n.npz")
+    b = load(tmp_path / "n.npz")
+    assert math.isnan(b.summary.ripple_pct) and math.isnan(b.summary.power_in)
+
+
+def test_cancel_kills_the_child(tmp_path):
+    started = []
+
+    def cancel():
+        return bool(started) and time.monotonic() - started[0] > 0.5
+
+    with pytest.raises(SimCancelled):
+        run(analytic_motor(), str(CTRL / "hang"), Scenario(duration=0.005, speed_rpm=1000.0, params=PARAMS),
+            cache_dir=tmp_path, cancel=cancel, on_compiled=lambda: started.append(time.monotonic()))
+    assert time.monotonic() - started[0] < 3
+    assert not mp.active_children()
