@@ -80,8 +80,9 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         adc_amps_per_count=full_scale / (2**ad.bits - 1),
         encoder_offset=se.encoder_offset, encoder_ecc_amp=se.encoder_ecc_amp,
         resolver_gain_mismatch=se.resolver_gain_mismatch, resolver_phase_error=se.resolver_phase_error,
-        adc_offset_error=ad.offset_error, adc_gain_error=ad.gain_error, adc_noise=ad.noise, adc_rc_tau=ad.rc_tau, n_steps=n_steps, trace_stride=stride, n_phases=q,
-        n_rotor_poles=m.n_rotor_poles, mode=int(scenario.mode == "dynamic"), command_mode=int(scenario.command_mode == "speed"),
+        adc_offset_error=ad.offset_error, adc_gain_error=ad.gain_error, adc_noise=ad.noise, adc_rc_tau=ad.rc_tau,
+        n_steps=n_steps, trace_stride=stride, n_phases=q, n_rotor_poles=m.n_rotor_poles,
+        mode=int(scenario.mode == "dynamic"), command_mode=int(scenario.command_mode == "speed"),
         encoder_cpr=se.encoder_cpr, adc_bits=ad.bits, adc_offset_counts=ad.offset_counts, seed=scenario.seed,
         encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
         resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits)

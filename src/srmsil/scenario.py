@@ -42,6 +42,12 @@ class AdcSettings(_Model):
     noise: float = Field(0.0, ge=0)          # counts, Gaussian sigma
     rc_tau: float = Field(0.0, ge=0)         # s, first-order filter on the sensed current, 0 = none
 
+    @model_validator(mode="after")
+    def _check_offset(self):
+        if self.offset_counts > 2**self.bits - 1:
+            raise ValueError(f"offset_counts {self.offset_counts} exceeds the top code {2**self.bits - 1}")
+        return self
+
 
 class Scenario(_Model):
     mode: Literal["fixed", "dynamic"] = "fixed"

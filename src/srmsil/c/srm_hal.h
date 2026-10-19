@@ -17,7 +17,7 @@ typedef struct {
     void     (*set_switches)(uint8_t phase, bool upper, bool lower);   /* direct gate control */
     void     (*set_pwm)(uint8_t phase, float duty, srm_chop_t mode);   /* duty 0..1; timer adds dead time */
     uint16_t (*adc_read)(uint8_t channel);                             /* channel = phase for currents */
-    uint32_t (*encoder_count)(void);
+    uint32_t (*encoder_count)(void);   /* single-turn count in [0, encoder_cpr), increasing with counter-clockwise rotation; wraps at encoder_cpr */
     void     (*resolver_sincos)(int16_t *s, int16_t *c);               /* raw signed ADC counts */
     uint32_t (*micros)(void);
     float    (*vbus_volts)(void);                                      /* DC bus voltage as a driver measures it */

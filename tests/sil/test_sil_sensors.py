@@ -5,6 +5,8 @@ import pytest
 from sil_fixtures import analytic_motor
 from test_sil_core import IDEAL, run
 
+from srmsil.scenario import AdcSettings
+
 FS = 25.0                          # default ADC full scale: 1.25 x the 20 A top current
 TOP = 2**12 - 1
 LSB = FS / TOP
@@ -81,17 +83,34 @@ def test_encoder_count_and_eccentricity(cache):
     rev = 60.0 / rpm
     res = run(cache, "probe", m, "sat", speed_rpm=rpm, duration=2.1 * rev, dt=dt, sensors={"encoder_cpr": cpr})
     enc, n = res.traces["encoder"], round(rev / dt)
-    assert (np.diff(enc) >= 0).all()
-    assert enc[n] - enc[0] == pytest.approx(cpr, abs=1)
-    assert enc[2 * n] - enc[0] == pytest.approx(2 * cpr, abs=1)
+    assert enc.min() >= 0 and enc.max() < cpr
+    wraps = np.flatnonzero(np.diff(enc) < 0)
+    assert len(wraps) == 2 and abs(wraps[0] - n) <= 1 and abs(wraps[1] - 2 * n) <= 1
+    assert enc[wraps[0] + 1] == 0 and enc[wraps[0]] == cpr - 1
 
     amp, h = 0.01, 2
     res = run(cache, "probe", m, "sat", speed_rpm=rpm, duration=rev, dt=dt,
               sensors={"encoder_cpr": cpr, "encoder_ecc_amp": amp, "encoder_ecc_harmonic": h})
     th = res.traces["theta"]
-    err = res.traces["encoder"] - np.floor(th * cpr / (2 * math.pi))
+    err = res.traces["encoder"] - np.floor(np.mod(th, 2 * math.pi) * cpr / (2 * math.pi))
     assert np.abs(err - amp * np.sin(h * th) * cpr / (2 * math.pi)).max() <= 1.0 + 1e-9
     assert np.abs(err).max() > 5
+
+
+def test_encoder_single_turn_negative_offset(cache):
+    m = analytic_motor()
+    cpr, off = 4000, -0.05
+    res = run(cache, "probe", m, "sat", speed_rpm=60.0, duration=0.01, dt=2e-6,
+              sensors={"encoder_cpr": cpr, "encoder_offset": off})
+    enc, th = res.traces["encoder"], res.traces["theta"]
+    assert enc.min() >= 0 and enc.max() < cpr
+    d = enc * 2 * math.pi / cpr - np.mod(th + off, 2 * math.pi)
+    assert np.abs(d).max() <= 2 * math.pi / cpr + 1e-9
+
+
+def test_adc_offset_counts_bound():
+    with pytest.raises(ValueError):
+        AdcSettings(bits=12, offset_counts=4096)
 
 
 def test_resolver_mismatch(cache):

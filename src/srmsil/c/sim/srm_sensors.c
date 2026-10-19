@@ -5,7 +5,8 @@
 #define TWO_PI 6.283185307179586476925286766559
 #define U53 (1.0 / 9007199254740992.0)
 
-/* xorshift64* seeded through splitmix64, then Box-Muller: the same draws on every platform. */
+/* The integer stream is identical on every platform; the Gaussian values agree to libm precision.
+   xorshift64* seeded through splitmix64, then Box-Muller: the same draws on every platform. */
 static uint64_t next_u64(srm_rng_t *r)
 {
     uint64_t x = r->s;
@@ -46,13 +47,17 @@ static double measured_angle(const srm_sim_config_t *c, double theta)
     return theta + c->encoder_offset + c->encoder_ecc_amp * sin((double)c->encoder_ecc_harmonic * theta);
 }
 
-/* A multi-turn counter that wraps at 2^32; it reads cpr counts per revolution. */
+/* Single-turn count in [0, cpr), like a timer in encoder mode with ARR = cpr - 1. */
 uint32_t srm_encoder_count(const srm_sim_config_t *c, double theta)
 {
     if (c->encoder_cpr == 0) return 0;
-    return (uint32_t)(int64_t)floor(measured_angle(c, theta) * (double)c->encoder_cpr / TWO_PI);
+    double turns = measured_angle(c, theta) / TWO_PI;
+    turns -= floor(turns);
+    uint32_t n = (uint32_t)(turns * (double)c->encoder_cpr);
+    return n >= c->encoder_cpr ? c->encoder_cpr - 1 : n;
 }
 
+/* The resolver channels clamp to int16. */
 static int16_t to_i16(double x)
 {
     x = floor(x + 0.5);
