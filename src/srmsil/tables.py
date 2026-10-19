@@ -94,11 +94,16 @@ def sim_tables(m: MotorData, n_theta: int = 720, n_psi: int = 512) -> SimTables:
         distinct = np.nonzero(np.diff(row) > 1e-12 * psi_max)[0]
         if distinct.size:
             q = distinct[-1]
-            slope = (cur[q + 1] - cur[q]) / (row[q + 1] - row[q])
+            dpsi_seg = row[q + 1] - row[q]
+            slope = (cur[q + 1] - cur[q]) / dpsi_seg
+            t_slope = (torque_f[r, q + 1] - torque_f[r, q]) / dpsi_seg
             over = psi_grid > row[-1]
             i_row[over] = i_top + slope * (psi_grid[over] - row[-1])
+        else:
+            over, t_slope = np.zeros(n_psi, bool), 0.0
         current[r] = i_row
         torque[r] = np.interp(i_row, cur, torque_f[r])
+        torque[r, over] = torque_f[r, -1] + t_slope * (psi_grid[over] - row[-1])
         inside = psi_grid <= row[-1]
         err = max(err, float(np.abs(np.interp(i_row[inside], cur, row) - psi_grid[inside]).max()) / psi_max)
     dw = 0.5 * (current[:, 1:] + current[:, :-1]) * np.diff(psi_grid)
@@ -149,6 +154,8 @@ def _f(x: float) -> str:
 
 
 def write_header(m: MotorData, ct: CtrlTables, path: Path) -> None:
+    if not ct.t_max > 0:
+        raise ValueError("motor map has no positive torque; no torque table can be written")
     n_theta, n_t = ct.i_of_t.shape
     rows = ",\n".join("  {" + ", ".join(_f(v) for v in r) + "}" for r in ct.i_of_t)
     Path(path).write_text(f"""#ifndef SRM_MOTOR_TABLES_H
@@ -176,6 +183,7 @@ static const float srm_i_of_t_table[SRM_I_OF_T_N_THETA][SRM_I_OF_T_N_T] = {{
 /* Bilinear lookup; theta_phase is wrapped periodically, t_nm is clamped to [0, SRM_T_MAX_NM]. */
 static inline float srm_i_of_t(float theta_phase, float t_nm)
 {{
+    if (!(fabsf(theta_phase) < 1.0e30f)) theta_phase = 0.0f;
     float u = theta_phase / SRM_POLE_PITCH_RAD;
     u -= floorf(u);
     float x = u * (float)SRM_I_OF_T_N_THETA;
@@ -183,7 +191,7 @@ static inline float srm_i_of_t(float theta_phase, float t_nm)
     float fj = x - (float)j;
     if (j >= SRM_I_OF_T_N_THETA) j -= SRM_I_OF_T_N_THETA;
     int j1 = (j + 1 >= SRM_I_OF_T_N_THETA) ? 0 : j + 1;
-    if (t_nm < 0.0f) t_nm = 0.0f;
+    if (!(t_nm > 0.0f)) t_nm = 0.0f;
     if (t_nm > SRM_T_MAX_NM) t_nm = SRM_T_MAX_NM;
     float y = t_nm / SRM_T_MAX_NM * (float)(SRM_I_OF_T_N_T - 1);
     int k = (int)y;

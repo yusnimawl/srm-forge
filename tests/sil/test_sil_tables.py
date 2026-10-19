@@ -40,14 +40,19 @@ def test_current_matches_analytic():
 
 
 def test_extrapolates_beyond_map():
-    st = tables.sim_tables(analytic_motor())
-    for th in (0.0, 0.3):
-        got = _lookup(st, th, 1.1 * st.psi_max)
-        assert math.isfinite(got)
-    # the table itself reaches psi_max; extrapolation continues the last slope
-    row = st.current[0]
-    slope = (row[-1] - row[-2]) / st.psi_step
-    assert row[-1] + slope * 0.1 * st.psi_max > row[-1]
+    m = analytic_motor()
+    st = tables.sim_tables(m)
+    got = _lookup(st, 0.3, 1.1 * st.psi_max)
+    assert math.isfinite(got) and got > st.i_max
+    r = int(0.3 / st.theta_step)
+    assert st.current[r, -1] > st.i_max
+    # torque beyond the top flux continues the last segment's slope, as the current does
+    row = st.torque[r]
+    top = np.nonzero(st.current[r] <= st.i_max)[0][-1]
+    assert top < row.size - 2
+    d = np.diff(row[top + 1:])
+    assert np.all(np.isfinite(row)) and np.allclose(d, d[-1], rtol=1e-6, atol=1e-12)
+    assert abs(d[-1]) > 0
 
 
 def test_w_field_linear():
@@ -81,6 +86,13 @@ def test_i_of_t_rules():
         tj = j * ct.t_max / (n_t - 1)
         if tj <= t * 1.0001 or i < ct.i_max - 1e-3:
             assert t == pytest.approx(tj, rel=0.01)
+
+
+def test_header_rejects_zero_torque(tmp_path):
+    m = analytic_motor()
+    ct = tables.ctrl_tables(m)
+    with pytest.raises(ValueError):
+        tables.write_header(m, tables.CtrlTables(ct.i_of_t, 0.0, ct.i_max, ct.l_min, ct.l_max), tmp_path / "h.h")
 
 
 def test_motor_data_from_json():
