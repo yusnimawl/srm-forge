@@ -1,0 +1,411 @@
+{
+ "preset": "full",
+ "rows": [
+  {
+   "table": 4,
+   "index": 0,
+   "rpm": 955,
+   "measured_peak": 1.07,
+   "measured_rms": 0.446,
+   "measured_iron_w": 5.6,
+   "measured_copper_w": 2.0,
+   "copper_from_measured_rms_w": 2.0289432,
+   "nominal": {
+    "computed_peak": 0.7741849892164336,
+    "computed_rms": 0.33178965430018315,
+    "valid": true,
+    "iron_w": 4.606170315331981,
+    "error_pct": -17.746958654786056,
+    "iron_uncertainty_pct": 38.80366379934297,
+    "computed_copper_w": 1.1228606219464774,
+    "regions": {
+     "stator_pole": 0.8656772586388995,
+     "stator_yoke": 2.7532640499305976,
+     "rotor_pole": 0.6982826662868756,
+     "rotor_yoke": 0.2889463404756078
+    }
+   },
+   "shift_deg": 3.5,
+   "shifted": {
+    "computed_peak": 1.07,
+    "computed_rms": 0.44835984800870615,
+    "valid": true,
+    "iron_w": 4.437361088007012,
+    "error_pct": -20.76140914273193,
+    "iron_uncertainty_pct": 38.81463541384864,
+    "computed_copper_w": 2.0504708437251784,
+    "regions": {
+     "stator_pole": 0.8702742115269031,
+     "stator_yoke": 2.590802613525314,
+     "rotor_pole": 0.7062957288065412,
+     "rotor_yoke": 0.26998853414825286
+    }
+   }
+  },
+  {
+   "table": 4,
+   "index": 1,
+   "rpm": 729,
+   "measured_peak": 1.54,
+   "measured_rms": 0.629,
+   "measured_iron_w": 9.6,
+   "measured_copper_w": 4.0,
+   "copper_from_measured_rms_w": 4.0355381999999995,
+   "nominal": {
+    "computed_peak": 1.0215953861555969,
+    "computed_rms": 0.4326749589735463,
+    "valid": true,
+    "iron_w": 5.624827825502992,
+    "error_pct": -41.40804348434383,
+    "iron_uncertainty_pct": 38.81060201751451,
+    "computed_copper_w": 1.9095177252521518,
+    "regions": {
+     "stator_pole": 1.0577290625241527,
+     "stator_yoke": 3.3889295456305524,
+     "rotor_pole": 0.8318572499094742,
+     "rotor_yoke": 0.34631196743881315
+    }
+   },
+   "shift_deg": 4.0,
+   "shifted": {
+    "computed_peak": 1.54,
+    "computed_rms": 0.6264016037128843,
+    "valid": true,
+    "iron_w": 5.36543061813956,
+    "error_pct": -44.11009772771292,
+    "iron_uncertainty_pct": 40.156931126627406,
+    "computed_copper_w": 4.002265485167549,
+    "regions": {
+     "stator_pole": 1.0639693266685657,
+     "stator_yoke": 3.136833961179015,
+     "rotor_pole": 0.8451153208047927,
+     "rotor_yoke": 0.31951200948718667
+    }
+   }
+  },
+  {
+   "table": 4,
+   "index": 2,
+   "rpm": 615,
+   "measured_peak": 1.83,
+   "measured_rms": 0.768,
+   "measured_iron_w": 10.4,
+   "measured_copper_w": 6.0,
+   "copper_from_measured_rms_w": 6.0162048,
+   "nominal": {
+    "computed_peak": 1.2795321361540433,
+    "computed_rms": 0.5196771420893009,
+    "valid": true,
+    "iron_w": 6.6370062283551094,
+    "error_pct": -36.18263241966241,
+    "iron_uncertainty_pct": 39.99313131594631,
+    "computed_copper_w": 2.7546561865030545,
+    "regions": {
+     "stator_pole": 1.2632965168004948,
+     "stator_yoke": 4.032564293286527,
+     "rotor_pole": 0.9527550348166063,
+     "rotor_yoke": 0.388390383451481
+    }
+   },
+   "shift_deg": 4.0,
+   "shifted": {
+    "computed_peak": 1.83,
+    "computed_rms": 0.7900790098573746,
+    "valid": true,
+    "iron_w": 6.11168624351903,
+    "error_pct": -41.233786120009334,
+    "iron_uncertainty_pct": 41.224039249809216,
+    "computed_copper_w": 6.367093386535535,
+    "regions": {
+     "stator_pole": 1.2256164765618858,
+     "stator_yoke": 3.5969126150266337,
+     "rotor_pole": 0.9389309750015453,
+     "rotor_yoke": 0.3502261769289643
+    }
+   }
+  },
+  {
+   "table": 4,
+   "index": 3,
+   "rpm": 550,
+   "measured_peak": 2.13,
+   "measured_rms": 0.888,
+   "measured_iron_w": 10.5,
+   "measured_copper_w": 8.0,
+   "copper_from_measured_rms_w": 8.043148799999999,
+   "nominal": {
+    "computed_peak": 1.6577162748766245,
+    "computed_rms": 0.6034659933478879,
+    "valid": true,
+    "iron_w": 7.453905027149009,
+    "error_pct": -29.010428312866583,
+    "iron_uncertainty_pct": 41.0182327457181,
+    "computed_copper_w": 3.714546292299001,
+    "regions": {
+     "stator_pole": 1.4399073444232495,
+     "stator_yoke": 4.565852091281456,
+     "rotor_pole": 1.0360895433561508,
+     "rotor_yoke": 0.412056048088153
+    }
+   },
+   "shift_deg": 3.0,
+   "shifted": {
+    "computed_peak": 2.13,
+    "computed_rms": 0.8705227860472924,
+    "valid": true,
+    "iron_w": 7.387382625402377,
+    "error_pct": -29.64397499616784,
+    "iron_uncertainty_pct": 41.72550476216208,
+    "computed_copper_w": 7.729661194480907,
+    "regions": {
+     "stator_pole": 1.4823211592013021,
+     "stator_yoke": 4.433658559548894,
+     "rotor_pole": 1.0713810878685375,
+     "rotor_yoke": 0.4000218187836432
+    }
+   }
+  },
+  {
+   "table": 4,
+   "index": 4,
+   "rpm": 486,
+   "measured_peak": 2.54,
+   "measured_rms": 1.051,
+   "measured_iron_w": 10.7,
+   "measured_copper_w": 11.3,
+   "copper_from_measured_rms_w": 11.2669302,
+   "nominal": {
+    "computed_peak": 2.54,
+    "computed_rms": 0.76278976955003,
+    "valid": true,
+    "iron_w": 8.112903736436536,
+    "error_pct": -24.178469752929566,
+    "iron_uncertainty_pct": 49.31277322567967,
+    "computed_copper_w": 5.934851971807916,
+    "regions": {
+     "stator_pole": 1.6040382369248778,
+     "stator_yoke": 5.002095081301492,
+     "rotor_pole": 1.087601780807953,
+     "rotor_yoke": 0.4191686374022121
+    }
+   },
+   "shift_deg": 0.0,
+   "shifted": null
+  },
+  {
+   "table": 5,
+   "index": 0,
+   "rpm": 2324,
+   "measured_peak": 2.67,
+   "measured_rms": 0.87,
+   "measured_iron_w": 20.6,
+   "measured_copper_w": 7.7,
+   "copper_from_measured_rms_w": 7.72038,
+   "nominal": {
+    "computed_peak": 1.8085180437486796,
+    "computed_rms": 0.5899013472951714,
+    "valid": true,
+    "iron_w": 4.529797109180695,
+    "error_pct": -78.01069364475391,
+    "iron_uncertainty_pct": 38.92580949909754,
+    "computed_copper_w": 3.5494327153147167,
+    "regions": {
+     "stator_pole": 1.080153629614735,
+     "stator_yoke": 2.2899320865803996,
+     "rotor_pole": 0.9112063647500849,
+     "rotor_yoke": 0.2485050282354752
+    }
+   },
+   "shift_deg": 5.0,
+   "shifted": {
+    "computed_peak": 2.67,
+    "computed_rms": 0.9442043054455195,
+    "valid": true,
+    "iron_w": 4.551483142495507,
+    "error_pct": -77.90542163837134,
+    "iron_uncertainty_pct": 39.42666820052519,
+    "computed_copper_w": 9.09352205830293,
+    "regions": {
+     "stator_pole": 1.1645617736349938,
+     "stator_yoke": 2.1788630837274057,
+     "rotor_pole": 0.9725289865002554,
+     "rotor_yoke": 0.23552929863285202
+    }
+   }
+  },
+  {
+   "table": 5,
+   "index": 1,
+   "rpm": 1806,
+   "measured_peak": 3.28,
+   "measured_rms": 1.067,
+   "measured_iron_w": 11.3,
+   "measured_copper_w": 11.6,
+   "copper_from_measured_rms_w": 11.612587799999998,
+   "nominal": {
+    "computed_peak": 2.3106267373516793,
+    "computed_rms": 0.7589379832900115,
+    "valid": true,
+    "iron_w": 5.116112437771842,
+    "error_pct": -54.72466869228459,
+    "iron_uncertainty_pct": 39.14398769227672,
+    "computed_copper_w": 5.875065997299159,
+    "regions": {
+     "stator_pole": 1.206279266438374,
+     "stator_yoke": 2.5944627971090934,
+     "rotor_pole": 1.020910614289491,
+     "rotor_yoke": 0.2944597599348838
+    }
+   },
+   "shift_deg": 4.5,
+   "shifted": {
+    "computed_peak": 3.28,
+    "computed_rms": 1.167716195324064,
+    "valid": true,
+    "iron_w": 5.180675928495782,
+    "error_pct": -54.15331036729396,
+    "iron_uncertainty_pct": 39.91996204638662,
+    "computed_copper_w": 13.908323350785494,
+    "regions": {
+     "stator_pole": 1.293083905198847,
+     "stator_yoke": 2.526178987748483,
+     "rotor_pole": 1.0768588497793867,
+     "rotor_yoke": 0.2845541857690662
+    }
+   }
+  },
+  {
+   "table": 5,
+   "index": 2,
+   "rpm": 1458,
+   "measured_peak": 4.04,
+   "measured_rms": 1.356,
+   "measured_iron_w": 7.3,
+   "measured_copper_w": 18.8,
+   "copper_from_measured_rms_w": 18.7551072,
+   "nominal": {
+    "computed_peak": 2.8404970181474627,
+    "computed_rms": 0.9467995201578648,
+    "valid": true,
+    "iron_w": 5.728904525714268,
+    "error_pct": -21.521855812133317,
+    "iron_uncertainty_pct": 39.52243089619707,
+    "computed_copper_w": 9.143579179985862,
+    "regions": {
+     "stator_pole": 1.3457514457235418,
+     "stator_yoke": 2.9117183678800647,
+     "rotor_pole": 1.1332194308286532,
+     "rotor_yoke": 0.33821528128200806
+    }
+   },
+   "shift_deg": 4.5,
+   "shifted": {
+    "computed_peak": 4.04,
+    "computed_rms": 1.466420116322902,
+    "valid": true,
+    "iron_w": 5.7758215737639516,
+    "error_pct": -20.879156523781482,
+    "iron_uncertainty_pct": 40.691578843839174,
+    "computed_copper_w": 21.933957167076027,
+    "regions": {
+     "stator_pole": 1.4267591311801884,
+     "stator_yoke": 2.8451421303442075,
+     "rotor_pole": 1.1770823035932965,
+     "rotor_yoke": 0.32683800864625917
+    }
+   }
+  },
+  {
+   "table": 5,
+   "index": 3,
+   "rpm": 1150,
+   "measured_peak": 4.94,
+   "measured_rms": 1.712,
+   "measured_iron_w": 15.5,
+   "measured_copper_w": 29.9,
+   "copper_from_measured_rms_w": 29.895628799999997,
+   "nominal": {
+    "computed_peak": 3.5667965873258693,
+    "computed_rms": 1.22951670506088,
+    "valid": true,
+    "iron_w": 6.616061162586498,
+    "error_pct": -57.31573443492582,
+    "iron_uncertainty_pct": 40.42072842488069,
+    "computed_copper_w": 15.419455545842379,
+    "regions": {
+     "stator_pole": 1.556551431828883,
+     "stator_yoke": 3.3807080961581772,
+     "rotor_pole": 1.2854252135764348,
+     "rotor_yoke": 0.393376421023003
+    }
+   },
+   "shift_deg": 4.5,
+   "shifted": {
+    "computed_peak": 4.94,
+    "computed_rms": 1.8825675156635036,
+    "valid": true,
+    "iron_w": 6.299466362029932,
+    "error_pct": -59.358281535290764,
+    "iron_uncertainty_pct": 41.36503125558014,
+    "computed_copper_w": 36.149416600520844,
+    "regions": {
+     "stator_pole": 1.5348558159539853,
+     "stator_yoke": 3.167381263443933,
+     "rotor_pole": 1.2374915555456023,
+     "rotor_yoke": 0.3597377270864116
+    }
+   }
+  },
+  {
+   "table": 5,
+   "index": 4,
+   "rpm": 1004,
+   "measured_peak": 5.66,
+   "measured_rms": 2.0,
+   "measured_iron_w": 22.9,
+   "measured_copper_w": 40.8,
+   "copper_from_measured_rms_w": 40.8,
+   "nominal": {
+    "computed_peak": 4.0617135298008185,
+    "computed_rms": 1.4459616252096716,
+    "valid": true,
+    "iron_w": 7.152889112975677,
+    "error_pct": -68.76467636255163,
+    "iron_uncertainty_pct": 41.11899891712351,
+    "computed_copper_w": 21.326211220105748,
+    "regions": {
+     "stator_pole": 1.6918454050217062,
+     "stator_yoke": 3.671194751005052,
+     "rotor_pole": 1.3686589876712651,
+     "rotor_yoke": 0.4211899692776533
+    }
+   },
+   "shift_deg": 4.5,
+   "shifted": {
+    "computed_peak": 5.66,
+    "computed_rms": 2.2170180229130416,
+    "valid": true,
+    "iron_w": 6.67227009437861,
+    "error_pct": -70.86344936952571,
+    "iron_uncertainty_pct": 41.72752948056894,
+    "computed_copper_w": 50.13472292199678,
+    "regions": {
+     "stator_pole": 1.6147247361629113,
+     "stator_yoke": 3.409854979384818,
+     "rotor_pole": 1.2709141267051145,
+     "rotor_yoke": 0.37677625212576593
+    }
+   }
+  }
+ ],
+ "yan": {
+  "rpm": 3000.0,
+  "torque_nm": 6.149124643834891,
+  "iron_w": 23.63179899278539,
+  "shares_pct": {
+   "stator yoke": 40.529530030299505,
+   "stator teeth": 30.19923575050001,
+   "rotor": 29.271234219200487
+  }
+ }
+}
