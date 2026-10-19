@@ -141,3 +141,20 @@ def test_degenerate_values_give_no_finding():
     f = by_id(fs)
     assert not {"saturation", "ripple", "efficiency_base"} & set(f)
     assert not any("nan" in x.text.lower() or "inf" in x.text.lower() for x in fs)
+
+
+def test_check_text_formats_numbers_and_skips_none():
+    c1 = dict(name="engine_version", status="fail", value=None, limit=None, detail="old")
+    c2 = dict(name="x", status="warn", value=0.0123456789, limit=1.0, detail="d")
+    f = by_id(run(validation=val([c1, c2])))
+    t = f["check:engine_version"].text.lower()
+    assert not any(w in t for w in ("none", "nan", "inf"))
+    assert "0.01235" in f["check:x"].text and "0.0123456" not in f["check:x"].text
+
+
+def test_ripple_finding_from_waveforms():
+    e = ev()
+    e["envelope"]["speeds_rpm"] = [3000.0, 6000.0]
+    e["envelope"]["waveforms"] = dict(torque=[[2.0] + [0.0] * 7, [0.0] * 8])
+    f = by_id(run(e))["ripple"]
+    assert f.level == "note" and f.value == pytest.approx(200.0) and f.unit == "%"

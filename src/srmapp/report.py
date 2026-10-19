@@ -121,10 +121,11 @@ def _losses(out, l):
         terms = {k: w for k, w in terms.items() if w is not None}
         if iron is None and terms:
             iron = sum(terms.values())
+        rpm = f" ({r:.0f} rpm)" if (r := _num(p.get("speed_rpm"))) is not None else ""
         if cdc is not None and iron is not None and cdc + cac + iron > 0:
             tot = cdc + cac + iron
             out.append(Finding("loss_split", "note", "losses",
-                               f"At the rated point ({p['speed_rpm']:.0f} rpm) copper DC {_pct(cdc / tot)}, "
+                               f"At the rated point{rpm} copper DC {_pct(cdc / tot)}, "
                                f"copper AC {_pct(cac / tot)}, iron {_pct(iron / tot)} of the loss",
                                100 * iron / tot, "%"))
         if terms:
@@ -151,8 +152,9 @@ def _validation(out, v):
     bad = [c for c in checks if c.get("status") in ("fail", "warn")]
     for c in bad:
         out.append(Finding(f"check:{c['name']}", "warn", "validation",
-                           f"{c['name']} {c['status']}: value {c.get('value')}, limit {c.get('limit')}; "
-                           f"{c.get('detail', '')}", _num(c.get("value"))))
+                           f"{c['name']} {c['status']}" + "".join(
+                               f", {k} {x:.4g}" for k in ("value", "limit") if (x := _num(c.get(k))) is not None)
+                           + f"; {c.get('detail', '')}", _num(c.get("value"))))
     if not bad:
         out.append(Finding("checks", "ok", "validation", f"All {len(checks)} checks pass", len(checks)))
     if v.get("label") is None:
