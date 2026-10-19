@@ -82,8 +82,10 @@ button,select{background:var(--card);color:var(--fg);border:1px solid var(--bord
 @media print{
 :root{color-scheme:light;--bg:#fff;--fg:#111;--card:#f6f6f6;--muted:#555;--border:#ccc;--border-strong:#aaa;--ok:#2d7a1f;--warn:#9a6a00;--bad:#b3261e;--plot:#fff}
 .controls{display:none}
-section + section{break-before:page}
-.plot{break-inside:avoid}
+h2,h3{break-after:avoid}
+.fig,tr{break-inside:avoid}
+.grid.two{grid-template-columns:1fr 1fr}
+.plot{min-height:260px}
 .modebar-container{display:none}
 .anim img{max-width:420px}
 }
@@ -270,7 +272,7 @@ ${kv([
         '<p class="muted">k2 = 1 − Lu/La_sat (Krishnan ch. 3).</p>',
       )
     }
-    return `<div class="grid two">${parts.map((p) => `<div>${p}</div>`).join("")}</div>`
+    return `<div class="grid two">${parts.map((p) => `<div class="fig">${p}</div>`).join("")}</div>`
   })()
   const mapSection = section("map", "Map plots", mapBody)
 
@@ -288,7 +290,7 @@ ${kv([
       line(s.lineCurrent, x, `Line current (${UNIT_LABEL.A})`, undefined, true),
       line(s.powerFactor, x, "Power factor"),
     ]
-    let out = `<div class="grid two">${parts.map((p) => `<div>${p}</div>`).join("")}</div><p class="muted">Efficiency and power factor count copper loss only.</p>`
+    let out = `<div class="grid two">${parts.map((p) => `<div class="fig">${p}</div>`).join("")}</div><p class="muted">Efficiency and power factor count copper loss only.</p>`
     const base = num(req.base_speed_rpm) ?? undefined
     const k = defaultSpeedIndex(ev, base)
     const wf = waveformSeries(ev, k)
@@ -303,7 +305,7 @@ ${kv([
         line(wf.line, X, `Line current (${UNIT_LABEL.A})`, undefined, false),
         line(wf.loop, `Current (${UNIT_LABEL.A})`, `Flux linkage (${UNIT_LABEL.mWb})`, undefined, true),
       ]
-      out += `<h3>Waveforms at ${e(speed == null ? "?" : String(Math.round(speed)))} rpm</h3><div class="grid two">${wparts.map((p) => `<div>${p}</div>`).join("")}</div>
+      out += `<h3>Waveforms at ${e(speed == null ? "?" : String(Math.round(speed)))} rpm</h3><div class="grid two">${wparts.map((p) => `<div class="fig">${p}</div>`).join("")}</div>
 <p class="muted">Phase A over one rotor pole pitch; line current sums all phases. Peak-only drive model.</p>`
     }
     return out
@@ -367,8 +369,8 @@ ${kv([
 ])}
 ${r.notes.length ? `<ul class="muted">${r.notes.map((n) => `<li>${e(n)}</li>`).join("")}</ul>` : ""}
 <h3>Operating points</h3>${table(head, rows)}
-<div class="grid two"><div><h3>Efficiency over speed and torque level</h3>${plot(contour, { ...panel, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (fraction of the envelope torque)") } as Partial<Layout>)}</div>
-<div><h3>Loss split</h3>${plot(barData, { ...panel, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: -0.5 } } as Partial<Layout>)}</div></div>`
+<div class="grid two"><div class="fig"><h3>Efficiency over speed and torque level</h3>${plot(contour, { ...panel, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (fraction of the envelope torque)") } as Partial<Layout>)}</div>
+<div class="fig"><h3>Loss split</h3>${plot(barData, { ...panel, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: -0.5 } } as Partial<Layout>)}</div></div>`
   }
   const losses = section("losses", "Losses", lossesBody)
 
@@ -446,7 +448,7 @@ ${table(
 <input type="range" id="anim-scrub" min="0" max="${fr.length - 1}" value="0" step="1" aria-label="Frame"></div>
 <p id="anim-readout">Frame 1 of ${fr.length} at ${e(f0.currentA.toFixed(1))} A</p>
 <p id="anim-values" class="mono muted">ψ ${e(numText(f0.psi, 1e3))} mWb, torque ${e(numText(f0.torque, 1))} N·m</p>
-<p class="muted">Phase A at ${e(a.value.currentA.toFixed(1))} A, rotor from unaligned to aligned; colour is |B| (inferno), full scale ${e(a.value.bMax.toFixed(2))} T.</p></div>${probe}`
+<p class="muted">Phase A at ${e(a.value.currentA.toFixed(1))} A, rotor from unaligned to aligned; colour is |B| (inferno), full scale ${e(a.value.bMax.toFixed(2))} T.</p></div>${probe ? `<div class="fig">${probe}</div>` : ""}`
   })()
   const animation = section("animation", "Flux animation", animBody)
 

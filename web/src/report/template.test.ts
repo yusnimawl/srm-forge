@@ -175,6 +175,23 @@ describe("buildReport", () => {
   })
 })
 
+describe("print layout", () => {
+  const html = buildReport(fixture({ losses: { ok: true, value: losses } }), PLOTLY)
+  it("does not force a page break per section and keeps figures whole", () => {
+    expect(html).not.toMatch(/break-before:\s*page/)
+    expect(html).toMatch(/\.fig,tr\{break-inside:avoid\}/)
+    expect(html).toMatch(/h2,h3\{break-after:avoid\}/)
+  })
+  it("puts every plot in a .fig wrapper, with its heading where it has one", () => {
+    const plots = html.match(/class="plot" id=/g)?.length ?? 0
+    expect(plots).toBeGreaterThan(5)
+    const withPlot = html.split('<div class="fig">').slice(1).filter((f) => /^(?:(?!<div class="fig">)[\s\S])*?class="plot"/.test(f))
+    expect(withPlot.length).toBe(plots)
+    const map = html.slice(html.indexOf('<section id="map"'), html.indexOf('<section id="performance"'))
+    map.split('<div class="fig">').slice(1).filter((f) => f.includes('class="plot"')).forEach((f) => expect(f.indexOf("<h3>")).toBeGreaterThanOrEqual(0))
+  })
+})
+
 describe("json blocks", () => {
   it("survive <!-- and </script> in values and round-trip", () => {
     const evil = "a<!--b</script>c"

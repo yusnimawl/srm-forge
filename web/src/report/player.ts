@@ -67,6 +67,10 @@ function readJson(id) {
         });
       } catch (err) {}
     });
+    // Print and screen layouts differ in width; wait a tick so the layout has settled.
+    setTimeout(function () {
+      figs.forEach(function (f) { try { window.Plotly.Plots.resize(document.getElementById(f.id)); } catch (err) {} });
+    }, 50);
   }
   var d = readJson("frames");
   if (!d) {
