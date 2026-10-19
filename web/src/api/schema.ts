@@ -75,6 +75,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Control Case */
+        post: operations["control_case_api_cases__case_id__control_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/control/header": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Control Header */
+        get: operations["control_header_api_cases__case_id__control_header_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/dxf": {
         parameters: {
             query?: never;
@@ -212,6 +246,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/controllers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Control Controllers */
+        get: operations["control_controllers_api_control_controllers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/target-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Control Target Check */
+        post: operations["control_target_check_api_control_target_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/geometry": {
         parameters: {
             query?: never;
@@ -297,6 +365,23 @@ export interface paths {
         put?: never;
         /** Cancel Job */
         post: operations["cancel_job_api_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Control */
+        get: operations["job_control_api_jobs__job_id__control_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -512,6 +597,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdcSettings */
+        AdcSettings: {
+            /**
+             * Bits
+             * @default 12
+             */
+            bits: number;
+            /** Full Scale */
+            full_scale?: number | null;
+            /**
+             * Gain Error
+             * @default 0
+             */
+            gain_error: number;
+            /**
+             * Noise
+             * @default 0
+             */
+            noise: number;
+            /**
+             * Offset Counts
+             * @default 0
+             */
+            offset_counts: number;
+            /**
+             * Offset Error
+             * @default 0
+             */
+            offset_error: number;
+            /**
+             * Rc Tau
+             * @default 0
+             */
+            rc_tau: number;
+        };
         /** AnimateIn */
         AnimateIn: {
             /** Current A */
@@ -729,6 +849,101 @@ export interface components {
             name: string;
             /** Unit */
             unit: string;
+        };
+        /** ControlIn */
+        ControlIn: {
+            /** Controller */
+            controller: string;
+            /**
+             * @default {
+             *       "adc": {
+             *         "bits": 12,
+             *         "gain_error": 0,
+             *         "noise": 0,
+             *         "offset_counts": 0,
+             *         "offset_error": 0,
+             *         "rc_tau": 0
+             *       },
+             *       "command_mode": "torque",
+             *       "command_value": 0,
+             *       "converter": {
+             *         "dead_time": 5e-7,
+             *         "turn_off_delay": 2e-7,
+             *         "turn_on_delay": 1e-7,
+             *         "v_diode": 1,
+             *         "v_switch": 1
+             *       },
+             *       "dt": 5e-7,
+             *       "duration": 0.02,
+             *       "friction": 0,
+             *       "inertia": 0.001,
+             *       "load": 0,
+             *       "load_step": 0,
+             *       "load_step_time": 0,
+             *       "mode": "fixed",
+             *       "params": {},
+             *       "pwm_hz": 20000,
+             *       "seed": 0,
+             *       "sensors": {
+             *         "encoder_cpr": 4096,
+             *         "encoder_ecc_amp": 0,
+             *         "encoder_ecc_harmonic": 1,
+             *         "encoder_offset": 0,
+             *         "resolver": false,
+             *         "resolver_bits": 12,
+             *         "resolver_gain_mismatch": 0,
+             *         "resolver_phase_error": 0,
+             *         "resolver_pole_pairs": 1
+             *       },
+             *       "speed_rpm": 1000,
+             *       "theta0": 0
+             *     }
+             */
+            scenario: components["schemas"]["Scenario"];
+        };
+        /** ControllerOut */
+        ControllerOut: {
+            /** Name */
+            name: string;
+            /** Params */
+            params: components["schemas"]["ControllerParamOut"][];
+        };
+        /** ControllerParamOut */
+        ControllerParamOut: {
+            /** Default */
+            default: string;
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+        };
+        /** ConverterSettings */
+        ConverterSettings: {
+            /**
+             * Dead Time
+             * @default 5e-7
+             */
+            dead_time: number;
+            /**
+             * Turn Off Delay
+             * @default 2e-7
+             */
+            turn_off_delay: number;
+            /**
+             * Turn On Delay
+             * @default 1e-7
+             */
+            turn_on_delay: number;
+            /**
+             * V Diode
+             * @default 1
+             */
+            v_diode: number;
+            /**
+             * V Switch
+             * @default 1
+             */
+            v_switch: number;
         };
         /** Design */
         Design: {
@@ -1407,6 +1622,129 @@ export interface components {
             torque_ratio: number | null;
             winding: components["schemas"]["WindingOut"];
         };
+        /** Scenario */
+        Scenario: {
+            /**
+             * @default {
+             *       "bits": 12,
+             *       "gain_error": 0,
+             *       "noise": 0,
+             *       "offset_counts": 0,
+             *       "offset_error": 0,
+             *       "rc_tau": 0
+             *     }
+             */
+            adc: components["schemas"]["AdcSettings"];
+            /** Bus Voltage */
+            bus_voltage?: number | null;
+            /**
+             * Command Mode
+             * @default torque
+             * @enum {string}
+             */
+            command_mode: "torque" | "speed";
+            /**
+             * Command Value
+             * @default 0
+             */
+            command_value: number;
+            /** Compute Delay */
+            compute_delay?: number | null;
+            /**
+             * @default {
+             *       "dead_time": 5e-7,
+             *       "turn_off_delay": 2e-7,
+             *       "turn_on_delay": 1e-7,
+             *       "v_diode": 1,
+             *       "v_switch": 1
+             *     }
+             */
+            converter: components["schemas"]["ConverterSettings"];
+            /**
+             * Dt
+             * @default 5e-7
+             */
+            dt: number;
+            /**
+             * Duration
+             * @default 0.02
+             */
+            duration: number;
+            /**
+             * Friction
+             * @default 0
+             */
+            friction: number;
+            /**
+             * Inertia
+             * @default 0.001
+             */
+            inertia: number;
+            /** Isr Hz */
+            isr_hz?: number | null;
+            /**
+             * Load
+             * @default 0
+             */
+            load: number;
+            /**
+             * Load Step
+             * @default 0
+             */
+            load_step: number;
+            /**
+             * Load Step Time
+             * @default 0
+             */
+            load_step_time: number;
+            /**
+             * Mode
+             * @default fixed
+             * @enum {string}
+             */
+            mode: "fixed" | "dynamic";
+            /**
+             * Params
+             * @default {}
+             */
+            params: {
+                [key: string]: number;
+            };
+            /**
+             * Pwm Hz
+             * @default 20000
+             */
+            pwm_hz: number;
+            /**
+             * Seed
+             * @default 0
+             */
+            seed: number;
+            /**
+             * @default {
+             *       "encoder_cpr": 4096,
+             *       "encoder_ecc_amp": 0,
+             *       "encoder_ecc_harmonic": 1,
+             *       "encoder_offset": 0,
+             *       "resolver": false,
+             *       "resolver_bits": 12,
+             *       "resolver_gain_mismatch": 0,
+             *       "resolver_phase_error": 0,
+             *       "resolver_pole_pairs": 1
+             *     }
+             */
+            sensors: components["schemas"]["SensorSettings"];
+            /**
+             * Speed Rpm
+             * @default 1000
+             */
+            speed_rpm: number;
+            /**
+             * Theta0
+             * @default 0
+             */
+            theta0: number;
+        };
         /** SearchJobIn */
         SearchJobIn: {
             /**
@@ -1496,6 +1834,54 @@ export interface components {
              */
             stator: string;
         };
+        /** SensorSettings */
+        SensorSettings: {
+            /**
+             * Encoder Cpr
+             * @default 4096
+             */
+            encoder_cpr: number;
+            /**
+             * Encoder Ecc Amp
+             * @default 0
+             */
+            encoder_ecc_amp: number;
+            /**
+             * Encoder Ecc Harmonic
+             * @default 1
+             */
+            encoder_ecc_harmonic: number;
+            /**
+             * Encoder Offset
+             * @default 0
+             */
+            encoder_offset: number;
+            /**
+             * Resolver
+             * @default false
+             */
+            resolver: boolean;
+            /**
+             * Resolver Bits
+             * @default 12
+             */
+            resolver_bits: number;
+            /**
+             * Resolver Gain Mismatch
+             * @default 0
+             */
+            resolver_gain_mismatch: number;
+            /**
+             * Resolver Phase Error
+             * @default 0
+             */
+            resolver_phase_error: number;
+            /**
+             * Resolver Pole Pairs
+             * @default 1
+             */
+            resolver_pole_pairs: number;
+        };
         /** SetupFile */
         SetupFile: {
             drive?: components["schemas"]["DriveSection"] | null;
@@ -1514,6 +1900,22 @@ export interface components {
              */
             version: 1;
             winding?: components["schemas"]["WindingSection"] | null;
+        };
+        /** TargetCheckIn */
+        TargetCheckIn: {
+            /** Case Id */
+            case_id: string;
+            /** Controller */
+            controller: string;
+        };
+        /** TargetCheckOut */
+        TargetCheckOut: {
+            /** Compiler */
+            compiler: string;
+            /** Log */
+            log: string;
+            /** Ok */
+            ok: boolean;
         };
         /** ValidateIn */
         ValidateIn: {
@@ -1846,6 +2248,72 @@ export interface operations {
             };
         };
     };
+    control_case_api_cases__case_id__control_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ControlIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    control_header_api_cases__case_id__control_header_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     dxf_export_api_cases__case_id__dxf_get: {
         parameters: {
             query?: never;
@@ -2137,6 +2605,59 @@ export interface operations {
             };
         };
     };
+    control_controllers_api_control_controllers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControllerOut"][];
+                };
+            };
+        };
+    };
+    control_target_check_api_control_target_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     geometry_api_geometry_post: {
         parameters: {
             query?: never;
@@ -2316,6 +2837,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_control_api_jobs__job_id__control_get: {
+        parameters: {
+            query?: {
+                n_px?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
