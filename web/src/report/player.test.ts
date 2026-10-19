@@ -46,3 +46,31 @@ describe("print theme", () => {
     expect(PLAYER_SOURCE).toMatch(/try \{ return JSON\.parse/)
   })
 })
+
+describe("print round trip", () => {
+  it("restores the screen colours after printing", () => {
+    const fig = { id: "p1", data: [{ type: "scatter", line: { color: "#e8b04a" } }, { type: "heatmap" }], layout: { xaxis: {}, yaxis: {} } }
+    const el = (id: string, text: string) => {
+      const d = document.createElement("script")
+      d.id = id
+      d.textContent = text
+      document.body.appendChild(d)
+    }
+    el("figures", JSON.stringify([fig]))
+    // Like Plotly, newPlot keeps the array it is given and restyle changes it in place.
+    let held: { type: string; line?: { color: string } }[] = []
+    ;(window as unknown as { Plotly: unknown }).Plotly = {
+      newPlot: (_id: string, data: typeof held) => { held = data },
+      relayout: () => {},
+      restyle: (_id: string, u: Record<string, string>, idx: number[]) => { held[idx[0]].line!.color = u["line.color"] },
+    }
+    new Function(PLAYER_SOURCE)()
+    window.dispatchEvent(new Event("beforeprint"))
+    expect(held[0].line!.color).toBe(PRINT_LINE_COLORS[1])
+    window.dispatchEvent(new Event("afterprint"))
+    expect(held[0].line!.color).toBe("#e8b04a")
+    window.dispatchEvent(new Event("beforeprint"))
+    window.dispatchEvent(new Event("afterprint"))
+    expect(held[0].line!.color).toBe("#e8b04a")
+  })
+})

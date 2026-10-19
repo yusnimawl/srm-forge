@@ -47,14 +47,16 @@ function readJson(id) {
   figs.forEach(function (f) {
     try { window.Plotly.newPlot(f.id, f.data, f.layout, { displaylogo: false, responsive: true }); } catch (err) {}
   });
+  // Palette index of each trace, taken before any restyle changes the colour Plotly holds in place.
+  figs.forEach(function (f) {
+    f.screen = f.data.map(function (t) { return t.type === "scatter" && t.line ? SCREEN_LINES.indexOf(t.line.color) : -1; });
+  });
   function paper(on) {
     figs.forEach(function (f) {
       try {
         window.Plotly.relayout(f.id, themeUpdate(f.layout, on ? PRINT_AXIS : SCREEN_AXIS));
-        f.data.forEach(function (t, i) {
-          var col = t.line && t.line.color;
-          var k = SCREEN_LINES.indexOf(col);
-          if (t.type === "scatter" && k >= 0) window.Plotly.restyle(f.id, { "line.color": on ? PRINT_LINES[k] : col }, [i]);
+        f.screen.forEach(function (k, i) {
+          if (k >= 0) window.Plotly.restyle(f.id, { "line.color": (on ? PRINT_LINES : SCREEN_LINES)[k] }, [i]);
         });
       } catch (err) {}
     });
