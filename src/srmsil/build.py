@@ -65,7 +65,8 @@ def _cache_key(sources: list[Path], include_dirs: list[Path]) -> str:
     return h.hexdigest()
 
 
-def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path) -> Path:
+def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path, log: list[str] | None = None) -> Path:
+    """Compile (or find in the cache) the host library. `log`, if given, receives the compiler output of a fresh build."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = ".dll" if os.name == "nt" else ".so"
@@ -81,6 +82,8 @@ def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path) -
         )
         if r.returncode != 0:
             raise CompileError(r.stderr + r.stdout)
+        if log is not None:
+            log.append(r.stderr + r.stdout)
         os.replace(tmp, lib)
     finally:
         Path(tmp).unlink(missing_ok=True)

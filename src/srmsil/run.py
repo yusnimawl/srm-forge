@@ -3,22 +3,33 @@
 from __future__ import annotations
 
 import ctypes as C
+import json
 import math
-from dataclasses import dataclass
+import multiprocessing as mp
+import tempfile
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
 from srmsil import _abi
-from srmsil.build import compile_host, controller_sources
+from srmsil.build import CompileError, compile_host, controller_sources
 from srmsil.scenario import Scenario
-from srmsil.tables import MotorData, sim_tables
+from srmsil.tables import MotorData, ctrl_tables, sim_tables, write_header
 
 TRACE_CAP = 2_000_000
 ADC_HEADROOM = 1.25
 
 _C_DIR = Path(__file__).parent / "c"
 _SIM_DIR = _C_DIR / "sim"
+_CTRL_DIR = _C_DIR / "controllers"
+REFERENCE = {"hysteresis", "pwm_current", "tsf"}
+
+
+class SimError(Exception):
+    def __init__(self, log: str):
+        super().__init__(log)
+        self.log = log
 
 
 @dataclass(frozen=True)
@@ -44,10 +55,20 @@ class SimResult:
     compile_log: str
 
 
-def sim_library(controller_dir: Path, header_dir: Path, cache_dir: Path) -> Path:
-    sources = [*sorted(_SIM_DIR.glob("*.c")), *controller_sources(Path(controller_dir))]
-    return compile_host(sources, [_C_DIR, _SIM_DIR, Path(header_dir), Path(controller_dir)],
-                        Path(cache_dir) / "sil" / "build")
+def controller_dir(controller: str) -> Path:
+    """Folder of a reference controller by name, else the given folder (checked for `.c` files)."""
+    if controller in REFERENCE:
+        return _CTRL_DIR / controller
+    controller_sources(Path(controller))
+    return Path(controller)
+
+
+def sim_library(controller_dir: Path, header_dir: Path, cache_dir: Path, common_dir: Path | None = None,
+                log: list[str] | None = None) -> Path:
+    """Compile the simulator core and the controller folder (plus `common_dir`, if given) into a cached library."""
+    folders = [Path(controller_dir), *([Path(common_dir)] if common_dir else [])]
+    sources = [*sorted(_SIM_DIR.glob("*.c")), *(s for f in folders for s in controller_sources(f))]
+    return compile_host(sources, [_C_DIR, _SIM_DIR, Path(header_dir), *folders], Path(cache_dir) / "sil" / "build", log)
 
 
 def _ptr(a: np.ndarray, ctype):
@@ -120,3 +141,77 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         copper_loss=csum.copper_sum / ws, power_in=csum.power_in_sum / ws, power_mech=csum.power_mech_sum / ws,
         beyond_map_fraction=csum.beyond_map_steps / n_steps, energy_error=err, roundtrip_error=tab.roundtrip_error)
     return SimResult(traces, summary, scenario, "", "", "")
+
+
+def _child_main(lib_path: Path, m: MotorData, scenario: Scenario, out: Path) -> None:
+    try:
+        save(_run_loaded(lib_path, m, scenario), out)
+    except (ValueError, RuntimeError) as e:
+        out.with_suffix(".err").write_text(str(e))
+
+
+def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, timeout_s: float = 300.0) -> SimResult:
+    """Compile the controller and run the scenario in a spawned child, so controller faults cannot reach this process."""
+    cdir = controller_dir(controller)
+    common = _CTRL_DIR / "common" if controller in REFERENCE else None
+    log: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="srmsil_") as tmp:
+        hdr = Path(tmp)
+        write_header(m, ctrl_tables(m), hdr / "srm_motor_tables.h")
+        try:
+            lib = sim_library(cdir, hdr, cache_dir, common, log)
+        except CompileError as e:
+            raise SimError(e.log) from e
+        out = hdr / "result.npz"
+        p = mp.get_context("spawn").Process(target=_child_main, args=(lib, m, scenario, out))
+        p.start()
+        p.join(timeout_s)
+        if p.is_alive():
+            p.kill()
+            p.join()
+            raise SimError(f"timed out after {timeout_s:g} s")
+        err = out.with_suffix(".err")
+        if err.exists():
+            raise SimError(err.read_text())
+        if not out.exists():
+            raise SimError(f"the controller crashed (exit code {p.exitcode})")
+        res = load(out)
+    return replace(res, controller=controller if controller in REFERENCE else str(cdir),
+                   source_hash=lib.stem, compile_log="".join(log))
+
+
+def save(result: SimResult, path: Path) -> None:
+    """Write traces and the summary arrays to `path` (.npz) and the scenario, scalars and strings to a .json sidecar."""
+    path = Path(path)
+    s = result.summary
+    tmp = path.with_suffix(".tmp.npz")
+    np.savez(tmp, i_rms=s.i_rms, **{f"trace_{k}": v for k, v in result.traces.items()})
+    tmp.replace(path)
+    meta = {"scenario": result.scenario.model_dump(mode="json"), "controller": result.controller,
+            "source_hash": result.source_hash, "compile_log": result.compile_log,
+            "summary": {k: v for k, v in vars(s).items() if k != "i_rms"}}
+    path.with_suffix(".json").write_text(json.dumps(meta))
+
+
+def load(path: Path) -> SimResult:
+    path = Path(path)
+    meta = json.loads(path.with_suffix(".json").read_text())
+    with np.load(path) as z:
+        traces = {k[6:]: z[k] for k in z.files if k.startswith("trace_")}
+        summary = SimSummary(i_rms=z["i_rms"], **meta["summary"])
+    return SimResult(traces, summary, Scenario.model_validate(meta["scenario"]), meta["controller"],
+                     meta["source_hash"], meta["compile_log"])
+
+
+def decimate(t: np.ndarray, y: np.ndarray, n_px: int) -> tuple[np.ndarray, np.ndarray]:
+    """Min and max of y per equal-count bucket, in the order they occur, so plotted extremes survive."""
+    n = len(t)
+    if n <= 2 * n_px:
+        return t, y
+    edges = np.linspace(0, n, n_px + 1).astype(int)
+    idx = []
+    for a, b in zip(edges[:-1], edges[1:]):
+        lo, hi = a + int(np.argmin(y[a:b])), a + int(np.argmax(y[a:b]))
+        idx.extend(sorted({lo, hi}))
+    idx = np.array(idx)
+    return t[idx], y[idx]
