@@ -49,7 +49,7 @@ describe("print theme", () => {
 
 describe("print round trip", () => {
   it("restores the screen colours after printing", () => {
-    const fig = { id: "p1", data: [{ type: "scatter", line: { color: "#e8b04a" } }, { type: "heatmap" }], layout: { xaxis: {}, yaxis: {} } }
+    const fig = { id: "p1", data: [{ type: "scatter", line: { color: "#e8b04a" } }, { type: "heatmap" }, { type: "bar", marker: { color: "#ededed" } }, { type: "scatter", mode: "markers", marker: { color: "#ededed", size: 7 } }], layout: { xaxis: {}, yaxis: {} } }
     const el = (id: string, text: string) => {
       const d = document.createElement("script")
       d.id = id
@@ -58,17 +58,24 @@ describe("print round trip", () => {
     }
     el("figures", JSON.stringify([fig]))
     // Like Plotly, newPlot keeps the array it is given and restyle changes it in place.
-    let held: { type: string; line?: { color: string } }[] = []
+    let held: { type: string; line?: { color: string }; marker?: { color: string } }[] = []
     ;(window as unknown as { Plotly: unknown }).Plotly = {
       newPlot: (_id: string, data: typeof held) => { held = data },
       relayout: () => {},
-      restyle: (_id: string, u: Record<string, string>, idx: number[]) => { held[idx[0]].line!.color = u["line.color"] },
+      restyle: (_id: string, u: Record<string, string>, idx: number[]) => {
+        if (u["line.color"]) held[idx[0]].line!.color = u["line.color"]
+        if (u["marker.color"]) held[idx[0]].marker!.color = u["marker.color"]
+      },
     }
     new Function(PLAYER_SOURCE)()
     window.dispatchEvent(new Event("beforeprint"))
     expect(held[0].line!.color).toBe(PRINT_LINE_COLORS[1])
+    expect(held[2].marker!.color).toBe(PRINT_LINE_COLORS[0])
+    expect(held[3].marker!.color).toBe(PRINT_LINE_COLORS[0])
     window.dispatchEvent(new Event("afterprint"))
     expect(held[0].line!.color).toBe("#e8b04a")
+    expect(held[2].marker!.color).toBe("#ededed")
+    expect(held[3].marker!.color).toBe("#ededed")
     window.dispatchEvent(new Event("beforeprint"))
     window.dispatchEvent(new Event("afterprint"))
     expect(held[0].line!.color).toBe("#e8b04a")

@@ -8,7 +8,7 @@ export type Part<T> = { ok: true; value: T } | { ok: false; reason: string }
 export type Finding = components["schemas"]["FindingOut"]
 export type Report = components["schemas"]["ReportOut"]
 export type CompareOut = components["schemas"]["CompareOut"]
-export type ReportFrame = { src: string; angle: number; currentA: number; psi: number; torque: number; status: string }
+export type ReportFrame = { src: string; angle: number; currentA: number; psi: number | null; torque: number | null; status: string }
 export type ReportAnimation = { frames: ReportFrame[]; probes: Trace[]; currentA: number; bMax: number }
 
 export interface ReportData {

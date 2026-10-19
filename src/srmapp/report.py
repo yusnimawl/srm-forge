@@ -155,7 +155,7 @@ def _validation(out, v):
                            f"{c['name']} {c['status']}" + "".join(
                                f", {k} {x:.4g}" for k in ("value", "limit") if (x := _num(c.get(k))) is not None)
                            + f"; {c.get('detail', '')}", _num(c.get("value"))))
-    if not bad:
+    if checks and not bad:
         out.append(Finding("checks", "ok", "validation", f"All {len(checks)} checks pass", len(checks)))
     if v.get("label") is None:
         out.append(Finding("label", "warn", "validation", "The case does not carry the 2D-verified label"))

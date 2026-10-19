@@ -664,7 +664,7 @@ def create_app(settings: Settings,
         if validation is not None and validation.get("cancelled"):
             validation = None
         found = findings(CaseInputs.model_validate(case["inputs"]), evaluation, validation,
-                         losses, compare_rows(case) if store.get_case(case["parent_case_id"] or "") else None, missing)
+                         losses, compare_rows(case) if case["origin"] == "dxf" and store.get_case(case["parent_case_id"] or "") else None, missing)
         return ReportOut(
             findings=[FindingOut(**vars(f)) for f in found],
             versions={"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": srmweb.__version__},

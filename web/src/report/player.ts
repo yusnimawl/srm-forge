@@ -37,6 +37,7 @@ var SCREEN_LINES = ${JSON.stringify(LINE_COLORS)};
 var PRINT_LINES = ${JSON.stringify(PRINT_LINE_COLORS)};
 var SCREEN_AXIS = ${JSON.stringify(SCREEN_AXIS)};
 var PRINT_AXIS = ${JSON.stringify(PRINT_AXIS)};
+function num(x, scale, d) { return typeof x === "number" && isFinite(x) ? (x * scale).toFixed(d) : "\u2013"; }
 function readJson(id) {
   var el = document.getElementById(id);
   if (!el) return null;
@@ -49,14 +50,20 @@ function readJson(id) {
   });
   // Palette index of each trace, taken before any restyle changes the colour Plotly holds in place.
   figs.forEach(function (f) {
-    f.screen = f.data.map(function (t) { return t.type === "scatter" && t.line ? SCREEN_LINES.indexOf(t.line.color) : -1; });
+    f.screen = f.data.map(function (t) {
+      return {
+        line: t.type === "scatter" && t.line ? SCREEN_LINES.indexOf(t.line.color) : -1,
+        marker: (t.type === "scatter" || t.type === "bar") && t.marker && typeof t.marker.color === "string" ? SCREEN_LINES.indexOf(t.marker.color) : -1
+      };
+    });
   });
   function paper(on) {
     figs.forEach(function (f) {
       try {
         window.Plotly.relayout(f.id, themeUpdate(f.layout, on ? PRINT_AXIS : SCREEN_AXIS));
         f.screen.forEach(function (k, i) {
-          if (k >= 0) window.Plotly.restyle(f.id, { "line.color": (on ? PRINT_LINES : SCREEN_LINES)[k] }, [i]);
+          if (k.line >= 0) window.Plotly.restyle(f.id, { "line.color": (on ? PRINT_LINES : SCREEN_LINES)[k.line] }, [i]);
+          if (k.marker >= 0) window.Plotly.restyle(f.id, { "marker.color": (on ? PRINT_LINES : SCREEN_LINES)[k.marker] }, [i]);
         });
       } catch (err) {}
     });
@@ -82,7 +89,7 @@ function readJson(id) {
     img.src = f.src;
     scrub.value = String(k);
     readout.textContent = "Frame " + (k + 1) + " of " + frames.length + " at " + f.currentA.toFixed(1) + " A";
-    values.textContent = "\\u03c8 " + (f.psi * 1e3).toFixed(2) + " mWb, torque " + f.torque.toFixed(2) + " N\\u00b7m";
+    values.textContent = "\\u03c8 " + num(f.psi, 1e3, 2) + " mWb, torque " + num(f.torque, 1, 2) + " N\\u00b7m";
   }
   function stop() {
     if (timer !== null) clearInterval(timer);

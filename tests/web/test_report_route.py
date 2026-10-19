@@ -73,6 +73,21 @@ def test_report_survives_deleted_parent(client):
     assert client.get(f"/api/cases/{child}/compare").status_code == 404
 
 
+def _child(client, origin):
+    store = client.app.state.store
+    parent = _case(client)
+    child = store.create_case(origin=origin, inputs=store.get_case(parent)["inputs"], label="child",
+                              parent_case_id=parent, stale=True)
+    assert store.attach_evaluation(child, None, store.case_result(parent, "evaluate"))
+    return child
+
+
+def test_report_dxf_findings_only_for_dxf_cases(client):
+    topics = lambda cid: {f["topic"] for f in _report(client, cid).json()["findings"]}  # noqa: E731
+    assert "dxf" not in topics(_child(client, "edit"))
+    assert "dxf" in topics(_child(client, "dxf"))
+
+
 def test_report_bad_animate_request_counts_as_not_cached(client):
     store = client.app.state.store
     cid = _case(client)

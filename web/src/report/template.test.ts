@@ -159,6 +159,12 @@ describe("buildReport", () => {
     expect(html.indexOf('id="figures"')).toBeLessThan(html.indexOf('id="frames"'))
   })
 
+  it("shows a dash for null frame values", () => {
+    const frame = { src: "data:image/png;base64,AA", angle: 0, currentA: 10, psi: null, torque: null, status: "ok" }
+    const html = buildReport(fixture({ animation: { ok: true, value: { frames: [frame], probes: [], currentA: 10, bMax: 2 } } }), PLOTLY)
+    expect(section(html, "animation")).toContain("ψ – mWb, torque – N·m")
+  })
+
   it("has parseable figures that match plot divs", () => {
     const html = buildReport(fixture({ losses: { ok: true, value: losses } }), PLOTLY)
     const m = /<script type="application\/json" id="figures">([\s\S]*?)<\/script>/.exec(html)

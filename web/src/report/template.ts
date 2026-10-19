@@ -39,6 +39,7 @@ export const jsonScript = (value: unknown): string => JSON.stringify(value).repl
 export const scriptSafe = (s: string): string => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--")
 
 const e = escapeHtml
+const numText = (x: number | null, scale: number) => (typeof x === "number" && isFinite(x) ? (x * scale).toFixed(2) : "–")
 type Rec = Record<string, unknown>
 const rec = (x: unknown): Rec => (x && typeof x === "object" && !Array.isArray(x) ? (x as Rec) : {})
 const num = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null)
@@ -347,7 +348,7 @@ ${kv([
       {
         type: "scatter", mode: "markers", showlegend: false, hoverinfo: "text", x: reached.map(([p]) => p.speed_rpm),
         y: reached.map(([, k]) => r.torque_fractions[k % nt]), text: reached.map(([p]) => pointLabel(p)),
-        marker: { color: "#ededed", size: 7 },
+        marker: { color: caseLine(0).color, size: 7 },
       },
     ]
     const bars = splitBars(r)
@@ -444,7 +445,7 @@ ${table(
 <label>Speed <select id="anim-speed">${SPEEDS.map((s) => `<option value="${s}"${s === 1 ? " selected" : ""}>${s}×</option>`).join("")}</select></label>
 <input type="range" id="anim-scrub" min="0" max="${fr.length - 1}" value="0" step="1" aria-label="Frame"></div>
 <p id="anim-readout">Frame 1 of ${fr.length} at ${e(f0.currentA.toFixed(1))} A</p>
-<p id="anim-values" class="mono muted">ψ ${e((f0.psi * 1e3).toFixed(2))} mWb, torque ${e(f0.torque.toFixed(2))} N·m</p>
+<p id="anim-values" class="mono muted">ψ ${e(numText(f0.psi, 1e3))} mWb, torque ${e(numText(f0.torque, 1))} N·m</p>
 <p class="muted">Phase A at ${e(a.value.currentA.toFixed(1))} A, rotor from unaligned to aligned; colour is |B| (inferno), full scale ${e(a.value.bMax.toFixed(2))} T.</p></div>${probe}`
   })()
   const animation = section("animation", "Flux animation", animBody)

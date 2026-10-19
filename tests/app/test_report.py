@@ -97,6 +97,10 @@ def test_validation_rules():
     assert f["checks"].level == "ok" and "label" not in f and "1 checks" in f["checks"].text
 
 
+def test_empty_checks_give_no_ok_finding():
+    assert "checks" not in by_id(run(validation=val([])))
+
+
 def test_budget_largest_row():
     v = val([], "x", total={"peak_torque": 0.07})
     v["budget"]["rows"] = [dict(source="mesh", rel={"peak_torque": 0.02}), dict(source="material", rel={"peak_torque": 0.06})]

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { collect } from "./collect"
 
 const geometry = { view_box: [-50, -50, 100, 100], stator: "M 0 0 Z", rotor: "M 0 0 Z", shaft: "M 0 0 Z", coils: [] }
-const caseBody = (parent: string | null) => ({ id: "c", parent_case_id: parent, inputs: { design: { machine: { n: 1 } } } })
+const caseBody = (parent: string | null, origin = "dxf") => ({ id: "c", origin, parent_case_id: parent, inputs: { design: { machine: { n: 1 } } } })
 const reportBody = (job: string | null) => ({
   findings: [{ id: "animation_missing", level: "missing", topic: "data", text: "Animation unavailable: nothing run", unit: "", value: null }],
   versions: {},
@@ -66,5 +66,10 @@ describe("collect", () => {
     const urls2 = mockFetch(base({}, "p"))
     expect((await collect("c", () => {}, render)).compare?.ok).toBe(true)
     expect(urls2.some((u) => u.includes("/compare"))).toBe(true)
+  })
+  it("no compare for an edit child", async () => {
+    const urls = mockFetch(base({ "/api/cases/c": ok(caseBody("p", "edit")) }, "p"))
+    expect((await collect("c", () => {}, render)).compare).toBeNull()
+    expect(urls.some((u) => u.includes("/compare"))).toBe(false)
   })
 })
