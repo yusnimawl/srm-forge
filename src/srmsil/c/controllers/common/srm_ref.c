@@ -39,6 +39,14 @@ static float last_theta = 0.0f;
 static uint32_t last_us = 0;
 static bool primed = false;
 
+/* Set by srm_ref_init: false when the setup cannot work (isr_hz <= 0, or a resolver whose pole pairs do not
+ * divide the rotor pole count, which leaves the phase angle ambiguous). The controllers then keep every
+ * switch off. */
+static bool ok = true;
+static float angle_period = TWO_PI_F;   /* range of srm_ref_angle: 2*pi, or 2*pi / pole pairs for a resolver */
+static float win_on = 0.0f;             /* theta_on and theta_off normalised into [0, 360) */
+static float win_off = 150.0f;
+
 static int lookup(const srm_ref_param_t *t, int n, const char *name, float value)
 {
     for (int i = 0; i < n; i++) {
@@ -70,7 +78,19 @@ void srm_ref_init(const srm_hal_t *hal)
     speed_est = 0.0f;
     integ = 0.0f;
     primed = false;
+
+    float p = hal->encoder_cpr > 0 ? 1.0f : resolver_pole_pairs;
+    ok = hal->isr_hz > 0.0f && p >= 1.0f && p == floorf(p) && SRM_N_ROTOR_POLES % (int)p == 0;
+    angle_period = ok ? TWO_PI_F / p : TWO_PI_F;
+
+    /* The window may cross the 0/360 degree wrap (an advanced turn-on is a negative theta_on). */
+    win_on = fmodf(theta_on, 360.0f);
+    if (win_on < 0.0f) win_on += 360.0f;
+    win_off = fmodf(theta_off, 360.0f);
+    if (win_off < 0.0f) win_off += 360.0f;
 }
+
+bool srm_ref_ok(void) { return ok; }
 
 void srm_ref_command(srm_cmd_mode_t mode, float value)
 {
@@ -108,7 +128,7 @@ float srm_ref_el_deg(float theta_phase)
 bool srm_ref_in_window(float theta_phase)
 {
     float e = srm_ref_el_deg(theta_phase);
-    return e >= theta_on && e < theta_off;
+    return win_on <= win_off ? (e >= win_on && e < win_off) : (e >= win_on || e < win_off);
 }
 
 float srm_ref_current(const srm_hal_t *hal, uint8_t k)
@@ -123,13 +143,14 @@ float srm_ref_torque_cmd(void) { return torque_cmd; }
 float srm_ref_i_ref(void)
 {
     /* The centre of the window is far from both ends, where i*(theta, T) is not reliable. */
-    float centre_deg = 0.5f * (theta_on + theta_off);
+    float centre_deg = 0.5f * (win_on <= win_off ? win_on + win_off : win_on + win_off + 360.0f);
     float theta_c = (centre_deg - 180.0f) * PI_F / 180.0f / (float)SRM_N_ROTOR_POLES;
     return srm_i_of_t(theta_c, torque_cmd);
 }
 
 void srm_ref_slow(void)
 {
+    if (!ok) return;
     float theta = srm_ref_angle(hal_);
     uint32_t now = hal_->micros();
     if (!primed) {
@@ -141,8 +162,9 @@ void srm_ref_slow(void)
     float dt = (float)(now - last_us) * 1e-6f;
     if (dt <= 0.0f) return;
     float d = theta - last_theta;
-    if (d > PI_F) d -= TWO_PI_F;
-    if (d < -PI_F) d += TWO_PI_F;
+    /* The angle wraps at its own period (2*pi / pole pairs for a resolver). */
+    if (d > 0.5f * angle_period) d -= angle_period;
+    if (d < -0.5f * angle_period) d += angle_period;
     last_theta = theta;
     last_us = now;
 
@@ -152,8 +174,11 @@ void srm_ref_slow(void)
 
     if (cmd_mode == SRM_CMD_SPEED) {
         float err = cmd_value - speed_est;
-        /* The integral term alone is clamped to the torque range, which also bounds the windup. */
-        integ = clampf(integ + speed_ki * err * dt, 0.0f, torque_limit);
+        /* Conditional integration: hold the integral while the output is saturated and the error pushes
+         * further into the limit. */
+        float raw = speed_kp * err + integ;
+        bool stuck = (raw >= torque_limit && err > 0.0f) || (raw <= 0.0f && err < 0.0f);
+        if (!stuck) integ = clampf(integ + speed_ki * err * dt, 0.0f, torque_limit);
         torque_cmd = clampf(speed_kp * err + integ, 0.0f, torque_limit);
     }
 }

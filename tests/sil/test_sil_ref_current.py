@@ -12,6 +12,7 @@ from srmsil.scenario import Scenario
 from srmsil.tables import ctrl_tables, write_header
 
 N_R = 6
+MAX_DEV, MAX_OVERSHOOT = 0.10, 0.05
 
 
 def el_deg(res, k, m):
@@ -86,18 +87,58 @@ def test_pwm_current_tracks_step(tmp_path):
             settled = seg_i[(seg_t > 1e-3) & (seg_t < seg_t[-1] - 0.3e-3)]
             assert settled.size > 0
             assert settled.mean() == pytest.approx(i_ref, rel=0.02)
+            after = seg_i[seg_t > 1e-3]
+            assert np.abs(after - i_ref).max() < MAX_DEV * i_ref
+            assert seg_i.max() < (1 + MAX_OVERSHOOT) * i_ref
             n_checked += 1
     assert n_checked >= 4
 
 
 def test_speed_mode_reaches_speed(tmp_path):
-    # A load is needed: the controllers only motor, so an overshoot is not braked.
+    # Gains for J = 1e-4: crossover w_c = 100 rad/s (well below the 500 Hz filter pole and the 1 kHz loop),
+    # kp = J w_c, ki = kp w_c / 16. The controllers only motor, so an overshoot would stay.
     m = analytic_motor()
+    target = 500.0 * 2 * math.pi / 60
+    params = {"speed_kp": 1e-4 * 100, "speed_ki": 1e-4 * 100 * 100 / 16, "speed_filter_hz": 500.0}
     res = run(m, "pwm_current",
               Scenario(mode="dynamic", speed_rpm=0.0, command_mode="speed", command_value=500.0, inertia=1e-4,
-                       load=0.2, duration=0.3), cache_dir=tmp_path)
-    omega = res.traces["omega"][-1]
-    assert omega == pytest.approx(500.0 * 2 * math.pi / 60, rel=0.05)
+                       duration=0.3, params=params), cache_dir=tmp_path)
+    omega = res.traces["omega"]
+    assert omega.max() < 1.1 * target
+    assert omega[-1] == pytest.approx(target, rel=0.05)
+
+
+def test_advanced_turn_on_starts_before_unaligned(tmp_path):
+    m = analytic_motor()
+    t_cmd = 0.5 * float(ctrl_tables(m).t_max)
+    peaks = {}
+    for on in (0.0, -15.0):
+        res = run(m, "hysteresis", Scenario(speed_rpm=300.0, duration=0.05, isr_hz=50e3, command_value=t_cmd,
+                                            params={"theta_on": on}), cache_dir=tmp_path)
+        before = np.concatenate([res.traces["i"][k][el_deg(res, k, m) >= 345.0] for k in range(m.n_phases)])
+        peaks[on] = before.max()
+    assert peaks[0.0] == 0.0
+    assert peaks[-15.0] > 1.0
+
+
+def test_resolver_with_two_pole_pairs(tmp_path):
+    m = analytic_motor()
+    target = 500.0 * 2 * math.pi / 60
+    res = run(m, "pwm_current",
+              Scenario(mode="dynamic", speed_rpm=0.0, command_mode="speed", command_value=500.0, inertia=1e-4,
+                       duration=0.3, sensors={"encoder_cpr": 0, "resolver": True, "resolver_pole_pairs": 2},
+                       params={"speed_kp": 1e-2, "speed_ki": 1e-2 * 100 / 16, "speed_filter_hz": 500.0,
+                               "resolver_pole_pairs": 2.0}), cache_dir=tmp_path)
+    assert res.traces["omega"].max() < 1.1 * target
+    assert res.traces["omega"][-1] == pytest.approx(target, rel=0.05)
+
+
+def test_unusable_resolver_pole_pairs_keeps_outputs_off(tmp_path):
+    m = analytic_motor()   # N_r = 6: 4 pole pairs do not divide it
+    res = run(m, "hysteresis", Scenario(speed_rpm=300.0, duration=0.02, command_value=1.0,
+                                        sensors={"encoder_cpr": 0, "resolver": True, "resolver_pole_pairs": 4},
+                                        params={"resolver_pole_pairs": 4.0}), cache_dir=tmp_path)
+    assert np.abs(res.traces["i"]).max() == 0.0
 
 
 def test_reference_controllers_target_check(tmp_path):

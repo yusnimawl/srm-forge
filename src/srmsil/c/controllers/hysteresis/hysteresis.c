@@ -34,6 +34,10 @@ void ctrl_slow(void) { srm_ref_slow(); }
 
 void ctrl_isr(void)
 {
+    if (!srm_ref_ok()) {
+        for (uint8_t k = 0; k < hal->n_phases; k++) hal->set_switches(k, false, false);
+        return;
+    }
     float theta = srm_ref_angle(hal);
     float i_ref = srm_ref_i_ref();
     for (uint8_t k = 0; k < hal->n_phases && k < SRM_N_PHASES; k++) {

@@ -27,7 +27,7 @@ void ctrl_init(const srm_hal_t *h)
 {
     hal = h;
     srm_ref_init(h);
-    dt = 1.0f / h->isr_hz;
+    dt = srm_ref_ok() ? 1.0f / h->isr_hz : 0.0f;
     float f = f_bw > 0.0f ? f_bw : h->pwm_hz / 20.0f;
     /* The loop is designed for the smallest inductance: bandwidth f in rad/s times L_min and R. */
     if (kp <= 0.0f) kp = SRM_L_MIN_H * 6.28318531f * f;
@@ -41,6 +41,10 @@ void ctrl_slow(void) { srm_ref_slow(); }
 
 void ctrl_isr(void)
 {
+    if (!srm_ref_ok()) {
+        for (uint8_t k = 0; k < hal->n_phases; k++) hal->set_switches(k, false, false);
+        return;
+    }
     float theta = srm_ref_angle(hal);
     float i_ref = srm_ref_i_ref();
     float vbus = hal->vbus_volts();
@@ -52,8 +56,10 @@ void ctrl_isr(void)
             continue;
         }
         float err = i_ref - srm_ref_current(hal, k);
-        /* The integrator is limited to the voltage range, so the duty cannot wind up. */
-        integ[k] += ki * err * dt;
+        /* Conditional integration: hold the integrator while the duty is saturated and the error pushes
+         * further into the limit; it is also limited to the voltage range. */
+        float raw = kp * err + integ[k];
+        if (!((raw >= vbus && err > 0.0f) || (raw <= 0.0f && err < 0.0f))) integ[k] += ki * err * dt;
         if (integ[k] < 0.0f) integ[k] = 0.0f;
         if (integ[k] > vbus) integ[k] = vbus;
         float duty = (kp * err + integ[k]) / vbus;
