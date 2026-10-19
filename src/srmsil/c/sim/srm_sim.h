@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SRM_SIM_ABI 1
+#define SRM_SIM_ABI 2
 #define SRM_SIM_MAX_PHASES 8
 
 #if defined(_WIN32) && defined(SRM_SIM_BUILD)
@@ -22,6 +22,9 @@ typedef struct {
     double pwm_hz, isr_hz, compute_delay, command_value;
     double v_switch, v_diode, dead_time, turn_on_delay, turn_off_delay;
     double adc_amps_per_count;
+    double encoder_offset, encoder_ecc_amp;
+    double resolver_gain_mismatch, resolver_phase_error;
+    double adc_offset_error, adc_gain_error, adc_noise, adc_rc_tau;
     int64_t n_steps, trace_stride;
     int32_t n_phases, n_rotor_poles;
     int32_t mode;               /* 0 fixed speed, 1 dynamic */
@@ -29,6 +32,7 @@ typedef struct {
     uint32_t encoder_cpr;
     int32_t adc_bits, adc_offset_counts;
     uint32_t seed;
+    int32_t encoder_ecc_harmonic, resolver, resolver_pole_pairs, resolver_bits;
 } srm_sim_config_t;
 
 typedef struct {
@@ -40,6 +44,7 @@ typedef struct {
 typedef struct {
     int64_t n_samples;
     double *t, *theta, *omega, *torque, *encoder;           /* n */
+    double *resolver_sin, *resolver_cos;                    /* n, raw counts, 0 without a resolver */
     float *i, *psi, *v, *adc_i;                             /* n_phases x n, phase-major */
     uint8_t *gate_u, *gate_l;
 } srm_sim_trace_t;
@@ -64,6 +69,28 @@ SRM_SIM_API int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
 /* Motor: bilinear lookup of i, T and field energy W at a phase angle (wrapped here) and flux. */
 void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi, double *i, double *torque,
                     double *w);
+
+/* Sensors: encoder and resolver readings from the rotor angle, and the ADC chain (RC filter, offset, gain, noise,
+   quantisation) on the phase currents. */
+typedef struct {
+    uint64_t s;
+    int have;
+    double spare;
+} srm_rng_t;
+
+typedef struct {
+    double alpha;
+    double filtered[SRM_SIM_MAX_PHASES];
+    srm_rng_t rng;
+} srm_adc_t;
+
+void srm_rng_seed(srm_rng_t *r, uint32_t seed);
+double srm_rng_gauss(srm_rng_t *r);
+uint32_t srm_encoder_count(const srm_sim_config_t *c, double theta);
+void srm_resolver(const srm_sim_config_t *c, double theta, int16_t *s, int16_t *co);
+void srm_adc_init(srm_adc_t *a, const srm_sim_config_t *c, const double *current);
+void srm_adc_filter(srm_adc_t *a, const srm_sim_config_t *c, const double *current);
+int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase);
 
 /* Converter: gate commands, switch delays, PWM and the winding voltage. */
 typedef struct {

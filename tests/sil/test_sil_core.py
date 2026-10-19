@@ -161,3 +161,38 @@ def test_max_steps_rejected():
 def test_unknown_param_rejected(cache):
     with pytest.raises(ValueError, match="nope"):
         run(cache, "open_loop", analytic_motor(), "sat", params={"nope": 1.0})
+
+
+def test_set_pwm_duty_and_centring(cache):
+    m = analytic_motor()
+    f, dt = 20000.0, 0.5e-6
+    per = round(1 / f / dt)
+    for soft in (0, 1):
+        res = run(cache, "pwm_fixed", m, "sat", speed_rpm=0.0, duration=10 / f, dt=dt, pwm_hz=f, converter=IDEAL,
+                  params={"soft": soft})
+        t, u, l = res.traces["t"], res.traces["gate_u"][0], res.traces["gate_l"][0]
+        for k in range(2, 10):
+            sl = slice(k * per, (k + 1) * per)
+            assert u[sl].mean() == pytest.approx(0.25, abs=dt * f)
+            assert t[sl][u[sl] == 1].mean() == pytest.approx((k + 0.5) / f, abs=dt)
+            if soft:
+                assert (l[sl] == 1).all()
+            else:
+                assert (l[sl] == u[sl]).all()
+
+
+def test_turn_off_delay(cache):
+    m = analytic_motor()
+    tau, dt, isr_hz, rpm = m.pole_pitch, 0.25e-6, 1e5, 6000.0
+    cv = ConverterSettings(v_switch=0, v_diode=0, dead_time=0, turn_on_delay=0, turn_off_delay=2e-6)
+    on, off = 0.2 * tau, 0.65 * tau
+    res = run(cache, "open_loop", m, "sat", speed_rpm=rpm, duration=1.5e-3, dt=dt, isr_hz=isr_hz, converter=cv,
+              sensors={"encoder_cpr": 2**20}, params={"theta_on": on, "theta_off": off})
+    n_isr = np.arange(round(0.5 / isr_hz / dt), res.traces["t"].size, round(1 / isr_hz / dt))
+    p = np.mod(rpm * 2 * math.pi / 60 * n_isr * dt, tau)
+    conducting = (p >= on) & (p < off)
+    k = np.flatnonzero(conducting[:-1] & ~conducting[1:])[0] + 1       # first ISR that commands switch-off
+    cmd_step = n_isr[k] + round(1 / isr_hz / dt)                       # compute delay is one ISR period
+    both = (res.traces["gate_u"][0] == 1) & (res.traces["gate_l"][0] == 1)
+    last_on = np.flatnonzero(both[:-1] & ~both[1:])[0]
+    assert (last_on - cmd_step) * dt == pytest.approx(2e-6, abs=dt * 1.01)

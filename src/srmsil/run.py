@@ -15,8 +15,7 @@ from srmsil.scenario import Scenario
 from srmsil.tables import MotorData, sim_tables
 
 TRACE_CAP = 2_000_000
-ADC_BITS = 16
-ADC_AMPS_PER_COUNT = 0.005
+ADC_HEADROOM = 1.25
 
 _C_DIR = Path(__file__).parent / "c"
 _SIM_DIR = _C_DIR / "sim"
@@ -69,7 +68,8 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
     n = math.ceil(n_steps / stride)
     rpm = 2 * math.pi / 60
     cv = scenario.command_value * (rpm if scenario.command_mode == "speed" else 1.0)
-    sc = scenario.converter
+    sc, se, ad = scenario.converter, scenario.sensors, scenario.adc
+    full_scale = ad.full_scale or ADC_HEADROOM * float(m.currents[-1])
     cfg = _abi.Config(
         resistance=m.resistance, bus_voltage=scenario.bus_voltage or m.bus_voltage, dt=scenario.dt,
         speed=scenario.speed_rpm * rpm, theta0=scenario.theta0, inertia=scenario.inertia,
@@ -77,14 +77,19 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         load_step_time=scenario.load_step_time, pwm_hz=scenario.pwm_hz, isr_hz=scenario.resolved_isr_hz,
         compute_delay=scenario.resolved_compute_delay, command_value=cv, v_switch=sc.v_switch, v_diode=sc.v_diode,
         dead_time=sc.dead_time, turn_on_delay=sc.turn_on_delay, turn_off_delay=sc.turn_off_delay,
-        adc_amps_per_count=ADC_AMPS_PER_COUNT, n_steps=n_steps, trace_stride=stride, n_phases=q,
+        adc_amps_per_count=full_scale / (2**ad.bits - 1),
+        encoder_offset=se.encoder_offset, encoder_ecc_amp=se.encoder_ecc_amp,
+        resolver_gain_mismatch=se.resolver_gain_mismatch, resolver_phase_error=se.resolver_phase_error,
+        adc_offset_error=ad.offset_error, adc_gain_error=ad.gain_error, adc_noise=ad.noise, adc_rc_tau=ad.rc_tau, n_steps=n_steps, trace_stride=stride, n_phases=q,
         n_rotor_poles=m.n_rotor_poles, mode=int(scenario.mode == "dynamic"), command_mode=int(scenario.command_mode == "speed"),
-        encoder_cpr=scenario.sensors.encoder_cpr, adc_bits=ADC_BITS, adc_offset_counts=0, seed=scenario.seed)
+        encoder_cpr=se.encoder_cpr, adc_bits=ad.bits, adc_offset_counts=ad.offset_counts, seed=scenario.seed,
+        encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
+        resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits)
     cur, trq, wf = (np.ascontiguousarray(a, dtype=np.float64) for a in (tab.current, tab.torque, tab.w_field))
     ctab = _abi.Tables(theta_step=tab.theta_step, psi_step=tab.psi_step, psi_max=tab.psi_max, i_max=tab.i_max,
                        n_theta=cur.shape[0], n_psi=cur.shape[1], current=_ptr(cur, C.c_double),
                        torque=_ptr(trq, C.c_double), w_field=_ptr(wf, C.c_double))
-    scalars = {k: np.zeros(n) for k in ("t", "theta", "omega", "torque", "encoder")}
+    scalars = {k: np.zeros(n) for k in ("t", "theta", "omega", "torque", "encoder", "resolver_sin", "resolver_cos")}
     phased = {k: np.zeros((q, n), np.float32) for k in ("i", "psi", "v", "adc_i")}
     gates = {k: np.zeros((q, n), np.uint8) for k in ("gate_u", "gate_l")}
     ctrace = _abi.Trace(n_samples=n)

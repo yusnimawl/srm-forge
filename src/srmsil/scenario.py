@@ -23,6 +23,24 @@ class ConverterSettings(_Model):
 
 class SensorSettings(_Model):
     encoder_cpr: int = Field(4096, ge=0)     # counts per mechanical revolution, 0 = no encoder
+    encoder_offset: float = 0.0              # rad, mounting offset
+    encoder_ecc_amp: float = 0.0             # rad, angle error amplitude
+    encoder_ecc_harmonic: int = Field(1, ge=1)
+    resolver: bool = False
+    resolver_pole_pairs: int = Field(1, ge=1)
+    resolver_bits: int = Field(12, ge=2, le=16)
+    resolver_gain_mismatch: float = 0.0      # cos amplitude = 1 + mismatch, sin = 1
+    resolver_phase_error: float = 0.0        # rad, added to the cos argument
+
+
+class AdcSettings(_Model):
+    bits: int = Field(12, ge=1, le=16)
+    full_scale: float | None = Field(None, gt=0)    # A at the top code, None = 1.25 x the motor data's top current
+    offset_counts: int = Field(0, ge=0)      # nominal zero-current code, given to the controller
+    offset_error: float = 0.0                # counts
+    gain_error: float = 0.0                  # relative
+    noise: float = Field(0.0, ge=0)          # counts, Gaussian sigma
+    rc_tau: float = Field(0.0, ge=0)         # s, first-order filter on the sensed current, 0 = none
 
 
 class Scenario(_Model):
@@ -46,6 +64,7 @@ class Scenario(_Model):
     params: dict[str, float] = {}
     converter: ConverterSettings = ConverterSettings()
     sensors: SensorSettings = SensorSettings()
+    adc: AdcSettings = AdcSettings()
 
     @property
     def n_steps(self) -> int:

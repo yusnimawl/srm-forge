@@ -22,6 +22,7 @@ typedef struct {
     int in_isr, overflow;
     double theta, omega;
     double psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
+    srm_adc_t adc;
     int adc_counts[SRM_SIM_MAX_PHASES];
     gate_event_t queue[QUEUE_SIZE];
     int64_t q_head, q_tail;
@@ -79,18 +80,14 @@ static uint16_t hal_adc_read(uint8_t channel)
 
 static uint32_t hal_encoder_count(void)
 {
-    uint32_t cpr = S.cfg->encoder_cpr;
-    if (cpr == 0) return 0;
-    double turns = fmod(S.theta / TWO_PI, 1.0);
-    if (turns < 0.0) turns += 1.0;
-    uint32_t c = (uint32_t)(turns * (double)cpr);
-    return c >= cpr ? cpr - 1 : c;
+    return srm_encoder_count(S.cfg, S.theta);
 }
 
 static void hal_resolver_sincos(int16_t *s, int16_t *c)
 {
     *s = 0;
     *c = 0;
+    if (S.cfg->resolver) srm_resolver(S.cfg, S.theta, s, c);
 }
 
 static uint32_t hal_micros(void)
@@ -112,11 +109,7 @@ static double adc_amps(int counts)
 
 static void latch_adc(void)
 {
-    int top = (1 << S.cfg->adc_bits) - 1;
-    for (int k = 0; k < S.cfg->n_phases; k++) {
-        double c = floor(S.cur[k] / S.cfg->adc_amps_per_count + 0.5) + (double)S.cfg->adc_offset_counts;
-        S.adc_counts[k] = c < 0.0 ? 0 : (c > (double)top ? top : (int)c);
-    }
+    for (int k = 0; k < S.cfg->n_phases; k++) S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
 }
 
 static double eps(void)
@@ -161,7 +154,8 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
 {
     const int q = cfg->n_phases;
     if (q < 1 || q > SRM_SIM_MAX_PHASES || cfg->n_steps < 1 || !(cfg->dt > 0.0) || cfg->trace_stride < 1 ||
-        cfg->adc_bits < 1 || cfg->adc_bits > 16)
+        cfg->adc_bits < 1 || cfg->adc_bits > 16 ||
+        cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1)
         return -1;
     memset(&S, 0, sizeof S);
     S.cfg = cfg;
@@ -178,6 +172,8 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     const int dynamic = cfg->mode == 1;
     double ttot = eval_all(S.theta, S.psi, S.cur, S.trq, S.wf);
     for (int k = 0; k < q; k++) sum->w_field_start += S.wf[k];
+
+    srm_adc_init(&S.adc, cfg, S.cur);
 
     srm_hal_t hal = {0};
     hal.n_phases = (uint8_t)q;
@@ -242,6 +238,10 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
             trace->omega[o] = S.omega;
             trace->torque[o] = ttot;
             trace->encoder[o] = (double)hal_encoder_count();
+            int16_t rs, rc;
+            hal_resolver_sincos(&rs, &rc);
+            trace->resolver_sin[o] = rs;
+            trace->resolver_cos[o] = rc;
             for (int k = 0; k < q; k++) {
                 int64_t at = (int64_t)k * trace->n_samples + o;
                 trace->i[at] = (float)S.cur[k];
@@ -294,6 +294,7 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
         S.theta = theta_new;
         S.omega = omega_new;
         ttot = ttot_new;
+        srm_adc_filter(&S.adc, cfg, S.cur);
     }
     for (int k = 0; k < q; k++) sum->w_field_end += S.wf[k];
     trace->n_samples = n_out;

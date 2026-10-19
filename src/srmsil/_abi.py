@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ctypes as C
 
-SRM_SIM_ABI = 1
+SRM_SIM_ABI = 2
 MAX_PHASES = 8
 
 _d, _i32, _u32, _i64 = C.c_double, C.c_int32, C.c_uint32, C.c_int64
@@ -15,10 +15,13 @@ class Config(C.Structure):
     _fields_ = [(n, _d) for n in (
         "resistance", "bus_voltage", "dt", "speed", "theta0", "inertia", "friction", "load", "load_step",
         "load_step_time", "pwm_hz", "isr_hz", "compute_delay", "command_value", "v_switch", "v_diode", "dead_time",
-        "turn_on_delay", "turn_off_delay", "adc_amps_per_count")] + [
+        "turn_on_delay", "turn_off_delay", "adc_amps_per_count", "encoder_offset", "encoder_ecc_amp",
+        "resolver_gain_mismatch", "resolver_phase_error", "adc_offset_error", "adc_gain_error", "adc_noise",
+        "adc_rc_tau")] + [
         ("n_steps", _i64), ("trace_stride", _i64), ("n_phases", _i32), ("n_rotor_poles", _i32), ("mode", _i32),
         ("command_mode", _i32), ("encoder_cpr", _u32), ("adc_bits", _i32), ("adc_offset_counts", _i32),
-        ("seed", _u32)]
+        ("seed", _u32), ("encoder_ecc_harmonic", _i32),
+        ("resolver", _i32), ("resolver_pole_pairs", _i32), ("resolver_bits", _i32)]
 
 
 class Tables(C.Structure):
@@ -28,6 +31,7 @@ class Tables(C.Structure):
 
 class Trace(C.Structure):
     _fields_ = [("n_samples", _i64), ("t", _pd), ("theta", _pd), ("omega", _pd), ("torque", _pd), ("encoder", _pd),
+                ("resolver_sin", _pd), ("resolver_cos", _pd),
                 ("i", _pf), ("psi", _pf), ("v", _pf), ("adc_i", _pf), ("gate_u", _pb), ("gate_l", _pb)]
 
 
