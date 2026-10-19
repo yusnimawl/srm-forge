@@ -28,10 +28,7 @@ void ctrl_init(const srm_hal_t *h)
     hal = h;
     srm_ref_init(h);
     dt = srm_ref_ok() ? 1.0f / h->isr_hz : 0.0f;
-    float f = f_bw > 0.0f ? f_bw : h->pwm_hz / 20.0f;
-    /* The loop is designed for the smallest inductance: bandwidth f in rad/s times L_min and R. */
-    if (kp <= 0.0f) kp = SRM_L_MIN_H * 6.28318531f * f;
-    if (ki <= 0.0f) ki = SRM_R_OHM * 6.28318531f * f;
+    srm_ref_pi_gains(h, f_bw, &kp, &ki);
     for (int k = 0; k < SRM_N_PHASES; k++) integ[k] = 0.0f;
 }
 
@@ -55,16 +52,7 @@ void ctrl_isr(void)
             hal->set_switches(k, false, false);
             continue;
         }
-        float err = i_ref - srm_ref_current(hal, k);
-        /* Conditional integration: hold the integrator while the duty is saturated and the error pushes
-         * further into the limit; it is also limited to the voltage range. */
-        float raw = kp * err + integ[k];
-        if (!((raw >= vbus && err > 0.0f) || (raw <= 0.0f && err < 0.0f))) integ[k] += ki * err * dt;
-        if (integ[k] < 0.0f) integ[k] = 0.0f;
-        if (integ[k] > vbus) integ[k] = vbus;
-        float duty = (kp * err + integ[k]) / vbus;
-        if (duty < 0.0f) duty = 0.0f;
-        if (duty > 1.0f) duty = 1.0f;
+        float duty = srm_ref_pi_duty(&integ[k], i_ref - srm_ref_current(hal, k), kp, ki, dt, vbus);
         hal->set_pwm(k, duty, SRM_CHOP_SOFT);
     }
 }

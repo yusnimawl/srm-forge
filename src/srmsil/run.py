@@ -245,4 +245,7 @@ PARAMS: dict[str, list[tuple[str, str, str]]] = {
     "hysteresis": [("band", "A", "0.05 * SRM_I_MAX_A"), ("soft", "1 = soft, 0 = hard", "1"), *_SHARED_PARAMS],
     "pwm_current": [("kp", "V/A", "0 (SRM_L_MIN_H * 2*pi*f_bw)"), ("ki", "V/(A*s)", "0 (SRM_R_OHM * 2*pi*f_bw)"),
                     ("f_bw", "Hz", "0 (pwm_hz / 20)"), *_SHARED_PARAMS],
+    "tsf": [("theta_on", "electrical deg from unaligned", "15"), ("overlap", "electrical deg", "30"),
+            ("kp", "V/A", "0 (SRM_L_MIN_H * 2*pi*f_bw)"), ("ki", "V/(A*s)", "0 (SRM_R_OHM * 2*pi*f_bw)"),
+            ("f_bw", "Hz", "0 (pwm_hz / 20)"), *[p for p in _SHARED_PARAMS if p[0] != "theta_on"]],
 }

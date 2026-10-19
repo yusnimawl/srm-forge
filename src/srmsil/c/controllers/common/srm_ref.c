@@ -136,6 +136,24 @@ float srm_ref_current(const srm_hal_t *hal, uint8_t k)
     return ((float)hal->adc_read(k) - (float)hal->adc_offset_counts) * hal->adc_amps_per_count;
 }
 
+void srm_ref_pi_gains(const srm_hal_t *hal, float f_bw, float *kp, float *ki)
+{
+    float f = f_bw > 0.0f ? f_bw : hal->pwm_hz / 20.0f;
+    /* The loop is designed for the smallest inductance. */
+    if (*kp <= 0.0f) *kp = SRM_L_MIN_H * TWO_PI_F * f;
+    if (*ki <= 0.0f) *ki = SRM_R_OHM * TWO_PI_F * f;
+}
+
+float srm_ref_pi_duty(float *integ, float err, float kp, float ki, float dt, float vbus)
+{
+    /* Conditional integration: hold the integrator while the duty is saturated and the error pushes further
+     * into the limit; it is also limited to the voltage range. */
+    float raw = kp * err + *integ;
+    if (!((raw >= vbus && err > 0.0f) || (raw <= 0.0f && err < 0.0f))) *integ += ki * err * dt;
+    *integ = clampf(*integ, 0.0f, vbus);
+    return clampf((kp * err + *integ) / vbus, 0.0f, 1.0f);
+}
+
 float srm_ref_speed(void) { return speed_est; }
 
 float srm_ref_torque_cmd(void) { return torque_cmd; }

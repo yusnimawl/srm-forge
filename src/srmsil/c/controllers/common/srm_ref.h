@@ -38,6 +38,13 @@ bool srm_ref_in_window(float theta_phase);
 /* Phase current in amperes from the ADC code and the nominal scale. */
 float srm_ref_current(const srm_hal_t *hal, uint8_t k);
 
+/* Default PI gains for a current loop of bandwidth f_bw (0 = pwm_hz / 20): kp = L_min * 2*pi*f, ki = R * 2*pi*f.
+ * A gain that is already > 0 is kept. */
+void srm_ref_pi_gains(const srm_hal_t *hal, float f_bw, float *kp, float *ki);
+/* One step of a phase's current PI loop: returns the soft-chopping duty for current error `err` and updates the
+ * voltage integrator `*integ` (conditional integration, limited to 0..vbus). `dt` is the ISR period. */
+float srm_ref_pi_duty(float *integ, float err, float kp, float ki, float dt, float vbus);
+
 float srm_ref_speed(void);        /* filtered speed estimate, rad/s */
 float srm_ref_torque_cmd(void);   /* torque command in [0, torque_limit], N*m */
 float srm_ref_i_ref(void);        /* current for the torque command at the window centre, A */
