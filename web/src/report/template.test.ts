@@ -169,6 +169,22 @@ describe("buildReport", () => {
   })
 })
 
+describe("json blocks", () => {
+  it("survive <!-- and </script> in values and round-trip", () => {
+    const evil = "a<!--b</script>c"
+    const frame = { src: "data:image/png;base64,AA", angle: 0, currentA: 10, psi: 0.01, torque: 1, status: evil }
+    const d = fixture({
+      losses: { ok: true, value: { ...losses, notes: [evil] } },
+      animation: { ok: true, value: { frames: [frame], probes: [{ type: "scatter", mode: "lines", name: evil, x: [0], y: [1], line: { color: "#ededed", dash: "solid", width: 2 }, connectgaps: false }], currentA: 10, bMax: 2 } },
+    })
+    const html = buildReport(d, PLOTLY)
+    const block = (id: string) => new RegExp(`<script type="application/json" id="${id}">([\\s\\S]*?)</script>`).exec(html)![1]
+    expect(JSON.parse(block("frames")).frames[0].status).toBe(evil)
+    expect(JSON.stringify(JSON.parse(block("figures")))).toContain("a<!--b</script>c")
+    expect(block("figures")).not.toContain("<")
+  })
+})
+
 describe("escaping helpers", () => {
   it("escapes html", () => expect(escapeHtml(`<a href="x">&'`)).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&#39;"))
   it("neutralises script terminators", () => {

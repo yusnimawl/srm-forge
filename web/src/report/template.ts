@@ -1,4 +1,4 @@
-import type { Data, Layout } from "plotly.js-dist-min"
+import type { Layout } from "plotly.js-dist-min"
 import type { Evaluation, MapArrays } from "@/api/types"
 import { caseLine, designFactorTraces, inductanceCurves, performanceSeries, torqueCurves, type Trace } from "@/lib/analysis"
 import { jLimitChip, lossChips, madeWithText, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
@@ -30,6 +30,10 @@ const GRAPHITE: PlotColors = {
 
 export const escapeHtml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+
+/** JSON for an inline `<script type="application/json">`: every `<` becomes `\u003c`, which stays valid JSON and cannot
+ *  close the tag or open a comment. */
+export const jsonScript = (value: unknown): string => JSON.stringify(value).replace(/</g, "\\u003c")
 
 /** Text safe inside an inline `<script>`: closing tags and comment openers are broken up. */
 export const scriptSafe = (s: string): string => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--")
@@ -75,10 +79,10 @@ tr:last-child td{border-bottom:0}
 .controls input[type=range]{flex:1 1 200px;min-width:120px}
 button,select{background:var(--card);color:var(--fg);border:1px solid var(--border-strong);border-radius:8px;padding:6px 12px;font:inherit;min-height:36px}
 @media print{
-:root{color-scheme:light;--bg:#fff;--fg:#111;--card:#f6f6f6;--muted:#555;--border:#ccc;--border-strong:#aaa;--ok:#2d7a1f;--warn:#9a6a00;--bad:#b3261e}
+:root{color-scheme:light;--bg:#fff;--fg:#111;--card:#f6f6f6;--muted:#555;--border:#ccc;--border-strong:#aaa;--ok:#2d7a1f;--warn:#9a6a00;--bad:#b3261e;--plot:#fff}
 .controls{display:none}
 section + section{break-before:page}
-.plot{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.plot{break-inside:avoid}
 .modebar-container{display:none}
 .anim img{max-width:420px}
 }
@@ -432,7 +436,7 @@ ${table(
     if (!a.ok) return notRun("press Animate stroke on the Field tab", a.reason)
     const fr = a.value.frames
     if (fr.length === 0) return unavailable("the animation has no frames")
-    framesJson = `<script type="application/json" id="frames">${scriptSafe(JSON.stringify({ frames: fr, currentA: a.value.currentA, bMax: a.value.bMax }))}</script>`
+    framesJson = `<script type="application/json" id="frames">${jsonScript({ frames: fr, currentA: a.value.currentA, bMax: a.value.bMax })}</script>`
     const f0 = fr[0]
     const probe = a.value.probes.length ? line(a.value.probes, "Electrical angle (°, from unaligned)", "|B| (T)", undefined, true) : ""
     return `<div class="anim"><img id="anim-frame" src="${e(f0.src)}" alt="Flux density in the machine at the selected rotor angle">
@@ -447,7 +451,7 @@ ${table(
 
   const sections = [header, findings, inputsSection, outline, keyNumbers, mapSection, performance, losses, validationSection, beforeAfter, animation]
   // The figures JSON is built last: every section above registers its plots while it is rendered.
-  const figuresJson = scriptSafe(JSON.stringify(figures as unknown as Data[]))
+  const figuresJson = jsonScript(figures)
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${e(`Run report — ${caseOut.label ?? caseOut.id}`)}</title>

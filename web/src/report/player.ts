@@ -1,21 +1,70 @@
+import { LINE_COLORS } from "@/lib/analysis"
+
 /** The frame after (delta 1) or before (delta -1) `index` among `count` frames, wrapping both ways. Kept to plain
  *  arithmetic so its source runs unchanged inside the report. */
 export function stepFrame(index: number, count: number, delta: number): number {
   return (((index + delta) % count) + count) % count
 }
 
+/** Series colours for paper: dark counterparts of `LINE_COLORS`, same order, no blue. */
+export const PRINT_LINE_COLORS = ["#222222", "#a86f00", "#3f8a2c", "#b03a80", "#c4382f", "#8a4a9a", "#666666"]
+
+export interface AxisColors { font: string; grid: string; zero: string; line: string }
+export const SCREEN_AXIS: AxisColors = { font: "#8a8a8a", grid: "#232323", zero: "#333333", line: "#232323" }
+export const PRINT_AXIS: AxisColors = { font: "#333333", grid: "#dddddd", zero: "#bbbbbb", line: "#bbbbbb" }
+
+/** The Plotly relayout update that gives a figure the axis and text colours `c`; only axes the layout has are touched.
+ *  Plain code: its source runs unchanged inside the report. */
+export function themeUpdate(layout: Record<string, unknown>, c: AxisColors): Record<string, string> {
+  var u: Record<string, string> = { "font.color": c.font };
+  ["xaxis", "yaxis", "yaxis2"].forEach(function (a) {
+    if (!layout[a]) return;
+    u[a + ".color"] = c.font;
+    u[a + ".tickfont.color"] = c.font;
+    u[a + ".gridcolor"] = c.grid;
+    u[a + ".zerolinecolor"] = c.zero;
+    u[a + ".linecolor"] = c.line;
+  });
+  return u;
+}
+
 /** The report's inline script: draws the figures and drives the flux animation. Reads the JSON blocks `figures` and
  *  `frames`; the elements it drives are created by `template.ts`. */
 export const PLAYER_SOURCE = `
 var stepFrame = (${stepFrame.toString()});
+var themeUpdate = (${themeUpdate.toString()});
+var SCREEN_LINES = ${JSON.stringify(LINE_COLORS)};
+var PRINT_LINES = ${JSON.stringify(PRINT_LINE_COLORS)};
+var SCREEN_AXIS = ${JSON.stringify(SCREEN_AXIS)};
+var PRINT_AXIS = ${JSON.stringify(PRINT_AXIS)};
+function readJson(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  try { return JSON.parse(el.textContent); } catch (err) { return null; }
+}
 (function () {
-  var figs = JSON.parse(document.getElementById("figures").textContent);
+  var figs = readJson("figures") || [];
   figs.forEach(function (f) {
-    window.Plotly.newPlot(f.id, f.data, f.layout, { displaylogo: false, responsive: true });
+    try { window.Plotly.newPlot(f.id, f.data, f.layout, { displaylogo: false, responsive: true }); } catch (err) {}
   });
-  var meta = document.getElementById("frames");
-  if (!meta) return;
-  var d = JSON.parse(meta.textContent);
+  function paper(on) {
+    figs.forEach(function (f) {
+      try {
+        window.Plotly.relayout(f.id, themeUpdate(f.layout, on ? PRINT_AXIS : SCREEN_AXIS));
+        f.data.forEach(function (t, i) {
+          var col = t.line && t.line.color;
+          var k = SCREEN_LINES.indexOf(col);
+          if (t.type === "scatter" && k >= 0) window.Plotly.restyle(f.id, { "line.color": on ? PRINT_LINES[k] : col }, [i]);
+        });
+      } catch (err) {}
+    });
+  }
+  var d = readJson("frames");
+  if (!d) {
+    window.addEventListener("beforeprint", function () { paper(true); });
+    window.addEventListener("afterprint", function () { paper(false); });
+    return;
+  }
   var frames = d.frames;
   var img = document.getElementById("anim-frame");
   var play = document.getElementById("anim-play");
@@ -46,6 +95,17 @@ var stepFrame = (${stepFrame.toString()});
   play.addEventListener("click", function () { if (timer === null) start(); else stop(); });
   speed.addEventListener("change", function () { if (timer !== null) start(); });
   scrub.addEventListener("input", function () { stop(); show(Number(scrub.value)); });
+  var shownBeforePrint = 0;
+  window.addEventListener("beforeprint", function () {
+    shownBeforePrint = index;
+    stop();
+    show(0);
+    paper(true);
+  });
+  window.addEventListener("afterprint", function () {
+    show(shownBeforePrint);
+    paper(false);
+  });
   show(0);
 })();
 `
