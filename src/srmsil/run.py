@@ -146,8 +146,10 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
 def _child_main(lib_path: Path, m: MotorData, scenario: Scenario, out: Path) -> None:
     try:
         save(_run_loaded(lib_path, m, scenario), out)
-    except (ValueError, RuntimeError) as e:
-        out.with_suffix(".err").write_text(str(e))
+    except Exception as e:  # noqa: BLE001 - relayed to the parent as the run's error text
+        if isinstance(e, OSError) and "access violation" in str(e):  # ctypes' report of a controller fault
+            raise
+        out.with_suffix(".err").write_text(str(e) if isinstance(e, ValueError) else f"{type(e).__name__}: {e}")
 
 
 def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, timeout_s: float = 300.0) -> SimResult:
@@ -163,19 +165,26 @@ def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, t
         except CompileError as e:
             raise SimError(e.log) from e
         out = hdr / "result.npz"
-        p = mp.get_context("spawn").Process(target=_child_main, args=(lib, m, scenario, out))
+        p = mp.get_context("spawn").Process(target=_child_main, args=(lib, m, scenario, out), daemon=True)
         p.start()
-        p.join(timeout_s)
-        if p.is_alive():
-            p.kill()
-            p.join()
+        try:
+            p.join(timeout_s)
+            timed_out = p.is_alive()
+        finally:
+            if p.is_alive():
+                p.kill()
+                p.join()
+        if timed_out:
             raise SimError(f"timed out after {timeout_s:g} s")
         err = out.with_suffix(".err")
         if err.exists():
             raise SimError(err.read_text())
         if not out.exists():
             raise SimError(f"the controller crashed (exit code {p.exitcode})")
-        res = load(out)
+        try:
+            res = load(out)
+        except OSError as e:
+            raise SimError(f"could not read the child's result: {e}") from e
     return replace(res, controller=controller if controller in REFERENCE else str(cdir),
                    source_hash=lib.stem, compile_log="".join(log))
 
@@ -186,11 +195,12 @@ def save(result: SimResult, path: Path) -> None:
     s = result.summary
     tmp = path.with_suffix(".tmp.npz")
     np.savez(tmp, i_rms=s.i_rms, **{f"trace_{k}": v for k, v in result.traces.items()})
-    tmp.replace(path)
     meta = {"scenario": result.scenario.model_dump(mode="json"), "controller": result.controller,
             "source_hash": result.source_hash, "compile_log": result.compile_log,
-            "summary": {k: v for k, v in vars(s).items() if k != "i_rms"}}
-    path.with_suffix(".json").write_text(json.dumps(meta))
+            "summary": {k: (None if isinstance(v, float) and math.isnan(v) else v)
+                        for k, v in vars(s).items() if k != "i_rms"}}
+    path.with_suffix(".json").write_text(json.dumps(meta, allow_nan=False))
+    tmp.replace(path)
 
 
 def load(path: Path) -> SimResult:
@@ -198,13 +208,16 @@ def load(path: Path) -> SimResult:
     meta = json.loads(path.with_suffix(".json").read_text())
     with np.load(path) as z:
         traces = {k[6:]: z[k] for k in z.files if k.startswith("trace_")}
-        summary = SimSummary(i_rms=z["i_rms"], **meta["summary"])
+        summary = SimSummary(i_rms=z["i_rms"],
+                              **{k: math.nan if v is None else v for k, v in meta["summary"].items()})
     return SimResult(traces, summary, Scenario.model_validate(meta["scenario"]), meta["controller"],
                      meta["source_hash"], meta["compile_log"])
 
 
 def decimate(t: np.ndarray, y: np.ndarray, n_px: int) -> tuple[np.ndarray, np.ndarray]:
     """Min and max of y per equal-count bucket, in the order they occur, so plotted extremes survive."""
+    if n_px < 1:
+        raise ValueError("n_px must be at least 1")
     n = len(t)
     if n <= 2 * n_px:
         return t, y

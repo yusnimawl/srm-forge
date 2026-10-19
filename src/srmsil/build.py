@@ -84,7 +84,11 @@ def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path, l
             raise CompileError(r.stderr + r.stdout)
         if log is not None:
             log.append(r.stderr + r.stdout)
-        os.replace(tmp, lib)
+        try:
+            os.replace(tmp, lib)
+        except PermissionError:
+            if not lib.exists():  # another process holds the finished library open
+                raise
     finally:
         Path(tmp).unlink(missing_ok=True)
         Path(tmp).with_suffix(".lib").unlink(missing_ok=True)

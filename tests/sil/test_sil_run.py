@@ -1,11 +1,12 @@
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
-from srmsil.run import REFERENCE, SimError, controller_dir, decimate, load, run, save
+from srmsil.run import REFERENCE, SimError, _child_main, controller_dir, decimate, load, run, save
 from srmsil.scenario import Scenario
 
 CTRL = Path(__file__).parent / "controllers"
@@ -21,7 +22,7 @@ def go(tmp_path, name="open_loop", timeout_s=300.0, duration=0.005):
 def test_run_open_loop_end_to_end(tmp_path):
     a = go(tmp_path)
     assert all(np.isfinite(v).all() for v in a.traces.values())
-    assert a.compile_log is not None and a.controller == str(CTRL / "open_loop")
+    assert isinstance(a.compile_log, str) and a.controller == str(CTRL / "open_loop")
     b = go(tmp_path)
     assert a.source_hash == b.source_hash and b.compile_log == ""
 
@@ -76,4 +77,21 @@ def test_decimate_keeps_extremes():
     assert dy.min() == -5.0 and dy.max() == 2000.0 and len(dt) <= 2000
     assert np.all(np.diff(dt) > 0)
     t2, y2 = decimate(t[:100], y[:100], 1000)
-    assert t2 is not None and len(t2) == 100 and math.isfinite(y2[0])
+    assert np.array_equal(t2, t[:100]) and np.array_equal(y2, y[:100])
+    with pytest.raises(ValueError):
+        decimate(t, y, 0)
+
+
+def test_child_failure_names_its_type(tmp_path):
+    bad = tmp_path / "not_a_library.dll"
+    bad.write_bytes(b"nope")
+    out = tmp_path / "r.npz"
+    _child_main(bad, analytic_motor(), Scenario(duration=0.001), out)
+    assert out.with_suffix(".err").read_text().startswith("OSError")
+
+
+def test_nan_summary_roundtrip(tmp_path):
+    a = go(tmp_path, duration=0.001)
+    a = replace(a, summary=replace(a.summary, ripple_pct=math.nan))
+    save(a, tmp_path / "n.npz")
+    assert math.isnan(load(tmp_path / "n.npz").summary.ripple_pct)
