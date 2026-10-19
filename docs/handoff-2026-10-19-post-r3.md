@@ -17,7 +17,7 @@ For the next session, which starts the next roadmap step. Read `CLAUDE.md`, then
 ## Open items before or right after merging PR #4
 
 1. Decide on an iron-loss build factor (the Materu gap is recorded as an open R3 finding; the roadmap R3 boxes are ticked).
-2. Bench goldens still pin srmcore 0.5.0 (`bench/srmbench/reference/*.json`, `bench/tests/test_workload.py`). Magnetostatics did not change, so the values should hold: re-run them at 0.6.0, compare, then relabel.
+2. Done 2026-10-19: bench references re-checked at 0.6.0 (reference points and the screening map pass unchanged) and relabelled; bench tests 164 passed. The bench venv was refreshed with `bench\.runtime\uv\uv.exe pip install -e . --no-deps --python bench\.runtime\venv\Scripts\python.exe` (its install record still said 0.5.0).
 3. Visual check of the Losses tab (desktop and 375 px) on `srmweb-smoke`, and re-evaluate existing cases before running Losses on them (pre-0.6.0 evaluations are refused).
 4. Parked minors: a duplicated two-line 0.6.0 check at `src/srmweb/api.py:419-422`; a B(t) vitest uses an 80 ms sleep instead of awaiting; a doubled import in `tests/solvers/test_factorization_failure.py`.
 5. Merge with the PR's checks run locally: GitHub Actions is blocked (private repo, free minutes used up, spending limit $0) until the minutes reset or the owner sets a budget.
