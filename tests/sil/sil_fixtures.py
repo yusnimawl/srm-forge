@@ -3,6 +3,9 @@
 import ctypes
 import math
 import multiprocessing as mp
+import pickle
+import queue
+import time
 
 import numpy as np
 
@@ -48,3 +51,44 @@ def call_in_child(lib, name, *float_args) -> float:
     finally:
         if p.is_alive():
             p.kill()
+
+
+def _child(q, fn, args):
+    try:
+        q.put(("ok", pickle.dumps(fn(*args))))
+    except BaseException as e:  # noqa: BLE001 - relayed to the parent
+        try:
+            q.put(("err", pickle.dumps(e)))
+        except Exception:
+            q.put(("err", pickle.dumps(RuntimeError(repr(e)))))
+
+
+def run_in_child(fn, *args, timeout=300):
+    """Run fn(*args) in a spawned process and return its picklable result; re-raise its exception; kill the child."""
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_child, args=(q, fn, args))
+    p.start()
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                kind, blob = q.get(timeout=0.5)
+                break
+            except queue.Empty:
+                if not p.is_alive():
+                    try:
+                        kind, blob = q.get(timeout=1)
+                        break
+                    except queue.Empty:
+                        raise RuntimeError(f"child exited with code {p.exitcode}") from None
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"child still running after {timeout} s") from None
+        out = pickle.loads(blob)
+        if kind == "err":
+            raise out
+        return out
+    finally:
+        if p.is_alive():
+            p.kill()
+        p.join()
