@@ -8,6 +8,8 @@ from netgen.libngpy._meshing import NgException
 from srmcore.fields.solution import SolveStatus
 from srmcore.materials.laws import LinearLaw, library_law
 from srmcore.solvers import ngsolve_adapter as mod
+from srmcore.solvers.settings import FactorizationFailed
+from srmcore.solvers.settings import FactorizationFailed
 
 
 def _fail_first(monkeypatch, n):
@@ -16,7 +18,7 @@ def _fail_first(monkeypatch, n):
     def flaky(mat, free):
         calls["n"] += 1
         if calls["n"] <= n:
-            raise mod.FactorizationFailed("UmfpackInverse: Numeric factorization failed.")
+            raise FactorizationFailed("UmfpackInverse: Numeric factorization failed.")
         return real(mat, free)
 
     monkeypatch.setattr(mod, "_factorize", flaky)
@@ -53,7 +55,7 @@ class _Mat:
 
 
 def test_only_a_failed_factorization_is_translated():
-    with pytest.raises(mod.FactorizationFailed):
+    with pytest.raises(FactorizationFailed):
         mod._factorize(_Mat("UmfpackInverse: Numeric factorization failed."), None)
     with pytest.raises(NgException):
         mod._factorize(_Mat("something else"), None)

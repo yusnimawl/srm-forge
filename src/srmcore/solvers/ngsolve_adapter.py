@@ -19,7 +19,7 @@ from ..materials.laws import LinearLaw
 from ..physics.energy import field_energies
 from ..physics.fem import element_flux_density, p1_gradients, secant_residual, tangent_element_matrices
 from ..physics.problem import Magnetostatic2D
-from .settings import ELEMENT_ORDER, QUADRATURE_ORDER, NewtonSettings
+from .settings import ELEMENT_ORDER, QUADRATURE_ORDER, FactorizationFailed, NewtonSettings
 
 # Below this relative residual the damped fallback stops capping the Newton step.
 _FULL_STEP_RESIDUAL = 1e-2
@@ -131,10 +131,6 @@ class _System:
         out = x.FV().NumPy().copy()
         out[self.problem.dirichlet_nodes] = 0.0
         return out
-
-
-class FactorizationFailed(RuntimeError):
-    """UMFPACK could not factorize the tangent (typically out of memory)."""
 
 
 def _factorize(mat, freedofs):
