@@ -95,11 +95,12 @@ export function scenarioErrors(s: Scenario): Record<string, string> {
   const adc = s.adc ?? defaultScenario().adc
   const bits = adc.bits ?? 12
   if (!Number.isInteger(bits) || bits < 1 || bits > 16) e["adc.bits"] = "Whole number from 1 to 16."
+  else if (!Number.isInteger(adc.offset_counts ?? 0) || (adc.offset_counts ?? 0) < 0) e["adc.offset_counts"] = "Whole number, 0 or more."
   else if ((adc.offset_counts ?? 0) > 2 ** bits - 1) e["adc.offset_counts"] = `At most ${2 ** bits - 1}.`
   num("adc.full_scale", adc.full_scale, 0, true)
   num("adc.noise", adc.noise, 0)
   num("adc.rc_tau", adc.rc_tau, 0)
-  num("converter.dead_time", s.converter?.dead_time, 0)
+  for (const k of ["v_switch", "v_diode", "dead_time", "turn_on_delay", "turn_off_delay"] as const) num(`converter.${k}`, s.converter?.[k], 0)
   const cpr = s.sensors?.encoder_cpr
   if (cpr != null && (!Number.isInteger(cpr) || cpr < 0)) e["sensors.encoder_cpr"] = "Whole number, 0 or more."
   return e

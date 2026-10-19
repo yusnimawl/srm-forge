@@ -32,6 +32,12 @@ class FakeEventSource {
 
 const posts: { url: string; body: unknown }[] = []
 
+let caseJobs: unknown[] = []
+
+const waitFor = (f: () => void) => act(async () => { await vi.waitFor(f) })
+
+const roots: { unmount: () => void }[] = []
+
 async function mount() {
   vi.stubGlobal("EventSource", FakeEventSource)
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
@@ -40,23 +46,27 @@ async function mount() {
       posts.push({ url, body: JSON.parse(init.body as string) })
       return json(201, { job_id: "j1" })
     }
-    if (url === "/api/cases/c1") return json(200, { id: "c1", jobs: [] })
+    if (url === "/api/cases/c1") return json(200, { id: "c1", jobs: caseJobs })
     return json(200, {})
   })
   const host = document.createElement("div")
   document.body.append(host)
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const root = createRoot(host)
+  roots.push(root)
   await act(async () => {
-    createRoot(host).render(<QueryClientProvider client={qc}><ControlTab caseId="c1" busVoltage={48} /></QueryClientProvider>)
+    root.render(<QueryClientProvider client={qc}><ControlTab caseId="c1" busVoltage={48} /></QueryClientProvider>)
   })
-  await act(async () => {})
+  await waitFor(() => expect(document.getElementById('ctl-p-band')).not.toBeNull())
 }
 
 const button = (text: string) => Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent === text) as HTMLButtonElement
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => { roots.splice(0).forEach((r) => r.unmount()) })
   document.body.innerHTML = ""
   posts.length = 0
+  caseJobs = []
   vi.unstubAllGlobals()
 })
 
@@ -96,5 +106,46 @@ describe("ControlTab", () => {
       FakeEventSource.last.emit("end", { id: "j1", kind: "control", status: "failed", active: false, error: "ctrl.c:3: error: expected ';'", progress: { steps: ["queued", "compile", "simulate", "saved"], step: "compile" } })
     })
     expect(document.body.querySelector("pre")?.textContent).toContain("expected ';'")
+  })
+
+  const type = async (el: HTMLInputElement, value: string) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value)
+      el.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+  }
+  const chooseCustom = async () => {
+    const select = document.getElementById("ctl-controller") as HTMLSelectElement
+    await act(async () => {
+      select.value = "__custom__"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    await type(document.getElementById("ctl-folder") as HTMLInputElement, "C:/ctl")
+    await act(async () => { button("Add parameter").click() })
+  }
+
+  it("posts a typed custom parameter and blocks a non-number", async () => {
+    await mount()
+    await chooseCustom()
+    await type(document.querySelector('[aria-label="Parameter 1 name"]') as HTMLInputElement, "kp")
+    await type(document.querySelector('[aria-label="Parameter 1 value"]') as HTMLInputElement, "abc")
+    expect(button("Run").disabled).toBe(true)
+    await type(document.querySelector('[aria-label="Parameter 1 value"]') as HTMLInputElement, "2.5")
+    await act(async () => { button("Run").click() })
+    expect(posts[0].body).toMatchObject({ controller: "C:/ctl", scenario: { params: { kp: 2.5 } } })
+  })
+
+  it("attaches to an active job after a reload and re-enables Run when it ends", async () => {
+    caseJobs = [{ id: "j9", kind: "control", status: "running", active: true, created: "2026-10-20" }]
+    await mount()
+    await waitFor(() => expect(button("Run").disabled).toBe(true))
+    const progress = { steps: ["queued", "compile", "simulate", "saved"], step: "simulate" }
+    await act(async () => { FakeEventSource.last.emit("progress", { id: "j9", kind: "control", status: "running", active: true, progress }) })
+    expect(document.querySelector('[aria-label="Job steps"]')).not.toBeNull()
+    caseJobs = []
+    await act(async () => {
+      FakeEventSource.last.emit("end", { id: "j9", kind: "control", status: "failed", active: false, error: "x", progress: { steps: ["queued", "compile", "simulate", "saved"], step: "compile" } })
+    })
+    expect(button("Run").disabled).toBe(false)
   })
 })

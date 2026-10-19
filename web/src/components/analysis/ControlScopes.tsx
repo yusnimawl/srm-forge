@@ -48,6 +48,7 @@ export default function ControlScopes({ meta, channels, onZoom }: {
     ...theme,
     height: 130 * ROWS.length + 70,
     margin: { l: 70, r: 10, t: 10, b: 45 },
+    uirevision: "control",
     showlegend: true,
     legend: { orientation: "h", y: 1.04 },
     xaxis: { ...theme.xaxis, title: { text: "Time (ms)" }, anchor: "y5" },

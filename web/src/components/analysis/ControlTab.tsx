@@ -1,7 +1,7 @@
 import { SrmSpinner } from "@/components/brand/SrmSpinner"
 import { lazy, Suspense, useEffect, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { api } from "@/api/client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { api, ApiError } from "@/api/client"
 import type { Case } from "@/api/types"
 import { useControllers, useControlScopes, useRunControl, useTargetCheck } from "@/api/control"
 import { useJobActions } from "@/api/useJobActions"
@@ -74,14 +74,20 @@ function Summary({ s }: { s: ControlSummary }) {
 }
 
 /** A running or finished control job: steps, failure log, or the scopes with their summary. */
-function RunView({ jobId, onBusy }: { jobId: string; onBusy: (busy: boolean) => void }) {
+function RunView({ caseId, jobId, onBusy }: { caseId: string; jobId: string; onBusy: (busy: boolean) => void }) {
   const { job } = useJobEvents(jobId)
+  const qc = useQueryClient()
   const actions = useJobActions()
   const [zoomed, setZoomed] = useState(false)
   const base = Math.min(10000, Math.max(100, Math.round(window.innerWidth)))
   const done = job?.status === "done"
   const scopes = useControlScopes(done ? jobId : null, zoomed ? Math.min(10000, base * 4) : base)
-  useEffect(() => onBusy(!!job?.active), [job?.active, onBusy])
+  // Busy until the job is known to have ended; a final status also refreshes the case so its job list is current.
+  useEffect(() => onBusy(!job || job.active), [job, onBusy])
+  const final = !!job && !job.active
+  useEffect(() => {
+    if (final) qc.invalidateQueries({ queryKey: ["case", caseId] })
+  }, [final, qc, caseId])
   useEffect(() => () => onBusy(false), [onBusy])
 
   if (!job) return <SrmSpinner label="Loading the run..." showLabel />
@@ -125,6 +131,8 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
   const [sc, setSc] = useState<Scenario>(() => defaultScenario(busVoltage))
   const [jobId, setJobId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [custom, setCustom] = useState<{ name: string; value: string }[]>([])
+  const [headerError, setHeaderError] = useState<string | null>(null)
 
   const info = controllers.data?.find((c) => c.name === choice)
   const controller = choice === CUSTOM ? folder.trim() : choice
@@ -133,10 +141,39 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
   const errors = scenarioErrors(sc)
   const paramErrors = Object.fromEntries(Object.entries(params).filter(([, v]) => v.trim() !== "" && !Number.isFinite(Number(v))).map(([k]) => [k, "Enter a number."]))
   const entered = Object.fromEntries(Object.entries(params).filter(([, v]) => v.trim() !== "" && Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]))
+  const customErrors = choice === CUSTOM ? custom.map((r, i) => ({
+    name: r.name.trim() === "" ? "Enter a name." : custom.some((o, j) => j !== i && o.name.trim() === r.name.trim()) ? "Names must be unique." : undefined,
+    value: r.value.trim() === "" || !Number.isFinite(Number(r.value)) ? "Enter a number." : undefined,
+  })) : []
+  const customInvalid = customErrors.some((e) => e.name || e.value)
+  const sent = choice === CUSTOM ? Object.fromEntries(custom.map((r) => [r.name.trim(), Number(r.value)])) : entered
   const folderError = choice === CUSTOM && !folder.trim() ? "Enter the absolute path of the controller folder." : undefined
-  const invalid = Object.keys(errors).length > 0 || Object.keys(paramErrors).length > 0 || !!folderError
+  const invalid = Object.keys(errors).length > 0 || Object.keys(paramErrors).length > 0 || !!folderError || customInvalid
   const last = (caseQ.data?.jobs ?? []).filter((j) => j.kind === "control" && j.status === "done").sort((a, b) => b.created.localeCompare(a.created))[0]
-  const running = busy || run.isPending || (caseQ.data?.jobs ?? []).some((j) => j.kind === "control" && j.active)
+  const running = busy || run.isPending
+  // After a reload a running job is picked up from the case's job list.
+  const active = (caseQ.data?.jobs ?? []).find((j) => j.kind === "control" && j.active)
+  useEffect(() => {
+    if (!jobId && active) setJobId(active.id)
+  }, [jobId, active])
+  async function downloadHeader() {
+    setHeaderError(null)
+    try {
+      const res = await fetch(`/api/cases/${caseId}/control/header`, { credentials: "same-origin" })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new ApiError(res.status, body?.detail ?? res.statusText, body)
+      }
+      const url = URL.createObjectURL(await res.blob())
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "srm_motor_tables.h"
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setHeaderError(errorMessage(e))
+    }
+  }
   const bus = sc.bus_voltage ?? busVoltage
 
   return (
@@ -153,11 +190,34 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
           {choice === CUSTOM && (
             <div className="space-y-1.5">
               <Label htmlFor="ctl-folder">Controller folder (absolute path)</Label>
-              <Input id="ctl-folder" className="min-h-11 font-mono" value={folder} aria-invalid={!!folderError} onChange={(e) => setFolder(e.target.value)} />
-              {folderError && <p className="text-xs text-destructive">{folderError}</p>}
+              <Input id="ctl-folder" className="min-h-11 font-mono" value={folder} aria-invalid={!!folderError} aria-describedby={folderError ? "ctl-folder-err" : undefined} onChange={(e) => setFolder(e.target.value)} />
+              {folderError && <p id="ctl-folder-err" className="text-xs text-destructive">{folderError}</p>}
             </div>
           )}
         </div>
+        {choice === CUSTOM && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium">Parameters (name and value)</legend>
+            {custom.map((r, i) => (
+              <div key={i} className="flex flex-wrap items-start gap-2">
+                <div className="space-y-1">
+                  <Input aria-label={`Parameter ${i + 1} name`} className="min-h-11 font-mono" value={r.name} aria-invalid={!!customErrors[i]?.name}
+                    aria-describedby={customErrors[i]?.name ? `ctl-cn-${i}-err` : undefined}
+                    onChange={(e) => setCustom((c) => c.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                  {customErrors[i]?.name && <p id={`ctl-cn-${i}-err`} className="text-xs text-destructive">{customErrors[i]?.name}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Input aria-label={`Parameter ${i + 1} value`} className="min-h-11 font-mono" value={r.value} aria-invalid={!!customErrors[i]?.value}
+                    aria-describedby={customErrors[i]?.value ? `ctl-cv-${i}-err` : undefined}
+                    onChange={(e) => setCustom((c) => c.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                  {customErrors[i]?.value && <p id={`ctl-cv-${i}-err`} className="text-xs text-destructive">{customErrors[i]?.value}</p>}
+                </div>
+                <Button type="button" variant="outline" className="min-h-11" onClick={() => setCustom((c) => c.filter((_, j) => j !== i))}>Remove</Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => setCustom((c) => [...c, { name: "", value: "" }])}>Add parameter</Button>
+          </fieldset>
+        )}
         {info && info.params.length > 0 && (
           <fieldset className="grid gap-3 @2xl:grid-cols-3">
             <legend className="mb-1 text-sm font-medium">Parameters (empty uses the default)</legend>
@@ -165,8 +225,8 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
               <div key={p.name} className="space-y-1.5">
                 <Label htmlFor={`ctl-p-${p.name}`}>{`${p.name} (${p.unit})`}</Label>
                 <Input id={`ctl-p-${p.name}`} className="min-h-11 font-mono" placeholder={p.default} value={params[p.name] ?? ""}
-                  aria-invalid={!!paramErrors[p.name]} onChange={(e) => setParams((s) => ({ ...s, [p.name]: e.target.value }))} />
-                {paramErrors[p.name] && <p className="text-xs text-destructive">{paramErrors[p.name]}</p>}
+                  aria-invalid={!!paramErrors[p.name]} aria-describedby={paramErrors[p.name] ? `ctl-p-${p.name}-err` : undefined} onChange={(e) => setParams((s) => ({ ...s, [p.name]: e.target.value }))} />
+                {paramErrors[p.name] && <p id={`ctl-p-${p.name}-err`} className="text-xs text-destructive">{paramErrors[p.name]}</p>}
               </div>
             ))}
           </fieldset>
@@ -205,7 +265,7 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
             <NumField id="ctl-dt" label="Time step (µs)" value={sc.dt} scale={1e6} onChange={(v) => patch({ dt: v })} error={errors.dt} />
             <NumField id="ctl-pwm" label="PWM frequency (Hz)" value={sc.pwm_hz} onChange={(v) => patch({ pwm_hz: v })} error={errors.pwm_hz} />
             <NumField id="ctl-dead" label="Dead time (µs)" value={sc.converter.dead_time} scale={1e6} onChange={(v) => sub("converter", { dead_time: v })} error={errors["converter.dead_time"]} />
-            <NumField id="ctl-vsw" label="Switch drop (V)" value={sc.converter.v_switch} onChange={(v) => sub("converter", { v_switch: v })} />
+            <NumField id="ctl-vsw" label="Switch drop (V)" value={sc.converter.v_switch} onChange={(v) => sub("converter", { v_switch: v })} error={errors["converter.v_switch"]} />
             <NumField id="ctl-cpr" label="Encoder counts / rev" value={sc.sensors.encoder_cpr} onChange={(v) => sub("sensors", { encoder_cpr: v })} error={errors["sensors.encoder_cpr"]} />
             <NumField id="ctl-bits" label="ADC bits" value={sc.adc.bits} onChange={(v) => sub("adc", { bits: v })} error={errors["adc.bits"]} />
             <NumField id="ctl-aoff" label="ADC offset (counts)" value={sc.adc.offset_counts} onChange={(v) => sub("adc", { offset_counts: v })} error={errors["adc.offset_counts"]} />
@@ -218,19 +278,18 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
         </details>
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" className="min-h-11" disabled={invalid || running || !controller}
-            onClick={() => run.mutate({ controller, scenario: { ...sc, bus_voltage: bus ?? null, params: entered } }, { onSuccess: (r) => setJobId(r.job_id) })}>
+            onClick={() => run.mutate({ controller, scenario: { ...sc, bus_voltage: bus ?? null, params: sent } }, { onSuccess: (r) => setJobId(r.job_id) })}>
             {run.isPending ? "Starting..." : "Run"}
           </Button>
           <Button type="button" variant="outline" className="min-h-11" disabled={!controller || check.isPending} onClick={() => check.mutate(controller)}>
             {check.isPending ? "Checking..." : "Check for target"}
           </Button>
-          <a className="inline-flex min-h-11 items-center text-sm underline" href={`/api/cases/${caseId}/control/header`} download="srm_motor_tables.h">
-            Download srm_motor_tables.h
-          </a>
+          <Button type="button" variant="outline" className="min-h-11" onClick={downloadHeader}>Download srm_motor_tables.h</Button>
           {last && last.id !== jobId && (
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setJobId(last.id)}>Load the last run</Button>
           )}
         </div>
+        {headerError && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{headerError}</p>}
         {run.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(run.error)}</p>}
         {check.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(check.error)}</p>}
         {check.data && (
@@ -245,7 +304,7 @@ export default function ControlTab({ caseId, busVoltage }: { caseId: string; bus
 
       {jobId && (
         <section className="border-t border-border pt-4" aria-label="Run">
-          <RunView key={jobId} jobId={jobId} onBusy={setBusy} />
+          <RunView key={jobId} caseId={caseId} jobId={jobId} onBusy={setBusy} />
         </section>
       )}
     </div>
