@@ -228,3 +228,21 @@ def decimate(t: np.ndarray, y: np.ndarray, n_px: int) -> tuple[np.ndarray, np.nd
         idx.extend(sorted({lo, hi}))
     idx = np.array(idx)
     return t[idx], y[idx]
+
+
+_SHARED_PARAMS = [
+    ("theta_on", "electrical deg from unaligned", "0"),
+    ("theta_off", "electrical deg from unaligned", "150"),
+    ("speed_kp", "N*m/(rad/s)", "0.05"),
+    ("speed_ki", "N*m/rad", "0.5"),
+    ("speed_filter_hz", "Hz", "50"),
+    ("torque_limit", "N*m", "SRM_T_MAX_NM"),
+    ("resolver_pole_pairs", "-", "1"),
+]
+
+# Parameters each reference controller accepts (name, unit, default), as listed in its README.
+PARAMS: dict[str, list[tuple[str, str, str]]] = {
+    "hysteresis": [("band", "A", "0.05 * SRM_I_MAX_A"), ("soft", "1 = soft, 0 = hard", "1"), *_SHARED_PARAMS],
+    "pwm_current": [("kp", "V/A", "0 (SRM_L_MIN_H * 2*pi*f_bw)"), ("ki", "V/(A*s)", "0 (SRM_R_OHM * 2*pi*f_bw)"),
+                    ("f_bw", "Hz", "0 (pwm_hz / 20)"), *_SHARED_PARAMS],
+}
