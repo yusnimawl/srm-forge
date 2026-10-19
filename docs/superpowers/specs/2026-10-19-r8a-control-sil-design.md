@@ -1,6 +1,6 @@
 # R8a — Control SIL — Design Spec
 
-Status: designed in chat 2026-10-19 with the owner; waiting for the owner's review of this file.
+Status: implemented on branch r8-control-sil (2026-10-20).
 Roadmap: `2026-10-12-roadmap-r1-r10-design.md` §3 R8. R8 is split into **R8a** (this spec: software-in-the-loop on the PC) and **R8b** (two-board hardware-in-the-loop, own spec later).
 
 ## 1. Goal
@@ -138,3 +138,15 @@ All fast-suite tests use small maps and short runs; any longer study is marked s
 ## 11. Versions
 
 srmweb and `web/` get the next minor version at merge; srmcore is unchanged (no change to `VALIDATED_VERSIONS`). The openapi schema is regenerated.
+
+## 12. Decisions made during implementation
+
+- The HAL has `vbus_volts()`, so a controller reads the bus voltage instead of a compile-time constant.
+- `compute_delay` defaults to one ISR period.
+- `encoder_count` is single-turn, in [0, cpr).
+- `run.run` takes `MotorData`; the web layer builds it from the case.
+- The reference controllers take `resolver_pole_pairs` as a parameter (p must divide N_r).
+- Speed PI scaling: kp = J·ω_c, ki = kp·ω_c/16; the default gains are tuned for J ≈ 1e-3 kg·m².
+- Custom controllers run only on a loopback host, enforced where the job runs as well as at the route.
+- The hysteresis command is the per-phase torque at the window centre.
+- Versions are not bumped on the branch; srmsil follows the srmweb version and the bump is made at merge.
