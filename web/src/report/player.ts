@@ -37,7 +37,7 @@ var SCREEN_LINES = ${JSON.stringify(LINE_COLORS)};
 var PRINT_LINES = ${JSON.stringify(PRINT_LINE_COLORS)};
 var SCREEN_AXIS = ${JSON.stringify(SCREEN_AXIS)};
 var PRINT_AXIS = ${JSON.stringify(PRINT_AXIS)};
-var PRINT_W_ONE = 703, PRINT_W_TWO = 343, PRINT_H = 260;
+var PRINT_W_ONE = 701, PRINT_W_TWO = 341, PRINT_H = 260;
 function num(x, scale, d) { return typeof x === "number" && isFinite(x) ? (x * scale).toFixed(d) : "\u2013"; }
 function readJson(id) {
   var el = document.getElementById(id);
@@ -47,6 +47,8 @@ function readJson(id) {
 (function () {
   var figs = readJson("figures") || [];
   figs.forEach(function (f) {
+    // newPlot adopts f.layout and relayout writes into it, so the screen size is recorded first.
+    f.size = { autosize: f.layout.autosize == null ? null : f.layout.autosize, width: f.layout.width == null ? null : f.layout.width, height: f.layout.height == null ? null : f.layout.height };
     try { window.Plotly.newPlot(f.id, f.data, f.layout, { displaylogo: false, responsive: true }); } catch (err) {}
   });
   // Palette index of each trace, taken before any restyle changes the colour Plotly holds in place.
@@ -67,7 +69,7 @@ function readJson(id) {
         var two = el && el.closest && el.closest(".grid.two");
         window.Plotly.relayout(f.id, on
           ? { autosize: false, width: two ? PRINT_W_TWO : PRINT_W_ONE, height: PRINT_H }
-          : { autosize: true, width: f.layout.width == null ? null : f.layout.width, height: f.layout.height == null ? null : f.layout.height });
+          : f.size);
         f.screen.forEach(function (k, i) {
           if (k.line >= 0) window.Plotly.restyle(f.id, { "line.color": (on ? PRINT_LINES : SCREEN_LINES)[k.line] }, [i]);
           if (k.marker >= 0) window.Plotly.restyle(f.id, { "marker.color": (on ? PRINT_LINES : SCREEN_LINES)[k.marker] }, [i]);
