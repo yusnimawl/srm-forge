@@ -32,3 +32,5 @@ the rise during one ISR period plus the compute delay.
   `speed_kp` 0.01, `speed_ki` 0.0625, `speed_filter_hz` 500. The controllers only motor (torque >= 0), so a speed
   overshoot is not braked.
 - `resolver_pole_pairs` must divide the rotor pole count; otherwise (or with `isr_hz` <= 0) every switch stays off.
+- The torque command is the per-phase torque at the window centre, so overlapping conduction windows (a window
+  longer than one stroke) raise the mean torque above the command.

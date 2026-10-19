@@ -3,6 +3,8 @@
  * mirror fall over the next `overlap` degrees (stroke = 360 / phases). Neighbouring shares sum to 1, so the
  * commanded torque is handed from one phase to the next. Phase k gets i_ref = i*(theta_k, s * T_cmd) from the
  * torque table and a PI current loop; a phase with no share is off. Intended pwm_hz: 20 kHz. */
+#include <math.h>
+
 #include "srm_ctrl.h"
 #include "srm_motor_tables.h"
 #include "srm_ref.h"
@@ -15,6 +17,7 @@ static float ki = 0.0f;          /* V/(A*s); 0 = derived from f_bw */
 static float f_bw = 0.0f;        /* Hz; 0 = pwm_hz / 20 */
 static float integ[SRM_N_PHASES];   /* V */
 static float dt;
+static float on_deg;   /* theta_on normalised into [0, 360) */
 
 /* Searched before the shared table, so this theta_on (default 15) replaces the shared window start. */
 static const srm_ref_param_t own[] = {
@@ -34,6 +37,8 @@ void ctrl_init(const srm_hal_t *h)
 {
     hal = h;
     srm_ref_init(h);
+    on_deg = fmodf(theta_on, 360.0f);
+    if (on_deg < 0.0f) on_deg += 360.0f;
     dt = srm_ref_ok() ? 1.0f / h->isr_hz : 0.0f;
     srm_ref_pi_gains(h, f_bw, &kp, &ki);
     for (int k = 0; k < SRM_N_PHASES; k++) integ[k] = 0.0f;
@@ -50,9 +55,8 @@ static float share(float el_deg)
 {
     float stroke = 360.0f / (float)SRM_N_PHASES;
     float ov = overlap < 0.0f ? 0.0f : (overlap > stroke ? stroke : overlap);
-    float x = el_deg - theta_on;   /* degrees since turn-on, wrapped into [0, 360) */
-    while (x < 0.0f) x += 360.0f;
-    while (x >= 360.0f) x -= 360.0f;
+    float x = fmodf(el_deg - on_deg, 360.0f);   /* degrees since turn-on, wrapped into [0, 360) */
+    if (x < 0.0f) x += 360.0f;
     if (x < ov) return smooth(x / ov);
     if (x < stroke) return 1.0f;
     if (x < stroke + ov) return 1.0f - smooth((x - stroke) / ov);

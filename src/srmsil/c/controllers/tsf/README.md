@@ -19,7 +19,6 @@ estimate that produces the torque command. Intended `pwm_hz`: 20 kHz.
 | `kp` | V/A | 0 (SRM_L_MIN_H * 2*pi*f_bw) |
 | `ki` | V/(A*s) | 0 (SRM_R_OHM * 2*pi*f_bw) |
 | `f_bw` | Hz | 0 (pwm_hz / 20) |
-| `theta_off` | electrical deg from unaligned | 150 (unused) |
 | `speed_kp` | N*m/(rad/s) | 0.05 |
 | `speed_ki` | N*m/rad | 0.5 |
 | `speed_filter_hz` | Hz | 50 |
