@@ -7,6 +7,7 @@ import json
 import math
 import multiprocessing as mp
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -152,8 +153,11 @@ def _child_main(lib_path: Path, m: MotorData, scenario: Scenario, out: Path) -> 
         out.with_suffix(".err").write_text(str(e) if isinstance(e, ValueError) else f"{type(e).__name__}: {e}")
 
 
-def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, timeout_s: float = 300.0) -> SimResult:
-    """Compile the controller and run the scenario in a spawned child, so controller faults cannot reach this process."""
+def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, timeout_s: float = 300.0,
+        on_compiled: Callable[[], None] | None = None) -> SimResult:
+    """Compile the controller and run the scenario in a spawned child, so controller faults cannot reach this process.
+
+    `on_compiled` is called once the library is built, before the child starts."""
     cdir = controller_dir(controller)
     common = _CTRL_DIR / "common" if controller in REFERENCE else None
     log: list[str] = []
@@ -164,6 +168,8 @@ def run(m: MotorData, controller: str, scenario: Scenario, *, cache_dir: Path, t
             lib = sim_library(cdir, hdr, cache_dir, common, log)
         except CompileError as e:
             raise SimError(e.log) from e
+        if on_compiled:
+            on_compiled()
         out = hdr / "result.npz"
         p = mp.get_context("spawn").Process(target=_child_main, args=(lib, m, scenario, out), daemon=True)
         p.start()

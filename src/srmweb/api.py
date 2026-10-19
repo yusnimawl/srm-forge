@@ -40,7 +40,7 @@ from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
 from srmweb.config import Settings, is_loopback
 from srmweb.frames import FieldContext, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
-from srmweb.jobs import KINDS, JobRunner, QueueFull, lane_of
+from srmweb.jobs import CUSTOM_REFUSED, KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
 from srmweb.results import CaseOut, DxfImportOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest, ControllerOut,
@@ -216,6 +216,8 @@ def create_app(settings: Settings,
         job = job_or_404(job_id)
         if job["status"] not in RESUMABLE:
             raise HTTPException(409, f"cannot resume a {job['status']} job")
+        if job["kind"] == "control":
+            controller_folders(job["request"]["controller"])
         if job["kind"] != "search":
             case = store.get_case(job["request"]["case_id"])
             if case is None:
@@ -490,9 +492,12 @@ def create_app(settings: Settings,
         evaluation = store.case_result(case_id, "evaluate")
         bus = bus_voltage or CaseInputs.model_validate(case["inputs"]).requirements.bus_voltage_v
         try:
-            return sil_tables.motor_data_from_json(evaluation, bus)
+            motor = sil_tables.motor_data_from_json(evaluation, bus)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
+        if not (np.isfinite(motor.psi).all() and np.isfinite(motor.torque).all()):
+            raise HTTPException(409, "the map has non-finite points")
+        return motor
 
     def controller_folders(controller: str) -> list[Path]:
         """The folders a controller compiles from; 403 off loopback for a custom folder, 422 if it is invalid."""
@@ -500,7 +505,9 @@ def create_app(settings: Settings,
             folder = sil_run.controller_dir(controller)
             return [folder, folder.parent / "common"]
         if not is_loopback(settings.host):
-            raise HTTPException(403, "custom controllers run only when srmweb is bound to a loopback host")
+            raise HTTPException(403, CUSTOM_REFUSED)
+        if not Path(controller).is_absolute():
+            raise HTTPException(422, "a custom controller must be an absolute folder path")
         try:
             folder = sil_run.controller_dir(controller)
         except ValueError as exc:
@@ -559,7 +566,10 @@ def create_app(settings: Settings,
         folders = controller_folders(body.controller)
         c_dir = Path(sil_run.__file__).parent / "c"
         with tempfile.TemporaryDirectory() as tmp:
-            sil_tables.write_header(motor, sil_tables.ctrl_tables(motor), Path(tmp) / "srm_motor_tables.h")
+            try:
+                sil_tables.write_header(motor, sil_tables.ctrl_tables(motor), Path(tmp) / "srm_motor_tables.h")
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
             sources = [s for f in folders for s in sil_build.controller_sources(f)]
             check = sil_build.target_check(sources, [c_dir, Path(tmp), *folders])
         return {"ok": check.ok, "compiler": check.compiler, "log": check.log}
@@ -656,7 +666,7 @@ def create_app(settings: Settings,
             return []
         sil = settings.cache_dir / "sil"
         found = [*settings.cache_dir.glob("*.h5"), *(settings.cache_dir / "fields").glob("*.npz"),
-                 *(sil / "runs").glob("*.npz"), *(sil / "build").glob("*")]
+                 *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*")]
         return [f for f in found if f.is_file() and ".tmp." not in f.name]
 
     @router.get("/settings/cache")
@@ -671,8 +681,6 @@ def create_app(settings: Settings,
             raise HTTPException(409, "a job is running; wait for it or cancel it")
         for f in cache_files():
             f.unlink(missing_ok=True)
-            if f.parent.name == "runs":
-                f.with_suffix(".json").unlink(missing_ok=True)
         return Response(status_code=204)
 
     @router.get("/openapi.json", include_in_schema=False)

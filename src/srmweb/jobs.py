@@ -21,7 +21,7 @@ from srmapp.pipeline import SearchSettings, run_search
 from srmcore.model.design import RegionMaterials
 from srmsil import run as sil_run
 from srmsil.tables import MotorData
-from srmweb.config import Settings
+from srmweb.config import Settings, is_loopback
 from srmweb.quick import QuickLane
 from srmweb.frames import frame_task
 from srmweb.schemas import AnimateRequest, ControlRequest, EvaluateRequest, SearchRequest, ValidateRequest
@@ -338,17 +338,22 @@ def run_animate_job(req: AnimateRequest, reporter: Reporter, ctx: JobContext) ->
 
 def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) -> dict:
     """Compile the controller and run the scenario in a child process; the run is stored beside the cache."""
+    if req.controller not in sil_run.REFERENCE and not is_loopback(ctx.settings.host):
+        raise ValueError(CUSTOM_REFUSED)
     m = MotorData(np.asarray(req.motor.angles), np.asarray(req.motor.currents), np.asarray(req.motor.psi),
                   np.asarray(req.motor.torque), req.motor.resistance, req.motor.n_phases,
                   req.motor.n_rotor_poles, req.motor.bus_voltage)
     reporter.progress(step="compile", message="compiling the controller")
-    reporter.progress(step="simulate", message="simulating")
-    res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir)
+    res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir,
+                      on_compiled=lambda: reporter.progress(step="simulate", message="simulating"))
     run_file = ctx.settings.cache_dir / "sil" / "runs" / f"{reporter.job_id}.npz"
     run_file.parent.mkdir(parents=True, exist_ok=True)
     sil_run.save(res, run_file)
     return {"case_id": req.case_id, "controller": res.controller, "summary": to_json(res.summary),
             "source_hash": res.source_hash, "compile_log": res.compile_log, "run_file": str(run_file)}
+
+
+CUSTOM_REFUSED = "custom controllers run only when srmweb is bound to a loopback host"
 
 
 KINDS: dict[str, tuple[type[BaseModel], Callable[[BaseModel, Reporter, JobContext], dict]]] = {

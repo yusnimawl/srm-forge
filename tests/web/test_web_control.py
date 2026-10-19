@@ -116,3 +116,39 @@ def test_cache_counts_and_clears_sil_files(client):
     assert client.delete("/api/settings/cache").status_code == 204
     assert client.get("/api/settings/cache").json()["files"] == 0
     assert client.get(f"/api/jobs/{job['id']}/control").status_code == 410
+
+
+def test_resume_custom_refused_off_loopback(tmp_path):
+    with _client(tmp_path, "0.0.0.0", "t0k") as c:
+        c.post("/api/login", json={"token": "t0k"})
+        cid = _case(c)
+        req = {"case_id": cid, "motor": {"angles": [0.0], "currents": [1.0], "psi": [[0.0]], "torque": [[0.0]],
+               "resistance": 0.5, "n_phases": 4, "n_rotor_poles": 6, "bus_voltage": 100.0},
+               "controller": CRASH, "scenario": {}}
+        store = c.app.state.store
+        job_id = store.create_job("control", req)
+        store.set_status(job_id, "interrupted")
+        assert c.post(f"/api/jobs/{job_id}/resume").status_code == 403
+
+
+def test_runner_refuses_custom_off_loopback(tmp_path):
+    from srmweb.jobs import JobContext, Reporter, run_control_job
+    from srmweb.schemas import ControlRequest
+    s = Settings("0.0.0.0", 8000, tmp_path / "a.db", tmp_path / "cache", 1, "t", 10, tmp_path / "nostatic")
+    req = ControlRequest.model_validate({"case_id": "x", "motor": {
+        "angles": [0.0], "currents": [1.0], "psi": [[0.0]], "torque": [[0.0]], "resistance": 0.5,
+        "n_phases": 4, "n_rotor_poles": 6, "bus_voltage": 100.0}, "controller": CRASH, "scenario": {}})
+    with pytest.raises(ValueError, match="loopback"):
+        run_control_job(req, None, JobContext(s, None))
+    assert not (tmp_path / "cache").exists()
+
+
+def test_custom_folder_must_be_absolute(client):
+    assert _control(client, _case(client), "controllers/crash").status_code == 422
+
+
+def test_target_check_refused_off_loopback(tmp_path):
+    with _client(tmp_path, "0.0.0.0", "t0k") as c:
+        c.post("/api/login", json={"token": "t0k"})
+        r = c.post("/api/control/target-check", json={"controller": CRASH, "case_id": _case(c)})
+        assert r.status_code == 403
