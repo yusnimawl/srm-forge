@@ -557,8 +557,12 @@ def create_app(settings: Settings,
     def frames_cached(job: dict) -> bool:
         """True when the animate job's result exists and all its frames are still cached."""
         result = store.get_result(job["id"])
-        return (result is not None and not result.get("cancelled")
-                and all(f is not None for f in cached_frames(job, result)))
+        if result is None or result.get("cancelled"):
+            return False
+        try:
+            return all(f is not None for f in cached_frames(job, result))
+        except (ValidationError, InputError):
+            return False
 
     @router.get("/jobs/{job_id}/frames")
     def job_frames(job_id: str):
@@ -656,8 +660,11 @@ def create_app(settings: Settings,
         chosen = next((j for j in animate if frames_cached(store.get_job(j["id"]))), None)
         missing = (None if chosen else "no animation run" if not animate
                    else "the frames were cleared from the cache; animate again")
-        found = findings(CaseInputs.model_validate(case["inputs"]), evaluation, store.case_result(case_id, "validate"),
-                         losses, compare_rows(case), missing)
+        validation = store.case_result(case_id, "validate")
+        if validation is not None and validation.get("cancelled"):
+            validation = None
+        found = findings(CaseInputs.model_validate(case["inputs"]), evaluation, validation,
+                         losses, compare_rows(case) if store.get_case(case["parent_case_id"] or "") else None, missing)
         return ReportOut(
             findings=[FindingOut(**vars(f)) for f in found],
             versions={"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": srmweb.__version__},

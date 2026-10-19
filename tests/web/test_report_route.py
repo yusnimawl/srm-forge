@@ -59,3 +59,34 @@ def test_report_frames_cleared_reason(client, fake, monkeypatch):
     assert body["animation_job_id"] is None
     texts = [f["text"] for f in body["findings"] if f["id"] == "animation_missing"]
     assert texts and "cleared" in texts[0]
+
+
+def test_report_survives_deleted_parent(client):
+    store = client.app.state.store
+    parent = _case(client)
+    body = store.case_result(parent, "evaluate")
+    child = store.create_case(origin="edit", inputs=store.get_case(parent)["inputs"], label="child",
+                              parent_case_id=parent, stale=True)
+    assert store.attach_evaluation(child, None, body)
+    store.delete_case(parent)
+    assert _report(client, child).status_code == 200
+    assert client.get(f"/api/cases/{child}/compare").status_code == 404
+
+
+def test_report_bad_animate_request_counts_as_not_cached(client):
+    store = client.app.state.store
+    cid = _case(client)
+    job = store.create_job("animate", {"case_id": cid, "garbage": True})
+    store.put_result(job, {"case_id": cid, "current_a": 3.0, "angles": [0.1]}, kind="animate")
+    store.set_status(job, "done")
+    body = _report(client, cid)
+    assert body.status_code == 200 and body.json()["animation_job_id"] is None
+    assert "cleared" in next(f["text"] for f in body.json()["findings"] if f["id"] == "animation_missing")
+
+
+def test_report_cancelled_validation_is_missing(client):
+    store = client.app.state.store
+    cid = _case(client)
+    store.put_result(None, {"cancelled": True}, kind="validate", case_id=cid)
+    r = _report(client, cid)
+    assert r.status_code == 200 and "validation_missing" in {f["id"] for f in r.json()["findings"]}
