@@ -1,7 +1,5 @@
-import ctypes
-import multiprocessing as mp
-
 import pytest
+from sil_fixtures import call_in_child
 
 from srmsil import build
 
@@ -9,22 +7,8 @@ ADD_C = """
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
-int add(int a, int b) { return a + b; }
+double add(double a, double b) { return a + b; }
 """
-
-
-def _call(lib, name, a, b, q):
-    q.put(getattr(ctypes.CDLL(str(lib)), name)(a, b))
-
-
-def _call_in_child(lib, name, a, b):
-    ctx = mp.get_context("spawn")
-    q = ctx.Queue()
-    p = ctx.Process(target=_call, args=(lib, name, a, b, q))
-    p.start()
-    out = q.get(timeout=60)
-    p.join()
-    return out
 
 
 def test_compile_host_builds_and_caches(tmp_path):
@@ -34,7 +18,7 @@ def test_compile_host_builds_and_caches(tmp_path):
     mtime = lib.stat().st_mtime_ns
     assert build.compile_host([src], [], tmp_path / "out") == lib
     assert lib.stat().st_mtime_ns == mtime
-    assert _call_in_child(lib, "add", 2, 3) == 5
+    assert call_in_child(lib, "add", 2, 3) == 5
 
 
 def test_compile_host_error_carries_log(tmp_path):
