@@ -184,7 +184,7 @@ function CaseEditor({ data }: { data: Case }) {
               evaluation.status === "ok" ? (
                 <div className="space-y-6">
                   <Suspense fallback={<SrmSpinner label="Loading charts…" showLabel />}>
-                    <AnalysisTabs evaluation={evaluation} label={data.label || data.id} baseSpeedRpm={(data.inputs as { requirements?: { base_speed_rpm?: number } }).requirements?.base_speed_rpm} caseId={data.id} />
+                    <AnalysisTabs evaluation={evaluation} label={data.label || data.id} baseSpeedRpm={(data.inputs as { requirements?: { base_speed_rpm?: number } }).requirements?.base_speed_rpm} caseId={data.id} busVoltage={(data.inputs as { requirements?: { bus_voltage_v?: number } }).requirements?.bus_voltage_v} />
                   </Suspense>
                   {data.validation && <ValidationPanel validation={data.validation} winding={evaluation.winding} />}
                 </div>

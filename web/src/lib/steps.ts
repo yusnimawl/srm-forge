@@ -7,6 +7,7 @@ const LABELS: Record<string, Record<string, string>> = {
   evaluate: { queued: "Queued", mesh: "Mesh built", mapping: "Mapping", winding: "Choosing the winding", saved: "Saved" },
   validate: { queued: "Queued", map: "Map (cache)", checks: "Checks and budget", saved: "Saved" },
   animate: { queued: "Queued", frames: "Frames", saved: "Saved" },
+  control: { queued: "Queued", compile: "Compiling the controller", simulate: "Simulating", saved: "Saved" },
   search: { queued: "Queued", sampling: "Sampling", designs: "Designs", pareto: "Pareto set", saved: "Saved" },
 }
 

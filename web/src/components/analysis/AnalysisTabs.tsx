@@ -9,6 +9,7 @@ import PerformanceTab from "./PerformanceTab"
 import WaveformsTab from "./WaveformsTab"
 
 const FieldTab = lazy(() => import("./FieldTab"))
+const ControlTab = lazy(() => import("./ControlTab"))
 
 /** Overlays (at most 6 cases) draw on the Performance and Design factors charts; `label` names the main case in their legends.
  *  `performanceOnly` drops the tab bar and the other tabs. */
@@ -19,6 +20,7 @@ export default function AnalysisTabs({
   performanceOnly = false,
   baseSpeedRpm,
   caseId,
+  busVoltage,
 }: {
   evaluation: Evaluation
   overlays?: Overlay[]
@@ -27,6 +29,8 @@ export default function AnalysisTabs({
   baseSpeedRpm?: number
   /** Enables the field tab (an evaluated case only). */
   caseId?: string
+  /** Bus voltage (V) the control scenario starts from. */
+  busVoltage?: number
 }) {
   if (performanceOnly) return <PerformanceTab evaluation={evaluation} overlays={overlays} label={label} />
   const showField = !!caseId && evaluation.status === "ok"
@@ -38,6 +42,7 @@ export default function AnalysisTabs({
         <TabsTrigger value="map">Map</TabsTrigger>
         <TabsTrigger value="factors">Design factors</TabsTrigger>
         {showField && <TabsTrigger value="field">Field</TabsTrigger>}
+        {showField && <TabsTrigger value="control">Control</TabsTrigger>}
       </TabsList>
       <TabsContent value="performance">
         <PerformanceTab evaluation={evaluation} overlays={overlays} label={label} />
@@ -57,6 +62,13 @@ export default function AnalysisTabs({
         <TabsContent value="field">
           <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
             <FieldTab key={caseId} caseId={caseId} />
+          </Suspense>
+        </TabsContent>
+      )}
+      {showField && (
+        <TabsContent value="control">
+          <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
+            <ControlTab key={caseId} caseId={caseId} busVoltage={busVoltage} />
           </Suspense>
         </TabsContent>
       )}
