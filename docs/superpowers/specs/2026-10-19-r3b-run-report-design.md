@@ -15,7 +15,7 @@ Done when: one click on an evaluated case gives the file, and it renders the sam
 - **Findings are rule-based** (no LLM, no physics advice): deterministic, offline, each finding cites its number.
 - **Parts not yet computed are left out and marked** ("Not run"). Export never starts a job and never waits on one. The owner runs Evaluate, Validate, Losses and Animate first if they want a full report.
 - **Built in the browser** (approach 1): the app already has the data and the field renderer. The findings are computed in Python, next to the physics.
-- **One file, no separate assets**: Plotly, CSS, fonts, data, the outline SVG and the animation frames are all inline. The file makes no network request.
+- **One file, no separate assets**: Plotly, CSS, data, the outline SVG and the animation frames are all inline. The file makes no network request.
 - **Storage stays SQLite** (asked and answered: a single-user tool, so Postgres adds setup with no gain).
 
 ## 3. Architecture
@@ -31,7 +31,7 @@ CasePage Export menu ── "Run report (HTML)" (evaluated cases only)
    │         GET /api/cases/{id}/field/mesh + GET /api/jobs/{last animate}/frames  (410/none → "No animation")
    │
    ├─ render the animation frames offscreen with the existing field renderer (WebGL2, 2D canvas fallback) → WebP data URIs
-   ├─ fill the template: inline CSS + Geist woff2, inline plotly.min.js, report data JSON, a small vanilla player script
+   ├─ fill the template: inline CSS (system font stack; the app's Geist comes from a CDN and is not inlined), inline plotly.min.js, report data JSON, a small vanilla player script
    └─ download("<label or id>-report.html")
 ```
 
@@ -83,7 +83,7 @@ Each finding's `text` contains its number. A `warn` is only for hard facts; heur
 - Margins: torque ratio, power ratio, mass as a fraction of its limit, outer diameter as a fraction of its limit.
 - Saturation: La at I_max as a percentage of the unsaturated La; La/Lu.
 - Torque ripple at base speed: the per-phase torque waveform summed over the phases shifted by the stroke (the same shift as `drive.envelope.line_current`), as (max − min) / mean.
-- Efficiency at base speed; the loss split at the base-speed full-torque point into copper DC, copper AC and iron; the largest iron region and term.
+- Efficiency at base speed; the loss split at the rated point (as the Losses tab: the highest speed reached at the top torque level) into copper DC, copper AC and iron; the largest iron region and term.
 - Validation budget: the largest row per quantity.
 - DXF: the three largest relative changes in the compare table.
 
