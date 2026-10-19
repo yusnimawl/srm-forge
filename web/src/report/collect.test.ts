@@ -51,6 +51,7 @@ describe("collect", () => {
     mockFetch(base({ "/api/jobs/j/frames": () => ({ status: 410, body: { detail: "gone" } }) }, null, "j"))
     const d = await collect("c", () => {}, render)
     expect(d.animation.ok).toBe(false)
+    if (!d.animation.ok) expect(d.animation.reason).toContain("cleared")
   })
   it("no animation job skips frame fetch", async () => {
     const urls = mockFetch(base())

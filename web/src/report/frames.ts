@@ -1,4 +1,4 @@
-import { bMaxOfFrames, boundsOf, buildScene, createGlRenderer, draw2d, viewMatrix } from "@/lib/fieldGl"
+import { boundsOf, buildScene, createGlRenderer, draw2d, viewMatrix } from "@/lib/fieldGl"
 import type { FieldFrameData, FieldMeshData } from "@/lib/fieldWire"
 
 const LAYERS = { bmap: true, flux: false, mesh: false, outlines: true }
@@ -9,10 +9,11 @@ const canvasOf = (size: number) => {
   return c
 }
 
-/** Renders each frame offscreen (the |B| map on one colour scale for all frames) and returns data URIs: WebP where the browser encodes it, else PNG. */
+/** Renders each frame offscreen (the |B| map on the colour scale `bMax`) and returns data URIs: WebP where the browser encodes it, else PNG. */
 export async function renderFrames(
   mesh: FieldMeshData,
   frames: FieldFrameData[],
+  bMax: number,
   onFrame: (k: number, n: number) => void,
   size = 640,
 ): Promise<string[]> {
@@ -25,7 +26,6 @@ export async function renderFrames(
     ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("no canvas renderer")
   }
-  const bMax = bMaxOfFrames(mesh, frames)
   const m = viewMatrix(boundsOf(mesh.nodes), size, size, 1, [0, 0])
   const out: string[] = []
   try {
