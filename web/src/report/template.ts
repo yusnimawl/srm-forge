@@ -79,7 +79,13 @@ tr:last-child td{border-bottom:0}
 .controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0}
 .controls input[type=range]{flex:1 1 200px;min-width:120px}
 button,select{background:var(--card);color:var(--fg);border:1px solid var(--border-strong);border-radius:8px;padding:6px 12px;font:inherit;min-height:36px}
+@page{size:A4;margin:12mm}
 @media print{
+main{max-width:none;padding:0}
+.scroll{overflow:visible}
+table{font-size:10.5px}
+th,td{padding:3px 5px}
+td.n,th.n{white-space:normal}
 :root{color-scheme:light;--bg:#fff;--fg:#111;--card:#f6f6f6;--muted:#555;--border:#ccc;--border-strong:#aaa;--ok:#2d7a1f;--warn:#9a6a00;--bad:#b3261e;--plot:#fff}
 .controls{display:none}
 h2,h3{break-after:avoid}

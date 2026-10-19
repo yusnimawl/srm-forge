@@ -37,6 +37,7 @@ var SCREEN_LINES = ${JSON.stringify(LINE_COLORS)};
 var PRINT_LINES = ${JSON.stringify(PRINT_LINE_COLORS)};
 var SCREEN_AXIS = ${JSON.stringify(SCREEN_AXIS)};
 var PRINT_AXIS = ${JSON.stringify(PRINT_AXIS)};
+var PRINT_W_ONE = 703, PRINT_W_TWO = 343, PRINT_H = 260;
 function num(x, scale, d) { return typeof x === "number" && isFinite(x) ? (x * scale).toFixed(d) : "\u2013"; }
 function readJson(id) {
   var el = document.getElementById(id);
@@ -61,16 +62,18 @@ function readJson(id) {
     figs.forEach(function (f) {
       try {
         window.Plotly.relayout(f.id, themeUpdate(f.layout, on ? PRINT_AXIS : SCREEN_AXIS));
+        // Fixed sizes: Plotly's own responsive resize is debounced and lands after the print snapshot.
+        var el = document.getElementById(f.id);
+        var two = el && el.closest && el.closest(".grid.two");
+        window.Plotly.relayout(f.id, on
+          ? { autosize: false, width: two ? PRINT_W_TWO : PRINT_W_ONE, height: PRINT_H }
+          : { autosize: true, width: f.layout.width == null ? null : f.layout.width, height: f.layout.height == null ? null : f.layout.height });
         f.screen.forEach(function (k, i) {
           if (k.line >= 0) window.Plotly.restyle(f.id, { "line.color": (on ? PRINT_LINES : SCREEN_LINES)[k.line] }, [i]);
           if (k.marker >= 0) window.Plotly.restyle(f.id, { "marker.color": (on ? PRINT_LINES : SCREEN_LINES)[k.marker] }, [i]);
         });
       } catch (err) {}
     });
-    // Print and screen layouts differ in width; wait a tick so the layout has settled.
-    setTimeout(function () {
-      figs.forEach(function (f) { try { window.Plotly.Plots.resize(document.getElementById(f.id)); } catch (err) {} });
-    }, 50);
   }
   var d = readJson("frames");
   if (!d) {

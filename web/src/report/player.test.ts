@@ -49,19 +49,21 @@ describe("print theme", () => {
 
 describe("print round trip", () => {
   it("restores the screen colours after printing", () => {
-    const fig = { id: "p1", data: [{ type: "scatter", line: { color: "#e8b04a" } }, { type: "heatmap" }, { type: "bar", marker: { color: "#ededed" } }, { type: "scatter", mode: "markers", marker: { color: "#ededed", size: 7 } }], layout: { xaxis: {}, yaxis: {} } }
+    const fig = { id: "p1", data: [{ type: "scatter", line: { color: "#e8b04a" } }, { type: "heatmap" }, { type: "bar", marker: { color: "#ededed" } }, { type: "scatter", mode: "markers", marker: { color: "#ededed", size: 7 } }], layout: { xaxis: {}, yaxis: {}, height: 360 } }
     const el = (id: string, text: string) => {
       const d = document.createElement("script")
       d.id = id
       d.textContent = text
       document.body.appendChild(d)
     }
+    document.body.innerHTML = '<div class="grid two"><div id="p1"></div></div>'
     el("figures", JSON.stringify([fig]))
     // Like Plotly, newPlot keeps the array it is given and restyle changes it in place.
+    const sizes: Record<string, unknown>[] = []
     let held: { type: string; line?: { color: string }; marker?: { color: string } }[] = []
     ;(window as unknown as { Plotly: unknown }).Plotly = {
       newPlot: (_id: string, data: typeof held) => { held = data },
-      relayout: () => {},
+      relayout: (_id: string, u: Record<string, unknown>) => { if ("width" in u) sizes.push(u) },
       restyle: (_id: string, u: Record<string, string>, idx: number[]) => {
         if (u["line.color"]) held[idx[0]].line!.color = u["line.color"]
         if (u["marker.color"]) held[idx[0]].marker!.color = u["marker.color"]
@@ -69,10 +71,12 @@ describe("print round trip", () => {
     }
     new Function(PLAYER_SOURCE)()
     window.dispatchEvent(new Event("beforeprint"))
+    expect(sizes[0]).toEqual({ autosize: false, width: 343, height: 260 })
     expect(held[0].line!.color).toBe(PRINT_LINE_COLORS[1])
     expect(held[2].marker!.color).toBe(PRINT_LINE_COLORS[0])
     expect(held[3].marker!.color).toBe(PRINT_LINE_COLORS[0])
     window.dispatchEvent(new Event("afterprint"))
+    expect(sizes[1]).toEqual({ autosize: true, width: null, height: 360 })
     expect(held[0].line!.color).toBe("#e8b04a")
     expect(held[2].marker!.color).toBe("#ededed")
     expect(held[3].marker!.color).toBe("#ededed")
