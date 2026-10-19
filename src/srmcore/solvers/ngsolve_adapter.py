@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import ngsolve as ng
 import numpy as np
+from netgen.libngpy._meshing import NgException
 from netgen.meshing import FaceDescriptor
 from netgen.meshing import Mesh as NetgenMesh
 
@@ -122,7 +123,7 @@ class _System:
 
     def solve_tangent(self, a: np.ndarray, nu: np.ndarray, dnu: np.ndarray, rhs: np.ndarray) -> np.ndarray:
         self.disc.set_tangent(a, nu, dnu)
-        inverse = self.disc.tangent.mat.Inverse(self.freedofs, inverse="umfpack")
+        inverse = _factorize(self.disc.tangent.mat, self.freedofs)
         b = ng.BaseVector(self.n)
         b.FV().NumPy()[:] = rhs
         x = b.CreateVector()
@@ -132,6 +133,20 @@ class _System:
         return out
 
 
+class FactorizationFailed(RuntimeError):
+    """UMFPACK could not factorize the tangent (typically out of memory)."""
+
+
+def _factorize(mat, freedofs):
+    try:
+        return mat.Inverse(freedofs, inverse="umfpack")
+    except NgException as exc:
+        # NgException is NGSolve's generic error; only a failed factorization is handled here.
+        if "factorization failed" not in str(exc):
+            raise
+        raise FactorizationFailed(str(exc)) from exc
+
+
 @dataclass
 class _Outcome:
     a: np.ndarray
@@ -139,6 +154,7 @@ class _Outcome:
     iterations: int
     residual: float
     delta: float
+    factorization_failed: bool = False
 
 
 def _newton(system: _System, f: np.ndarray, a0: np.ndarray, settings: NewtonSettings,
@@ -150,7 +166,10 @@ def _newton(system: _System, f: np.ndarray, a0: np.ndarray, settings: NewtonSett
     r, nu, dnu = system.residual(a, f)
     res, delta = np.linalg.norm(r[free]) / f_norm, np.inf
     for it in range(1, max_iterations + 1):
-        da = system.solve_tangent(a, nu, dnu, -r)
+        try:
+            da = system.solve_tangent(a, nu, dnu, -r)
+        except FactorizationFailed:
+            return _Outcome(a, False, it, res, delta, True)
         step = max_step if res > _FULL_STEP_RESIDUAL else 1.0
         for _ in range(settings.max_halvings):
             trial = a + step * da
@@ -183,7 +202,7 @@ class NgsolveAdapter:
         a = np.asarray(a, float)
         _, nu, dnu = system.material(a)
         system.disc.set_tangent(a, nu, dnu)
-        inverse = system.disc.tangent.mat.Inverse(system.freedofs, inverse="umfpack")
+        inverse = _factorize(system.disc.tangent.mat, system.freedofs)
         m = len(problem.winding.circuits)
         out = np.zeros((system.n, m))
         for k in range(m):
@@ -217,7 +236,11 @@ class NgsolveAdapter:
             return self._result(system, _Outcome(zero, True, 0, 0.0, 0.0), SolveStatus.OK, ())
         if system.linear:
             r, nu, dnu = system.residual(zero, f)
-            a = system.solve_tangent(zero, nu, dnu, f)
+            try:
+                a = system.solve_tangent(zero, nu, dnu, f)
+            except FactorizationFailed:
+                return self._result(system, _Outcome(zero, False, 0, 1.0, np.inf, True),
+                                    SolveStatus.NONCONVERGED, ("factorization",))
             r, _, _ = system.residual(a, f)
             res = float(np.linalg.norm(r[system.free]) / np.linalg.norm(f[system.free]))
             return self._result(system, _Outcome(a, True, 1, res, 0.0), SolveStatus.OK, ())
@@ -225,19 +248,23 @@ class NgsolveAdapter:
         out = _newton(system, f, a0, cfg, 1.0, cfg.max_iterations)
         if out.converged:
             return self._result(system, out, SolveStatus.OK, ())
+        failed = out.factorization_failed
         out = _newton(system, f, a0, cfg, cfg.damped_max_step, 2 * cfg.max_iterations)
         if out.converged:
             return self._result(system, out, SolveStatus.OK_WITH_FALLBACK, ("damped",))
+        failed |= out.factorization_failed
         a, total = a0, 0
         for k in range(1, cfg.ramp_steps + 1):
             fraction = k / cfg.ramp_steps
             out = _newton(system, f * fraction, a, cfg, cfg.damped_max_step, 2 * cfg.max_iterations)
             a, total = out.a, total + out.iterations
+            failed |= out.factorization_failed
             if not out.converged:
                 break
         status = SolveStatus.OK_WITH_FALLBACK if out.converged else SolveStatus.NONCONVERGED
+        names = ("damped", "ramp") + (("factorization",) if failed else ())
         return self._result(system, _Outcome(out.a, out.converged, total, out.residual, out.delta), status,
-                            ("damped", "ramp"), fraction)
+                            names, fraction)
 
     @staticmethod
     def _result(system: _System, out: _Outcome, status: SolveStatus, fallbacks: tuple[str, ...],
