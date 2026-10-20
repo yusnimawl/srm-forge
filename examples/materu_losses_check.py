@@ -181,7 +181,7 @@ def main():
 
     preset = opt("--preset", "reference")
     workers = opt("--workers", None, int)
-    cache_dir = opt("--cache-dir") or str(Path(tempfile.gettempdir()) / "srm-r3c-strokes")
+    cache_dir = opt("--cache-dir") or str(Path(tempfile.gettempdir()) / "srm-materu-cache")
     json_path = opt("--json")
     skip_yan = "--skip-yan" in args
     if skip_yan:
@@ -218,9 +218,8 @@ def main():
             for p in PROCESSES[1:]:
                 x = c["cut"][p]
                 lo, hi = x["cut_edge_rel"]
-                e0 = c["error_pct"]
-                cells.append(f"{x['error_pct']:+.0f} % ({(e0 + 100) * (1 + lo / 100) - 100:+.0f} to "
-                             f"{(e0 + 100) * (1 + hi / 100) - 100:+.0f})")
+                cells.append(f"{x['error_pct']:+.0f} % ({(x['error_pct'] + 100) * (1 + lo / 100) - 100:+.0f} to "
+                             f"{(x['error_pct'] + 100) * (1 + hi / 100) - 100:+.0f})")
             print(f"| T{r['table']}.{r['index'] + 1} {label} | {c['error_pct']:+.0f} % | " + " | ".join(cells)
                   + f" | {r['measured_iron_w']:.1f} |")
     if not skip_yan:

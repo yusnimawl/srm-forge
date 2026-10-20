@@ -113,10 +113,10 @@ range. R3 is the `unspecified` run (no edge multiplier).
 
 | Row | R3 error | WEDM error (range) | punching error (range) | laser error (range) | Measured (W) |
 |---|---|---|---|---|---|
-| T4.1 nominal | -21 % | -23 % (-22 to -20) | -16 % (-21 to -10) | -14 % (-22 to -3) | 5.6 |
-| T4.1 3.5 deg earlier | -24 % | -26 % (-25 to -23) | -19 % (-24 to -13) | -17 % (-25 to -7) | 5.6 |
-| T5.5 nominal | -68 % | -68 % (-68 to -67) | -65 % (-68 to -63) | -64 % (-68 to -60) | 22.9 |
-| T5.5 4.5 deg earlier | -71 % | -71 % (-71 to -70) | -69 % (-71 to -66) | -68 % (-71 to -63) | 22.9 |
+| T4.1 nominal | -21 % | -23 % (-24 to -22) | -16 % (-16 to -5) | -14 % (-15 to +5) | 5.6 |
+| T4.1 3.5 deg earlier | -24 % | -26 % (-27 to -24) | -19 % (-19 to -8) | -17 % (-18 to +2) | 5.6 |
+| T5.5 nominal | -68 % | -68 % (-69 to -68) | -65 % (-65 to -60) | -64 % (-65 to -56) | 22.9 |
+| T5.5 4.5 deg earlier | -71 % | -71 % (-72 to -71) | -69 % (-69 to -63) | -68 % (-68 to -59) | 22.9 |
 
 Change of the computed iron loss against R3 at the nominal width coefficient: WEDM -2 %, punching +6 to +8 %, laser
 +9 to +11 %. The one-sided range reported for an unspecified process (WEDM low to laser high) is -3.6 % to +34..41 %.
@@ -126,12 +126,12 @@ Reading:
 - Punching and laser raise the loss by 6 to 11 %, inside the +5 to +15 % that spec §3 expected for these rotor and
   stator sizes. WEDM lowers it by about 2 % because its nominal width coefficient (0.3 mm) is below the as-sheared
   Epstein strips (1.4 mm) that the fitted loss data already contain.
-- The cut-edge factor moves the error by 2 to 10 percentage points on T4.1 and 3 to 4 on T5.5. The sign is right
-  (all errors stay negative and move toward zero for punching and laser), but it does not explain the gap: T5.5 stays
-  at -64 to -71 % and T4.1 at -14 to -26 %. The remaining gap is the current shortfall, the steel stand-in and the
-  3D effects discussed above; the cut-edge range at most closes a few percent of it.
+- Per row. At the nominal width coefficients every error stays negative (T4.1 -14 to -26 %, T5.5 -64 to -71 %).
+  Over the laser range T4.1 crosses zero (up to +5 % nominal turn-on, +2 % shifted), so T4.1 is bracketed by the
+  cut-edge range; punching and WEDM do not reach zero. T5.5 is not explained by the cut edge: -56 % at best (laser
+  high). The remaining gap is the current shortfall, the steel stand-in and the 3D effects discussed above.
 
-8/6 (10JNEX900, same stroke as the Yan share cross-check, 3000 rpm, 6.14 N·m) cut-edge factor (hysteresis plus
+8/6 (10JNEX900, 3000 rpm, 6.14 N·m, 23.8 W; a separate run from the Yan share cross-check above, which differs slightly at 6.15 N·m, 23.6 W) cut-edge factor (hysteresis plus
 excess, with over without the multiplier) and the area share of the damaged band per region:
 
 | Process | Region | Factor | Band share |
@@ -149,7 +149,7 @@ excess, with over without the multiplier) and the area share of the damaged band
 | laser | rotor pole | 1.164 | 8.9 % |
 | laser | rotor yoke | 1.046 | 5.6 % |
 
-The pole regions carry the larger factors and the yokes the smaller ones (a pole has more cut edge per area). The spec §3
+The pole regions carry the larger factors and the yokes the smaller ones (the band areas are alike, 8.5 to 8.9 % for punching; the difference comes from where the loss sits inside each region, since the factor is loss-weighted). The spec §3
 estimate for the wide-part Materu 6/4 had the stator yoke highest; that is a different machine. Raw output: `docs/r3-data/materu-cut-screening.json`.
 
 ## Preliminary screening run (laptop, 2026-10-19)
