@@ -1,6 +1,60 @@
 {
   "components": {
     "schemas": {
+      "AdcSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "bits": {
+            "default": 12,
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Bits",
+            "type": "integer"
+          },
+          "full_scale": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Scale"
+          },
+          "gain_error": {
+            "default": 0.0,
+            "title": "Gain Error",
+            "type": "number"
+          },
+          "noise": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Noise",
+            "type": "number"
+          },
+          "offset_counts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Offset Counts",
+            "type": "integer"
+          },
+          "offset_error": {
+            "default": 0.0,
+            "title": "Offset Error",
+            "type": "number"
+          },
+          "rc_tau": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Rc Tau",
+            "type": "number"
+          }
+        },
+        "title": "AdcSettings",
+        "type": "object"
+      },
       "AnimateIn": {
         "additionalProperties": false,
         "properties": {
@@ -938,6 +992,147 @@
         "title": "CompareRowOut",
         "type": "object"
       },
+      "ControlIn": {
+        "additionalProperties": false,
+        "properties": {
+          "controller": {
+            "title": "Controller",
+            "type": "string"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/Scenario",
+            "default": {
+              "adc": {
+                "bits": 12,
+                "gain_error": 0.0,
+                "noise": 0.0,
+                "offset_counts": 0,
+                "offset_error": 0.0,
+                "rc_tau": 0.0
+              },
+              "command_mode": "torque",
+              "command_value": 0.0,
+              "converter": {
+                "dead_time": 5e-07,
+                "turn_off_delay": 2e-07,
+                "turn_on_delay": 1e-07,
+                "v_diode": 1.0,
+                "v_switch": 1.0
+              },
+              "dt": 5e-07,
+              "duration": 0.02,
+              "friction": 0.0,
+              "inertia": 0.001,
+              "load": 0.0,
+              "load_step": 0.0,
+              "load_step_time": 0.0,
+              "mode": "fixed",
+              "params": {},
+              "pwm_hz": 20000.0,
+              "seed": 0,
+              "sensors": {
+                "encoder_cpr": 4096,
+                "encoder_ecc_amp": 0.0,
+                "encoder_ecc_harmonic": 1,
+                "encoder_offset": 0.0,
+                "resolver": false,
+                "resolver_bits": 12,
+                "resolver_gain_mismatch": 0.0,
+                "resolver_phase_error": 0.0,
+                "resolver_pole_pairs": 1
+              },
+              "speed_rpm": 1000.0,
+              "theta0": 0.0
+            }
+          }
+        },
+        "required": [
+          "controller"
+        ],
+        "title": "ControlIn",
+        "type": "object"
+      },
+      "ControllerOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/ControllerParamOut"
+            },
+            "title": "Params",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "params"
+        ],
+        "title": "ControllerOut",
+        "type": "object"
+      },
+      "ControllerParamOut": {
+        "properties": {
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "unit",
+          "default"
+        ],
+        "title": "ControllerParamOut",
+        "type": "object"
+      },
+      "ConverterSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "dead_time": {
+            "default": 5e-07,
+            "minimum": 0.0,
+            "title": "Dead Time",
+            "type": "number"
+          },
+          "turn_off_delay": {
+            "default": 2e-07,
+            "minimum": 0.0,
+            "title": "Turn Off Delay",
+            "type": "number"
+          },
+          "turn_on_delay": {
+            "default": 1e-07,
+            "minimum": 0.0,
+            "title": "Turn On Delay",
+            "type": "number"
+          },
+          "v_diode": {
+            "default": 1.0,
+            "minimum": 0.0,
+            "title": "V Diode",
+            "type": "number"
+          },
+          "v_switch": {
+            "default": 1.0,
+            "minimum": 0.0,
+            "title": "V Switch",
+            "type": "number"
+          }
+        },
+        "title": "ConverterSettings",
+        "type": "object"
+      },
       "Design": {
         "additionalProperties": false,
         "properties": {
@@ -1673,6 +1868,56 @@
           "current_a"
         ],
         "title": "FieldIn",
+        "type": "object"
+      },
+      "FindingOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "warn",
+              "note",
+              "ok",
+              "missing"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "unit": {
+            "default": "",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "topic",
+          "text"
+        ],
+        "title": "FindingOut",
         "type": "object"
       },
       "FixedWinding": {
@@ -3407,6 +3652,57 @@
         "title": "RegionMaterials",
         "type": "object"
       },
+      "ReportOut": {
+        "properties": {
+          "animation_current_a": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Animation Current A"
+          },
+          "animation_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Animation Job Id"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "generated": {
+            "title": "Generated",
+            "type": "string"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "findings",
+          "versions",
+          "generated"
+        ],
+        "title": "ReportOut",
+        "type": "object"
+      },
       "Requirements": {
         "additionalProperties": false,
         "properties": {
@@ -3611,6 +3907,178 @@
           "feasible"
         ],
         "title": "ScanPointOut",
+        "type": "object"
+      },
+      "Scenario": {
+        "additionalProperties": false,
+        "properties": {
+          "adc": {
+            "$ref": "#/components/schemas/AdcSettings",
+            "default": {
+              "bits": 12,
+              "gain_error": 0.0,
+              "noise": 0.0,
+              "offset_counts": 0,
+              "offset_error": 0.0,
+              "rc_tau": 0.0
+            }
+          },
+          "bus_voltage": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bus Voltage"
+          },
+          "command_mode": {
+            "default": "torque",
+            "enum": [
+              "torque",
+              "speed"
+            ],
+            "title": "Command Mode",
+            "type": "string"
+          },
+          "command_value": {
+            "default": 0.0,
+            "title": "Command Value",
+            "type": "number"
+          },
+          "compute_delay": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Delay"
+          },
+          "converter": {
+            "$ref": "#/components/schemas/ConverterSettings",
+            "default": {
+              "dead_time": 5e-07,
+              "turn_off_delay": 2e-07,
+              "turn_on_delay": 1e-07,
+              "v_diode": 1.0,
+              "v_switch": 1.0
+            }
+          },
+          "dt": {
+            "default": 5e-07,
+            "exclusiveMinimum": 0.0,
+            "title": "Dt",
+            "type": "number"
+          },
+          "duration": {
+            "default": 0.02,
+            "exclusiveMinimum": 0.0,
+            "title": "Duration",
+            "type": "number"
+          },
+          "friction": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Friction",
+            "type": "number"
+          },
+          "inertia": {
+            "default": 0.001,
+            "exclusiveMinimum": 0.0,
+            "title": "Inertia",
+            "type": "number"
+          },
+          "isr_hz": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isr Hz"
+          },
+          "load": {
+            "default": 0.0,
+            "title": "Load",
+            "type": "number"
+          },
+          "load_step": {
+            "default": 0.0,
+            "title": "Load Step",
+            "type": "number"
+          },
+          "load_step_time": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Load Step Time",
+            "type": "number"
+          },
+          "mode": {
+            "default": "fixed",
+            "enum": [
+              "fixed",
+              "dynamic"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Params",
+            "type": "object"
+          },
+          "pwm_hz": {
+            "default": 20000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Pwm Hz",
+            "type": "number"
+          },
+          "seed": {
+            "default": 0,
+            "exclusiveMaximum": 4294967296.0,
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "sensors": {
+            "$ref": "#/components/schemas/SensorSettings",
+            "default": {
+              "encoder_cpr": 4096,
+              "encoder_ecc_amp": 0.0,
+              "encoder_ecc_harmonic": 1,
+              "encoder_offset": 0.0,
+              "resolver": false,
+              "resolver_bits": 12,
+              "resolver_gain_mismatch": 0.0,
+              "resolver_phase_error": 0.0,
+              "resolver_pole_pairs": 1
+            }
+          },
+          "speed_rpm": {
+            "default": 1000.0,
+            "title": "Speed Rpm",
+            "type": "number"
+          },
+          "theta0": {
+            "default": 0.0,
+            "title": "Theta0",
+            "type": "number"
+          }
+        },
+        "title": "Scenario",
         "type": "object"
       },
       "SearchJobIn": {
@@ -3826,6 +4294,63 @@
         "title": "SearchSettingsIn",
         "type": "object"
       },
+      "SensorSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "encoder_cpr": {
+            "default": 4096,
+            "minimum": 0.0,
+            "title": "Encoder Cpr",
+            "type": "integer"
+          },
+          "encoder_ecc_amp": {
+            "default": 0.0,
+            "title": "Encoder Ecc Amp",
+            "type": "number"
+          },
+          "encoder_ecc_harmonic": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Encoder Ecc Harmonic",
+            "type": "integer"
+          },
+          "encoder_offset": {
+            "default": 0.0,
+            "title": "Encoder Offset",
+            "type": "number"
+          },
+          "resolver": {
+            "default": false,
+            "title": "Resolver",
+            "type": "boolean"
+          },
+          "resolver_bits": {
+            "default": 12,
+            "maximum": 16.0,
+            "minimum": 2.0,
+            "title": "Resolver Bits",
+            "type": "integer"
+          },
+          "resolver_gain_mismatch": {
+            "default": 0.0,
+            "title": "Resolver Gain Mismatch",
+            "type": "number"
+          },
+          "resolver_phase_error": {
+            "default": 0.0,
+            "title": "Resolver Phase Error",
+            "type": "number"
+          },
+          "resolver_pole_pairs": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Resolver Pole Pairs",
+            "type": "integer"
+          }
+        },
+        "title": "SensorSettings",
+        "type": "object"
+      },
       "SetupFile": {
         "additionalProperties": false,
         "properties": {
@@ -3905,6 +4430,48 @@
           "version"
         ],
         "title": "SetupFile",
+        "type": "object"
+      },
+      "TargetCheckIn": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "controller": {
+            "title": "Controller",
+            "type": "string"
+          }
+        },
+        "required": [
+          "controller",
+          "case_id"
+        ],
+        "title": "TargetCheckIn",
+        "type": "object"
+      },
+      "TargetCheckOut": {
+        "properties": {
+          "compiler": {
+            "title": "Compiler",
+            "type": "string"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "compiler",
+          "log"
+        ],
+        "title": "TargetCheckOut",
         "type": "object"
       },
       "ValidateIn": {
@@ -4337,7 +4904,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.6.0"
+    "version": "0.9.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4624,6 +5191,92 @@
           }
         },
         "summary": "Compare"
+      }
+    },
+    "/api/cases/{case_id}/control": {
+      "post": {
+        "operationId": "control_case_api_cases__case_id__control_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control Case"
+      }
+    },
+    "/api/cases/{case_id}/control/header": {
+      "get": {
+        "operationId": "control_header_api_cases__case_id__control_header_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control Header"
       }
     },
     "/api/cases/{case_id}/dxf": {
@@ -5149,6 +5802,45 @@
         "summary": "Map Mat"
       }
     },
+    "/api/cases/{case_id}/report": {
+      "get": {
+        "operationId": "report_api_cases__case_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report"
+      }
+    },
     "/api/cases/{case_id}/setup": {
       "get": {
         "operationId": "case_setup_api_cases__case_id__setup_get",
@@ -5225,6 +5917,66 @@
           }
         },
         "summary": "Validate Case Job"
+      }
+    },
+    "/api/control/controllers": {
+      "get": {
+        "operationId": "control_controllers_api_control_controllers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ControllerOut"
+                  },
+                  "title": "Response Control Controllers Api Control Controllers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Control Controllers"
+      }
+    },
+    "/api/control/target-check": {
+      "post": {
+        "operationId": "control_target_check_api_control_target_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control Target Check"
       }
     },
     "/api/geometry": {
@@ -5459,6 +6211,55 @@
           }
         },
         "summary": "Cancel Job"
+      }
+    },
+    "/api/jobs/{job_id}/control": {
+      "get": {
+        "operationId": "job_control_api_jobs__job_id__control_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "n_px",
+            "required": false,
+            "schema": {
+              "default": 1500,
+              "maximum": 10000,
+              "minimum": 100,
+              "title": "N Px",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Control"
       }
     },
     "/api/jobs/{job_id}/events": {

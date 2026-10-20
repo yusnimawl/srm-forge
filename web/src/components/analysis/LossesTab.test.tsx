@@ -159,6 +159,17 @@ describe("LossesTab", () => {
   })
 })
 
+describe("LossesTab layout", () => {
+  it("stacks the plots by container width, not viewport width", async () => {
+    const m = mount({ "/losses": () => json(losses(2)), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    expect(m.host.querySelector("[class~='@container']")).toBeTruthy()
+    const row = m.host.querySelector("[class~='@3xl:grid-cols-2']")
+    expect(row?.querySelectorAll("[data-testid=plot]").length).toBe(2)
+    expect(m.host.innerHTML).not.toContain("lg:grid-cols-2")
+  })
+})
+
 describe("LossesTab grid and job", () => {
   it("posts the grid from the inputs", async () => {
     const m = mount({

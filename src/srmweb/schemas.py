@@ -11,6 +11,7 @@ from srmapp.case import CaseInputs
 from srmapp.references import REFERENCES
 from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
+from srmsil.scenario import Scenario
 
 
 def soft_magnetic(name: str) -> str:
@@ -239,3 +240,57 @@ class FieldIn(BaseModel):
 
     angle: float = Field(ge=0, lt=2 * math.pi)
     current_a: float = Field(gt=0)
+
+
+class ControlIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    controller: str   # a reference name or an absolute folder path
+    scenario: Scenario = Scenario()
+
+
+class MotorIn(BaseModel):
+    """`srmsil.tables.MotorData` as JSON."""
+    model_config = ConfigDict(extra="forbid")
+
+    angles: list[float]
+    currents: list[float]
+    psi: list[list[float]]
+    torque: list[list[float]]
+    resistance: float
+    n_phases: int
+    n_rotor_poles: int
+    bus_voltage: float
+
+
+class ControlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    motor: MotorIn
+    controller: str
+    scenario: Scenario
+
+
+class TargetCheckIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    controller: str
+    case_id: str
+
+
+class TargetCheckOut(BaseModel):
+    ok: bool
+    compiler: str
+    log: str
+
+
+class ControllerParamOut(BaseModel):
+    name: str
+    unit: str
+    default: str
+
+
+class ControllerOut(BaseModel):
+    name: str
+    params: list[ControllerParamOut]

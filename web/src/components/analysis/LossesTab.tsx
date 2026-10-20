@@ -67,12 +67,12 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   const edge = envelopeEdge(r)
   const nt = r.torque_fractions.length
   const reached = r.points.map((p, k) => [p, k] as const).filter(([p]) => p.reached)
-  const labels = r.points.map(pointLabel)
+  const labels = r.points.map((p) => `${p.speed_rpm == null ? "?" : Math.round(p.speed_rpm)} · ${p.torque_nm == null ? "?" : Number(p.torque_nm.toPrecision(3))}`)
 
   const contour: Data[] = [
     {
       type: "contour", x: c.x, y: c.y, z: c.z, colorscale: INFERNO_SCALE, connectgaps: false,
-      contours: { coloring: "heatmap" }, colorbar: { title: { text: "Efficiency (%)" } },
+      contours: { coloring: "heatmap" }, colorbar: { title: { text: "Eff. (%)" }, thickness: 12 },
       hovertemplate: "%{x} rpm, level %{y}: %{z:.1f} %<extra></extra>",
     } as Data,
     {
@@ -92,6 +92,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   })) as Data[]
   const axis = (text: string) => ({ ...theme.xaxis, title: { text } })
   const base = { ...theme, margin: { l: 60, r: 10, t: 10, b: 60 } }
+  const barMargin = { ...base.margin, l: 70, t: 90, b: 100 }
   const cfg = { responsive: true, displaylogo: false }
   const sp = sel >= 0 ? r.points[sel] : null
   const factors = Object.entries(sp?.cut_edge_factor ?? {}).filter((e): e is [string, number] => e[1] != null && e[1] !== 1)
@@ -106,12 +107,12 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
           {r.notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       )}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 @3xl:grid-cols-2">
         <section className="space-y-2">
           <h2 className={HEADING}>Efficiency over speed and torque level</h2>
           <Plot
             data={contour}
-            layout={{ ...base, height: 340, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (fraction of the envelope torque)") } as Partial<Layout>}
+            layout={{ ...base, height: 340, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (× envelope)") } as Partial<Layout>}
             config={cfg}
             onClick={(e) => {
               const k = (e.points?.[0] as { customdata?: unknown } | undefined)?.customdata
@@ -123,8 +124,8 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
           <h2 className={HEADING}>Loss split</h2>
           <Plot
             data={barData}
-            layout={{ ...base, height: 340, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: -0.5 } } as Partial<Layout>}
-            config={cfg}
+            layout={{ ...base, margin: barMargin, height: 440, barmode: "stack", xaxis: { ...axis("Speed (rpm) · torque (N·m)"), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", entrywidth: 110 } } as Partial<Layout>}
+            config={{ ...cfg, displayModeBar: false }}
           />
         </section>
       </div>
@@ -245,7 +246,7 @@ export default function LossesTab({ caseId }: { caseId: string }) {
     </div>
   )
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       {active && <p role="status" className="pt-2 text-sm text-muted-foreground">Losses job running — progress above.</p>}
       {losses.data ? (
         <Results caseId={caseId} r={losses.data} machine={machine} />

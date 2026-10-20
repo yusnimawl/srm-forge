@@ -26,3 +26,9 @@ def test_core_and_app_never_import_srmweb():
 
 def test_srmweb_imports_no_solver_or_mesher():
     _assert_no_import("srmweb", ("gmsh", "ngsolve", "netgen", "skfem"))
+
+
+def test_srmsil_layering():
+    _assert_no_import("srmsil", ("srmweb", "gmsh", "ngsolve", "netgen", "skfem"))
+    for package in ("srmcore", "srmapp"):
+        _assert_no_import(package, ("srmsil",))

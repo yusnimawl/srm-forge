@@ -1,6 +1,9 @@
 """Fake search results and a test client for the srmweb case and result tests."""
+import dataclasses
 import json
 import struct
+import sys
+from pathlib import Path
 
 import numpy as np
 from fastapi.testclient import TestClient
@@ -40,6 +43,16 @@ def evaluation(ident: str, ok: bool = True) -> Evaluation:
     curves = MapCurves(a, np.ones((2, 2)), a, a, 0.01, a, a, a, np.array([NAN, 1.0]))
     return Evaluation(ident, design, "ok", "", 1.0, Winding(10, 1, 1e-6, 5.0, 0.1, 0.2, None), 1.1, 1.2, 1000.0,
                       2.0, 0.9, True, env, key, i_rms_a=3.0, j_rms=NAN, map=m, curves=curves)
+
+
+def analytic_evaluation(ident: str) -> Evaluation:
+    """An ok evaluation whose map is the SIL analytic motor's (4 phases, 6 rotor poles) and whose resistance is 0.5."""
+    sys.path.insert(0, str(Path(__file__).parent / "sil"))
+    from sil_fixtures import analytic_motor
+    m = analytic_motor()
+    ev = evaluation(ident)
+    winding = dataclasses.replace(ev.winding, resistance=0.5)
+    return dataclasses.replace(ev, winding=winding, map=MapArrays(m.angles, m.currents, m.psi, m.torque))
 
 
 def search_body(*evaluations: Evaluation) -> dict:

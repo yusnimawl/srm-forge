@@ -1,6 +1,6 @@
 """Job runner: one thread per lane, FIFO within a lane, progress kept in memory.
 
-The main lane runs search, evaluate, validate and losses; the quick lane runs animate, so an animation never waits behind
+The main lane runs search, evaluate, validate, losses and control; the quick lane runs animate, so an animation never waits behind
 a map build."""
 from __future__ import annotations
 
@@ -23,10 +23,12 @@ from srmapp.pipeline import SearchSettings, run_search
 from srmapp.sizing.estimates import J_LIMIT
 from srmapp.sizing.winding import Winding
 from srmcore.model.design import RegionMaterials
-from srmweb.config import Settings
+from srmsil import run as sil_run
+from srmsil.tables import MotorData
+from srmweb.config import Settings, is_loopback
 from srmweb.quick import QuickLane
 from srmweb.frames import frame_task
-from srmweb.schemas import AnimateRequest, EvaluateRequest, LossesRequest, SearchRequest, ValidateRequest
+from srmweb.schemas import AnimateRequest, ControlRequest, EvaluateRequest, LossesRequest, SearchRequest, ValidateRequest
 from srmweb.serialize import evaluation_json, search_result_json, to_json
 from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
 
@@ -42,6 +44,7 @@ STEPS: dict[str, tuple[str, ...]] = {
     "evaluate": ("queued", "mesh", "mapping", "winding", "saved"),
     "validate": ("queued", "map", "checks", "saved"),
     "animate": ("queued", "frames", "saved"),
+    "control": ("queued", "compile", "simulate", "saved"),
     "search": ("queued", "sampling", "designs", "pareto", "saved"),
     "losses": ("queued", "strokes", "fields", "losses", "saved"),
 }
@@ -63,7 +66,7 @@ class Reporter:
     """Latest progress of one running job plus its cancel flag."""
 
     def __init__(self, store: Store, job_id: str, kind: str = ""):
-        self.store, self._job_id = store, job_id
+        self.store, self.job_id = store, job_id
         self._lock = threading.Lock()
         self._cancel = threading.Event()
         self._fields = dict(initial_progress(kind), status="running")
@@ -99,7 +102,7 @@ class Reporter:
 
     def flush(self) -> None:
         self._last_write = time.monotonic()
-        self.store.set_progress(self._job_id, self.snapshot()[1])
+        self.store.set_progress(self.job_id, self.snapshot()[1])
 
 
 LANE_OF = {"animate": "quick"}
@@ -236,8 +239,8 @@ class JobRunner:
                 self._store.put_result(job_id, result, kind=job["kind"])
             elif job["kind"] == "evaluate":
                 self._store.attach_evaluation(job["request"]["case_id"], job_id, result)
-            else:   # an animation belongs to its job, not to the case
-                case_id = None if job["kind"] == "animate" else job["request"].get("case_id")
+            else:   # an animation or a control run belongs to its job, not to the case
+                case_id = None if job["kind"] in ("animate", "control") else job["request"].get("case_id")
                 self._store.put_result(job_id, result, kind=job["kind"], case_id=case_id)
             if cancelled:
                 status = "interrupted" if self._stopping else "cancelled"
@@ -338,6 +341,30 @@ def run_animate_job(req: AnimateRequest, reporter: Reporter, ctx: JobContext) ->
             "psi": psi, "torque": torque, "status": status, "probes": probes}
 
 
+def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) -> dict:
+    """Compile the controller and run the scenario in a child process; the run is stored beside the cache."""
+    if req.controller not in sil_run.REFERENCE and not is_loopback(ctx.settings.host):
+        raise ValueError(CUSTOM_REFUSED)
+    m = MotorData(np.asarray(req.motor.angles), np.asarray(req.motor.currents), np.asarray(req.motor.psi),
+                  np.asarray(req.motor.torque), req.motor.resistance, req.motor.n_phases,
+                  req.motor.n_rotor_poles, req.motor.bus_voltage)
+    reporter.progress(step="compile", message="compiling the controller")
+    try:
+        res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir,
+                          on_compiled=lambda: reporter.progress(step="simulate", message="simulating"),
+                          cancel=reporter.cancelled)
+    except sil_run.SimCancelled:
+        return {"cancelled": True}
+    run_file = ctx.settings.cache_dir / "sil" / "runs" / f"{reporter.job_id}.npz"
+    run_file.parent.mkdir(parents=True, exist_ok=True)
+    sil_run.save(res, run_file)
+    return {"case_id": req.case_id, "controller": res.controller, "summary": to_json(res.summary),
+            "source_hash": res.source_hash, "compile_log": res.compile_log, "run_file": str(run_file)}
+
+
+CUSTOM_REFUSED = "custom controllers run only when srmweb is bound to a loopback host"
+
+
 def run_losses_job(req: LossesRequest, reporter: Reporter, ctx: JobContext) -> dict:
     """Efficiency map of an evaluated case. `efficiency_map` reads only the status, the winding and the current-density
     limit of the evaluation, which are rebuilt from the stored one."""
@@ -364,5 +391,6 @@ KINDS: dict[str, tuple[type[BaseModel], Callable[[BaseModel, Reporter, JobContex
     "evaluate": (EvaluateRequest, run_evaluate_job),
     "validate": (ValidateRequest, run_validate_job),
     "animate": (AnimateRequest, run_animate_job),
+    "control": (ControlRequest, run_control_job),
     "losses": (LossesRequest, run_losses_job),
 }

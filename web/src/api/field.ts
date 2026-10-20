@@ -3,7 +3,7 @@ import { api, ApiError } from "./client"
 import { frameFromWire, framesFromWire, meshFromWire } from "@/lib/fieldWire"
 
 /** Binary response; errors are `ApiError`s with the JSON `detail`, like `api`'s. */
-async function binary(path: string, init: RequestInit = {}): Promise<ArrayBuffer> {
+export async function binary(path: string, init: RequestInit = {}): Promise<ArrayBuffer> {
   const res = await fetch(path, { ...init, credentials: "same-origin" })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
@@ -43,18 +43,21 @@ export const useAnimate = (caseId: string) => {
   })
 }
 
+/** The frames of a finished animate job; a 410 (cleared from the cache) gets a readable message. */
+export async function fetchFrames(jobId: string) {
+  try {
+    return framesFromWire(await binary(`/api/jobs/${jobId}/frames`))
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 410) throw new Error("The frames were cleared; animate again.")
+    throw e
+  }
+}
+
 /** The frames of a finished animate job, loaded once. */
 export const useFrames = (jobId: string | null) =>
   useQuery({
     queryKey: ["field-frames", jobId],
-    queryFn: async () => {
-      try {
-        return framesFromWire(await binary(`/api/jobs/${jobId}/frames`))
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 410) throw new Error("The frames were cleared; animate again.")
-        throw e
-      }
-    },
+    queryFn: () => fetchFrames(jobId!),
     enabled: jobId !== null,
     staleTime: Infinity,
     retry: false,
