@@ -17,6 +17,7 @@ Run from the repo root (hours at `reference`):
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -24,16 +25,18 @@ import numpy as np
 import krishnan_6_4 as k64
 from materials.m19_loss_fixture import m19_loss_data
 from srmapp.drive.envelope import envelope, fixed_stroke, min_copper_stroke
-from srmapp.losses import iron_uncertainty, phase_current_samples, stroke_losses
+from srmapp.losses import iron_fractions, iron_uncertainty, phase_current_samples, stroke_losses
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, stroke_angles
 from srmcore.materials.library import load_material
 from srmcore.materials.loss import fit_loss
 from srmcore.mesh import build_machine_mesh
+from srmcore.post.cut_edge import CUT_PROCESSES
 
 BUS_V, R_PHASE = 180.0, 3.4
 IMAGE_FACTOR = 1.5
+PROCESSES = ("unspecified", "wedm", "punching", "laser")
 I_MAX = 6.0                      # above the largest measured peak current, 5.66 A
 SHIFT_STEP_DEG, SHIFT_MAX_DEG = 0.5, 30.0
 N_THETA = 721                    # table angles over one rotor pole pitch (0.125 deg)
@@ -86,9 +89,12 @@ def _evaluate(result, static, d, model, angles, tau, rpm, angle_set, shift, peak
     trace = pulse(result, machine, rpm, angle_set["advance"] + shift, angle_set["conduction"], peak)
     phase = phase_current_samples(trace.current, angles, tau, machine.n_phases)
     with k64.waivers():
-        sl = stroke_losses(static, d, angles, phase, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
-                           model=model)
-    return dict(computed_peak=float(trace.current.max()), computed_rms=trace.i_rms, valid=trace.valid,
+        by_process = {p: stroke_losses(static, d, angles, phase, rpm, solver=solver, workers=workers,
+                                       cache_dir=cache_dir, model=model, cut_process=p) for p in PROCESSES}
+    sl = by_process["unspecified"]
+    cut = {p: dict(iron_w=s.iron_w, error_pct=100 * (s.iron_w - iron) / iron,
+                   cut_edge_rel=[100 * x for x in s.cut_edge_rel]) for p, s in by_process.items()}
+    return dict(cut=cut, computed_peak=float(trace.current.max()), computed_rms=trace.i_rms, valid=trace.valid,
                 iron_w=sl.iron_w, error_pct=100 * (sl.iron_w - iron) / iron,
                 iron_uncertainty_pct=100 * iron_uncertainty(list(sl.sides)), computed_copper_w=trace.copper_dc_w,
                 regions={k: v.hysteresis + v.classical + v.excess for k, v in sl.iron.items()})
@@ -143,11 +149,22 @@ def yan_shares(preset="reference", workers=None, cache_dir=None, solver="ngsolve
     angles = stroke_angles(static, tau, DEFAULT_STROKE_ANGLES)
     phase = phase_current_samples(trace.current, angles, tau, machine.n_phases)
     sl = stroke_losses(static, d, angles, phase, YAN_RPM, solver=solver, workers=workers, cache_dir=cache_dir)
+    cut_factors = {}
+    for p in PROCESSES[1:]:
+        c = stroke_losses(static, d, angles, phase, YAN_RPM, solver=solver, workers=workers, cache_dir=cache_dir,
+                          cut_process=p)
+        stator_frac, rotor_frac = iron_fractions(static, CUT_PROCESSES[p].delta)
+        shares = {}
+        for side, frac in ((sl.fields.stator, stator_frac), (sl.fields.rotor, rotor_frac)):
+            for name in np.unique(side.region):
+                m = side.region == name
+                shares[str(name)] = float(np.sum(side.areas[m] * frac[m]) / np.sum(side.areas[m]))
+        cut_factors[p] = dict(factor=c.cut_edge_factor, band_share=shares, iron_w=c.iron_w)
     w = {k: v.hysteresis + v.classical + v.excess for k, v in sl.iron.items()}
     total = sum(w.values())
     shares = {"stator yoke": w["stator_yoke"], "stator teeth": w["stator_pole"],
               "rotor": w["rotor_pole"] + w["rotor_yoke"]}
-    return dict(rpm=YAN_RPM, torque_nm=trace.torque_avg, iron_w=total,
+    return dict(rpm=YAN_RPM, torque_nm=trace.torque_avg, iron_w=total, cut_factors=cut_factors,
                 shares_pct={k: 100 * v / total for k, v in shares.items()})
 
 
@@ -164,7 +181,7 @@ def main():
 
     preset = opt("--preset", "reference")
     workers = opt("--workers", None, int)
-    cache_dir = opt("--cache-dir")
+    cache_dir = opt("--cache-dir") or str(Path(tempfile.gettempdir()) / "srm-r3c-strokes")
     json_path = opt("--json")
     skip_yan = "--skip-yan" in args
     if skip_yan:
@@ -190,6 +207,22 @@ def main():
                   f"{r['measured_iron_w']:.1f} | {c['iron_w']:.2f} | {c['error_pct']:+.0f} % | "
                   f"{c['iron_uncertainty_pct']:.0f} % | {r['measured_copper_w']:.1f} | "
                   f"{r['copper_from_measured_rms_w']:.1f} | {c['computed_copper_w']:.1f} | {c['valid']} |")
+    print("\nCut-edge factor: iron error against the measurement (range over the process width coefficient)")
+    print("| Row | R3 error | WEDM error (range) | punching error (range) | laser error (range) | measured (W) |\n"
+          "|---|---|---|---|---|---|")
+    for r in out["rows"]:
+        for label, c in (("nominal", r["nominal"]), (f"{r['shift_deg']} deg earlier", r["shifted"])):
+            if c is None:
+                continue
+            cells = []
+            for p in PROCESSES[1:]:
+                x = c["cut"][p]
+                lo, hi = x["cut_edge_rel"]
+                e0 = c["error_pct"]
+                cells.append(f"{x['error_pct']:+.0f} % ({(e0 + 100) * (1 + lo / 100) - 100:+.0f} to "
+                             f"{(e0 + 100) * (1 + hi / 100) - 100:+.0f})")
+            print(f"| T{r['table']}.{r['index'] + 1} {label} | {c['error_pct']:+.0f} % | " + " | ".join(cells)
+                  + f" | {r['measured_iron_w']:.1f} |")
     if not skip_yan:
         y = yan_shares(preset, workers, cache_dir)
         out["yan"] = y
@@ -198,6 +231,11 @@ def main():
         print("| Region | This 8/6 (%) | Yan et al. 2020 (%) |\n|---|---|---|")
         for k, v in y["shares_pct"].items():
             print(f"| {k} | {v:.1f} | {YAN_SHARES[k]} |")
+        print("\n8/6 cut-edge factor (hysteresis + excess, with over without) and band area share, per region:")
+        print("| Process | Region | Factor | Band share |\n|---|---|---|---|")
+        for p, cf in y["cut_factors"].items():
+            for k, f in cf["factor"].items():
+                print(f"| {p} | {k} | {f:.3f} | {100 * cf['band_share'].get(k, float('nan')):.1f} % |")
     if json_path:
         Path(json_path).parent.mkdir(parents=True, exist_ok=True)
         Path(json_path).write_text(json.dumps(out, indent=1))

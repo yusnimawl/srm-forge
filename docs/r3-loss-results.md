@@ -99,6 +99,59 @@ Reading: run at 3000 rpm and 6.15 N m (23.6 W of iron loss). The ranking matches
 teeth, then rotor); the yoke share is lower than Yan's. Different geometry, material and operating point, so this is a
 pattern check only.
 
+## Cut-edge factor (R3c)
+
+Screening preset only (laptop, 2026-10-20, 4 workers; `full` run pending owner go-ahead). Rows T4.1 and T5.5, nominal
+and shifted turn-on, M19 stand-in as above. Nothing is fitted: the width coefficients and band widths are the
+literature values in `srmcore.post.cut_edge.CUT_PROCESSES`. Command:
+`$env:PYTHONPATH="src;tests"; python -u examples\materu_losses_check.py --preset screening --workers 4 --rows 4:0 5:4 --json docs\r3-data\materu-cut-screening.json`
+(about 45 min: 12 min for the map, about 5 min per stroke solve; the four process evaluations of a row share one
+stroke solve through the cache). The full screening row set (10 rows, 20 stroke solves, about 2 h) was not run.
+
+Iron error against the measurement; in brackets the error at the low and high end of the process's width-coefficient
+range. R3 is the `unspecified` run (no edge multiplier).
+
+| Row | R3 error | WEDM error (range) | punching error (range) | laser error (range) | Measured (W) |
+|---|---|---|---|---|---|
+| T4.1 nominal | -21 % | -23 % (-22 to -20) | -16 % (-21 to -10) | -14 % (-22 to -3) | 5.6 |
+| T4.1 3.5 deg earlier | -24 % | -26 % (-25 to -23) | -19 % (-24 to -13) | -17 % (-25 to -7) | 5.6 |
+| T5.5 nominal | -68 % | -68 % (-68 to -67) | -65 % (-68 to -63) | -64 % (-68 to -60) | 22.9 |
+| T5.5 4.5 deg earlier | -71 % | -71 % (-71 to -70) | -69 % (-71 to -66) | -68 % (-71 to -63) | 22.9 |
+
+Change of the computed iron loss against R3 at the nominal width coefficient: WEDM -2 %, punching +6 to +8 %, laser
++9 to +11 %. The one-sided range reported for an unspecified process (WEDM low to laser high) is -3.6 % to +34..41 %.
+
+Reading:
+
+- Punching and laser raise the loss by 6 to 11 %, inside the +5 to +15 % that spec §3 expected for these rotor and
+  stator sizes. WEDM lowers it by about 2 % because its nominal width coefficient (0.3 mm) is below the as-sheared
+  Epstein strips (1.4 mm) that the fitted loss data already contain.
+- The cut-edge factor moves the error by 2 to 10 percentage points on T4.1 and 3 to 4 on T5.5. The sign is right
+  (all errors stay negative and move toward zero for punching and laser), but it does not explain the gap: T5.5 stays
+  at -64 to -71 % and T4.1 at -14 to -26 %. The remaining gap is the current shortfall, the steel stand-in and the
+  3D effects discussed above; the cut-edge range at most closes a few percent of it.
+
+8/6 (10JNEX900, same stroke as the Yan share cross-check, 3000 rpm, 6.14 N·m) cut-edge factor (hysteresis plus
+excess, with over without the multiplier) and the area share of the damaged band per region:
+
+| Process | Region | Factor | Band share |
+|---|---|---|---|
+| wedm | stator pole | 0.984 | 3.1 % |
+| wedm | stator yoke | 0.968 | 1.6 % |
+| wedm | rotor pole | 0.997 | 4.6 % |
+| wedm | rotor yoke | 0.961 | 0.9 % |
+| punching | stator pole | 1.097 | 8.6 % |
+| punching | stator yoke | 1.061 | 8.5 % |
+| punching | rotor pole | 1.118 | 8.9 % |
+| punching | rotor yoke | 1.026 | 5.6 % |
+| laser | stator pole | 1.138 | 8.6 % |
+| laser | stator yoke | 1.092 | 8.5 % |
+| laser | rotor pole | 1.164 | 8.9 % |
+| laser | rotor yoke | 1.046 | 5.6 % |
+
+The pole regions carry the larger factors and the yokes the smaller ones (a pole has more cut edge per area). The spec §3
+estimate for the wide-part Materu 6/4 had the stator yoke highest; that is a different machine. Raw output: `docs/r3-data/materu-cut-screening.json`.
+
 ## Preliminary screening run (laptop, 2026-10-19)
 
 Preliminary. Screening mesh, two rows only (T4.1 and T5.5), M19 0.36 mm as the stand-in for Materu's steel. These
