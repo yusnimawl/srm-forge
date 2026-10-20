@@ -138,7 +138,7 @@ Capture samples are packed per step (int16 currents, fluxes and voltages, int16 
 - `HilSession`: connect and check modes, upload tables and config, start/stop, set parameters, command, live statistics, capture. `run_hil(...)` scripts a fixed run and returns a `SimResult` like the SIL's plus a `hil` block (health numbers of §5.9 and §6, `valid`).
 - `compare(hil, motor, controller, scenario)`: runs the SIL with the measured output latency and the sensing mode's latency as `SensorSettings.delay` (§11) and returns the differences in mean torque, RMS current and ripple against D10.
 
-New optional extra `hil` = `platformio`, `pyserial` (pinned). Not installed into the shared `.venv` by the implementation sessions; reported to the owner.
+New optional extra `hil` = `pyserial` (pinned); `srmsil.hil` imports it lazily, so a missing package fails only when a session opens. PlatformIO runs from its own environment `hil/.runtime` (git-ignored), created by `hil/setup.bat` or `hil/setup.sh`, as `bench/` does; the shared `.venv` is never changed by the implementation sessions.
 
 ## 10. Web
 
@@ -175,7 +175,7 @@ Bench (manual, recorded in `docs/r8b-hil-results.md`):
 
 ## 13. Versions and dependencies
 
-srmsil, srmweb and `web/` take the next minor version at merge, after R3c; the number is agreed with the coordinating session at merge time. srmcore is unchanged. The openapi schema is regenerated. Firmware carries `HIL_PROTOCOL_VERSION`, checked at connect. New dependencies (extra `hil`): `platformio`, `pyserial`.
+srmsil, srmweb and `web/` take the next minor version at merge, after R3c; the number is agreed with the coordinating session at merge time. srmcore is unchanged. The openapi schema is regenerated. Firmware carries `HIL_PROTOCOL_VERSION`, checked at connect. New dependencies: extra `hil` = `pyserial`; PlatformIO in `hil/.runtime` (§9).
 
 ## 14. Future use
 
