@@ -66,7 +66,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   const edge = envelopeEdge(r)
   const nt = r.torque_fractions.length
   const reached = r.points.map((p, k) => [p, k] as const).filter(([p]) => p.reached)
-  const labels = r.points.map(pointLabel)
+  const labels = r.points.map((p) => `${p.speed_rpm == null ? "?" : Math.round(p.speed_rpm)} · ${p.torque_nm == null ? "?" : Number(p.torque_nm.toPrecision(3))}`)
 
   const contour: Data[] = [
     {
@@ -91,7 +91,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   })) as Data[]
   const axis = (text: string) => ({ ...theme.xaxis, title: { text } })
   const base = { ...theme, margin: { l: 60, r: 10, t: 10, b: 60 } }
-  const barMargin = { ...base.margin, t: 40, b: 110 }
+  const barMargin = { ...base.margin, l: 70, t: 90, b: 100 }
   const cfg = { responsive: true, displaylogo: false }
   const sp = sel >= 0 ? r.points[sel] : null
 
@@ -122,8 +122,8 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
           <h2 className={HEADING}>Loss split</h2>
           <Plot
             data={barData}
-            layout={{ ...base, margin: barMargin, height: 340, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: 1.02, yanchor: "bottom" } } as Partial<Layout>}
-            config={cfg}
+            layout={{ ...base, margin: barMargin, height: 440, barmode: "stack", xaxis: { ...axis("Speed (rpm) · torque (N·m)"), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", entrywidth: 110 } } as Partial<Layout>}
+            config={{ ...cfg, displayModeBar: false }}
           />
         </section>
       </div>
