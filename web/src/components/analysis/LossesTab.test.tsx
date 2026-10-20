@@ -108,6 +108,30 @@ describe("LossesTab", () => {
     expect(t).toContain("Angle convergence 2 % (placeholder until measured)")
   })
 
+  it("shows the cut-edge range and the process, and renders without them", async () => {
+    const r = { ...losses(2), cut_process: "unspecified" }
+    r.points = r.points.map((p) => ({ ...p, cut_edge_rel: [-0.03, 0.21], cut_edge_factor: { stator_pole: 1.05 } }))
+    const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    const t = m.host.textContent ?? ""
+    expect(t).toContain("cut edge −3 / +21 %")
+    expect(t).toContain("Cut process: unspecified (range over all processes)")
+    expect(t).toContain("stator pole ×1.05")
+    document.body.innerHTML = ""
+    const m2 = mount({ "/losses": () => json(losses(2)), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m2.render()
+    expect(m2.host.textContent).not.toContain("Cut process")
+    expect(m2.host.textContent).toContain("Efficiency")
+  })
+
+  it("names a specified cutting process", async () => {
+    const r = { ...losses(2), cut_process: "laser" }
+    r.points = r.points.map((p) => ({ ...p, cut_edge_rel: [0.12, 0.12], cut_edge_factor: { stator_pole: 1 } }))
+    const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    expect(m.host.textContent).toContain("Cut process: laser")
+  })
+
   it("loads B(t) at the picked element in metres", async () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
       { left: 0, top: 0, width: 200, height: 200, right: 200, bottom: 200, x: 0, y: 0, toJSON: () => ({}) })

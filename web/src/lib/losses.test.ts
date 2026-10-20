@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { components } from "@/api/schema"
-import { bestPoint, contourData, envelopeEdge, lossKeyNumbers, ratedPoint, splitBars, svgToMetres } from "./losses"
+import { bestPoint, contourData, envelopeEdge, cutEdgeText, lossKeyNumbers, ratedPoint, splitBars, svgToMetres } from "./losses"
 
 type R = components["schemas"]["LossesOut"]
 type P = components["schemas"]["OperatingLossOut"]
@@ -104,5 +104,14 @@ describe("svgToMetres", () => {
     const wide = { left: 0, top: 0, width: 400, height: 200 }
     expect(svgToMetres(wide, vb, 200, 100).x).toBeCloseTo(0, 12)
     expect(svgToMetres(wide, vb, 300, 100).x).toBeCloseTo(0.05, 12)
+  })
+})
+
+describe("cutEdgeText", () => {
+  it("writes the signed range in percent", () => expect(cutEdgeText([-0.03, 0.21])).toBe("cut edge −3 / +21 %"))
+  it("is a dash without a range", () => {
+    expect(cutEdgeText(null)).toBe("—")
+    expect(cutEdgeText([NaN, NaN])).toBe("—")
+    expect(cutEdgeText([null, null])).toBe("—")
   })
 })

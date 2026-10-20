@@ -16,7 +16,7 @@ import { LINE_COLORS } from "@/lib/analysis"
 import { lossChips } from "@/lib/chips"
 import { fmt } from "@/lib/format"
 import { INFERNO_SCALE } from "@/lib/inferno"
-import { bestPoint, contourData, envelopeEdge, pointLabel, splitBars, svgToMetres, type LossesResult } from "@/lib/losses"
+import { bestPoint, contourData, cutEdgeText, envelopeEdge, pointLabel, splitBars, svgToMetres, type LossesResult } from "@/lib/losses"
 import { parseNum } from "@/lib/searchForm"
 import { fmtAbout } from "@/lib/steps"
 
@@ -93,6 +93,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   const base = { ...theme, margin: { l: 60, r: 10, t: 10, b: 60 } }
   const cfg = { responsive: true, displaylogo: false }
   const sp = sel >= 0 ? r.points[sel] : null
+  const factors = Object.entries(sp?.cut_edge_factor ?? {}).filter((e): e is [string, number] => e[1] != null && e[1] !== 1)
 
   return (
     <div className="space-y-6 pt-2">
@@ -150,8 +151,15 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
             <dd className="num">
               {fmt(sp.iron_w, 3)} W
               {sp.iron_uncertainty_rel != null && <> ± {fmt(sp.iron_uncertainty_rel * 100, 2)} %</>}
+              {sp.cut_edge_rel != null && <>, {cutEdgeText(sp.cut_edge_rel)}</>}
             </dd>
           </dl>
+        )}
+        {r.cut_process != null && (
+          <p className="text-xs text-muted-foreground">
+            Cut process: {r.cut_process === "unspecified" ? "unspecified (range over all processes)" : r.cut_process}
+            {factors.length > 0 && <> ({factors.map(([k, v]) => `${k.replaceAll("_", " ")} ×${v.toFixed(2)}`).join(", ")})</>}
+          </p>
         )}
         {sp?.reached && sp.beyond_fit_range && (
           <div role="note" className="text-sm text-muted-foreground">

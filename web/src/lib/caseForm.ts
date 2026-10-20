@@ -32,10 +32,18 @@ export const POLE_SETS: readonly (readonly [number, number, number])[] = [
   [6, 4, 3], [8, 6, 4], [12, 8, 3], [16, 12, 4], [24, 16, 3],
 ]
 
+export const CUT_PROCESSES = [
+  { value: "unspecified", label: "Unspecified" },
+  { value: "wedm", label: "WEDM" },
+  { value: "punching", label: "Punching or shearing" },
+  { value: "laser", label: "Laser" },
+] as const
+export type CutProcess = (typeof CUT_PROCESSES)[number]["value"]
+
 export type CaseForm = {
   requirements: {
     peakPowerKw: Num; peakTorqueNm: Num; baseSpeedRpm: Num; maxSpeedRpm: Num; busVoltageV: Num
-    maxOuterDiameterMm: Num; maxMassKg: Num; maxSlotFill: Num; phaseCurrentA: Num; windingTemperatureC: Num; wires: WireForm[]
+    maxOuterDiameterMm: Num; maxMassKg: Num; maxSlotFill: Num; phaseCurrentA: Num; windingTemperatureC: Num; cutProcess: CutProcess; wires: WireForm[]
   }
   /** `MACHINE_FIELDS` and the pole counts, as text in UI units. */
   machine: Record<string, Num>
@@ -112,6 +120,7 @@ export function toForm(inputs: Raw): CaseForm {
       maxSlotFill: show(req.max_slot_fill),
       phaseCurrentA: show(req.phase_current_a),
       windingTemperatureC: show(req.winding_temperature_c) || String(DEFAULT_WINDING_TEMPERATURE_C),
+      cutProcess: CUT_PROCESSES.find((c) => c.value === req.cut_process)?.value ?? "unspecified",
       wires: (Array.isArray(req.wires) ? req.wires : []).flatMap(wireToForm),
     },
     machine: Object.fromEntries([
@@ -184,6 +193,7 @@ export function toInputs(f: CaseForm): CaseInputs {
       max_slot_fill: conv(r.maxSlotFill, restReq.max_slot_fill),
       phase_current_a: conv(r.phaseCurrentA, restReq.phase_current_a, undefined, true),
       winding_temperature_c: conv(r.windingTemperatureC, restReq.winding_temperature_c),
+      cut_process: r.cutProcess,
       wires: r.wires.map(wire),
     },
     design: { ...restDesign, machine, mesh: { ...obj(restDesign.mesh), preset: f.preset } },
@@ -237,7 +247,7 @@ export const CASE_TABS: { id: CaseTab; label: string }[] = [
   { id: "drive", label: "Drive" },
 ]
 
-const REQ_KEYS = ["peak_power_w", "peak_torque_nm", "base_speed_rpm", "max_speed_rpm", "max_outer_diameter_m", "max_mass_kg", "max_slot_fill", "winding_temperature_c"]
+const REQ_KEYS = ["peak_power_w", "peak_torque_nm", "base_speed_rpm", "max_speed_rpm", "max_outer_diameter_m", "max_mass_kg", "max_slot_fill", "winding_temperature_c", "cut_process"]
 const TAB_OF_KEY: Record<string, CaseTab> = {
   ...Object.fromEntries(REQ_KEYS.map((k) => [`requirements.${k}`, "requirement"])),
   "requirements.bus_voltage_v": "drive",

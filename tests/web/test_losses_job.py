@@ -112,6 +112,28 @@ def test_losses_route_end_to_end(client, calls):
     assert body["winding_temperature_c"] == 120.0 and body["notes"] == ["note"]
 
 
+def test_losses_cut_edge_fields(client):
+    case = _case(client)
+    res = _result()
+    _store_losses(client, case, res)
+    body = client.get(f"/api/cases/{case}/losses").json()
+    assert body["cut_process"] == res.cut_process
+    assert len(body["points"][0]["cut_edge_rel"]) == 2
+    assert body["points"][1]["cut_edge_rel"] == [None, None]
+
+
+def test_losses_before_cut_edge_load(client):
+    case = _case(client)
+    body = to_json(_result())
+    del body["cut_process"]
+    for p in body["points"]:
+        del p["cut_edge_rel"], p["cut_edge_factor"]
+    client.app.state.store.put_result(None, body, kind="losses", case_id=case)
+    out = client.get(f"/api/cases/{case}/losses")
+    assert out.status_code == 200, out.text
+    assert out.json()["cut_process"] is None and out.json()["points"][0]["cut_edge_rel"] is None
+
+
 def test_losses_absent_is_404(client):
     assert client.get(f"/api/cases/{_case(client)}/losses").status_code == 404
 

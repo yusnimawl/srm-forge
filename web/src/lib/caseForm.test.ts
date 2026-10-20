@@ -5,7 +5,7 @@ import { tabOfKey, toForm, toInputs, validationByField, withWires } from "./case
 const inputs = {
   requirements: {
     peak_power_w: 10000, peak_torque_nm: 32, base_speed_rpm: 3000, max_speed_rpm: 9000, bus_voltage_v: 400,
-    max_outer_diameter_m: 0.2, max_mass_kg: null, max_slot_fill: 0.6, phase_current_a: 60, winding_temperature_c: 100,
+    max_outer_diameter_m: 0.2, max_mass_kg: null, max_slot_fill: 0.6, phase_current_a: 60, winding_temperature_c: 100, cut_process: "unspecified",
     wires: [{ kind: "round", diameter: 0.0012, outer_diameter: 0.00128 }],
   },
   design: {
@@ -42,6 +42,14 @@ describe("caseForm", () => {
     expect(f.requirements.windingTemperatureC).toBe("120")
     const g = { ...f, requirements: { ...f.requirements, windingTemperatureC: "90" } }
     expect((toInputs(g).requirements as unknown as Record<string, unknown>).winding_temperature_c).toBe(90)
+  })
+  it("edits the cutting process and defaults a draft without one to unspecified", () => {
+    expect(toForm(inputs).requirements.cutProcess).toBe("unspecified")
+    const f = toForm({ ...inputs, requirements: { ...inputs.requirements, cut_process: undefined } } as unknown as CaseInputs)
+    expect(f.requirements.cutProcess).toBe("unspecified")
+    const g = { ...f, requirements: { ...f.requirements, cutProcess: "punching" as const } }
+    expect((toInputs(g).requirements as unknown as Record<string, unknown>).cut_process).toBe("punching")
+    expect(tabOfKey("requirements.cut_process")).toBe("requirement")
   })
   it("files a temperature error under the requirement tab", () => {
     expect(tabOfKey("requirements.winding_temperature_c")).toBe("requirement")

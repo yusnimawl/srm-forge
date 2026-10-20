@@ -184,6 +184,8 @@ class OperatingLossOut(_Out):
     theta_off: F
     current_limit: F
     stroke_key: str
+    cut_edge_rel: tuple[F, F] | None = None
+    cut_edge_factor: dict[str, F] | None = None
 
 
 class LossesOut(_Out):
@@ -195,6 +197,7 @@ class LossesOut(_Out):
     angle_convergence_rel: F
     srmapp_version: str
     notes: list[str]
+    cut_process: str | None = None
 
 
 class BWaveformOut(_Out):

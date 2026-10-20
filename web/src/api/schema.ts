@@ -1218,6 +1218,8 @@ export interface components {
         LossesOut: {
             /** Angle Convergence Rel */
             angle_convergence_rel: number | null;
+            /** Cut Process */
+            cut_process?: string | null;
             /** N Angles */
             n_angles: number;
             /** Notes */
@@ -1337,6 +1339,15 @@ export interface components {
             copper_dc_w: number | null;
             /** Current Limit */
             current_limit: number | null;
+            /** Cut Edge Factor */
+            cut_edge_factor?: {
+                [key: string]: number | null;
+            } | null;
+            /** Cut Edge Rel */
+            cut_edge_rel?: [
+                number | null,
+                number | null
+            ] | null;
             /** Efficiency */
             efficiency: number | null;
             /** Iron */
@@ -1524,6 +1535,12 @@ export interface components {
              * @default 400
              */
             bus_voltage_v: number;
+            /**
+             * Cut Process
+             * @default unspecified
+             * @enum {string}
+             */
+            cut_process: "unspecified" | "wedm" | "punching" | "laser";
             /** Max Mass Kg */
             max_mass_kg?: number | null;
             /** Max Outer Diameter M */
