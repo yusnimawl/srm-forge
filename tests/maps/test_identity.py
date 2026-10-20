@@ -22,3 +22,34 @@ def test_design_hash_changes_with_geometry_preset_and_material():
     assert design_hash(D.model_copy(update={"mesh": MeshSettings(preset="screening")})) != base
     other = D.machine.model_copy(update={"materials": RegionMaterials(stator="M43", rotor="M43")})
     assert design_hash(D.model_copy(update={"machine": other})) != base
+
+
+def test_loss_block_does_not_change_digest():
+    import json
+    from srmcore.materials import library
+    raw = (library._data_dir() / "10JNEX900.json").read_bytes()
+    record = json.loads(raw)
+    assert "loss" in record
+    without = {k: v for k, v in record.items() if k != "loss"}
+    assert material_digest(raw) == material_digest(json.dumps(without).encode())
+    edited = json.loads(raw)
+    edited["loss"]["confidence"] = "A"
+    assert material_digest(json.dumps(edited).encode()) == material_digest(raw)
+
+
+def test_design_hash_ignores_loss_data(monkeypatch):
+    import json
+    from srmcore.materials import library
+    base = design_hash(D)
+    real = library._data_dir()
+    orig = type(real).read_bytes
+
+    def patched(self):
+        data = orig(self)
+        if self.name == "10JNEX900.json":
+            rec = json.loads(data)
+            rec["loss"]["confidence"] = "A"
+            return json.dumps(rec).encode()
+        return data
+    monkeypatch.setattr(type(real), "read_bytes", patched)
+    assert design_hash(D) == base

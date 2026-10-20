@@ -35,6 +35,41 @@ class BHTable(_Frozen):
         return self
 
 
+class LossPoint(_Frozen):
+    """Measured sinusoidal core loss: peak flux density b (T), frequency f (Hz), loss in W/kg."""
+    b: float = Field(gt=0)
+    f: float = Field(gt=0)
+    w_per_kg: float = Field(gt=0)
+
+
+class LossData(_Frozen):
+    """Sinusoidal core-loss table of a lamination steel plus the conductivity used for the classical term."""
+    points: tuple[LossPoint, ...]
+    provenance: Provenance
+    confidence: Literal["A", "B", "C"]
+    frequency_range: tuple[float, float]
+    b_range: tuple[float, float]   # peak flux density span (T) the table and the fit cover
+    thickness: float = Field(gt=0)   # m, lamination thickness the table was measured at
+    conductivity: float = Field(gt=0)   # S/m
+    conductivity_source: str
+
+    @model_validator(mode="after")
+    def _enough_points(self) -> "LossData":
+        if len(self.points) < 6:
+            raise ValueError(f"loss data needs at least 6 points, got {len(self.points)}")
+        if len({p.f for p in self.points}) < 2:
+            raise ValueError("loss data needs at least 2 distinct frequencies")
+        for name, (lo, hi) in (("frequency_range", self.frequency_range), ("b_range", self.b_range)):
+            if not 0 < lo < hi:
+                raise ValueError(f"{name} must satisfy 0 < low < high")
+        for p in self.points:
+            if not self.b_range[0] <= p.b <= self.b_range[1]:
+                raise ValueError(f"point b={p.b} T lies outside b_range {self.b_range}")
+            if not self.frequency_range[0] <= p.f <= self.frequency_range[1]:
+                raise ValueError(f"point f={p.f} Hz lies outside frequency_range {self.frequency_range}")
+        return self
+
+
 class _Sourced(_Frozen):
     """Every numeric property carries a *_source string; placeholders are listed and say PROVISIONAL."""
     density: float = Field(gt=0)
@@ -69,6 +104,7 @@ class SoftMagneticMaterial(_Sourced):
     saturation_polarisation: float = Field(gt=0)
     saturation_polarisation_source: str
     digitisation_error: float | None = Field(default=None, ge=0, lt=0.5)   # relative B error of a digitised curve
+    loss: LossData | None = None
 
 
 class ConductorMaterial(_Sourced):

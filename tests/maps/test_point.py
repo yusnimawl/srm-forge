@@ -104,3 +104,14 @@ def test_ngsolve_agrees_with_skfem(static):
     assert np.allclose(ngs.psi, ref.psi, rtol=1e-4, atol=1e-4 * np.abs(ref.psi).max())
     scale = max(abs(ref.torque_arkkio), abs(ref.coenergy))
     assert abs(ngs.torque_arkkio - ref.torque_arkkio) <= 1e-4 * scale
+
+
+def test_failed_sensitivity_factorization_withholds_l_inc_but_keeps_the_point(static):
+    from srmcore.solvers.settings import FactorizationFailed
+
+    class Failing(SkfemReference):
+        def sensitivity(self, problem, a):
+            raise FactorizationFailed("Numeric factorization failed.")
+
+    r = solve_point(static, DESIGN, math.radians(10.0), {"A": 5.0}, Failing(), with_l_inc=True)
+    assert r.l_inc is None and r.status is not SolveStatus.NONCONVERGED

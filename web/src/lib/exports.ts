@@ -63,7 +63,7 @@ export function applySearchSetup(file: SetupFile, v: SearchFormValues): SearchFo
       ...out,
       peakPowerKw: r.peakPowerKw, peakTorqueNm: r.peakTorqueNm, baseSpeedRpm: r.baseSpeedRpm, maxSpeedRpm: r.maxSpeedRpm,
       busVoltageV: r.busVoltageV, maxOuterDiameterMm: r.maxOuterDiameterMm, maxMassKg: r.maxMassKg,
-      maxSlotFill: r.maxSlotFill, phaseCurrentA: r.phaseCurrentA, wires: r.wires,
+      maxSlotFill: r.maxSlotFill, phaseCurrentA: r.phaseCurrentA, windingTemperatureC: r.windingTemperatureC, wires: r.wires,
       windingMode: r.wires.length > 0 ? "wires" : "density",
     }
   }

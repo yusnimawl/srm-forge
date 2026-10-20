@@ -154,3 +154,11 @@ def test_export_refuses_mesh_settings_a_setup_file_cannot_hold(client):
         r = client.get(f"{url}/setup")
         assert r.status_code == 422, r.text
         assert r.json()["errors"][0]["loc"][:1] == ["design"]   # check_case rejects "reference"; a custom mesh is ours
+
+
+def test_winding_temperature_round_trip(client):
+    case = _reference(client, REQ | {"winding_temperature_c": 95.0})
+    body = client.get(f"/api/cases/{case['id']}/setup").json()
+    imported = client.post("/api/cases", json={"origin": "import", "setup": body})
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["inputs"]["requirements"]["winding_temperature_c"] == 95.0
