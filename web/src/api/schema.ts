@@ -234,6 +234,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report */
+        get: operations["report_api_cases__case_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/setup": {
         parameters: {
             query?: never;
@@ -985,6 +1002,27 @@ export interface components {
             /** Current A */
             current_a: number;
         };
+        /** FindingOut */
+        FindingOut: {
+            /** Id */
+            id: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "warn" | "note" | "ok" | "missing";
+            /** Text */
+            text: string;
+            /** Topic */
+            topic: string;
+            /**
+             * Unit
+             * @default
+             */
+            unit: string;
+            /** Value */
+            value?: number | null;
+        };
         /** FixedWinding */
         FixedWinding: {
             /**
@@ -1514,6 +1552,21 @@ export interface components {
              * @default M19
              */
             stator: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /** Animation Current A */
+            animation_current_a?: number | null;
+            /** Animation Job Id */
+            animation_job_id?: string | null;
+            /** Findings */
+            findings: components["schemas"]["FindingOut"][];
+            /** Generated */
+            generated: string;
+            /** Versions */
+            versions: {
+                [key: string]: string;
+            };
         };
         /** Requirements */
         Requirements: {
@@ -2366,6 +2419,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_cases__case_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */

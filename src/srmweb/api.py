@@ -7,6 +7,7 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -23,9 +24,11 @@ from scipy.io import savemat
 
 import srmcore
 import srmweb
+import srmapp
 from srmapp import field
 from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
 from srmapp.losses import N_ANGLES, check_loss_data
+from srmapp.report import findings
 from srmapp.sizing.estimates import active_mass
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
@@ -42,8 +45,8 @@ from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.jobs import KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
-from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, LossesOut, MaterialOut,
-                            ReferenceOut, SearchResultOut)
+from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, FindingOut, LossesOut,
+                            MaterialOut, ReferenceOut, ReportOut, SearchResultOut)
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, EditCase, EstimateOut,
                             EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, LossesBody,
                             LossesEstimateOut, LossesRequest, ReferenceCase, ValidateIn, ValidateRequest)
@@ -544,16 +547,30 @@ def create_app(settings: Settings,
                                  coil_current=body.current_a * ctx.k, k=ctx.k, frames=body.frames)
         return {"job_id": _submit(runner, "animate", request.model_dump(mode="json"))["id"]}
 
+    def cached_frames(job: dict, result: dict) -> list:
+        """The cached frame of every angle of an animate job's result (None for a cleared frame)."""
+        request = AnimateRequest.model_validate(job["request"])
+        design = reference_design(request.inputs)
+        return [field.cached_frame(design, angle, request.coil_current, cache_dir=settings.cache_dir)
+                for angle in result["angles"]]
+
+    def frames_cached(job: dict) -> bool:
+        """True when the animate job's result exists and all its frames are still cached."""
+        result = store.get_result(job["id"])
+        if result is None or result.get("cancelled"):
+            return False
+        try:
+            return all(f is not None for f in cached_frames(job, result))
+        except (ValidationError, InputError):
+            return False
+
     @router.get("/jobs/{job_id}/frames")
     def job_frames(job_id: str):
         job = job_or_404(job_id)
         result = store.get_result(job_id) if job["kind"] == "animate" else None
         if result is None or result.get("cancelled"):
             raise HTTPException(404, "no frames")
-        request = AnimateRequest.model_validate(job["request"])
-        design = reference_design(request.inputs)
-        frames = [field.cached_frame(design, angle, request.coil_current, cache_dir=settings.cache_dir)
-                  for angle in result["angles"]]
+        frames = cached_frames(job, result)
         if any(f is None for f in frames):
             raise HTTPException(410, "the frames were cleared; animate again")
         arrays = {}
@@ -596,11 +613,10 @@ def create_app(settings: Settings,
                                 parent_case_id=parent["id"], stale=True)
         return DxfImportOut(case=case_out(store.get_case(new)), warnings=found)
 
-    @router.get("/cases/{case_id}/compare", response_model=CompareOut)
-    def compare(case_id: str):
-        case = case_or_404(case_id)
+    def compare_rows(case: dict) -> list[dict] | None:
+        """Before/after rows against the case's parent, None for a case without a parent."""
         if case["parent_case_id"] is None:
-            raise HTTPException(404, "this case has no parent to compare with")
+            return None
         parent = case_or_404(case["parent_case_id"])
 
         def column(c: dict) -> list[float | None]:
@@ -620,8 +636,41 @@ def create_app(settings: Settings,
         before, after = column(parent), column(case)
         names = [("La", "mH"), ("Lu", "mH"), ("Peak torque", "N·m"), ("Flux linkage max", "Wb"),
                  ("Stator iron", "kg"), ("Rotor iron", "kg"), ("Total mass", "kg")]
-        rows = [{"name": n, "unit": u, "before": b, "after": a} for (n, u), b, a in zip(names, before, after)]
-        return CompareOut(parent_id=parent["id"], parent_evaluated=before[0] is not None, rows=rows)
+        return [{"name": n, "unit": u, "before": b, "after": a} for (n, u), b, a in zip(names, before, after)]
+
+    @router.get("/cases/{case_id}/compare", response_model=CompareOut)
+    def compare(case_id: str):
+        case = case_or_404(case_id)
+        rows = compare_rows(case)
+        if rows is None:
+            raise HTTPException(404, "this case has no parent to compare with")
+        return CompareOut(parent_id=case["parent_case_id"], parent_evaluated=rows[0]["before"] is not None, rows=rows)
+
+    @router.get("/cases/{case_id}/report", response_model=ReportOut)
+    def report(case_id: str):
+        case = case_or_404(case_id)
+        evaluation = store.case_result(case_id, "evaluate")
+        if evaluation is None:
+            raise HTTPException(409, "the case has no evaluation")
+        losses = store.case_result(case_id, "losses")
+        if losses is not None and losses.get("cancelled"):
+            losses = None
+        animate = [j for j in store.case_jobs(case_id) if j["kind"] == "animate" and j["status"] == "done"
+                   and not (store.get_result(j["id"]) or {"cancelled": True}).get("cancelled")]
+        chosen = next((j for j in animate if frames_cached(store.get_job(j["id"]))), None)
+        missing = (None if chosen else "no animation run" if not animate
+                   else "the frames were cleared from the cache; animate again")
+        validation = store.case_result(case_id, "validate")
+        if validation is not None and validation.get("cancelled"):
+            validation = None
+        found = findings(CaseInputs.model_validate(case["inputs"]), evaluation, validation,
+                         losses, compare_rows(case) if case["origin"] == "dxf" and store.get_case(case["parent_case_id"] or "") else None, missing)
+        return ReportOut(
+            findings=[FindingOut(**vars(f)) for f in found],
+            versions={"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": srmweb.__version__},
+            generated=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            animation_job_id=chosen["id"] if chosen else None,
+            animation_current_a=store.get_result(chosen["id"])["current_a"] if chosen else None)
 
     @router.get("/cases/{case_id}/map.mat")
     def map_mat(case_id: str):

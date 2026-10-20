@@ -186,6 +186,23 @@ class OperatingLossOut(_Out):
     stroke_key: str
 
 
+class FindingOut(_Out):
+    id: str
+    level: Literal["warn", "note", "ok", "missing"]
+    topic: str
+    text: str
+    value: F = None
+    unit: str = ""
+
+
+class ReportOut(_Out):
+    findings: list[FindingOut]
+    versions: dict[str, str]
+    generated: str
+    animation_job_id: str | None = None
+    animation_current_a: F = None
+
+
 class LossesOut(_Out):
     points: list[OperatingLossOut]
     speeds_rpm: Vec

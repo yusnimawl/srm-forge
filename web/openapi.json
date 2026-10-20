@@ -1675,6 +1675,56 @@
         "title": "FieldIn",
         "type": "object"
       },
+      "FindingOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "warn",
+              "note",
+              "ok",
+              "missing"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "unit": {
+            "default": "",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "topic",
+          "text"
+        ],
+        "title": "FindingOut",
+        "type": "object"
+      },
       "FixedWinding": {
         "additionalProperties": false,
         "properties": {
@@ -3340,6 +3390,57 @@
         "title": "RegionMaterials",
         "type": "object"
       },
+      "ReportOut": {
+        "properties": {
+          "animation_current_a": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Animation Current A"
+          },
+          "animation_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Animation Job Id"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "generated": {
+            "title": "Generated",
+            "type": "string"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "findings",
+          "versions",
+          "generated"
+        ],
+        "title": "ReportOut",
+        "type": "object"
+      },
       "Requirements": {
         "additionalProperties": false,
         "properties": {
@@ -4259,7 +4360,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5069,6 +5170,45 @@
           }
         },
         "summary": "Map Mat"
+      }
+    },
+    "/api/cases/{case_id}/report": {
+      "get": {
+        "operationId": "report_api_cases__case_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report"
       }
     },
     "/api/cases/{case_id}/setup": {
