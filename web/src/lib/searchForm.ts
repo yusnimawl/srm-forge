@@ -91,6 +91,7 @@ export function toSearchRequest(v: SearchFormValues): SearchRequest {
       wires: wireMode ? v.wires.map(wireToSI) : [],
       phase_current_a: wireMode ? optional(v.phaseCurrentA) : null,
       winding_temperature_c: num(v.windingTemperatureC),
+      cut_process: "unspecified",
     },
     settings: {
       n_candidates: num(v.nCandidates),

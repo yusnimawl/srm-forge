@@ -2676,6 +2676,17 @@
             ],
             "title": "Angle Convergence Rel"
           },
+          "cut_process": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Process"
+          },
           "n_angles": {
             "title": "N Angles",
             "type": "integer"
@@ -3139,6 +3150,62 @@
               }
             ],
             "title": "Current Limit"
+          },
+          "cut_edge_factor": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Edge Factor"
+          },
+          "cut_edge_rel": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Edge Rel"
           },
           "efficiency": {
             "anyOf": [
@@ -3649,6 +3716,17 @@
             "exclusiveMinimum": 0.0,
             "title": "Bus Voltage V",
             "type": "number"
+          },
+          "cut_process": {
+            "default": "unspecified",
+            "enum": [
+              "unspecified",
+              "wedm",
+              "punching",
+              "laser"
+            ],
+            "title": "Cut Process",
+            "type": "string"
           },
           "max_mass_kg": {
             "anyOf": [
@@ -4826,7 +4904,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "openapi": "3.1.0",
   "paths": {

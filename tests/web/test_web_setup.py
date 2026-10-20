@@ -162,3 +162,20 @@ def test_winding_temperature_round_trip(client):
     imported = client.post("/api/cases", json={"origin": "import", "setup": body})
     assert imported.status_code == 201, imported.text
     assert imported.json()["inputs"]["requirements"]["winding_temperature_c"] == 95.0
+
+
+def test_cut_process_round_trip(client):
+    case = _reference(client, REQ | {"cut_process": "laser"})
+    body = client.get(f"/api/cases/{case['id']}/setup").json()
+    imported = client.post("/api/cases", json={"origin": "import", "setup": body})
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["inputs"]["requirements"]["cut_process"] == "laser"
+
+
+def test_setup_without_cut_process_imports_unspecified(client):
+    case = _reference(client)
+    body = client.get(f"/api/cases/{case['id']}/setup").json()
+    body["requirements"].pop("cut_process", None)
+    imported = client.post("/api/cases", json={"origin": "import", "setup": body})
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["inputs"]["requirements"]["cut_process"] == "unspecified"

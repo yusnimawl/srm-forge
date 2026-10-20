@@ -1,5 +1,6 @@
 """Vehicle-motor requirements (v0 spec §3, v0a-2 spec §3.2). Peak-only: no continuous rating. Wire mode when wires are given, density mode otherwise."""
 import math
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -24,6 +25,7 @@ class Requirements(BaseModel):
     phase_current_a: float | None = Field(default=None, gt=0)      # inverter peak phase current, A
     max_slot_fill: float = Field(default=0.6, gt=0, le=0.9)        # outer wire area / coil-side area
     winding_temperature_c: float = Field(default=120.0, ge=-40, le=250)   # copper temperature for resistance and AC loss
+    cut_process: Literal["unspecified", "wedm", "punching", "laser"] = "unspecified"   # lamination cutting process
 
     @field_validator("max_outer_diameter_m")
     @classmethod

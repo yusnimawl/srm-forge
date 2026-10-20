@@ -32,7 +32,7 @@ def test_report_findings_and_versions(client):
     r = _report(client, _case(client))
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["versions"] == {"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": "0.8.0"}
+    assert body["versions"] == {"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": "0.9.0"}
     by_id = {f["id"]: f for f in body["findings"]}
     assert {"losses_missing", "validation_missing", "animation_missing"} <= set(by_id)
     assert "no animation run" in by_id["animation_missing"]["text"]

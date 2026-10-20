@@ -18,6 +18,15 @@ export function contourData(r: LossesResult): { x: number[]; y: number[]; z: (nu
   return { x, y, z }
 }
 
+/** The cut-edge range of an operating point's iron loss, relative to the model without it ("cut edge −3 / +21 %");
+ *  a dash where there is none. */
+export function cutEdgeText(rel: readonly (number | null)[] | null | undefined): string {
+  const [lo, hi] = rel ?? []
+  if (lo == null || hi == null || !Number.isFinite(lo) || !Number.isFinite(hi)) return "—"
+  const pct = (v: number) => `${v < 0 ? "−" : "+"}${Math.abs(Math.round(v * 100))}`
+  return `cut edge ${pct(lo)} / ${pct(hi)} %`
+}
+
 const REGION_ORDER = ["stator_pole", "stator_yoke", "rotor_pole", "rotor_yoke"]
 
 export type LossSeries = { name: string; values: (number | null)[]; hover?: string[] }

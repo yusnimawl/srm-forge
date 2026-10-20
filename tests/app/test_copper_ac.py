@@ -95,3 +95,13 @@ def test_reversing_field_gives_proximity_at_the_fundamental():
     n_strands = w.turns * w.strands * P.n_stator_poles
     want = n_strands * np.pi * 2 * P.stack_length * (1.0e-4) ** 4 * (2 * np.pi * f) ** 2 * b_amp**2 / (128 * rho)
     assert got == pytest.approx(want, rel=1e-6)
+
+
+def test_cut_process_default_and_validation():
+    from pydantic import ValidationError
+    assert _req().cut_process == "unspecified"
+    data = json.loads(_req().model_dump_json())
+    data.pop("cut_process", None)
+    assert Requirements.model_validate(data).cut_process == "unspecified"
+    with pytest.raises(ValidationError):
+        Requirements.model_validate({**data, "cut_process": "saw"})
