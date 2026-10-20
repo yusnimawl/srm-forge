@@ -1,5 +1,6 @@
 import ctypes as C
 import json
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import numpy as np
 import pytest
 from sil_fixtures import run_in_child
 
-from srmsil.build import compile_host
+from srmsil.build import compile_host, zig_cc
 from srmsil.hil import proto
 from srmsil.hil.proto import ProtoError, Type
 
@@ -106,3 +107,9 @@ def test_c_and_python_agree():
         assert parsed[2 * i + 1] == want_small
     assert sizes == {int(t): proto.PAYLOAD_SIZE.get(t, 0) for t in Type}
     assert sample == 36 and crc == 0x29B1
+
+
+def test_proto_compiles_strict(tmp_path):
+    r = subprocess.run([*zig_cc(), "-std=c99", "-Wall", "-Wextra", "-Werror", f"-I{COMMON}", "-c",
+                        "-o", str(tmp_path / "p.o"), str(COMMON / "hil_proto.c")], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
