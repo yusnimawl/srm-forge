@@ -82,22 +82,23 @@ def _ptr(a: np.ndarray, ctype):
     return a.ctypes.data_as(C.POINTER(ctype))
 
 
-def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
-    """Load the library and run it. Call only in a child process: the library holds controller code and C state."""
-    lib = C.CDLL(str(Path(lib_path).resolve()))
-    _abi.bind(lib)
-    cps = (_abi.ParamStep * max(len(scenario.param_steps), 1))()
-    steps = sorted(scenario.param_steps, key=lambda s: s.time)   # stable: steps at one time keep list order
-    for c, s in zip(cps, steps):
-        c.t, c.value, c.name = s.time, s.value, s.name.encode()
-    for name, value in scenario.params.items():
-        if lib.srm_sim_param(name.encode(), value) != 0:
-            raise ValueError(f"controller rejected parameter {name!r}")
-    tab = sim_tables(m)
+def summarise(csum: _abi.Summary, n_phases: int, n_steps: int, roundtrip_error: float) -> SimSummary:
+    """SimSummary of a finished run over its window (the second half of the steps)."""
+    ws = max(csum.window_steps, 1)
+    mean_t = csum.torque_sum / ws
+    ripple = 100 * (csum.torque_max - csum.torque_min) / abs(mean_t) if abs(mean_t) > 1e-12 else math.nan
+    e_in = csum.energy_in
+    err = abs(e_in - csum.energy_mech - csum.energy_copper - (csum.w_field_end - csum.w_field_start)) / max(abs(e_in), 1e-12)
+    return SimSummary(
+        mean_torque=mean_t, ripple_pct=ripple, i_rms=np.sqrt(np.array(csum.i2_sum[:n_phases]) / ws),
+        copper_loss=csum.copper_sum / ws, power_in=csum.power_in_sum / ws, power_mech=csum.power_mech_sum / ws,
+        beyond_map_fraction=csum.beyond_map_steps / n_steps, energy_error=err, roundtrip_error=roundtrip_error)
+
+
+def make_config(m: MotorData, scenario: Scenario, cps, n_param_steps: int, stride: int) -> _abi.Config:
+    """The simulator Config of a scenario; `cps` is the ctypes ParamStep array."""
     q = m.n_phases
     n_steps = scenario.n_steps
-    stride = math.ceil(n_steps / TRACE_CAP)
-    n = math.ceil(n_steps / stride)
     rpm = 2 * math.pi / 60
     cv = scenario.command_value * (rpm if scenario.command_mode == "speed" else 1.0)
     sc, se, ad = scenario.converter, scenario.sensors, scenario.adc
@@ -119,7 +120,27 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
         resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits, sensor_delay=se.delay,
         volt_full_scale=ad.volt_full_scale or 0.0, volt_rc_tau=ad.volt_rc_tau, param_steps=cps,
-        n_param_steps=len(steps))
+        n_param_steps=n_param_steps)
+    return cfg
+
+
+def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
+    """Load the library and run it. Call only in a child process: the library holds controller code and C state."""
+    lib = C.CDLL(str(Path(lib_path).resolve()))
+    _abi.bind(lib)
+    cps = (_abi.ParamStep * max(len(scenario.param_steps), 1))()
+    steps = sorted(scenario.param_steps, key=lambda s: s.time)   # stable: steps at one time keep list order
+    for c, s in zip(cps, steps):
+        c.t, c.value, c.name = s.time, s.value, s.name.encode()
+    for name, value in scenario.params.items():
+        if lib.srm_sim_param(name.encode(), value) != 0:
+            raise ValueError(f"controller rejected parameter {name!r}")
+    tab = sim_tables(m)
+    q = m.n_phases
+    n_steps = scenario.n_steps
+    stride = math.ceil(n_steps / TRACE_CAP)
+    n = math.ceil(n_steps / stride)
+    cfg = make_config(m, scenario, cps, len(steps), stride)
     cur, trq, wf = (np.ascontiguousarray(a, dtype=np.float64) for a in (tab.current, tab.torque, tab.w_field))
     ctab = _abi.Tables(theta_step=tab.theta_step, psi_step=tab.psi_step, psi_max=tab.psi_max, i_max=tab.i_max,
                        n_theta=cur.shape[0], n_psi=cur.shape[1], current=_ptr(cur, C.c_double),
@@ -146,15 +167,7 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
     got = ctrace.n_samples
     traces = {k: a[:got] for k, a in scalars.items()}
     traces.update({k: a[:, :got] for k, a in {**phased, **gates}.items()})
-    ws = max(csum.window_steps, 1)
-    mean_t = csum.torque_sum / ws
-    ripple = 100 * (csum.torque_max - csum.torque_min) / abs(mean_t) if abs(mean_t) > 1e-12 else math.nan
-    e_in = csum.energy_in
-    err = abs(e_in - csum.energy_mech - csum.energy_copper - (csum.w_field_end - csum.w_field_start)) / max(abs(e_in), 1e-12)
-    summary = SimSummary(
-        mean_torque=mean_t, ripple_pct=ripple, i_rms=np.sqrt(np.array(csum.i2_sum[:q]) / ws),
-        copper_loss=csum.copper_sum / ws, power_in=csum.power_in_sum / ws, power_mech=csum.power_mech_sum / ws,
-        beyond_map_fraction=csum.beyond_map_steps / n_steps, energy_error=err, roundtrip_error=tab.roundtrip_error)
+    summary = summarise(csum, q, n_steps, tab.roundtrip_error)
     return SimResult(traces, summary, scenario, "", "", "")
 
 

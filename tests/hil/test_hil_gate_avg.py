@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pytest
 from sil_fixtures import analytic_motor, run_in_child
 
 from srmsil.build import compile_host
@@ -80,6 +81,21 @@ def test_short_pulse_swallowed():
     assert abs(ou[1, 0] - 0.1) < 1e-6 and abs(ou.sum() - 0.1) < 1e-6
     _, ou, _ = windows(1, [(10, upper(0)), (16, 0)], 4, 10, [1.0], rise=6)       # exactly the delay: swallowed
     assert np.all(ou == 0)
+
+
+def test_pending_change_matures_in_later_window():
+    # tick 0.1 us windows of 10 ticks; on at tick 15 with a 6-tick rise: the switch turns on at tick 21
+    _, ou, _ = windows(1, [(15, upper(0))], 4, 10, [1.0], rise=6)
+    assert list(ou[:, 0]) == pytest.approx([0.0, 0.0, 0.9, 1.0])
+
+
+def test_fall_delay_and_reon_keeps_switch_on():
+    # off at tick 12 with a 3-tick fall delay, back on at tick 14: the switch never turns off
+    _, ou, _ = windows(1, [(12, 0), (14, upper(0))], 3, 10, [1.0], fall=3, initial=upper(0))
+    assert np.all(ou == 1.0)
+    # without the re-on it turns off at tick 15
+    _, ou, _ = windows(1, [(12, 0)], 3, 10, [1.0], fall=3, initial=upper(0))
+    assert list(ou[:, 0]) == pytest.approx([1.0, 0.5, 0.0])
 
 
 def test_zero_current_both_off():

@@ -47,6 +47,18 @@ class Summary(C.Structure):
                                                                     ("refused", _i32), ("refused_code", _i32)]
 
 
+def bind_tables(lib: C.CDLL) -> None:
+    """Check the ABI and the Config, Tables and Summary sizes of a library that lacks the controller entry points."""
+    lib.srm_sim_abi.restype = C.c_int
+    if lib.srm_sim_abi() != SRM_SIM_ABI:
+        raise RuntimeError(f"simulator ABI {lib.srm_sim_abi()} does not match {SRM_SIM_ABI}")
+    for name, st in (("config", Config), ("tables", Tables), ("summary", Summary)):
+        fn = getattr(lib, f"srm_sim_sizeof_{name}")
+        fn.restype = C.c_size_t
+        if fn() != C.sizeof(st):
+            raise RuntimeError(f"simulator {name} struct is {fn()} bytes in C and {C.sizeof(st)} in ctypes")
+
+
 def bind(lib: C.CDLL) -> None:
     """Declare the library's entry points and check that both sides agree on the ABI and the struct sizes."""
     lib.srm_sim_abi.restype = C.c_int
