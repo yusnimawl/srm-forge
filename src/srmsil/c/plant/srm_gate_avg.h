@@ -23,10 +23,12 @@ typedef struct {
 
 void srm_gate_avg_init(srm_gate_avg_t *g, int64_t rise_ticks, int64_t fall_ticks, uint16_t initial);
 
-/* Consumes the sorted edges with t in [t0, t0 + dt) and writes, for each phase, the time-weighted asymmetric
-   half-bridge voltage over the window (srm_ahb_voltage with the start-of-step current) and the fractions of the
-   window each switch is on. Pending commands that mature after the window stay pending. */
+/* Consumes the sorted edges with t in [t0, t0 + dt) (dt ticks of c->dt / dt seconds) and writes, for each phase, the
+   winding voltage averaged over the window and the fractions of the window each switch is on. The flux starts at
+   psi0 and follows the asymmetric half-bridge voltage segment by segment (resistive drop neglected); freewheeling
+   and demagnetising conduct only while the running flux is positive, and the flux stops at zero. The voltage is
+   (end flux - psi0) / c->dt. Pending commands that mature after the window stay pending. */
 void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm_edge_t *edges, int n, uint64_t t0,
-                         uint64_t dt, const double *current, double *v_out, float *on_upper, float *on_lower);
+                         uint64_t dt, const double *psi0, double *v_out, float *on_upper, float *on_lower);
 
 #endif

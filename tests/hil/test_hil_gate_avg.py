@@ -55,7 +55,7 @@ def windows(q, edges, n_windows, dt, current, rise=0, fall=0, initial=0, bus=48.
 
 def test_single_window_exact():
     # 10 ticks of 0.5 us: on at 1.0 us (tick 2), off at 3.5 us (tick 7)
-    v, ou, ol = windows(1, [(2, upper(0) | lower(0)), (7, 0)], 1, 10, [1.0])
+    v, ou, ol = windows(1, [(2, upper(0) | lower(0)), (7, 0)], 1, 10, [1e-3])
     assert ou[0, 0] == 0.5 and ol[0, 0] == 0.5
     assert abs(v[0, 0]) < 1e-12
 
@@ -64,7 +64,7 @@ def test_several_edges_and_boundary():
     # window 0 = ticks [0, 16): upper on 3..4 and 9..11, lower on 9..11; the edge at 16 belongs to window 1
     edges = [(3, upper(0)), (5, 0), (9, upper(0) | lower(0)), (12, 0), (16, upper(0) | lower(0))]
     vs, vd = 1.0, 0.7
-    v, ou, ol = windows(1, edges, 2, 16, [1.0], bus=48.0, vs=vs, vd=vd)
+    v, ou, ol = windows(1, edges, 2, 16, [1e-3], bus=48.0, vs=vs, vd=vd)
     assert abs(ou[0, 0] - 5 / 16) < 1e-12 and abs(ol[0, 0] - 3 / 16) < 1e-12
     assert abs(ou[1, 0] - 1.0) < 1e-12 and abs(ol[1, 0] - 1.0) < 1e-12
     both, one, none = 48.0 - 2 * vs, -(vs + vd), -(48.0 + 2 * vd)
@@ -96,6 +96,14 @@ def test_fall_delay_and_reon_keeps_switch_on():
     # without the re-on it turns off at tick 15
     _, ou, _ = windows(1, [(12, 0)], 3, 10, [1.0], fall=3, initial=upper(0))
     assert list(ou[:, 0]) == pytest.approx([1.0, 0.5, 0.0])
+
+
+def test_flux_stops_at_zero_inside_a_window():
+    # 10 ticks of 0.5 us, flux 1e-6 Wb: both off for 4 ticks (2 us) at 48 V, then both on for 3 us
+    both_on = upper(0) | lower(0)
+    v, ou, _ = windows(1, [(4, both_on)], 1, 10, [1e-6], vs=0.0, vd=0.0)
+    assert abs(1e-6 + v[0, 0] * 5e-6 - 48.0 * 3e-6) < 1e-15
+    assert abs(ou[0, 0] - 0.6) < 1e-6
 
 
 def test_zero_current_both_off():

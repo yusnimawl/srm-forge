@@ -10,7 +10,9 @@ from srmsil.scenario import ConverterSettings, Scenario
 
 CTRL = Path(__file__).parents[1] / "sil" / "controllers"
 ZERO = ConverterSettings(dead_time=0.0, turn_on_delay=0.0, turn_off_delay=0.0)
-CASES = [("open_loop", {"theta_on": 0.1, "theta_off": 0.45}), ("pwm_fixed", {"soft": 1})]
+CASES = [("open_loop", {"theta_on": 0.1, "theta_off": 0.45}), pytest.param("pwm_fixed", {}, marks=pytest.mark.xfail(
+        strict=True, reason="hard chop at 25 % duty: i_rms is sampled once per 5 us step against ~6 us current pulses (1.3 % low)")),
+    ("pwm_fixed", {"soft": 1})]
 
 
 @pytest.mark.parametrize("name, params", CASES)
