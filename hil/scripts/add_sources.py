@@ -7,6 +7,7 @@ Environment variables (set by srmsil.hil.build, or by CI):
   SRM_HIL_FIRMWARE_HASH  32-bit hash as hex digits
 """
 import os
+import sys
 
 Import("env")  # noqa: F821  (provided by SCons)
 
@@ -33,17 +34,14 @@ gen = os.environ.get("SRM_HIL_GEN_DIR")
 if gen:
     env.Append(CPPPATH=[gen])  # noqa: F821
 
-modes = [m for m in os.environ.get("SRM_HIL_MODES", "").split(",") if m]
-flags = []
-if modes:
-    sense, pos = modes[0], modes[1] if len(modes) > 1 else "encoder"
-    flags.append(f"HIL_CURRENT_SENSE_{sense.upper()}=1")
-    if pos in ("encoder", "both"):
-        flags.append("HIL_POSITION_ENCODER=1")
-    if pos in ("ad2s1210", "both"):
-        flags.append("HIL_POSITION_AD2S1210=1")
-    if sense == "internal" and len(modes) > 2:
-        flags.append(f"HIL_DAC_{modes[2].upper()}=1")
+sys.path.insert(0, os.path.join(HERE, "scripts"))
+from hil_modes import mode_macros  # noqa: E402
+
+try:
+    flags = mode_macros(os.environ.get("SRM_HIL_MODES", ""))
+except ValueError as e:
+    sys.stderr.write("error: " + str(e) + "\n")
+    env.Exit(1)  # noqa: F821
 h = os.environ.get("SRM_HIL_FIRMWARE_HASH")
 if h:
     flags.append(f"HIL_FIRMWARE_HASH=0x{h}")

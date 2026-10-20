@@ -1,9 +1,9 @@
 name: hil
 on:
   push:
-    paths: ["hil/**", "src/srmsil/c/**", ".github/workflows/hil.yml"]
+    paths: ["hil/**", "src/srmsil/c/**", "src/srmsil/hil/**", "src/srmsil/tables.py", ".github/workflows/hil.yml"]
   pull_request:
-    paths: ["hil/**", "src/srmsil/c/**", ".github/workflows/hil.yml"]
+    paths: ["hil/**", "src/srmsil/c/**", "src/srmsil/hil/**", "src/srmsil/tables.py", ".github/workflows/hil.yml"]
 jobs:
   firmware:
     strategy:

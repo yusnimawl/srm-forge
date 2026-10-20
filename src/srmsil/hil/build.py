@@ -18,6 +18,7 @@ from srmsil.tables import MotorData, ctrl_tables, write_header
 HIL_DIR = Path(__file__).resolve().parents[3] / "hil"
 RUNTIME = HIL_DIR / ".runtime"
 PLANT_DIR = Path(__file__).resolve().parents[1] / "c" / "plant"
+TIMEOUT_S = 900
 ENVS = ("emulator", "controller")
 SETUP_MESSAGE = "PlatformIO is not set up; run hil/setup.bat (Windows) or hil/setup.sh"
 
@@ -44,7 +45,10 @@ def _hash_files(h, files: list[Path]) -> None:
 
 def _source_hash(ctrl_dirs: list[Path], gen_dir: Path, modes: HilModes) -> str:
     h = hashlib.sha256(modes.env_string.encode())
-    hil_files = [p for p in HIL_DIR.rglob("*") if p.is_file() and ".runtime" not in p.parts and ".pio" not in p.parts]
+    hil_files = []
+    for root, dirs, files in os.walk(HIL_DIR):
+        dirs[:] = [d for d in dirs if d not in (".runtime", ".pio")]
+        hil_files += [Path(root) / f for f in files]
     for folder in (*ctrl_dirs, PLANT_DIR, PLANT_DIR.parent, gen_dir):
         _hash_files(h, [p for p in Path(folder).glob("*") if p.suffix in (".c", ".h")])
     h.update(b"hil")
@@ -88,7 +92,13 @@ def build_and_flash(controller: str, m: MotorData, scenario: Scenario, modes: Hi
     if upload:
         cmd += ["-t", "upload"]
     try:
-        r = subprocess.run(cmd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = subprocess.run(cmd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=TIMEOUT_S)
+    except subprocess.TimeoutExpired as e:
+        partial = (e.stdout or b"") if isinstance(e.stdout, bytes) else (e.stdout or "")
+        if isinstance(partial, bytes):
+            partial = partial.decode("utf-8", "replace")
+        raise HilError(f"PlatformIO did not finish in {TIMEOUT_S} s (is a board attached?)" + "\n" + partial[-2000:]) from e
     except OSError as e:
         raise HilError(f"cannot run PlatformIO: {e}") from e
     out = r.stdout + r.stderr
