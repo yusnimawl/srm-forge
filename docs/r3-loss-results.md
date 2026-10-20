@@ -102,12 +102,13 @@ pattern check only.
 ## Cut-edge factor (R3c)
 
 Screening preset only (laptop, 2026-10-20; `full` run pending owner go-ahead). Numbers regenerated after the band
-fraction was made independent of the element size (sub-triangle sampling), from the cached map and strokes. Rows T4.1 and T5.5, nominal
-and shifted turn-on, M19 stand-in as above. Nothing is fitted: the width coefficients and band widths are the
+fraction was made independent of the element size (sub-triangle sampling), from the cached map and strokes. All ten
+rows, nominal and shifted turn-on, M19 stand-in as above (T4.1 and T5.5 in `docs/r3-data/materu-cut-screening.json`,
+the other eight in `docs/r3-data/materu-cut-screening-rest.json`, same command with `--rows 4:1 4:2 4:3 4:4 5:0 5:1 5:2 5:3 --skip-yan`). Nothing is fitted: the width coefficients and band widths are the
 literature values in `srmcore.post.cut_edge.CUT_PROCESSES`. Command:
 `$env:PYTHONPATH="src;tests"; python -u examples\materu_losses_check.py --preset screening --workers 4 --rows 4:0 5:4 --json docs\r3-data\materu-cut-screening.json`
 (about 45 min cold: 12 min for the map, about 5 min per stroke solve; the four process evaluations of a row share one
-stroke solve through the cache; about 3 min with the map and strokes cached, `--cache-dir`). The full screening row set (10 rows, 20 stroke solves, about 2 h) was not run.
+stroke solve through the cache; about 3 min with the map and strokes cached, `--cache-dir`).
 
 Iron error against the measurement; in brackets the error at the low and high end of the process's width-coefficient
 range. R3 is the `unspecified` run (no edge multiplier).
@@ -118,6 +119,21 @@ range. R3 is the `unspecified` run (no edge multiplier).
 | T4.1 3.5 deg earlier | -24 % | -25 % (-27 to -23) | -20 % (-20 to -9) | -18 % (-19 to -0) | 5.6 |
 | T5.5 nominal | -68 % | -68 % (-69 to -67) | -66 % (-66 to -61) | -65 % (-65 to -57) | 22.9 |
 | T5.5 4.5 deg earlier | -71 % | -71 % (-72 to -70) | -69 % (-69 to -64) | -68 % (-68 to -60) | 22.9 |
+| T4.2 nominal | -44 % | -45 % (-46 to -43) | -40 % (-40 to -33) | -39 % (-40 to -26) | 9.6 |
+| T4.2 4.0 deg earlier | -43 % | -44 % (-45 to -42) | -39 % (-39 to -31) | -38 % (-38 to -24) | 9.6 |
+| T4.3 nominal | -33 % | -34 % (-35 to -32) | -29 % (-29 to -20) | -27 % (-28 to -11) | 10.4 |
+| T4.3 4.0 deg earlier | -41 % | -42 % (-43 to -40) | -37 % (-37 to -28) | -35 % (-36 to -21) | 10.4 |
+| T4.4 nominal | -27 % | -29 % (-30 to -27) | -23 % (-23 to -13) | -21 % (-22 to -4) | 10.5 |
+| T4.4 3.0 deg earlier | -29 % | -31 % (-32 to -29) | -25 % (-25 to -15) | -23 % (-24 to -6) | 10.5 |
+| T4.5 nominal | -24 % | -25 % (-27 to -23) | -20 % (-20 to -8) | -17 % (-19 to +1) | 10.7 |
+| T5.1 nominal | -78 % | -78 % (-79 to -78) | -77 % (-77 to -74) | -76 % (-76 to -71) | 20.6 |
+| T5.1 5.0 deg earlier | -79 % | -79 % (-79 to -78) | -77 % (-77 to -74) | -76 % (-77 to -71) | 20.6 |
+| T5.2 nominal | -56 % | -56 % (-57 to -55) | -53 % (-53 to -47) | -52 % (-52 to -41) | 11.3 |
+| T5.2 4.5 deg earlier | -55 % | -56 % (-57 to -54) | -52 % (-52 to -45) | -51 % (-51 to -39) | 11.3 |
+| T5.3 nominal | -24 % | -25 % (-27 to -23) | -19 % (-19 to -8) | -17 % (-18 to +2) | 7.3 |
+| T5.3 4.5 deg earlier | -19 % | -20 % (-22 to -17) | -13 % (-13 to -0) | -11 % (-12 to +11) | 7.3 |
+| T5.4 nominal | -57 % | -58 % (-59 to -56) | -54 % (-54 to -48) | -53 % (-54 to -42) | 15.5 |
+| T5.4 4.5 deg earlier | -59 % | -59 % (-60 to -58) | -56 % (-56 to -49) | -55 % (-55 to -43) | 15.5 |
 
 Change of the computed iron loss against R3 at the nominal width coefficient: WEDM -1 to -2 %, punching +5 to +7 %,
 laser +8 to +10 %. The one-sided range reported for an unspecified process (WEDM low to laser high) is -3.7 % to
@@ -128,10 +144,12 @@ Reading:
 - Punching and laser raise the loss by 5 to 10 %, inside the +5 to +15 % that spec §3 expected for these rotor and
   stator sizes. WEDM lowers it by 1 to 2 % because its nominal width coefficient (0.3 mm) is below the as-sheared
   Epstein strips (1.4 mm) that the fitted loss data already contain.
-- Per row. At the nominal width coefficients every error stays negative (T4.1 -15 to -25 %, T5.5 -65 to -71 %).
-  Over the laser range T4.1 reaches zero (up to +3 % at nominal turn-on, -0.3 % shifted), so T4.1 is just bracketed
-  by the cut-edge range; punching and WEDM do not reach zero. T5.5 is not explained by the cut edge: -57 % at best
-  (laser high). The remaining gap is the current shortfall, the steel stand-in and the 3D effects discussed above.
+- Per row. At the nominal width coefficients every error stays negative, on all ten rows. Over the laser range
+  three rows reach zero: T4.1 (+3 % at nominal turn-on, -0.3 % shifted), T4.5 (+1 %) and T5.3 (+2 % nominal,
+  +11 % shifted; punching high also reaches -0 % there). These are the rows that were already inside the stated
+  iron uncertainty. The other seven (T4.2 to T4.4 at -4 to -26 % at best, T5.1, T5.2, T5.4 and T5.5 at -39 to -71 %
+  at best, all at the laser high end) are not explained by the cut edge. The remaining gap is the current shortfall, the steel stand-in and the
+  3D effects discussed above.
 
 8/6 (10JNEX900, 3000 rpm, 6.14 N·m, 23.8 W; a separate run from the Yan share cross-check above, which differs slightly at 6.15 N·m, 23.6 W) cut-edge factor (hysteresis plus
 excess, with over without the multiplier) and the area share of the damaged band per region:
