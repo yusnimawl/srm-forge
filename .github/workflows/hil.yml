@@ -1,0 +1,44 @@
+name: hil
+on:
+  push:
+    paths: ["hil/**", "src/srmsil/c/**", ".github/workflows/hil.yml"]
+  pull_request:
+    paths: ["hil/**", "src/srmsil/c/**", ".github/workflows/hil.yml"]
+jobs:
+  firmware:
+    strategy:
+      fail-fast: false
+      matrix:
+        sense: [ad7606, internal]
+        position: [encoder, ad2s1210, both]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sh hil/setup.sh
+      - name: Generate the case and mode headers
+        run: |
+          python -m pip install -e ".[dev]"
+          mkdir -p "$RUNNER_TEMP/gen"
+          PYTHONPATH=src:tests/sil python - <<'PY'
+          import os
+          from pathlib import Path
+          from sil_fixtures import analytic_motor
+          from srmsil.hil.config import HilModes, write_hil_config
+          from srmsil.scenario import Scenario
+          from srmsil.tables import ctrl_tables, write_header
+          g = Path(os.environ["RUNNER_TEMP"]) / "gen"
+          m = analytic_motor()
+          write_header(m, ctrl_tables(m), g / "srm_motor_tables.h")
+          write_hil_config(HilModes(current_sense="${{ matrix.sense }}", position="${{ matrix.position }}"), Scenario(), m, g / "hil_config.h")
+          PY
+      - name: Compile both environments
+        run: |
+          export PLATFORMIO_CORE_DIR="$PWD/hil/.runtime/core"
+          export SRM_HIL_GEN_DIR="$RUNNER_TEMP/gen"
+          export SRM_CTRL_DIR="$PWD/src/srmsil/c/controllers/hysteresis:$PWD/src/srmsil/c/controllers/common"
+          export SRM_HIL_MODES="${{ matrix.sense }},${{ matrix.position }},mcp4922x2"
+          hil/.runtime/bin/pio run -d hil -e emulator -e controller
