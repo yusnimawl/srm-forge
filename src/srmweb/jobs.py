@@ -1,6 +1,6 @@
 """Job runner: one thread per lane, FIFO within a lane, progress kept in memory.
 
-The main lane runs search, evaluate, validate and losses; the quick lane runs animate, so an animation never waits behind
+The main lane runs search, evaluate, validate, losses and control; the quick lane runs animate, so an animation never waits behind
 a map build."""
 from __future__ import annotations
 
