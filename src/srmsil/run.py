@@ -24,6 +24,7 @@ ADC_HEADROOM = 1.25
 
 _C_DIR = Path(__file__).parent / "c"
 _SIM_DIR = _C_DIR / "sim"
+_PLANT_DIR = _C_DIR / "plant"
 _CTRL_DIR = _C_DIR / "controllers"
 REFERENCE = {"hysteresis", "pwm_current", "tsf"}
 
@@ -73,8 +74,8 @@ def sim_library(controller_dir: Path, header_dir: Path, cache_dir: Path, common_
                 log: list[str] | None = None) -> Path:
     """Compile the simulator core and the controller folder (plus `common_dir`, if given) into a cached library."""
     folders = [Path(controller_dir), *([Path(common_dir)] if common_dir else [])]
-    sources = [*sorted(_SIM_DIR.glob("*.c")), *(s for f in folders for s in controller_sources(f))]
-    return compile_host(sources, [_C_DIR, _SIM_DIR, Path(header_dir), *folders], Path(cache_dir) / "sil" / "build", log)
+    sources = [*sorted(_PLANT_DIR.glob("*.c")), *sorted(_SIM_DIR.glob("*.c")), *(s for f in folders for s in controller_sources(f))]
+    return compile_host(sources, [_C_DIR, _PLANT_DIR, _SIM_DIR, Path(header_dir), *folders], Path(cache_dir) / "sil" / "build", log)
 
 
 def _ptr(a: np.ndarray, ctype):

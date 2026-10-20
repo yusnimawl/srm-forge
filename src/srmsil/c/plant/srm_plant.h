@@ -1,0 +1,64 @@
+#ifndef SRM_PLANT_H
+#define SRM_PLANT_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#define SRM_SIM_MAX_PHASES 8
+
+/* Element type of the flux-grid tables. */
+#ifdef SRM_TABLE_FLOAT
+typedef float srm_table_t;
+#else
+typedef double srm_table_t;
+#endif
+
+/* The structs are mirrored by ctypes: 8-byte members first, then 4-byte members. */
+typedef struct {
+    double resistance, bus_voltage, dt, speed, theta0;
+    double inertia, friction, load, load_step, load_step_time;
+    double pwm_hz, isr_hz, compute_delay, command_value;
+    double v_switch, v_diode, dead_time, turn_on_delay, turn_off_delay;
+    double adc_amps_per_count;
+    double encoder_offset, encoder_ecc_amp;
+    double resolver_gain_mismatch, resolver_phase_error;
+    double adc_offset_error, adc_gain_error, adc_noise, adc_rc_tau;
+    int64_t n_steps, trace_stride;
+    int32_t n_phases, n_rotor_poles;
+    int32_t mode;               /* 0 fixed speed, 1 dynamic */
+    int32_t command_mode;       /* 0 torque, 1 speed */
+    uint32_t encoder_cpr;
+    int32_t adc_bits, adc_offset_counts;
+    uint32_t seed;
+    int32_t encoder_ecc_harmonic, resolver, resolver_pole_pairs, resolver_bits;
+} srm_sim_config_t;
+
+typedef struct {
+    double theta_step, psi_step, psi_max, i_max;
+    int64_t n_theta, n_psi;
+    const srm_table_t *current, *torque, *w_field;      /* w_field may be NULL */
+} srm_sim_tables_t;
+
+/* Rotor angle and speed, total torque, and flux, current, torque and field energy of every phase. */
+typedef struct {
+    double theta, omega, ttot;
+    double psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
+} srm_plant_t;
+
+/* Motor: bilinear lookup of i, T and field energy W at a phase angle (wrapped here) and flux. W is 0 without a
+   w_field table. */
+void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi, double *i, double *torque,
+                    double *w);
+/* i, T and W of every phase at rotor angle theta and fluxes psi; returns the total torque. */
+double srm_plant_eval(const srm_sim_config_t *c, const srm_sim_tables_t *t, double theta, const double *psi,
+                      double *i, double *trq, double *w);
+/* Rotor at theta0 and speed with zero flux. */
+void srm_plant_init(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tables_t *t);
+/* One Heun step of length dt with the winding voltages v held over the step; t_now is the time and n the step
+   index (fixed-speed mode places the rotor from n). */
+void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tables_t *t, const double *v,
+                    double t_now, int64_t n);
+/* Asymmetric half-bridge winding voltage for the effective switch states and the winding current. */
+double srm_ahb_voltage(const srm_sim_config_t *c, int upper, int lower, double current);
+
+#endif
