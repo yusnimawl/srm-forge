@@ -110,7 +110,7 @@ All rows are grade C for 10JNEX900 (no thin-gauge data); the note on every losse
   the high end of the range against the nominal (for example (-0.03, +0.21)). It is one-sided for `unspecified` and is
   kept apart from the symmetric `iron_uncertainty_rel`. `LossResult.cut_process` records the process. The web shows the
   row next to the iron uncertainty ("cut edge -3 / +21 %"), and the region table shows the mean multiplier per region.
-- `srmweb` result models get the new fields as optional, so losses stored before 0.7.0 still load.
+- `srmweb` result models get the new fields as optional, so losses stored before R3c still load.
 
 ## 7. Checks and reporting
 
@@ -135,8 +135,10 @@ All rows are grade C for 10JNEX900 (no thin-gauge data); the note on every losse
 
 ## 9. Version
 
-srmcore, srmapp, srmweb and `web/` 0.7.0 (a new input and new result fields). The nominal result is unchanged unless a
-process is chosen. `VALIDATED_VERSIONS` unchanged; adding 0.7.0 goes through the validation report as before.
+The PR does not bump versions. Planned merge order: #4 (R3), #5 (R3b), #6 (R8a), then R3c. At merge time srmcore and
+srmapp go to 0.7.0, and srmweb and `web/` to the next free number after #6 (0.9.0); the PR body says so. The nominal
+result is unchanged unless a process is chosen. `VALIDATED_VERSIONS` is unchanged; a new version joins it only through
+the validation report, as before.
 
 ## 10. Out of scope
 
