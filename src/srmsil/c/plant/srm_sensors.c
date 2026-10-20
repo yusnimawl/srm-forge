@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "srm_sim.h"
+#include "srm_sensors.h"
 
 #define TWO_PI 6.283185307179586476925286766559
 #define U53 (1.0 / 9007199254740992.0)

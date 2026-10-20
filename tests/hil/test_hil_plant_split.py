@@ -1,11 +1,13 @@
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
+from srmsil.build import zig_cc
 from srmsil.run import run
 from srmsil.scenario import Scenario
 
@@ -43,3 +45,12 @@ def test_plant_split_matches_golden(tmp_path):
     for name, vals in want.items():
         for key, v in vals.items():
             assert got[name][key] == pytest.approx(v, rel=1e-12, abs=1e-300), (name, key)
+
+
+@pytest.mark.parametrize("flags", [[], ["-DSRM_TABLE_FLOAT"]])
+def test_plant_compiles_alone(tmp_path, flags):
+    plant = Path(__file__).parents[2] / "src" / "srmsil" / "c" / "plant"
+    for i, src in enumerate(sorted(plant.glob("*.c"))):
+        r = subprocess.run([*zig_cc(), "-std=c99", "-Wall", "-Wextra", "-Werror", *flags, f"-I{plant}", "-c",
+                            "-o", str(tmp_path / f"{i}.o"), str(src)], capture_output=True, text=True)
+        assert r.returncode == 0, f"{src.name}: {r.stderr}"
