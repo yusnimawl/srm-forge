@@ -11,7 +11,7 @@ Nucleo pins are Zio labels (CN7-CN10 side headers). Teensy pins are the printed 
 - [ ] Never join Nucleo 3V3 to Teensy 3V3.
 - [ ] Never join Nucleo 5V to Teensy VIN.
 - [ ] Never connect any 5 V signal to a Teensy pin (not 5 V tolerant).
-- [ ] Check the Nucleo sticker says MB1364.
+- [ ] Check the Nucleo sticker says MB1364 (owner's board: MB1364E, NUH723ZG$AT2: confirmed).
 - [ ] Check solder bridges at default: SB28 ON, SB39 ON, SB14 ON, SB15 ON, SB32 ON.
 - [ ] Check JP5 is on 3V3.
 - [ ] Have the Teensy pinout card ready (for the GND pads).
