@@ -86,6 +86,8 @@ The table element type is one compile-time type, `srm_table_t`: `double` on the 
 
 The SIL's static gate queue (65536 entries) stays in the PC scheduler only; the emulator has no queue (real gates arrive as edges).
 
+Current pulses shorter than about two steps (for example low-current hard chopping in discontinuous conduction) are resolved only at the step instants, so a full-rate RMS reads about 1 to 2 % low at 5 µs; the FPGA emulator (R8c) lifts this.
+
 ### 5.4 Modes and the safety interlock
 At connect the PC reads each board's build info (protocol version, firmware hash, `current_sense`, `position`, `dac`) and refuses a session when the modes differ. The Teensy drives the shared SCK wire (DAC mode) only while RUN is high, and the Nucleo raises RUN only after it has set PA5 to an input; a 330 Ω series resistor on that wire is the backstop. RUN low stops the emulator: DAC outputs go to the zero-current code, BUSY goes low, the encoder holds. READY low (emulator fault, overrun, stop) makes the Nucleo turn every gate off and report it.
 

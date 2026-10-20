@@ -42,11 +42,11 @@ def _library(cache_dir: Path) -> Path:
 
 
 def _run_loaded(lib_path: Path, m: MotorData, edges: np.ndarray, scenario: Scenario, tick_s: float,
-                grid: tuple[int, int]) -> SimSummary:
+                grid: tuple[int, int], return_trace: bool):
     lib = C.CDLL(str(Path(lib_path).resolve()))
     _abi.bind_tables(lib)
     lib.srm_emu_run.argtypes = [C.POINTER(_abi.Config), C.POINTER(_abi.Tables), C.c_void_p, C.c_int64, C.c_double,
-                                C.POINTER(_abi.Summary)]
+                                C.POINTER(_abi.Summary), C.c_void_p]
     lib.srm_emu_run.restype = C.c_int
     tab = emu_tables(m, *grid)
     cur, trq, wf = (np.ascontiguousarray(a, dtype=np.float32) for a in (tab.current, tab.torque, tab.w_field))
@@ -57,10 +57,13 @@ def _run_loaded(lib_path: Path, m: MotorData, edges: np.ndarray, scenario: Scena
     cfg = make_config(m, scenario, (_abi.ParamStep * 1)(), 0, 1)
     edges = np.ascontiguousarray(edges, dtype=EDGE_DTYPE)
     csum = _abi.Summary()
-    rc = lib.srm_emu_run(C.byref(cfg), C.byref(ctab), edges.ctypes.data, len(edges), tick_s, C.byref(csum))
+    itr = np.zeros((scenario.n_steps, m.n_phases)) if return_trace else None
+    rc = lib.srm_emu_run(C.byref(cfg), C.byref(ctab), edges.ctypes.data, len(edges), tick_s, C.byref(csum),
+                         itr.ctypes.data if return_trace else None)
     if rc != 0:
         raise ValueError(f"emulator model rejected the configuration (code {rc})")
-    return summarise(csum, m.n_phases, scenario.n_steps, tab.roundtrip_error)
+    summary = summarise(csum, m.n_phases, scenario.n_steps, tab.roundtrip_error)
+    return (summary, itr.T) if return_trace else summary
 
 
 def _child_main(args: tuple, out: Path) -> None:
@@ -72,9 +75,11 @@ def _child_main(args: tuple, out: Path) -> None:
 
 
 def run_model(m: MotorData, edges: np.ndarray, scenario: Scenario, *, tick_s: float, step: float = 5e-6,
-              grid: tuple[int, int] = (180, 192), cache_dir: Path, timeout_s: float = 300.0) -> SimSummary:
+              grid: tuple[int, int] = (180, 192), cache_dir: Path, timeout_s: float = 300.0,
+              return_trace: bool = False):
     """Run the emulator model for `scenario` (fixed speed, open loop) on the gate edges (ticks of `tick_s`), stepping
-    at `step`, in a spawned child. The converter delays of the scenario are applied to the edges, in ticks."""
+    at `step`, in a spawned child. With `return_trace` the result is (summary, i) where i[k, n] is the current of phase k
+    at t = n * step. The converter delays of the scenario are applied to the edges, in ticks."""
     import pickle
     if scenario.mode != "fixed":
         raise ValueError("the emulator model runs fixed-speed scenarios only (open loop, no dynamics)")
@@ -85,7 +90,7 @@ def run_model(m: MotorData, edges: np.ndarray, scenario: Scenario, *, tick_s: fl
     lib = _library(cache_dir)
     with tempfile.TemporaryDirectory(prefix="srmemu_") as tmp:
         out = Path(tmp) / "result.pkl"
-        p = mp.get_context("spawn").Process(target=_child_main, args=((lib, m, edges, scn, tick_s, grid), out),
+        p = mp.get_context("spawn").Process(target=_child_main, args=((lib, m, edges, scn, tick_s, grid, return_trace), out),
                                             daemon=True)
         p.start()
         p.join(timeout_s)

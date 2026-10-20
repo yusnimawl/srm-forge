@@ -10,9 +10,7 @@ from srmsil.scenario import ConverterSettings, Scenario
 
 CTRL = Path(__file__).parents[1] / "sil" / "controllers"
 ZERO = ConverterSettings(dead_time=0.0, turn_on_delay=0.0, turn_off_delay=0.0)
-CASES = [("open_loop", {"theta_on": 0.1, "theta_off": 0.45}), pytest.param("pwm_fixed", {}, marks=pytest.mark.xfail(
-        strict=True, reason="hard chop at 25 % duty: i_rms is sampled once per 5 us step against ~6 us current pulses (1.3 % low)")),
-    ("pwm_fixed", {"soft": 1})]
+CASES = [("open_loop", {"theta_on": 0.1, "theta_off": 0.45}), ("pwm_fixed", {"soft": 1})]
 
 
 @pytest.mark.parametrize("name, params", CASES)
@@ -32,6 +30,25 @@ def test_emulator_model_within_1pct(tmp_path, name, params):
           f"i_rms err {np.array2string(di, formatter={'float': lambda x: f'{x:.3%}'})}")
     assert dt_ <= 0.01
     assert np.all(di <= 0.01)
+
+
+def test_emulator_model_hard_chop_state(tmp_path):
+    """Hard chop at 25 % duty has current pulses of about two steps: the model is checked at its step instants."""
+    m = analytic_motor()
+    kw = dict(speed_rpm=1000.0, duration=0.04)
+    ctrl = str(CTRL / "pwm_fixed")
+    sil = run(m, ctrl, Scenario(**kw), cache_dir=tmp_path)
+    cmd = run(m, ctrl, Scenario(**kw, converter=ZERO), cache_dir=tmp_path)
+    got, i_model = run_model(m, edges_from_trace(cmd.traces, 0.5e-6), Scenario(**kw), tick_s=0.5e-6, cache_dir=tmp_path,
+                             return_trace=True)
+    n = i_model.shape[1]
+    ref = sil.traces["i"][0, ::10][n // 2:n].astype(np.float64)      # the SIL state at t = n * 5 us
+    mod = i_model[0, n // 2:]
+    rms = lambda x: np.sqrt(np.mean(x**2))  # noqa: E731
+    err = rms(mod) / rms(ref) - 1
+    print(f"hard chop at step instants: SIL {rms(ref):.5f} A, model {rms(mod):.5f} A, err {err:.3%}; "
+          f"full-rate SIL {sil.summary.i_rms[0]:.5f}, model summary {got.i_rms[0]:.5f}")
+    assert abs(err) <= 0.01
 
 
 def test_model_rejects_dynamic_and_odd_step(tmp_path):

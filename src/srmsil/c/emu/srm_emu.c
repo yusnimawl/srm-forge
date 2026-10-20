@@ -12,9 +12,10 @@ SRM_SIM_API size_t srm_sim_sizeof_config(void) { return sizeof(srm_sim_config_t)
 SRM_SIM_API size_t srm_sim_sizeof_tables(void) { return sizeof(srm_sim_tables_t); }
 SRM_SIM_API size_t srm_sim_sizeof_summary(void) { return sizeof(srm_sim_summary_t); }
 
-/* 0 ok, -1 bad configuration (dynamic mode, a step that is not a whole number of ticks, ...) */
+/* i_trace, if not NULL, receives the phase currents at the start of every step (n_steps x n_phases, step-major).
+   0 ok, -1 bad configuration (dynamic mode, a step that is not a whole number of ticks, ...) */
 SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, const srm_edge_t *edges,
-                            int64_t n_edges, double tick_s, srm_sim_summary_t *sum)
+                            int64_t n_edges, double tick_s, srm_sim_summary_t *sum, double *i_trace)
 {
     const int q = cfg->n_phases;
     if (q < 1 || q > SRM_SIM_MAX_PHASES || cfg->n_steps < 1 || !(cfg->dt > 0.0) || !(tick_s > 0.0) ||
@@ -44,6 +45,7 @@ SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
         double v[SRM_SIM_MAX_PHASES], pin = 0.0, cu = 0.0;
         float on_u[SRM_SIM_MAX_PHASES], on_l[SRM_SIM_MAX_PHASES];
         srm_gate_avg_window(&g, cfg, edges + first, (int)(e - first), t0, (uint64_t)per_step, pl.psi, v, on_u, on_l);
+        if (i_trace) memcpy(i_trace + (size_t)n * (size_t)q, pl.cur, (size_t)q * sizeof(double));
         int beyond = 0;
         for (int k = 0; k < q; k++) {
             pin += v[k] * pl.cur[k];
