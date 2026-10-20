@@ -114,10 +114,11 @@ All rows are grade C for 10JNEX900 (no thin-gauge data); the note on every losse
 
 ## 7. Checks and reporting
 
-- **Materu (check only).** `examples/materu_losses_check.py --cut-process <p>` recomputes the iron loss from the cached
-  strokes for each process, with no new solves when the cache is present (otherwise the full run, about 3 h, which needs
-  the owner's go-ahead on the shared laptop). `docs/r3-loss-results.md` gets one table: per row the R3 error, then the
-  error for `punching`, `laser` and `wedm`, with the range. Nothing is fitted.
+- **Materu (check only).** `examples/materu_losses_check.py` reports every process from one run (the loss is linear
+  in a, so one set of strokes serves all of them). The 2026-10-19 run kept no stroke cache, so this is a new run: first
+  at `screening` (which agreed with `full` within about 5 % on Materu), and at `full` (about 3 h) only with the owner's
+  go-ahead on the shared laptop. `docs/r3-loss-results.md` gets one table: per row the R3 error, then the error for
+  `wedm`, `punching` and `laser`, with the range. Nothing is fitted.
 - **8/6 region factors.** For the repo 8/6 on 10JNEX900, the mean multiplier per region (stator pole, stator yoke,
   rotor pole, rotor yoke) per process, and the band fraction per region, in the same results doc.
 
@@ -125,7 +126,8 @@ All rows are grade C for 10JNEX900 (no thin-gauge data); the note on every losse
 
 - Strip: a rectangular iron strip meshed at screening density, w = 5, 10 and 30 mm, uniform B. The mean multiplier
   times B0 equals 1 + a/w within 1 % for each process.
-- `unspecified` and a = 0 give results identical to R3, bit for bit (hysteresis, excess and classical per region).
+- `unspecified` gives results identical to R3, bit for bit (hysteresis, excess and classical per region). A process with
+  a = 0 scales hysteresis and excess by exactly 1/B0 (the part has no more edge damage than the Epstein strips have).
 - Linearity: the low and high ends of `cut_edge_rel` equal a direct recompute with that a.
 - Band fraction is 1 for an element inside the band, 0 far from every edge, and in (0, 1) for an element across
   the band edge.
