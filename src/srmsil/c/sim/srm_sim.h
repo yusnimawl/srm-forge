@@ -7,7 +7,7 @@
 #include "srm_plant.h"
 #include "srm_sensors.h"
 
-#define SRM_SIM_ABI 2
+#define SRM_SIM_ABI 3
 
 #if defined(_WIN32) && defined(SRM_SIM_BUILD)
 #define SRM_SIM_API __declspec(dllexport)
@@ -21,7 +21,7 @@ typedef struct {
     int64_t n_samples;
     double *t, *theta, *omega, *torque, *encoder;           /* n */
     double *resolver_sin, *resolver_cos;                    /* n, raw counts, 0 without a resolver */
-    float *i, *psi, *v, *adc_i;                             /* n_phases x n, phase-major */
+    float *i, *psi, *v, *adc_i, *adc_v;                     /* n_phases x n, phase-major; adc_v is 0 without voltage channels */
     uint8_t *gate_u, *gate_l;
 } srm_sim_trace_t;
 
@@ -30,6 +30,7 @@ typedef struct {
     double energy_in, energy_mech, energy_copper, w_field_start, w_field_end;
     double torque_sum, torque_min, torque_max, copper_sum, power_in_sum, power_mech_sum;
     double i2_sum[SRM_SIM_MAX_PHASES];
+    int32_t refused, refused_code;      /* 1-based index of the param step ctrl_param refused, and its code; 0 = none */
 } srm_sim_summary_t;
 
 SRM_SIM_API int srm_sim_abi(void);
@@ -38,7 +39,7 @@ SRM_SIM_API size_t srm_sim_sizeof_tables(void);
 SRM_SIM_API size_t srm_sim_sizeof_trace(void);
 SRM_SIM_API size_t srm_sim_sizeof_summary(void);
 SRM_SIM_API int srm_sim_param(const char *name, float value);
-/* 0 ok, -1 bad configuration, -2 gate command queue overflow */
+/* 0 ok, -1 bad configuration, -2 gate command queue overflow, -3 a param step was refused (see the summary) */
 SRM_SIM_API int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_sim_trace_t *trace,
                             srm_sim_summary_t *summary);
 

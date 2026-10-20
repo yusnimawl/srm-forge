@@ -25,6 +25,8 @@ estimate that produces the torque command. Intended `pwm_hz`: 20 kHz.
 | `torque_limit` | N*m | SRM_T_MAX_NM |
 | `resolver_pole_pairs` | - | 1 |
 
+Every parameter can also be changed while the controller runs (`ctrl_param` returns 0 and the new value is used from the next ISR); `resolver_pole_pairs` is the exception and returns -2 after `ctrl_init`.
+
 ## Notes
 
 - Speed loop gains: see the `pwm_current` README.

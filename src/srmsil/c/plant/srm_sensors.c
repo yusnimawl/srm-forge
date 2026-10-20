@@ -72,17 +72,46 @@ void srm_resolver(const srm_sim_config_t *c, double theta, int16_t *s, int16_t *
     *co = to_i16(amp * (1.0 + c->resolver_gain_mismatch) * cos(x + c->resolver_phase_error));
 }
 
+int64_t srm_sensor_delay_steps(const srm_sim_config_t *c)
+{
+    return (int64_t)floor(c->sensor_delay / c->dt + 0.5);
+}
+
 void srm_adc_init(srm_adc_t *a, const srm_sim_config_t *c, const double *current)
 {
     a->alpha = c->adc_rc_tau > 0.0 ? 1.0 - exp(-c->dt / c->adc_rc_tau) : 1.0;
-    for (int k = 0; k < c->n_phases; k++) a->filtered[k] = current[k];
+    a->v_alpha = c->volt_rc_tau > 0.0 ? 1.0 - exp(-c->dt / c->volt_rc_tau) : 1.0;
+    a->delay_steps = srm_sensor_delay_steps(c);
+    a->pos = 0;
+    for (int k = 0; k < c->n_phases; k++) {
+        a->filtered[k] = current[k];
+        a->v_filtered[k] = 0.0;
+    }
+    for (int64_t s = 0; s < a->delay_steps; s++)
+        for (int k = 0; k < c->n_phases; k++) {
+            a->ring[s][k] = (float)current[k];
+            a->ring[s][SRM_SIM_MAX_PHASES + k] = 0.0f;
+        }
     srm_rng_seed(&a->rng, c->seed);
 }
 
-/* Advance the first-order filter on the sensed current by one step. */
-void srm_adc_filter(srm_adc_t *a, const srm_sim_config_t *c, const double *current)
+/* The value pushed delay_steps calls ago for ring channel ch; the input itself without a delay. */
+static double delayed(srm_adc_t *a, int ch, double x)
 {
-    for (int k = 0; k < c->n_phases; k++) a->filtered[k] += a->alpha * (current[k] - a->filtered[k]);
+    if (a->delay_steps == 0) return x;
+    double out = (double)a->ring[a->pos][ch];
+    a->ring[a->pos][ch] = (float)x;
+    return out;
+}
+
+/* Advance the delay and the first-order filters on the sensed currents and voltages by one step. */
+void srm_adc_filter(srm_adc_t *a, const srm_sim_config_t *c, const double *current, const double *volts)
+{
+    for (int k = 0; k < c->n_phases; k++) {
+        a->filtered[k] += a->alpha * (delayed(a, k, current[k]) - a->filtered[k]);
+        a->v_filtered[k] += a->v_alpha * (delayed(a, SRM_SIM_MAX_PHASES + k, volts[k]) - a->v_filtered[k]);
+    }
+    if (a->delay_steps > 0 && ++a->pos == a->delay_steps) a->pos = 0;
 }
 
 int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase)
@@ -92,5 +121,12 @@ int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase)
     if (c->adc_noise > 0.0) x += c->adc_noise * srm_rng_gauss(&a->rng);
     double top = (double)((1 << c->adc_bits) - 1);
     x = floor(x + 0.5);
+    return (int)(x < 0.0 ? 0.0 : (x > top ? top : x));
+}
+
+int srm_adc_convert_volt(const srm_adc_t *a, const srm_sim_config_t *c, int phase)
+{
+    double top = (double)((1 << c->adc_bits) - 1);
+    double x = floor((double)(1 << (c->adc_bits - 1)) + a->v_filtered[phase] / (2.0 * c->volt_full_scale) * top + 0.5);
     return (int)(x < 0.0 ? 0.0 : (x > top ? top : x));
 }

@@ -13,6 +13,13 @@ typedef float srm_table_t;
 typedef double srm_table_t;
 #endif
 
+/* A controller parameter set at a simulation time: applied through ctrl_param just before the first ISR at or after t. */
+typedef struct {
+    double t;
+    float value;
+    char name[24];
+} srm_param_step_t;
+
 /* The structs are mirrored by ctypes: 8-byte members first, then 4-byte members. */
 typedef struct {
     double resistance, bus_voltage, dt, speed, theta0;
@@ -23,7 +30,11 @@ typedef struct {
     double encoder_offset, encoder_ecc_amp;
     double resolver_gain_mismatch, resolver_phase_error;
     double adc_offset_error, adc_gain_error, adc_noise, adc_rc_tau;
+    double sensor_delay;        /* s, transport delay of the sensed currents and voltages */
+    double volt_full_scale;     /* V at the top code of the bipolar voltage channels, 0 = no voltage channels */
+    double volt_rc_tau;         /* s, first-order filter on the sensed voltages, 0 = none */
     int64_t n_steps, trace_stride;
+    const srm_param_step_t *param_steps;    /* n_param_steps entries in time order */
     int32_t n_phases, n_rotor_poles;
     int32_t mode;               /* 0 fixed speed, 1 dynamic */
     int32_t command_mode;       /* 0 torque, 1 speed */
@@ -31,6 +42,7 @@ typedef struct {
     int32_t adc_bits, adc_offset_counts;
     uint32_t seed;
     int32_t encoder_ecc_harmonic, resolver, resolver_pole_pairs, resolver_bits;
+    int32_t n_param_steps;
 } srm_sim_config_t;
 
 typedef struct {

@@ -43,6 +43,7 @@ static bool primed = false;
  * divide the rotor pole count, which leaves the phase angle ambiguous). The controllers then keep every
  * switch off. */
 static bool ok = true;
+static bool running = false;            /* set by srm_ref_init: resolver_pole_pairs is then fixed */
 static float angle_period = TWO_PI_F;   /* range of srm_ref_angle: 2*pi, or 2*pi / pole pairs for a resolver */
 static float win_on = 0.0f;             /* theta_on and theta_off normalised into [0, 360) */
 static float win_off = 150.0f;
@@ -58,10 +59,23 @@ static int lookup(const srm_ref_param_t *t, int n, const char *name, float value
     return -1;
 }
 
+/* theta_on and theta_off normalised into [0, 360); the window may cross the wrap (an advanced turn-on is a
+ * negative theta_on). */
+static void update_window(void)
+{
+    win_on = fmodf(theta_on, 360.0f);
+    if (win_on < 0.0f) win_on += 360.0f;
+    win_off = fmodf(theta_off, 360.0f);
+    if (win_off < 0.0f) win_off += 360.0f;
+}
+
 int srm_ref_param(const srm_ref_param_t *own, int n_own, const char *name, float value)
 {
-    if (lookup(own, n_own, name, value) == 0) return 0;
-    return lookup(shared, (int)(sizeof shared / sizeof shared[0]), name, value);
+    if (running && strcmp(name, "resolver_pole_pairs") == 0) return -2;
+    if (lookup(own, n_own, name, value) != 0 && lookup(shared, (int)(sizeof shared / sizeof shared[0]), name, value) != 0)
+        return -1;
+    update_window();
+    return 0;
 }
 
 static float clampf(float x, float lo, float hi)
@@ -72,6 +86,7 @@ static float clampf(float x, float lo, float hi)
 void srm_ref_init(const srm_hal_t *hal)
 {
     hal_ = hal;
+    running = true;
     cmd_mode = SRM_CMD_TORQUE;
     cmd_value = 0.0f;
     torque_cmd = 0.0f;
@@ -83,11 +98,7 @@ void srm_ref_init(const srm_hal_t *hal)
     ok = hal->isr_hz > 0.0f && p >= 1.0f && p <= (float)SRM_N_ROTOR_POLES && p == floorf(p) && SRM_N_ROTOR_POLES % (int)p == 0;
     angle_period = ok ? TWO_PI_F / p : TWO_PI_F;
 
-    /* The window may cross the 0/360 degree wrap (an advanced turn-on is a negative theta_on). */
-    win_on = fmodf(theta_on, 360.0f);
-    if (win_on < 0.0f) win_on += 360.0f;
-    win_off = fmodf(theta_off, 360.0f);
-    if (win_off < 0.0f) win_off += 360.0f;
+    update_window();
 }
 
 bool srm_ref_ok(void) { return ok; }

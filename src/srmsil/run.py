@@ -86,6 +86,10 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
     """Load the library and run it. Call only in a child process: the library holds controller code and C state."""
     lib = C.CDLL(str(Path(lib_path).resolve()))
     _abi.bind(lib)
+    cps = (_abi.ParamStep * max(len(scenario.param_steps), 1))()
+    steps = sorted(scenario.param_steps, key=lambda s: s.time)   # stable: steps at one time keep list order
+    for c, s in zip(cps, steps):
+        c.t, c.value, c.name = s.time, s.value, s.name.encode()
     for name, value in scenario.params.items():
         if lib.srm_sim_param(name.encode(), value) != 0:
             raise ValueError(f"controller rejected parameter {name!r}")
@@ -113,13 +117,15 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         mode=int(scenario.mode == "dynamic"), command_mode=int(scenario.command_mode == "speed"),
         encoder_cpr=se.encoder_cpr, adc_bits=ad.bits, adc_offset_counts=ad.offset_counts, seed=scenario.seed,
         encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
-        resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits)
+        resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits, sensor_delay=se.delay,
+        volt_full_scale=ad.volt_full_scale or 0.0, volt_rc_tau=ad.volt_rc_tau, param_steps=cps,
+        n_param_steps=len(steps))
     cur, trq, wf = (np.ascontiguousarray(a, dtype=np.float64) for a in (tab.current, tab.torque, tab.w_field))
     ctab = _abi.Tables(theta_step=tab.theta_step, psi_step=tab.psi_step, psi_max=tab.psi_max, i_max=tab.i_max,
                        n_theta=cur.shape[0], n_psi=cur.shape[1], current=_ptr(cur, C.c_double),
                        torque=_ptr(trq, C.c_double), w_field=_ptr(wf, C.c_double))
     scalars = {k: np.zeros(n) for k in ("t", "theta", "omega", "torque", "encoder", "resolver_sin", "resolver_cos")}
-    phased = {k: np.zeros((q, n), np.float32) for k in ("i", "psi", "v", "adc_i")}
+    phased = {k: np.zeros((q, n), np.float32) for k in ("i", "psi", "v", "adc_i", "adc_v")}
     gates = {k: np.zeros((q, n), np.uint8) for k in ("gate_u", "gate_l")}
     ctrace = _abi.Trace(n_samples=n)
     for k, a in scalars.items():
@@ -130,6 +136,8 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         setattr(ctrace, k, _ptr(a, C.c_uint8))
     csum = _abi.Summary()
     rc = lib.srm_sim_run(C.byref(cfg), C.byref(ctab), C.byref(ctrace), C.byref(csum))
+    if rc == -3:
+        raise ValueError(f"controller refused live parameter {steps[csum.refused - 1].name} (code {csum.refused_code})")
     if rc == -2:
         raise RuntimeError("the controller queued more gate commands than the simulator can delay; "
                            "shorten compute_delay or issue fewer commands")

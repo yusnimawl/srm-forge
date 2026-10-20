@@ -21,7 +21,7 @@ typedef struct {
     int in_isr, overflow;
     srm_plant_t pl;
     srm_adc_t adc;
-    int adc_counts[SRM_SIM_MAX_PHASES];
+    int adc_counts[SRM_SIM_MAX_PHASES], adc_vcounts[SRM_SIM_MAX_PHASES];
     gate_event_t queue[QUEUE_SIZE];
     int64_t q_head, q_tail;
 } sim_t;
@@ -73,7 +73,10 @@ static void hal_set_pwm(uint8_t phase, float duty, srm_chop_t mode)
 
 static uint16_t hal_adc_read(uint8_t channel)
 {
-    return channel < S.cfg->n_phases ? (uint16_t)S.adc_counts[channel] : 0;
+    const int q = S.cfg->n_phases;
+    if (channel < q) return (uint16_t)S.adc_counts[channel];
+    if (channel < 2 * q && S.cfg->volt_full_scale > 0.0) return (uint16_t)S.adc_vcounts[channel - q];
+    return 0;
 }
 
 static uint32_t hal_encoder_count(void)
@@ -107,7 +110,16 @@ static double adc_amps(int counts)
 
 static void latch_adc(void)
 {
-    for (int k = 0; k < S.cfg->n_phases; k++) S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
+    for (int k = 0; k < S.cfg->n_phases; k++) {
+        S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
+        if (S.cfg->volt_full_scale > 0.0) S.adc_vcounts[k] = srm_adc_convert_volt(&S.adc, S.cfg, k);
+    }
+}
+
+static double adc_volts(int counts)
+{
+    return (double)(counts - (1 << (S.cfg->adc_bits - 1))) * 2.0 * S.cfg->volt_full_scale /
+           (double)((1 << S.cfg->adc_bits) - 1);
 }
 
 int srm_sim_abi(void) { return SRM_SIM_ABI; }
@@ -131,7 +143,9 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
 {
     const int q = cfg->n_phases;
     if (q < 1 || q > SRM_SIM_MAX_PHASES || cfg->n_steps < 1 || !(cfg->dt > 0.0) || cfg->trace_stride < 1 ||
-        cfg->adc_bits < 1 || cfg->adc_bits > 16 ||
+        cfg->adc_bits < 1 || cfg->adc_bits > 16 || !(cfg->sensor_delay >= 0.0) || !(cfg->volt_full_scale >= 0.0) ||
+        !(cfg->volt_rc_tau >= 0.0) || srm_sensor_delay_steps(cfg) > SRM_DELAY_MAX || cfg->n_param_steps < 0 ||
+        (cfg->n_param_steps > 0 && !cfg->param_steps) ||
         cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1)
         return -1;
     memset(&S, 0, sizeof S);
@@ -157,6 +171,10 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     hal.adc_amps_per_count = (float)cfg->adc_amps_per_count;
     hal.adc_offset_counts = cfg->adc_offset_counts;
     hal.encoder_cpr = cfg->encoder_cpr;
+    if (cfg->volt_full_scale > 0.0) {
+        hal.adc_volts_per_count = (float)(2.0 * cfg->volt_full_scale / (double)((1 << cfg->adc_bits) - 1));
+        hal.adc_volt_offset_counts = 1 << (cfg->adc_bits - 1);
+    }
     hal.set_switches = hal_set_switches;
     hal.set_pwm = hal_set_pwm;
     hal.adc_read = hal_adc_read;
@@ -172,13 +190,26 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     int64_t isr_k = 0, slow_k = 1;
     int64_t next_isr = step_of(0.5 / cfg->isr_hz, dt), next_slow = step_of(SLOW_PERIOD_S, dt);
     const int64_t window_start = cfg->n_steps / 2;
-    double adc_hold[SRM_SIM_MAX_PHASES] = {0};
+    double adc_hold[SRM_SIM_MAX_PHASES] = {0}, adc_vhold[SRM_SIM_MAX_PHASES] = {0};
+    int32_t next_step = 0;
     int64_t n_out = 0;
 
     for (int64_t n = 0; n < cfg->n_steps; n++) {
         const double t = (double)n * dt;
         S.n = n;
         while (n >= next_isr) {
+            while (next_step < cfg->n_param_steps && cfg->param_steps[next_step].t <= t + 1.0e-9 * dt) {
+                char name[sizeof cfg->param_steps[0].name];
+                memcpy(name, cfg->param_steps[next_step].name, sizeof name);
+                name[sizeof name - 1] = '\0';
+                int rc = ctrl_param(name, cfg->param_steps[next_step].value);
+                next_step++;
+                if (rc != 0) {
+                    sum->refused = next_step;
+                    sum->refused_code = rc;
+                    return -3;
+                }
+            }
             latch_adc();
             S.in_isr = 1;
             ctrl_isr();
@@ -201,6 +232,7 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
             cu += R * S.pl.cur[k] * S.pl.cur[k];
             if (S.pl.cur[k] > tab->i_max || S.pl.psi[k] > tab->psi_max) beyond = 1;
             adc_hold[k] = adc_amps(S.adc_counts[k]);
+            if (cfg->volt_full_scale > 0.0) adc_vhold[k] = adc_volts(S.adc_vcounts[k]);
         }
         sum->beyond_map_steps += beyond;
         const double pmech = S.pl.ttot * S.pl.omega;
@@ -222,6 +254,7 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
                 trace->psi[at] = (float)S.pl.psi[k];
                 trace->v[at] = (float)v[k];
                 trace->adc_i[at] = (float)adc_hold[k];
+                trace->adc_v[at] = (float)adc_vhold[k];
                 trace->gate_u[at] = (uint8_t)S.conv.ph[k].u_eff;
                 trace->gate_l[at] = (uint8_t)S.conv.ph[k].l_eff;
             }
@@ -246,7 +279,7 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
             sum->energy_copper += dt * R * 0.5 * (i_old[k] * i_old[k] + S.pl.cur[k] * S.pl.cur[k]);
         }
         sum->energy_mech += dt * 0.5 * (pmech + S.pl.ttot * S.pl.omega);
-        srm_adc_filter(&S.adc, cfg, S.pl.cur);
+        srm_adc_filter(&S.adc, cfg, S.pl.cur, v);
     }
     for (int k = 0; k < q; k++) sum->w_field_end += S.pl.wf[k];
     trace->n_samples = n_out;

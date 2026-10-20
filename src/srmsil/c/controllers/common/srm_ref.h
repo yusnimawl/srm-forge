@@ -15,7 +15,9 @@ typedef struct {
 } srm_ref_param_t;
 
 /* Look `name` up in the controller's own table, then in the shared one (theta_on, theta_off, speed_kp,
- * speed_ki, speed_filter_hz, torque_limit, resolver_pole_pairs, which must divide the rotor pole count). 0 = accepted, -1 = unknown name. */
+ * speed_ki, speed_filter_hz, torque_limit, resolver_pole_pairs, which must divide the rotor pole count).
+ * 0 = accepted, -1 = unknown name, -2 = resolver_pole_pairs after srm_ref_init. Every other parameter takes
+ * effect at once. */
 int srm_ref_param(const srm_ref_param_t *own, int n_own, const char *name, float value);
 
 /* Call from ctrl_init (after the parameters were set) and from ctrl_command / ctrl_slow. */

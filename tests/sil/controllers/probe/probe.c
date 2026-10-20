@@ -13,7 +13,7 @@ void ctrl_isr(void)
 {
     int16_t s, c;
     uint32_t sum = hal->encoder_count();
-    for (uint8_t k = 0; k < hal->n_phases; k++) sum += hal->adc_read(k);
+    for (uint8_t k = 0; k < 2 * hal->n_phases; k++) sum += hal->adc_read(k);   /* currents, then phase voltages */
     hal->resolver_sincos(&s, &c);
     probe_sink = sum + (uint32_t)(int32_t)s + (uint32_t)(int32_t)c;
 }

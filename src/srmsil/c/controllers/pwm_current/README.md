@@ -22,6 +22,8 @@ goes through a PI loop on the speed estimate that produces the torque command.
 | `torque_limit` | N*m | SRM_T_MAX_NM |
 | `resolver_pole_pairs` | - | 1 |
 
+Every parameter can also be changed while the controller runs (`ctrl_param` returns 0 and the new value is used from the next ISR); `resolver_pole_pairs` is the exception and returns -2 after `ctrl_init`.
+
 ## Notes
 
 - The window may wrap through 0/360 degrees: `theta_on` = -15 starts conduction 15 degrees before the unaligned
