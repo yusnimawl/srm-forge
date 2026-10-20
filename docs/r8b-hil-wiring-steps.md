@@ -89,7 +89,7 @@ Nucleo pins are Zio labels (CN7-CN10 side headers). Teensy pins are the printed 
 
 ## Step 7: continuity check (multimeter, both boards unpowered)
 
-- [ ] Beep each of the 27 signal wires end to end (8 + 3 + 5 + 7 + 2 = 25 wires, plus 2 GND = 27).
+- [ ] Beep all 27 wires end to end (25 signals: 8 + 3 + 5 + 7 + 2, plus 2 GND).
 - [ ] SCLK: expect about 330 Ω between D13 and Teensy 13.
 - [ ] Every other signal: under 1 Ω.
 - [ ] Nucleo 3V3 to Teensy 3V3: open (no beep).
