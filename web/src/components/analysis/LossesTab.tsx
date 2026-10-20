@@ -71,7 +71,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   const contour: Data[] = [
     {
       type: "contour", x: c.x, y: c.y, z: c.z, colorscale: INFERNO_SCALE, connectgaps: false,
-      contours: { coloring: "heatmap" }, colorbar: { title: { text: "Efficiency (%)" } },
+      contours: { coloring: "heatmap" }, colorbar: { title: { text: "Eff. (%)" }, thickness: 12 },
       hovertemplate: "%{x} rpm, level %{y}: %{z:.1f} %<extra></extra>",
     } as Data,
     {
@@ -91,6 +91,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   })) as Data[]
   const axis = (text: string) => ({ ...theme.xaxis, title: { text } })
   const base = { ...theme, margin: { l: 60, r: 10, t: 10, b: 60 } }
+  const barMargin = { ...base.margin, t: 40, b: 110 }
   const cfg = { responsive: true, displaylogo: false }
   const sp = sel >= 0 ? r.points[sel] : null
 
@@ -104,12 +105,12 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
           {r.notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       )}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 @3xl:grid-cols-2">
         <section className="space-y-2">
           <h2 className={HEADING}>Efficiency over speed and torque level</h2>
           <Plot
             data={contour}
-            layout={{ ...base, height: 340, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (fraction of the envelope torque)") } as Partial<Layout>}
+            layout={{ ...base, height: 340, xaxis: axis("Speed (rpm)"), yaxis: axis("Torque level (× envelope)") } as Partial<Layout>}
             config={cfg}
             onClick={(e) => {
               const k = (e.points?.[0] as { customdata?: unknown } | undefined)?.customdata
@@ -121,7 +122,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
           <h2 className={HEADING}>Loss split</h2>
           <Plot
             data={barData}
-            layout={{ ...base, height: 340, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: -0.5 } } as Partial<Layout>}
+            layout={{ ...base, margin: barMargin, height: 340, barmode: "stack", xaxis: { ...axis(""), tickangle: -60 }, yaxis: axis("Loss (W)"), legend: { orientation: "h", y: 1.02, yanchor: "bottom" } } as Partial<Layout>}
             config={cfg}
           />
         </section>
@@ -236,7 +237,7 @@ export default function LossesTab({ caseId }: { caseId: string }) {
     </div>
   )
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       {active && <p role="status" className="pt-2 text-sm text-muted-foreground">Losses job running — progress above.</p>}
       {losses.data ? (
         <Results caseId={caseId} r={losses.data} machine={machine} />
