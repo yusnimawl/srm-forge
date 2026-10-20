@@ -48,6 +48,11 @@ static float angle_period = TWO_PI_F;   /* range of srm_ref_angle: 2*pi, or 2*pi
 static float win_on = 0.0f;             /* theta_on and theta_off normalised into [0, 360) */
 static float win_off = 150.0f;
 
+static float clampf(float x, float lo, float hi)
+{
+    return x < lo ? lo : (x > hi ? hi : x);
+}
+
 static int lookup(const srm_ref_param_t *t, int n, const char *name, float value)
 {
     for (int i = 0; i < n; i++) {
@@ -75,12 +80,8 @@ int srm_ref_param(const srm_ref_param_t *own, int n_own, const char *name, float
     if (lookup(own, n_own, name, value) != 0 && lookup(shared, (int)(sizeof shared / sizeof shared[0]), name, value) != 0)
         return -1;
     update_window();
+    if (cmd_mode == SRM_CMD_TORQUE) torque_cmd = clampf(cmd_value, 0.0f, torque_limit);
     return 0;
-}
-
-static float clampf(float x, float lo, float hi)
-{
-    return x < lo ? lo : (x > hi ? hi : x);
 }
 
 void srm_ref_init(const srm_hal_t *hal)

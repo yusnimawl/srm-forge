@@ -69,3 +69,20 @@ def test_reference_controllers_accept_live_params(cache, ctrl, names):
              enumerate(zip(names, [1.0, 1.0, 120.0, 5.0]))]
     scn = Scenario(mode="dynamic", speed_rpm=300.0, duration=0.006, command_value=0.5, param_steps=steps)
     assert sil_run(analytic_motor(), ctrl, scn, cache_dir=cache).summary.energy_error < 0.05
+
+
+def test_torque_limit_is_live(cache):
+    scn = dict(speed_rpm=1000.0, duration=0.03, command_value=1.0)
+    m = analytic_motor()
+    r = sil_run(m, "hysteresis", Scenario(**scn, param_steps=[ParamStep(time=0.015, name="torque_limit", value=0.3)]),
+                cache_dir=cache)
+    t = r.traces["t"]
+    before = r.traces["torque"][(t >= 0.008) & (t < 0.015)].mean()
+    after = r.traces["torque"][t >= 0.02].mean()
+    assert before > 0.6 and after < 0.5 * before
+
+
+def test_delay_step_rounding_boundary():
+    Scenario(dt=1e-3 / 2048.4, sensors=SensorSettings(delay=1e-3))          # rounds to 2048 steps
+    with pytest.raises(ValueError, match="2049 steps"):
+        Scenario(dt=1e-3 / 2048.6, sensors=SensorSettings(delay=1e-3))      # rounds to 2049 steps

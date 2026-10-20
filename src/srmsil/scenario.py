@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -114,7 +115,7 @@ class Scenario(_Model):
             raise ValueError(f"{n} steps (duration / dt) exceed the limit of {MAX_STEPS}; shorten the run or raise dt")
         if self.pwm_hz * self.dt > 1 or self.resolved_isr_hz * self.dt > 1:
             raise ValueError("pwm_hz and isr_hz must not exceed 1 / dt")
-        steps = round(self.sensors.delay / self.dt)
+        steps = math.floor(self.sensors.delay / self.dt + 0.5)   # the rule of srm_sensor_delay_steps
         if steps > MAX_DELAY_STEPS:
             raise ValueError(f"sensor delay {self.sensors.delay} s is {steps} steps of {self.dt} s, over the limit of "
                              f"{MAX_DELAY_STEPS}; raise dt or shorten the delay")
