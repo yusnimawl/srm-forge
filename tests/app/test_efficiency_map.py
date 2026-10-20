@@ -234,3 +234,12 @@ def test_efficiency_map_records_process_and_note(case, tmp_path):
             assert all(math.isfinite(v) for v in pt.cut_edge_rel) and pt.cut_edge_factor
         else:
             assert all(math.isnan(v) for v in pt.cut_edge_rel) and pt.cut_edge_factor == {}
+
+
+def test_band_fractions_computed_once_per_delta(tmp_path):
+    band = {}
+    with mock.patch.object(losses, "iron_fractions", wraps=losses.iron_fractions) as spy:
+        first = _stroke(tmp_path, cut_process="punching", fractions=band)
+        again = _stroke(tmp_path, cut_process="punching", fractions=band)
+    assert spy.call_count == 1 and set(band) == {losses.CUT_PROCESSES["punching"].delta}
+    assert again.iron_w == first.iron_w == _stroke(tmp_path, cut_process="punching").iron_w

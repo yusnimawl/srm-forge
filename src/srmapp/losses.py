@@ -206,21 +206,30 @@ def iron_fractions(static, delta: float) -> tuple[np.ndarray, np.ndarray]:
 
 def stroke_losses(static, design: Design, angles: np.ndarray, coil_currents: np.ndarray, rpm: float, *,
                   solver: str = "ngsolve", workers: int | None = None, cache_dir=None, progress=None, cancel=None,
-                  model: LossModel | None = None, cut_process: str = "unspecified") -> StrokeLoss:
+                  model: LossModel | None = None, cut_process: str = "unspecified",
+                  fractions: dict[float, tuple[np.ndarray, np.ndarray]] | None = None) -> StrokeLoss:
     """Iron loss of a given stroke: the fields at the rotor `angles` (one pole pitch) with the coil currents
     `coil_currents` (n_angles, n_phases), at `rpm`. `model` replaces the loss model of the iron materials.
     `cut_process` ("unspecified" or a key of CUT_PROCESSES) raises the hysteresis and excess loss near cut edges; `cut_edge_rel` is the iron loss range over the process's
-    width coefficient (for "unspecified": wedm low to laser high) relative to `iron_w`."""
+    width coefficient (for "unspecified": wedm low to laser high) relative to `iron_w`. `fractions` caches
+    `iron_fractions(static, delta)` by delta; pass the same dict for every stroke on one static mesh."""
     fields = stroke_fields(static, design, angles, coil_currents, solver=solver, workers=workers,
                            cache_dir=cache_dir, progress=progress, cancel=cancel)
     omega = rpm * 2 * math.pi / 60
     d = design.machine.lamination_thickness
     unspecified = cut_process == "unspecified"
+    fractions = {} if fractions is None else fractions
+
+    def frac(delta: float) -> tuple[np.ndarray, np.ndarray]:
+        if delta not in fractions:
+            fractions[delta] = iron_fractions(static, delta)
+        return fractions[delta]
+
     if unspecified:
         proc, mult = None, (None, None)
     else:
         proc = CUT_PROCESSES[cut_process]
-        mult = tuple(edge_multiplier(f, proc.a, proc.delta) for f in iron_fractions(static, proc.delta))
+        mult = tuple(edge_multiplier(f, proc.a, proc.delta) for f in frac(proc.delta))
     sides = (_side_loss(fields.stator, omega, design.machine.stack_length, model, d, mult[0]),
              _side_loss(fields.rotor, omega, design.machine.stack_length, model, d, mult[1]))
     iron = {k: v for s in sides for k, v in s.regions.items()}
@@ -230,8 +239,10 @@ def stroke_losses(static, design: Design, angles: np.ndarray, coil_currents: np.
               for k, r in iron.items()}
 
     def total(a: float, delta: float) -> float:
+        if a == 0:
+            return sum(s.classical_w + float(np.sum(s.he_mass)) / B0 for s in sides)
         return sum(s.classical_w + float(np.sum(s.he_mass * (1 + a / (2 * delta) * f))) / B0
-                   for s, f in zip(sides, iron_fractions(static, delta)))
+                   for s, f in zip(sides, frac(delta)))
 
     if unspecified:
         wedm, laser = CUT_PROCESSES["wedm"], CUT_PROCESSES["laser"]
@@ -302,7 +313,7 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         _progress(progress, "fields", solved[0] + done, reached * len(angles))
 
     wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
-    points, side_flags = [], []
+    points, side_flags, band = [], [], {}
     for done, ((i, f), trace) in enumerate(zip(grid, strokes), 1):
         rpm, torque = float(speeds[i]), f * float(env.torque[i])
         if trace is None:
@@ -314,7 +325,7 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
         omega = rpm * 2 * math.pi / 60
         sl = stroke_losses(static, ref, angles, coil, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
                            progress=field_progress, cancel=cancel,
-                           cut_process=req.cut_process)
+                           cut_process=req.cut_process, fractions=band)
         fields, sides, iron, iron_w = sl.fields, list(sl.sides), sl.iron, sl.iron_w
         solved[0] += len(angles)
         ac = None if wire is None else ac_copper_loss(w, wire, phase[:, 0], tau / omega, fields.b_coil,

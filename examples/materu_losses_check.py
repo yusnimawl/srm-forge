@@ -25,7 +25,7 @@ import numpy as np
 import krishnan_6_4 as k64
 from materials.m19_loss_fixture import m19_loss_data
 from srmapp.drive.envelope import envelope, fixed_stroke, min_copper_stroke
-from srmapp.losses import iron_fractions, iron_uncertainty, phase_current_samples, stroke_losses
+from srmapp.losses import iron_uncertainty, phase_current_samples, stroke_losses
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.stroke import DEFAULT_STROKE_ANGLES, stroke_angles
@@ -88,9 +88,11 @@ def _evaluate(result, static, d, model, angles, tau, rpm, angle_set, shift, peak
     machine = d.machine
     trace = pulse(result, machine, rpm, angle_set["advance"] + shift, angle_set["conduction"], peak)
     phase = phase_current_samples(trace.current, angles, tau, machine.n_phases)
+    band = {}
     with k64.waivers():
         by_process = {p: stroke_losses(static, d, angles, phase, rpm, solver=solver, workers=workers,
-                                       cache_dir=cache_dir, model=model, cut_process=p) for p in PROCESSES}
+                                       cache_dir=cache_dir, model=model, cut_process=p, fractions=band)
+                      for p in PROCESSES}
     sl = by_process["unspecified"]
     cut = {p: dict(iron_w=s.iron_w, error_pct=100 * (s.iron_w - iron) / iron,
                    cut_edge_rel=[100 * x for x in s.cut_edge_rel]) for p, s in by_process.items()}
@@ -148,12 +150,14 @@ def yan_shares(preset="reference", workers=None, cache_dir=None, solver="ngsolve
     static = build_machine_mesh(d)
     angles = stroke_angles(static, tau, DEFAULT_STROKE_ANGLES)
     phase = phase_current_samples(trace.current, angles, tau, machine.n_phases)
-    sl = stroke_losses(static, d, angles, phase, YAN_RPM, solver=solver, workers=workers, cache_dir=cache_dir)
+    band = {}
+    sl = stroke_losses(static, d, angles, phase, YAN_RPM, solver=solver, workers=workers, cache_dir=cache_dir,
+                       fractions=band)
     cut_factors = {}
     for p in PROCESSES[1:]:
         c = stroke_losses(static, d, angles, phase, YAN_RPM, solver=solver, workers=workers, cache_dir=cache_dir,
-                          cut_process=p)
-        stator_frac, rotor_frac = iron_fractions(static, CUT_PROCESSES[p].delta)
+                          cut_process=p, fractions=band)
+        stator_frac, rotor_frac = band[CUT_PROCESSES[p].delta]
         shares = {}
         for side, frac in ((sl.fields.stator, stator_frac), (sl.fields.rotor, rotor_frac)):
             for name in np.unique(side.region):

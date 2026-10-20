@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SELECT_CLASS } from "@/components/case/fields"
 import { LINE_COLORS } from "@/lib/analysis"
+import { CUT_PROCESSES } from "@/lib/caseForm"
 import { lossChips } from "@/lib/chips"
 import { fmt } from "@/lib/format"
 import { INFERNO_SCALE } from "@/lib/inferno"
@@ -157,7 +158,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
         )}
         {r.cut_process != null && (
           <p className="text-xs text-muted-foreground">
-            Cut process: {r.cut_process === "unspecified" ? "unspecified (range over all processes)" : r.cut_process}
+            Cut process: {r.cut_process === "unspecified" ? "unspecified (range over all processes)" : (CUT_PROCESSES.find((c) => c.value === r.cut_process)?.label ?? r.cut_process)}
             {factors.length > 0 && <> ({factors.map(([k, v]) => `${k.replaceAll("_", " ")} ×${v.toFixed(2)}`).join(", ")})</>}
           </p>
         )}

@@ -34,19 +34,19 @@ def _kind(static, part):
 
 def test_strip_fraction_matches_band_area():
     for w in (5e-3, 10e-3, 30e-3):
-        nodes, tris = _strip(w, 0.05, 0.1e-3)
+        nodes, tris = _strip(w, 0.02, 0.2e-3)
         d = 0.5e-3
         area = _areas(nodes, tris)
         frac = band_fraction(nodes, tris, d)
-        exact = (2 * d * (0.05 + w) - 4 * d * d) / (w * 0.05)
+        exact = (2 * d * (0.02 + w) - 4 * d * d) / (w * 0.02)
         assert np.sum(frac * area) / area.sum() == pytest.approx(exact, rel=0.01)
 
 
 def test_strip_multiplier_follows_one_over_w():
     for p in CUT_PROCESSES.values():
         for w in (5e-3, 10e-3, 30e-3):
-            length = 0.05
-            nodes, tris = _strip(w, length, 0.1e-3)
+            length = 0.02
+            nodes, tris = _strip(w, length, 0.2e-3)
             area = _areas(nodes, tris)
             m = edge_multiplier(band_fraction(nodes, tris, p.delta), p.a, p.delta)
             ends = p.a / length - p.a * p.delta / (w * length) * 2
@@ -68,8 +68,13 @@ def test_fraction_limits():
     assert f[0] == pytest.approx(1.0) and f[1] == 0.0 and 0 < f[2] < 1 and np.all(np.isfinite(f))
 
 
-def test_cut_edges_of_8_6_iron_form_closed_loops(srm_8_6):
-    static = build_machine_mesh(Design(machine=srm_8_6, mesh=MeshSettings(preset="screening")))
+@pytest.fixture(scope="module")
+def static_8_6():
+    return build_machine_mesh(Design(machine=make_8_6(), mesh=MeshSettings(preset="screening")))
+
+
+def test_cut_edges_of_8_6_iron_form_closed_loops(static_8_6, srm_8_6):
+    static = static_8_6
     for part, kind in ((static.stator, "stator_iron"), (static.rotor, "rotor_iron")):
         iron = _kind(static, part) == kind
         seg = cut_edges(part.nodes, part.triangles[iron])
@@ -104,3 +109,33 @@ def test_imported_iron_hole_edges_are_cut_edges():
                    for k in range(6)], axis=0)
     assert np.count_nonzero(dist < 1e-9) > 6 * 8
     assert np.all(np.isfinite(band_fraction(part.nodes, tris, 0.5 * MM)))
+
+
+def test_zero_a_gives_exactly_one_over_b0():
+    frac = np.array([0.0, 0.25, 0.5, 1.0])
+    for delta in (0.2e-3, 0.5e-3):
+        assert np.all(edge_multiplier(frac, 0.0, delta) == 1 / B0)
+
+
+@pytest.mark.parametrize("h", [3e-3, 4e-3, 6e-3])
+def test_coarse_strip_multiplier_matches_analytic(h):
+    w = 12e-3
+    nodes, tris = _strip(w, 0.05, h)
+    length = nodes[:, 0].max()
+    area = _areas(nodes, tris)
+    for p in CUT_PROCESSES.values():
+        m = edge_multiplier(band_fraction(nodes, tris, p.delta), p.a, p.delta)
+        exact = 1 + p.a / w + p.a / length - 2 * p.a * p.delta / (w * length)
+        assert np.sum(m * area) / area.sum() * B0 == pytest.approx(exact, rel=0.02)
+
+
+def test_8_6_band_area_equals_delta_times_cut_length(static_8_6):
+    static = static_8_6
+    for part, kind in ((static.stator, "stator_iron"), (static.rotor, "rotor_iron")):
+        tris = part.triangles[_kind(static, part) == kind]
+        seg = cut_edges(part.nodes, tris)
+        cut_length = np.hypot(*(seg[:, 1] - seg[:, 0]).T).sum()
+        area = _areas(part.nodes, tris)
+        for delta in (0.2e-3, 0.5e-3):
+            band = np.sum(band_fraction(part.nodes, tris, delta) * area)
+            assert band == pytest.approx(delta * cut_length, rel=0.05), (kind, delta)

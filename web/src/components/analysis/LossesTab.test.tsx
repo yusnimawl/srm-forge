@@ -124,13 +124,14 @@ describe("LossesTab", () => {
     expect(m2.host.textContent).toContain("Efficiency")
   })
 
-  it("names a specified cutting process", async () => {
-    const r = { ...losses(2), cut_process: "laser" }
-    r.points = r.points.map((p) => ({ ...p, cut_edge_rel: [0.12, 0.12], cut_edge_factor: { stator_pole: 1 } }))
-    const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
-    await m.render()
-    expect(m.host.textContent).toContain("Cut process: laser")
-  })
+  it.each([["punching", "Punching or shearing"], ["wedm", "WEDM"], ["plasma", "plasma"]])(
+    "names the cutting process %s by its label", async (process, label) => {
+      const r = { ...losses(2), cut_process: process }
+      r.points = r.points.map((p) => ({ ...p, cut_edge_rel: [0.12, 0.12], cut_edge_factor: { stator_pole: 1 } }))
+      const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+      await m.render()
+      expect(m.host.textContent).toContain(`Cut process: ${label}`)
+    })
 
   it("loads B(t) at the picked element in metres", async () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(

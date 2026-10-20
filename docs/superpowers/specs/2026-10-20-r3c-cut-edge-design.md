@@ -62,10 +62,13 @@ features, not to close Materu.
 - **Cut edges.** Per mesh part (stator, rotor): the edges of iron triangles that are not shared with another iron
   triangle of the same part. These are the iron boundaries against slot air, the air gap, the outside, the shaft and
   imported hole air; every one of them is a cut edge of the lamination.
-- **Band fraction.** For each iron element, the fraction of its area within δ of a cut edge, from 6 fixed interior
-  sample points per triangle (a symmetric rule) and the distance to the nearest cut-edge segment. The distance
-  uses a KD-tree on points along the cut edges spaced at most δ/8, refined to the exact segment distance on the
-  nearest candidates. It is computed once per static mesh and process; it does not depend on angle or current.
+- **Band fraction.** For each iron element, the fraction of its area within δ of a cut edge. An element farther than
+  δ plus its longest edge from every cut edge has fraction 0. Every other element is split uniformly into n²
+  sub-triangles, n = ceil(longest edge / (δ/4)), and its fraction is the share of sub-centroids within δ of a cut
+  segment, so the result does not depend on the element size. The distance is exact: a KD-tree on points along the
+  cut edges spaced at most h = δ/8 settles points nearer than δ (inside) or farther than δ + h/2 (outside); the rest
+  are checked with the exact segment distance to every segment with a sample within δ + h/2. It is computed once per
+  static mesh and δ; it does not depend on angle or current.
 - **Multiplier.** For element e:
 
       m_e = (1 + (K - 1) frac_e) / B0,   K - 1 = a / (2 δ),   B0 = 1 + a_epstein / 0.030 m

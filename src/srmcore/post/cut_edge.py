@@ -42,12 +42,7 @@ CUT_PROCESSES: dict[str, CutProcess] = {
     "laser": CutProcess(a=1.8e-3, a_low=1.6e-3, a_high=5.3e-3, delta=0.5e-3),
 }
 
-# symmetric 6-point rule: (barycentric coordinates, weight); the weights sum to 1
-_A1, _B1, _W1 = 0.816847572980459, 0.091576213509771, 0.109951743655322
-_A2, _B2, _W2 = 0.108103018168070, 0.445948490915965, 0.223381589678011
-_BARY = np.array([[_A1, _B1, _B1], [_B1, _A1, _B1], [_B1, _B1, _A1],
-                  [_A2, _B2, _B2], [_B2, _A2, _B2], [_B2, _B2, _A2]])
-_WEIGHTS = np.array([_W1] * 3 + [_W2] * 3)
+_CHUNK = 200_000  # sample points per distance query
 
 
 def cut_edges(nodes: np.ndarray, triangles: np.ndarray) -> np.ndarray:
@@ -66,30 +61,68 @@ def _segment_distance(pts: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarr
     return np.hypot(*(pts - (a + t[:, None] * ab)).T)
 
 
+def _sub_centroids(n: int) -> np.ndarray:
+    """(n * n, 2) barycentric (u, v) of the centroids of the n * n equal sub-triangles of a triangle split uniformly."""
+    i, j = np.meshgrid(np.arange(n), np.arange(n), indexing="ij")
+    up = (i + j <= n - 1)
+    down = (i + j <= n - 2)
+    return np.vstack([np.column_stack([i[up] + 1 / 3, j[up] + 1 / 3]),
+                      np.column_stack([i[down] + 2 / 3, j[down] + 2 / 3])]) / n
+
+
 def band_fraction(nodes: np.ndarray, triangles: np.ndarray, delta: float, cut: np.ndarray | None = None) -> np.ndarray:
     """(n_tri,) share of each triangle's area within delta of a cut edge, in [0, 1].
 
-    `cut` are the cut-edge segments (default: those of `triangles`).
+    `cut` are the cut-edge segments (default: those of `triangles`). A triangle that may reach the band is split
+    uniformly into n * n sub-triangles, n = ceil(longest edge / (delta / 4)); its fraction is the share of
+    sub-centroids within delta (exact point-to-segment distance) of a cut segment.
     """
-    nodes = np.asarray(nodes)
+    nodes = np.asarray(nodes, dtype=float)
     tri = np.asarray(triangles)
-    seg = cut_edges(nodes, tri) if cut is None else cut
-    if len(seg) == 0:
-        return np.zeros(len(tri))
+    seg = cut_edges(nodes, tri) if cut is None else np.asarray(cut, dtype=float)
+    frac = np.zeros(len(tri))
+    if len(seg) == 0 or len(tri) == 0:
+        return frac
     a, b = seg[:, 0], seg[:, 1]
     longest = np.hypot(*(b - a).T).max()
-    n = max(1, int(np.ceil(longest / (delta / 8))))
-    t = np.linspace(0.0, 1.0, n + 1)
-    along = a[:, None, :] + t[None, :, None] * (b - a)[:, None, :]
-    owner = np.repeat(np.arange(len(seg)), n + 1)
-    tree = cKDTree(along.reshape(-1, 2))
+    m = max(1, int(np.ceil(longest / (delta / 8))))
+    h = longest / m  # largest spacing of the samples along a segment
+    t = np.linspace(0.0, 1.0, m + 1)
+    samples = (a[:, None, :] + t[None, :, None] * (b - a)[:, None, :]).reshape(-1, 2)
+    owner = np.repeat(np.arange(len(seg)), m + 1)
+    tree = cKDTree(samples)
 
-    samples = np.einsum("sk,tkd->tsd", _BARY, nodes[tri]).reshape(-1, 2)
-    k = min(8, len(owner))
-    _, near = tree.query(samples, k=k)
-    cand = owner[near.reshape(len(samples), k)]
-    dist = np.min([_segment_distance(samples, a[cand[:, j]], b[cand[:, j]]) for j in range(k)], axis=0)
-    return (dist.reshape(len(tri), -1) <= delta) @ _WEIGHTS
+    # the nearest sample is at most h / 2 farther than the nearest segment point, and never nearer
+    p = nodes[tri]
+    edge = np.max(np.hypot(*(p - np.roll(p, 1, axis=1)).transpose(2, 0, 1)), axis=1)
+    d_c, _ = tree.query(p.mean(axis=1))
+    near = np.flatnonzero(d_c - h / 2 <= delta + edge)
+    n_sub = np.maximum(1, np.ceil(edge[near] / (delta / 4)).astype(int))
+
+    def within(pts: np.ndarray) -> np.ndarray:
+        d_s, _ = tree.query(pts, distance_upper_bound=delta + h / 2)  # inf beyond the bound
+        inside = d_s <= delta
+        unsure = np.flatnonzero(~inside & (d_s - h / 2 <= delta))
+        if len(unsure):
+            hits = tree.query_ball_point(pts[unsure], delta + h / 2, return_sorted=False)
+            counts = np.fromiter(map(len, hits), int, len(hits))
+            row = np.repeat(unsure, counts)
+            s = owner[np.concatenate(hits).astype(int)]
+            ok = _segment_distance(pts[row], a[s], b[s]) <= delta
+            inside[np.unique(row[ok])] = True
+        return inside
+
+    for n in np.unique(n_sub):
+        uv = _sub_centroids(int(n))
+        group = near[n_sub == n]
+        step = max(1, _CHUNK // len(uv))
+        for k in range(0, len(group), step):
+            g = group[k:k + step]
+            q = p[g]
+            pts = (q[:, None, 0] + uv[None, :, 0, None] * (q[:, None, 1] - q[:, None, 0])
+                   + uv[None, :, 1, None] * (q[:, None, 2] - q[:, None, 0])).reshape(-1, 2)
+            frac[g] = within(pts).reshape(len(g), -1).mean(axis=1)
+    return frac
 
 
 def edge_multiplier(frac: np.ndarray, a: float, delta: float) -> np.ndarray:
