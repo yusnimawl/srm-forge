@@ -113,3 +113,36 @@ def test_proto_compiles_strict(tmp_path):
     r = subprocess.run([*zig_cc(), "-std=c99", "-Wall", "-Wextra", "-Werror", f"-I{COMMON}", "-c",
                         "-o", str(tmp_path / "p.o"), str(COMMON / "hil_proto.c")], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def _c_edges(lib):
+    dll = C.CDLL(str(lib))
+    dll.shim_frame.restype = C.c_size_t
+    dll.shim_frame.argtypes = [C.c_uint8, C.c_uint16, C.c_char_p, C.c_size_t, C.c_void_p]
+    dll.shim_unframe.restype = C.c_long
+    dll.shim_unframe.argtypes = [C.c_char_p, C.c_size_t, C.c_void_p, C.c_void_p, C.c_void_p, C.c_size_t]
+    # worst case: all-nonzero payloads, buffers of exactly HIL_FRAME_MAX(n) (guard bytes after)
+    exact = {}
+    for n in (0, 1, 249, 253, 254, 503, 1015, 1024):
+        fmax = n + 5 + (n + 5) // 254 + 2
+        out = (C.c_uint8 * (fmax + 8))(*([0xAA] * (fmax + 8)))
+        m = dll.shim_frame(1, 7, bytes([0x55]) * n, n, out)
+        exact[n] = (m, fmax, bytes(out[:m]).hex(), bytes(out[fmax:]) == b"\xaa" * 8)
+    over = (C.c_uint8 * 2048)()
+    too_big = dll.shim_frame(1, 0, bytes(1025), 1025, over)
+    # four 0xFF groups and a 15-byte group: 1035 encoded bytes that decode to 1030
+    crafted = b"".join(b"\xff" + b"\x01" * 254 for _ in range(4)) + b"\x0f" + b"\x01" * 14
+    pad = (C.c_uint8 * 64)(*([0xCC] * 64))
+    t, s, payload = C.c_uint8(), C.c_uint16(), (C.c_uint8 * 1100)()
+    rc = dll.shim_unframe(crafted, len(crafted), C.byref(t), C.byref(s), payload, 1100)
+    return exact, too_big, len(crafted), rc, bytes(pad) == b"\xcc" * 64
+
+
+def test_frame_buffer_bounds_and_hostile_input():
+    exact, too_big, n_crafted, rc, _ = run_in_child(_c_edges, _lib())
+    for n, (m, fmax, hexframe, guard_ok) in exact.items():
+        assert m <= fmax and guard_ok, n
+        assert hexframe == proto.frame(1, 7, bytes([0x55]) * n).hex()
+    assert exact[249][1] == 257 and exact[1024][1] == 1035
+    assert too_big == 0
+    assert n_crafted == 1035 and rc == -3

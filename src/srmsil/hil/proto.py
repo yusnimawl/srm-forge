@@ -101,7 +101,7 @@ def unframe(data: bytes, cap: int = PAYLOAD_MAX) -> tuple[int, int, bytes]:
     """Parse one frame (the trailing 0x00 is optional) into (type, seq, payload)."""
     if data.endswith(b"\x00"):
         data = data[:-1]
-    if len(data) > PAYLOAD_MAX + 5 + PAYLOAD_MAX // 254 + 2:
+    if len(data) > PAYLOAD_MAX + 5 + (PAYLOAD_MAX + 5) // 254 + 2:
         raise ProtoError(-3)
     raw = cobs_decode(data)
     if len(raw) < 5:

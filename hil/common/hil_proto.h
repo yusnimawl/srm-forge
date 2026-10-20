@@ -11,7 +11,7 @@
 #define HIL_PROTOCOL_VERSION 1
 #define HIL_PAYLOAD_MAX 1024
 /* Output buffer size hil_frame needs for an n-byte payload (COBS overhead plus type, seq, CRC and the delimiter). */
-#define HIL_FRAME_MAX(n) ((n) + 5 + (n) / 254 + 2)
+#define HIL_FRAME_MAX(n) ((n) + 5 + ((n) + 5) / 254 + 2)
 #define HIL_CAPTURE_SAMPLES_PER_PACKET 28
 #define HIL_TABLE_CHUNK_FLOATS 200
 
@@ -153,7 +153,7 @@ size_t hil_cobs_encode(const uint8_t *in, size_t n, uint8_t *out);
 /* Decode; out needs n bytes. Returns the decoded length, -1 on a malformed frame. */
 long hil_cobs_decode(const uint8_t *in, size_t n, uint8_t *out);
 uint16_t hil_crc16(const uint8_t *p, size_t n);
-/* Build a frame including the trailing 0x00; out needs HIL_FRAME_MAX(n) bytes and n <= HIL_PAYLOAD_MAX. Returns its length. */
+/* Build a frame including the trailing 0x00; out needs HIL_FRAME_MAX(n) bytes. Returns its length, 0 when n > HIL_PAYLOAD_MAX. */
 size_t hil_frame(uint8_t type, uint16_t seq, const void *payload, size_t n, uint8_t *out);
 /* Parse a frame (the trailing 0x00 is optional). Returns the payload length, -1 COBS error, -2 CRC error,
  * -3 payload longer than cap or HIL_PAYLOAD_MAX. */

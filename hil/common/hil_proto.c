@@ -22,22 +22,34 @@ size_t hil_cobs_encode(const uint8_t *in, size_t n, uint8_t *out)
     return w;
 }
 
-long hil_cobs_decode(const uint8_t *in, size_t n, uint8_t *out)
+/* Decode into at most cap bytes; -1 malformed, -3 output would exceed cap. */
+static long cobs_decode_cap(const uint8_t *in, size_t n, uint8_t *out, size_t cap)
 {
     size_t r = 0, w = 0;
     while (r < n) {
         uint8_t code = in[r++];
         if (code == 0 || r + (size_t)(code - 1) > n)
             return -1;
+        if (w + (size_t)(code - 1) > cap)
+            return -3;
         for (uint8_t i = 1; i < code; i++) {
             if (in[r] == 0)
                 return -1;
             out[w++] = in[r++];
         }
-        if (code != 0xFF && r < n)
+        if (code != 0xFF && r < n) {
+            if (w >= cap)
+                return -3;
             out[w++] = 0;
+        }
     }
     return (long)w;
+}
+
+long hil_cobs_decode(const uint8_t *in, size_t n, uint8_t *out)
+{
+    long m = cobs_decode_cap(in, n, out, n);
+    return m == -3 ? -1 : m;
 }
 
 uint16_t hil_crc16(const uint8_t *p, size_t n)
@@ -55,6 +67,8 @@ size_t hil_frame(uint8_t type, uint16_t seq, const void *payload, size_t n, uint
 {
     uint8_t raw[HIL_PAYLOAD_MAX + 5];
     const uint8_t *p = (const uint8_t *)payload;
+    if (n > HIL_PAYLOAD_MAX)
+        return 0;
     raw[0] = type;
     raw[1] = (uint8_t)seq;
     raw[2] = (uint8_t)(seq >> 8);
@@ -75,7 +89,9 @@ long hil_unframe(const uint8_t *frame, size_t n, uint8_t *type, uint16_t *seq, u
         n--;
     if (n > HIL_FRAME_MAX(HIL_PAYLOAD_MAX))
         return -3;
-    long m = hil_cobs_decode(frame, n, raw);
+    long m = cobs_decode_cap(frame, n, raw, sizeof raw);
+    if (m == -3)
+        return -3;
     if (m < 5)
         return -1;
     size_t len = (size_t)m - 5;
