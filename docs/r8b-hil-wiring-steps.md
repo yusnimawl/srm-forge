@@ -106,7 +106,7 @@ Nucleo pins are Zio labels (CN7-CN10 side headers). Teensy pins are the printed 
 
 ## Step 9 (later): DAC group, internal current-sense mode only
 
-Grey dashed lines in the drawing. Skip until needed.
+Bottom box of the drawing: a DAC board (2x MCP4922, or 4x MCP4921) sits between the Teensy and the Nucleo analog pins. Skip until needed.
 
 | From | To | Signal | Colour |
 |---|---|---|---|

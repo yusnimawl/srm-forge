@@ -10,8 +10,8 @@
 <line x1="452" y1="84" x2="502" y2="84" stroke="#7b3fa0" stroke-width="3.5" stroke-dasharray="20 6"/><text x="508" y="89" font-size="14">AD2S1210 SPI</text>
 <line x1="638" y1="84" x2="688" y2="84" stroke="#c2185b" stroke-width="2.2"/><text x="694" y="89" font-size="14">RUN / READY</text>
 <line x1="815" y1="84" x2="865" y2="84" stroke="#000000" stroke-width="5"/><text x="871" y="89" font-size="14">GND</text>
-<line x1="920" y1="84" x2="970" y2="84" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/><text x="976" y="89" font-size="14">DAC (later)</text>
-<text x="20" y="106" font-size="13">→ = Nucleo drives, ← = Teensy drives (arrows in the wire label).  Grey dashed = DAC group: later, internal current-sense mode only.  Greyscale-safe: each group has its own line style.</text>
+<line x1="920" y1="84" x2="970" y2="84" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/><text x="976" y="89" font-size="14">DAC BOARD (later)</text>
+<text x="20" y="106" font-size="13">→ = Nucleo drives, ← = Teensy drives (arrows in the wire label).  Grey dashed box at the bottom = DAC board, later.  Greyscale-safe: each group has its own line style.</text>
 <text x="20" y="164" font-size="14" font-weight="bold" fill="#d62728" stroke="#000" stroke-width="0.3">▌GATES</text>
 <rect x="20" y="169.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
 <text x="26" y="183.25" font-size="13" font-weight="bold">D6 / PE9</text><text x="394" y="183.25" font-size="12" text-anchor="end" fill="#333">CN10-4</text>
@@ -182,67 +182,53 @@
 <text x="1091" y="777.75" font-size="13" font-weight="bold">Teensy GND</text><text x="1459" y="777.75" font-size="12" text-anchor="end" fill="#333">between VIN and 3V3</text>
 <line x1="400" y1="772.75" x2="1085" y2="772.75" stroke="#000000" stroke-width="5"/>
 <text x="742" y="777.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">GND #2 (SPI side)</text>
-<text x="20" y="795.5" font-size="14" font-weight="bold" fill="#555555" stroke="#000" stroke-width="0.3">▌DAC (later)</text>
-<rect x="20" y="801.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="814.75" font-size="13" font-weight="bold">A0 / PA3</text><text x="394" y="814.75" font-size="12" text-anchor="end" fill="#333">CN9-1</text>
-<rect x="1085" y="801.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="814.75" font-size="13" font-weight="bold">DAC1 VOUTA</text><text x="1459" y="814.75" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="809.75" x2="1085" y2="809.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="814.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">←  Current A analog</text>
-<rect x="20" y="820.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="834.25" font-size="13" font-weight="bold">A3 / PB1</text><text x="394" y="834.25" font-size="12" text-anchor="end" fill="#333">CN9-7</text>
-<rect x="1085" y="820.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="834.25" font-size="13" font-weight="bold">DAC2 VOUTA</text><text x="1459" y="834.25" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="829.25" x2="1085" y2="829.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="834.25" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">←  Current B analog</text>
-<rect x="20" y="840.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="853.75" font-size="13" font-weight="bold">A1 / PC0</text><text x="394" y="853.75" font-size="12" text-anchor="end" fill="#333">CN9-3</text>
-<rect x="1085" y="840.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="853.75" font-size="13" font-weight="bold">DAC1 VOUTB</text><text x="1459" y="853.75" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="848.75" x2="1085" y2="848.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="853.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">←  Current C analog</text>
-<rect x="20" y="859.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="873.25" font-size="13" font-weight="bold">D24 / PA4</text><text x="394" y="873.25" font-size="12" text-anchor="end" fill="#333">CN7-17</text>
-<rect x="1085" y="859.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="873.25" font-size="13" font-weight="bold">DAC2 VOUTB</text><text x="1459" y="873.25" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="868.25" x2="1085" y2="868.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="873.25" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">←  Current D analog</text>
-<rect x="20" y="879.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="892.75" font-size="13" font-weight="bold">AGND / 3V3</text><text x="394" y="892.75" font-size="12" text-anchor="end" fill="#333">CN10-3 / CN8-7</text>
-<rect x="1085" y="879.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="892.75" font-size="13" font-weight="bold">DAC board</text><text x="1459" y="892.75" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="887.75" x2="1085" y2="887.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="892.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC board GND / 3V3 (supply+VREF)</text>
-<rect x="20" y="898.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="912.25" font-size="13" font-weight="bold">DAC board</text><text x="394" y="912.25" font-size="12" text-anchor="end" fill="#333"></text>
-<rect x="1085" y="898.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="912.25" font-size="13" font-weight="bold">Teensy 24</text><text x="1459" y="912.25" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="907.25" x2="1085" y2="907.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="912.25" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC CS 1  →  (Teensy to DAC)</text>
-<rect x="20" y="918.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="931.75" font-size="13" font-weight="bold">DAC board</text><text x="394" y="931.75" font-size="12" text-anchor="end" fill="#333"></text>
-<rect x="1085" y="918.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="931.75" font-size="13" font-weight="bold">Teensy 25</text><text x="1459" y="931.75" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="926.75" x2="1085" y2="926.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="931.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC CS 2  →</text>
-<rect x="20" y="937.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="951.25" font-size="13" font-weight="bold">DAC board</text><text x="394" y="951.25" font-size="12" text-anchor="end" fill="#333"></text>
-<rect x="1085" y="937.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="951.25" font-size="13" font-weight="bold">Teensy 28</text><text x="1459" y="951.25" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="946.25" x2="1085" y2="946.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="951.25" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC CS 3  → (only with 4x MCP4921)</text>
-<rect x="20" y="957.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="970.75" font-size="13" font-weight="bold">DAC board</text><text x="394" y="970.75" font-size="12" text-anchor="end" fill="#333"></text>
-<rect x="1085" y="957.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="970.75" font-size="13" font-weight="bold">Teensy 29</text><text x="1459" y="970.75" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="965.75" x2="1085" y2="965.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="970.75" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC CS 4  → (only with 4x MCP4921)</text>
-<rect x="20" y="976.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="26" y="990.25" font-size="13" font-weight="bold">DAC board</text><text x="394" y="990.25" font-size="12" text-anchor="end" fill="#333"></text>
-<rect x="1085" y="976.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/>
-<text x="1091" y="990.25" font-size="13" font-weight="bold">Teensy 30</text><text x="1459" y="990.25" font-size="12" text-anchor="end" fill="#333"></text>
-<line x1="400" y1="985.25" x2="1085" y2="985.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
-<text x="742" y="990.25" font-size="13" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC LDAC  →</text>
-<text x="20" y="1012.0" font-size="12">Do not use Nucleo CN9-15 (D71) for gate A upper. Check MB1364 sticker and SB28, SB39, SB14/15, SB32 at default before wiring.</text>
-<text x="20" y="1027.0" font-size="12">DAC rows: DAC SCK and SDI reuse the AD7606 SCLK / DOUTA wires (Teensy 13 / 11). Teensy GND pads: confirm on the pinout card.</text>
+<rect x="20" y="797.5" width="1445" height="204.5" fill="none" stroke="#555" stroke-width="1.5" stroke-dasharray="8 5"/>
+<text x="30" y="814.5" font-size="14" font-weight="bold">DAC BOARD: build later, only for current_sense = internal (adds analog current inputs). Not needed for first runs.</text>
+<rect x="625" y="825.5" width="235" height="140.5" fill="#fff" stroke="#000" stroke-width="3"/>
+<text x="742.5" y="845.5" font-size="16" font-weight="bold" text-anchor="middle">DAC BOARD</text>
+<text x="742.5" y="863.5" font-size="12" text-anchor="middle">2x MCP4922, or 4x MCP4921</text>
+<text x="742.5" y="879.5" font-size="12" text-anchor="middle">VDD + VREF = 3.3 V (VOUT max 3.3 V)</text>
+<rect x="645" y="891.5" width="90" height="42" fill="#eee" stroke="#000"/><text x="690" y="917.5" font-size="13" text-anchor="middle">DAC1</text>
+<rect x="750" y="891.5" width="90" height="42" fill="#eee" stroke="#000"/><text x="795" y="917.5" font-size="13" text-anchor="middle">DAC2</text>
+<rect x="20" y="825.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="839.25" font-size="13" font-weight="bold">A0 / PA3</text><text x="394" y="839.25" font-size="12" text-anchor="end" fill="#333">CN9-1</text>
+<line x1="400" y1="834.25" x2="625" y2="834.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="512" y="839.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">Current A  ←  DAC1 VOUTA</text>
+<rect x="20" y="845.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="858.75" font-size="13" font-weight="bold">A3 / PB1</text><text x="394" y="858.75" font-size="12" text-anchor="end" fill="#333">CN9-7</text>
+<line x1="400" y1="853.75" x2="625" y2="853.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="512" y="858.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">Current B  ←  DAC2 VOUTA</text>
+<rect x="20" y="864.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="878.25" font-size="13" font-weight="bold">A1 / PC0</text><text x="394" y="878.25" font-size="12" text-anchor="end" fill="#333">CN9-3</text>
+<line x1="400" y1="873.25" x2="625" y2="873.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="512" y="878.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">Current C  ←  DAC1 VOUTB</text>
+<rect x="20" y="884.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="897.75" font-size="13" font-weight="bold">D24 / PA4</text><text x="394" y="897.75" font-size="12" text-anchor="end" fill="#333">CN7-17</text>
+<line x1="400" y1="892.75" x2="625" y2="892.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="512" y="897.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">Current D  ←  DAC2 VOUTB</text>
+<rect x="20" y="903.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="917.25" font-size="13" font-weight="bold">AGND</text><text x="394" y="917.25" font-size="12" text-anchor="end" fill="#333">CN10-3</text>
+<line x1="400" y1="912.25" x2="625" y2="912.25" stroke="#000" stroke-width="5"/>
+<text x="512" y="917.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC board GND</text>
+<rect x="20" y="923.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="26" y="936.75" font-size="13" font-weight="bold">3V3</text><text x="394" y="936.75" font-size="12" text-anchor="end" fill="#333">CN8-7</text>
+<line x1="400" y1="931.75" x2="625" y2="931.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="512" y="936.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">DAC supply + VREF 3.3 V</text>
+<rect x="1085" y="825.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="839.25" font-size="13" font-weight="bold">Teensy 13</text>
+<line x1="860" y1="834.25" x2="1085" y2="834.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="839.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">SCK  →  (tap AD7606 SCLK wire)</text>
+<rect x="1085" y="845.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="858.75" font-size="13" font-weight="bold">Teensy 11</text>
+<line x1="860" y1="853.75" x2="1085" y2="853.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="858.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">SDI  →  (tap AD7606 DOUTA wire)</text>
+<rect x="1085" y="864.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="878.25" font-size="13" font-weight="bold">Teensy 24</text>
+<line x1="860" y1="873.25" x2="1085" y2="873.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="878.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">CS 1  →</text>
+<rect x="1085" y="884.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="897.75" font-size="13" font-weight="bold">Teensy 25</text>
+<line x1="860" y1="892.75" x2="1085" y2="892.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="897.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">CS 2  →</text>
+<rect x="1085" y="903.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="917.25" font-size="13" font-weight="bold">Teensy 28</text>
+<line x1="860" y1="912.25" x2="1085" y2="912.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="917.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">CS 3  →  (only 4x MCP4921)</text>
+<rect x="1085" y="923.0" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="936.75" font-size="13" font-weight="bold">Teensy 29</text>
+<line x1="860" y1="931.75" x2="1085" y2="931.75" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="936.75" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">CS 4  →  (only 4x MCP4921)</text>
+<rect x="1085" y="942.5" width="380" height="16.5" fill="#f2f2f2" stroke="#000"/><text x="1091" y="956.25" font-size="13" font-weight="bold">Teensy 30</text>
+<line x1="860" y1="951.25" x2="1085" y2="951.25" stroke="#555555" stroke-width="2" stroke-dasharray="5 5"/>
+<text x="972" y="956.25" font-size="12" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">LDAC  →</text>
+<text x="20" y="996.0" font-size="12">Do not use Nucleo CN9-15 (D71) for gate A upper. Check MB1364 sticker and SB28, SB39, SB14/15, SB32 at default before wiring.</text>
+<text x="20" y="1011.0" font-size="12">DAC rows: DAC SCK and SDI reuse the AD7606 SCLK / DOUTA wires (Teensy 13 / 11). Teensy GND pads: confirm on the pinout card.</text>
 </svg>
