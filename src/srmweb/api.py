@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import tempfile
 import re
 import time
 from collections.abc import Callable
@@ -38,18 +39,20 @@ from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
 from srmcore.topology.dxf_io import import_dxf, write_dxf
+from srmsil import build as sil_build, run as sil_run, tables as sil_tables
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.cases import check_case, estimate as estimate_case, losses_estimate, resolved_margin
-from srmweb.config import Settings
+from srmweb.config import Settings, is_loopback
 from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
-from srmweb.jobs import KINDS, JobRunner, QueueFull, lane_of
+from srmweb.jobs import CUSTOM_REFUSED, KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
 from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, FindingOut, LossesOut,
                             MaterialOut, ReferenceOut, ReportOut, SearchResultOut)
-from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, EditCase, EstimateOut,
-                            EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, LossesBody,
-                            LossesEstimateOut, LossesRequest, ReferenceCase, ValidateIn, ValidateRequest)
+from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest,
+                            ControllerOut, EditCase, EstimateOut, EvaluateBody, EvaluateRequest, FieldIn, IssuesOut,
+                            JobCreated, JobIn, JobOut, LossesBody, LossesEstimateOut, LossesRequest, MotorIn,
+                            ReferenceCase, TargetCheckIn, TargetCheckOut, ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
                           setup_from_case, setup_loc)
 from srmweb.serialize import to_json
@@ -230,6 +233,8 @@ def create_app(settings: Settings,
         job = job_or_404(job_id)
         if job["status"] not in RESUMABLE:
             raise HTTPException(409, f"cannot resume a {job['status']} job")
+        if job["kind"] == "control":
+            controller_folders(job["request"]["controller"])
         if job["kind"] != "search":
             case = store.get_case(job["request"]["case_id"])
             if case is None:
@@ -579,6 +584,100 @@ def create_app(settings: Settings,
                        f"a.{n}": f.a.astype(np.float32)}
         return binary(result, arrays)
 
+    def control_motor(case_id: str, bus_voltage: float | None = None) -> sil_tables.MotorData:
+        """The case's map and winding as simulator motor data; 409 unless the case is evaluated."""
+        field_context(case_id)
+        case = case_or_404(case_id)
+        evaluation = store.case_result(case_id, "evaluate")
+        bus = bus_voltage or CaseInputs.model_validate(case["inputs"]).requirements.bus_voltage_v
+        try:
+            motor = sil_tables.motor_data_from_json(evaluation, bus)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        if not (np.isfinite(motor.psi).all() and np.isfinite(motor.torque).all()):
+            raise HTTPException(409, "the map has non-finite points")
+        return motor
+
+    def controller_folders(controller: str) -> list[Path]:
+        """The folders a controller compiles from; 403 off loopback for a custom folder, 422 if it is invalid."""
+        if controller in sil_run.REFERENCE:
+            folder = sil_run.controller_dir(controller)
+            return [folder, folder.parent / "common"]
+        if not is_loopback(settings.host):
+            raise HTTPException(403, CUSTOM_REFUSED)
+        if not Path(controller).is_absolute():
+            raise HTTPException(422, "a custom controller must be an absolute folder path")
+        try:
+            folder = sil_run.controller_dir(controller)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return [folder]
+
+    @router.post("/cases/{case_id}/control", status_code=201, response_model=JobCreated)
+    def control_case(case_id: str, body: ControlIn):
+        motor = control_motor(case_id, body.scenario.bus_voltage)
+        controller_folders(body.controller)
+        request = ControlRequest(case_id=case_id, motor=MotorIn(**{
+            "angles": motor.angles.tolist(), "currents": motor.currents.tolist(), "psi": motor.psi.tolist(),
+            "torque": motor.torque.tolist(), "resistance": motor.resistance, "n_phases": motor.n_phases,
+            "n_rotor_poles": motor.n_rotor_poles, "bus_voltage": motor.bus_voltage}),
+            controller=body.controller, scenario=body.scenario)
+        return {"job_id": _submit(runner, "control", request.model_dump(mode="json"))["id"]}
+
+    @router.get("/jobs/{job_id}/control")
+    def job_control(job_id: str, n_px: Annotated[int, Query(ge=100, le=10000)] = 1500):
+        job = job_or_404(job_id)
+        result = store.get_result(job_id) if job["kind"] == "control" and job["status"] == "done" else None
+        if result is None:
+            raise HTTPException(404, "no control run")
+        run_file = Path(result["run_file"])
+        if not run_file.is_file():
+            raise HTTPException(410, "the run was cleared; run the controller again")
+        res = sil_run.load(run_file)
+        arrays = {}
+        for name, trace in res.traces.items():
+            if name == "t":
+                continue
+            for k, y in (enumerate(trace) if trace.ndim == 2 else [(None, trace)]):
+                label = name if k is None else f"{name}.{k}"
+                t, y = sil_run.decimate(res.traces["t"], y, n_px)
+                arrays[f"t.{label}"], arrays[f"y.{label}"] = t.astype(np.float32), y.astype(np.float32)
+        meta = {"summary": result["summary"], "scenario": res.scenario.model_dump(mode="json"),
+                "controller": res.controller, "n_phases": res.traces["i"].shape[0]}
+        return binary(meta, arrays)
+
+    @router.get("/cases/{case_id}/control/header")
+    def control_header(case_id: str):
+        motor = control_motor(case_id)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "srm_motor_tables.h"
+            try:
+                sil_tables.write_header(motor, sil_tables.ctrl_tables(motor), path)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            text = path.read_text()
+        return Response(text, media_type="text/x-c",
+                        headers={"Content-Disposition": 'attachment; filename="srm_motor_tables.h"'})
+
+    @router.post("/control/target-check", response_model=TargetCheckOut)
+    def control_target_check(body: TargetCheckIn):
+        motor = control_motor(body.case_id)
+        folders = controller_folders(body.controller)
+        c_dir = Path(sil_run.__file__).parent / "c"
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                sil_tables.write_header(motor, sil_tables.ctrl_tables(motor), Path(tmp) / "srm_motor_tables.h")
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            sources = [s for f in folders for s in sil_build.controller_sources(f)]
+            check = sil_build.target_check(sources, [c_dir, Path(tmp), *folders])
+        return {"ok": check.ok, "compiler": check.compiler, "log": check.log}
+
+    @router.get("/control/controllers", response_model=list[ControllerOut])
+    def control_controllers():
+        return [{"name": name, "params": [{"name": n, "unit": u, "default": d} for n, u, d in params]}
+                for name, params in sil_run.PARAMS.items()]
+
     def case_machine(case: dict) -> RadialSRMParams | JSONResponse:
         """The case's machine, or the 422 response for inputs that fail the case check."""
         inputs, errors, warnings = check_case(case["inputs"])
@@ -696,9 +795,11 @@ def create_app(settings: Settings,
     def cache_files():
         if not settings.cache_dir.is_dir():
             return []
-        return [*settings.cache_dir.glob("*.h5"),
-                *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")
-                  if not f.name.endswith(".tmp.npz"))]
+        sil = settings.cache_dir / "sil"
+        found = [*settings.cache_dir.glob("*.h5"),
+                 *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")),
+                 *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*")]
+        return [f for f in found if f.is_file() and ".tmp." not in f.name]
 
     @router.get("/settings/cache")
     def cache_info():
