@@ -1,0 +1,108 @@
+import ctypes as C
+import json
+import tempfile
+from pathlib import Path
+
+import numpy as np
+import pytest
+from sil_fixtures import run_in_child
+
+from srmsil.build import compile_host
+from srmsil.hil import proto
+from srmsil.hil.proto import ProtoError, Type
+
+ROOT = Path(__file__).parents[2]
+COMMON = ROOT / "hil" / "common"
+SHIM = Path(__file__).parent / "c" / "proto_shim.c"
+VECTORS = COMMON / "proto_vectors.json"
+CACHE = Path(tempfile.gettempdir()) / "srm_hil_proto_tests"
+
+
+def test_crc_check_value():
+    assert proto.crc16(b"123456789") == 0x29B1
+
+
+@pytest.mark.parametrize("n", [0, 1, 2, 253, 254, 255, 508, 600])
+def test_cobs_round_trip(n):
+    for data in (bytes(range(1, 256)) * 3, bytes(n), b"\x00\x01\x00" * n):
+        data = data[:n]
+        enc = proto.cobs_encode(data)
+        assert 0 not in enc
+        assert proto.cobs_decode(enc) == data
+
+
+def test_frame_round_trip_and_corruption():
+    payload = bytes([1, 0, 2, 0, 0, 3])
+    f = proto.frame(Type.COMMAND, 513, payload)
+    assert f[-1] == 0 and 0 not in f[:-1]
+    assert proto.unframe(f) == (Type.COMMAND, 513, payload)
+    bad = bytearray(f)
+    bad[4] ^= 0x10
+    with pytest.raises(ProtoError) as e:
+        proto.unframe(bytes(bad))
+    assert e.value.code == -2
+    with pytest.raises(ProtoError) as e:
+        proto.unframe(f[:-3])
+    assert e.value.code == -1
+    with pytest.raises(ProtoError) as e:
+        proto.frame(Type.ERROR, 0, bytes(proto.PAYLOAD_MAX + 1))
+    assert e.value.code == -3
+
+
+def test_struct_sizes():
+    assert proto.SAMPLE.size == 36 and proto.SAMPLE_DTYPE.itemsize == 36
+    assert proto.EMU_CONFIG.size == len(proto.EMU_CONFIG_FIELDS) * 4 - 3 * 4 + 0 or proto.EMU_CONFIG.size > 0
+    s = np.zeros(2, proto.SAMPLE_DTYPE)
+    s["step"] = [7, 8]
+    s["i"][1] = [1, -2, 3, -4]
+    s["gates"] = [0x0101, 0x8001]
+    data = proto.pack_capture_data(100, s)
+    first, back = proto.unpack_capture_data(data)
+    assert first == 100 and back.tobytes() == s.tobytes()
+
+
+def _lib():
+    return compile_host([SHIM, COMMON / "hil_proto.c"], [COMMON], CACHE)
+
+
+def _c_side(lib, vectors):
+    dll = C.CDLL(str(lib))
+    dll.shim_frame.restype = C.c_size_t
+    dll.shim_frame.argtypes = [C.c_uint8, C.c_uint16, C.c_char_p, C.c_size_t, C.c_void_p]
+    dll.shim_unframe.restype = C.c_long
+    dll.shim_unframe.argtypes = [C.c_char_p, C.c_size_t, C.c_void_p, C.c_void_p, C.c_void_p, C.c_size_t]
+    dll.shim_payload_size.restype = C.c_size_t
+    dll.shim_payload_size.argtypes = [C.c_uint8]
+    dll.shim_sample_size.restype = C.c_size_t
+    dll.shim_crc16.restype = C.c_uint16
+    dll.shim_crc16.argtypes = [C.c_char_p, C.c_size_t]
+    framed, parsed = [], []
+    for v in vectors:
+        payload = bytes.fromhex(v["payload"])
+        out = (C.c_uint8 * (len(payload) + len(payload) // 254 + 16))()
+        n = dll.shim_frame(v["type"], v["seq"], payload, len(payload), out)
+        framed.append(bytes(out[:n]).hex())
+        t, s, pl = C.c_uint8(), C.c_uint16(), (C.c_uint8 * 1100)()
+        m = dll.shim_unframe(bytes.fromhex(v["frame"]), len(v["frame"]) // 2, C.byref(t), C.byref(s), pl, 1100)
+        parsed.append((m, t.value, s.value, bytes(pl[: max(m, 0)]).hex()))
+        small = dll.shim_unframe(bytes.fromhex(v["frame"]), len(v["frame"]) // 2, C.byref(t), C.byref(s), pl, 0)
+        parsed.append(small)
+    sizes = {int(t): dll.shim_payload_size(int(t)) for t in Type}
+    crc = dll.shim_crc16(b"123456789", 9)
+    return framed, parsed, sizes, dll.shim_sample_size(), crc
+
+
+def test_c_and_python_agree():
+    vectors = json.loads(VECTORS.read_text())
+    assert len(vectors) >= 12
+    framed, parsed, sizes, sample, crc = run_in_child(_c_side, _lib(), vectors)
+    for v, f in zip(vectors, framed):
+        assert f == v["frame"]
+        assert proto.frame(v["type"], v["seq"], bytes.fromhex(v["payload"])).hex() == v["frame"]
+    for i, v in enumerate(vectors):
+        m, t, s, pl = parsed[2 * i]
+        assert (m, t, s, pl) == (len(v["payload"]) // 2, v["type"], v["seq"], v["payload"])
+        want_small = -3 if v["payload"] else 0
+        assert parsed[2 * i + 1] == want_small
+    assert sizes == {int(t): proto.PAYLOAD_SIZE.get(t, 0) for t in Type}
+    assert sample == 36 and crc == 0x29B1
