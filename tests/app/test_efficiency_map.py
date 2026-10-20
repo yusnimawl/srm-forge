@@ -186,3 +186,51 @@ def test_range_notes_one_per_cause():
     assert losses.range_notes([side(high=0.1, beyond=True)]) == [losses._EXTRAPOLATION_NOTE]
     assert losses.range_notes([side(low=0.1, beyond=True), side(low=0.2, beyond=True)]) == [losses._LOW_B_NOTE]
     assert losses.range_notes([side(beyond=True)]) == [losses._FREQUENCY_NOTE]
+
+
+def _stroke(tmp_path, **kw):
+    static = build_machine_mesh(DESIGN)
+    tau = 2 * math.pi / DESIGN.machine.n_rotor_poles
+    angles = losses.stroke_angles(static, tau, N_ANGLES)
+    currents = np.zeros((len(angles), DESIGN.machine.n_phases))
+    currents[:, 0] = 40.0 * np.sin(np.linspace(0.0, math.pi, len(angles)))
+    return losses.stroke_losses(static, DESIGN, angles, currents, 3000.0, workers=1, cache_dir=tmp_path, **kw)
+
+
+def test_unspecified_is_r3_bit_for_bit(tmp_path):
+    base, cut = _stroke(tmp_path), _stroke(tmp_path, cut_process="unspecified")
+    assert cut.iron == base.iron and cut.iron_w == base.iron_w
+    assert all(v == 1.0 for v in cut.cut_edge_factor.values())
+    lo, hi = cut.cut_edge_rel
+    assert lo < 0 < hi
+
+
+def test_process_raises_hysteresis_and_excess_only(tmp_path):
+    base, laser = _stroke(tmp_path), _stroke(tmp_path, cut_process="laser")
+    for k in base.iron:
+        assert laser.iron[k].classical == base.iron[k].classical
+        assert laser.iron[k].hysteresis > base.iron[k].hysteresis / losses.B0
+    assert laser.cut_edge_factor["stator_pole"] > 1.0
+
+
+def test_range_is_linear_in_a(tmp_path, monkeypatch):
+    p = losses.CUT_PROCESSES["punching"]
+    sl = _stroke(tmp_path, cut_process="punching")
+    for a, rel in ((p.a_low, sl.cut_edge_rel[0]), (p.a_high, sl.cut_edge_rel[1])):
+        monkeypatch.setitem(losses.CUT_PROCESSES, "punching", dataclasses.replace(p, a=a))
+        direct = _stroke(tmp_path, cut_process="punching").iron_w
+        assert direct == pytest.approx(sl.iron_w * (1 + rel), rel=1e-12)
+
+
+def test_efficiency_map_records_process_and_note(case, tmp_path):
+    inputs, evaluation = case
+    laser = inputs.model_copy(update={"requirements": inputs.requirements.model_copy(update={"cut_process": "laser"})})
+    with mock.patch("srmapp.losses.build_map", side_effect=_fake_map):
+        out = efficiency_map(laser, evaluation, n_speeds=N_SPEEDS, n_torques=N_TORQUES, n_angles=N_ANGLES,
+                             cache_dir=tmp_path, workers=1)
+    assert out.cut_process == "laser" and losses.CUT_EDGE_NOTE in out.notes
+    for pt in out.points:
+        if pt.reached:
+            assert all(math.isfinite(v) for v in pt.cut_edge_rel) and pt.cut_edge_factor
+        else:
+            assert all(math.isnan(v) for v in pt.cut_edge_rel) and pt.cut_edge_factor == {}
