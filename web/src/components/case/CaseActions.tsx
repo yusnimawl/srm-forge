@@ -23,7 +23,7 @@ const report = (e: unknown) => {
   if (!(e instanceof NotSaved)) toast.error(requestMessage(e))
 }
 
-const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation" }
+const KIND_LABEL: Record<string, string> = { evaluate: "Evaluation", validate: "EM validation", losses: "Losses" }
 
 /** Live state of the case's job as a step list. The page refetches the case when the job ends. */
 function CaseJobProgress({ job, caseId }: { job: JobOut; caseId: string }) {
@@ -135,6 +135,17 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
       report(e)
     }
   }
+  const exportReport = async () => {
+    const id = toast.loading("Collecting the results")
+    try {
+      const { exportReport } = await import("@/report/export")
+      await exportReport(data.id, stem(data), (msg) => toast.loading(msg, { id }))
+      toast.success("Report saved", { id })
+    } catch (e) {
+      toast.dismiss(id)
+      report(e)
+    }
+  }
   const map = evaluation?.map
 
   return (
@@ -164,6 +175,7 @@ export function CaseActions({ data, editable, ready, savedText, flush }: Props) 
               onClick={() => map && download(`${stem(data)}_map.csv`, mapCsv(map))}>Map (CSV)</Button>
             <Button variant="ghost" className="min-h-11 w-full justify-start" disabled={!map} onClick={exportMat}>Map (MAT)</Button>
             <Button variant="ghost" className="min-h-11 w-full justify-start" onClick={exportDxf}>Geometry (DXF)</Button>
+            <Button variant="ghost" className="min-h-11 w-full justify-start" disabled={!data.evaluation} onClick={exportReport}>Run report (HTML)</Button>
           </PopoverContent>
         </Popover>
         <Button variant="outline" className="min-h-11" onClick={() => setImporting(true)}>Import DXF</Button>

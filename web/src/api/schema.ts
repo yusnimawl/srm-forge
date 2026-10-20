@@ -195,6 +195,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/losses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Losses */
+        get: operations["get_losses_api_cases__case_id__losses_get"];
+        put?: never;
+        /** Losses Job */
+        post: operations["losses_job_api_cases__case_id__losses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/losses/b": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Losses B
+         * @description B(t) in the lamination at the iron element nearest (x, y) metres (stator frame, rotor at angle 0) for
+         *     operating point `point`, from the cached stroke.
+         */
+        get: operations["losses_b_api_cases__case_id__losses_b_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/losses/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Losses Estimate Route */
+        get: operations["losses_estimate_route_api_cases__case_id__losses_estimate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/map.mat": {
         parameters: {
             query?: never;
@@ -204,6 +260,23 @@ export interface paths {
         };
         /** Map Mat */
         get: operations["map_mat_api_cases__case_id__map_mat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report */
+        get: operations["report_api_cases__case_id__report_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -641,6 +714,22 @@ export interface components {
              * @default 36
              */
             frames: number;
+        };
+        /** BWaveformOut */
+        BWaveformOut: {
+            /** B R */
+            b_r: (number | null)[];
+            /** B T */
+            b_t: (number | null)[];
+            /** Region */
+            region: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "stator" | "rotor";
+            /** T */
+            t: (number | null)[];
         };
         /** Body_dxf_import_api_cases__case_id__dxf_post */
         Body_dxf_import_api_cases__case_id__dxf_post: {
@@ -1113,6 +1202,8 @@ export interface components {
              * @default []
              */
             scan: components["schemas"]["ScanPointOut"][];
+            /** Srmapp Version */
+            srmapp_version?: string | null;
             /** Status */
             status: string;
             /** Torque Ratio */
@@ -1125,6 +1216,27 @@ export interface components {
             angle: number;
             /** Current A */
             current_a: number;
+        };
+        /** FindingOut */
+        FindingOut: {
+            /** Id */
+            id: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "warn" | "note" | "ok" | "missing";
+            /** Text */
+            text: string;
+            /** Topic */
+            topic: string;
+            /**
+             * Unit
+             * @default
+             */
+            unit: string;
+            /** Value */
+            value?: number | null;
         };
         /** FixedWinding */
         FixedWinding: {
@@ -1328,6 +1440,52 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** LossesBody */
+        LossesBody: {
+            /**
+             * N Speeds
+             * @default 6
+             */
+            n_speeds: number;
+            /**
+             * N Torques
+             * @default 5
+             */
+            n_torques: number;
+        };
+        /** LossesEstimateOut */
+        LossesEstimateOut: {
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "history" | "budget";
+            /** Per Solve S */
+            per_solve_s: number;
+            /** Seconds */
+            seconds: number;
+            /** Solves */
+            solves: number;
+        };
+        /** LossesOut */
+        LossesOut: {
+            /** Angle Convergence Rel */
+            angle_convergence_rel: number | null;
+            /** N Angles */
+            n_angles: number;
+            /** Notes */
+            notes: string[];
+            /** Points */
+            points: components["schemas"]["OperatingLossOut"][];
+            /** Speeds Rpm */
+            speeds_rpm: (number | null)[];
+            /** Srmapp Version */
+            srmapp_version: string;
+            /** Torque Fractions */
+            torque_fractions: (number | null)[];
+            /** Winding Temperature C */
+            winding_temperature_c: number | null;
+        };
         /** MapArraysOut */
         MapArraysOut: {
             /** Angles */
@@ -1421,6 +1579,41 @@ export interface components {
             scale: number;
             /** Skin Depth Layers */
             skin_depth_layers?: number | null;
+        };
+        /** OperatingLossOut */
+        OperatingLossOut: {
+            /** Beyond Fit Range */
+            beyond_fit_range: boolean;
+            /** Copper Ac W */
+            copper_ac_w: number | null;
+            /** Copper Dc W */
+            copper_dc_w: number | null;
+            /** Current Limit */
+            current_limit: number | null;
+            /** Efficiency */
+            efficiency: number | null;
+            /** Iron */
+            iron: {
+                [key: string]: components["schemas"]["RegionLossOut"];
+            };
+            /** Iron Uncertainty Rel */
+            iron_uncertainty_rel: number | null;
+            /** Iron W */
+            iron_w: number | null;
+            /** Power W */
+            power_w: number | null;
+            /** Reached */
+            reached: boolean;
+            /** Speed Rpm */
+            speed_rpm: number | null;
+            /** Stroke Key */
+            stroke_key: string;
+            /** Theta Off */
+            theta_off: number | null;
+            /** Theta On */
+            theta_on: number | null;
+            /** Torque Nm */
+            torque_nm: number | null;
         };
         /** RadialSRMParams */
         RadialSRMParams: {
@@ -1543,6 +1736,15 @@ export interface components {
              */
             name: "8/6" | "12/8" | "24/16";
         };
+        /** RegionLossOut */
+        RegionLossOut: {
+            /** Classical */
+            classical: number | null;
+            /** Excess */
+            excess: number | null;
+            /** Hysteresis */
+            hysteresis: number | null;
+        };
         /** RegionMaterials */
         RegionMaterials: {
             /**
@@ -1565,6 +1767,21 @@ export interface components {
              * @default M19
              */
             stator: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /** Animation Current A */
+            animation_current_a?: number | null;
+            /** Animation Job Id */
+            animation_job_id?: string | null;
+            /** Findings */
+            findings: components["schemas"]["FindingOut"][];
+            /** Generated */
+            generated: string;
+            /** Versions */
+            versions: {
+                [key: string]: string;
+            };
         };
         /** Requirements */
         Requirements: {
@@ -1592,6 +1809,11 @@ export interface components {
             peak_torque_nm: number;
             /** Phase Current A */
             phase_current_a?: number | null;
+            /**
+             * Winding Temperature C
+             * @default 120
+             */
+            winding_temperature_c: number;
             /**
              * Wires
              * @default []
@@ -2512,6 +2734,141 @@ export interface operations {
             };
         };
     };
+    get_losses_api_cases__case_id__losses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    losses_job_api_cases__case_id__losses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LossesBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    losses_b_api_cases__case_id__losses_b_get: {
+        parameters: {
+            query: {
+                point: number;
+                x: number;
+                y: number;
+            };
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BWaveformOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    losses_estimate_route_api_cases__case_id__losses_estimate_get: {
+        parameters: {
+            query?: {
+                n_speeds?: number;
+                n_torques?: number;
+            };
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossesEstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     map_mat_api_cases__case_id__map_mat_get: {
         parameters: {
             query?: never;
@@ -2530,6 +2887,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_cases__case_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */

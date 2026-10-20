@@ -43,6 +43,11 @@ def mesh_task(design: Design, cache_dir):
     return field.field_mesh(design, cache_dir=cache_dir)
 
 
+def b_task(design: Design, key: str, n_angles: int, rpm: float, x: float, y: float, cache_dir):
+    from srmapp import losses
+    return losses.b_waveform(design, key, n_angles, rpm, x, y, cache_dir=cache_dir)
+
+
 def frame_task(design: Design, angle: float, coil_current: float, cache_dir):
     from srmapp import field
     return field.field_frame(design, angle, coil_current, cache_dir=cache_dir)

@@ -11,7 +11,7 @@ from ..model.design import Design
 from ..physics.build import machine_problem
 from ..post.forces import pole_forces
 from ..post.quantities import arkkio_torque, flux_linkage, incremental_inductance, virtual_work_torque
-from ..solvers.settings import SolverAdapter
+from ..solvers.settings import FactorizationFailed, SolverAdapter
 
 B_PEAK_QUANTILE = 0.999   # area fraction of iron below b_peak; the element maximum diverges at the pole corners
 
@@ -55,7 +55,10 @@ def solve_point(static: StaticMesh, design: Design, angle: float, currents: Mapp
     solution = solver.solve(problem, initial=initial)
     l_inc = None
     if with_l_inc and solution.status is not SolveStatus.NONCONVERGED and solution.load_fraction == 1.0:
-        l_inc = incremental_inductance(problem, solver.sensitivity(problem, solution.a))
+        try:
+            l_inc = incremental_inductance(problem, solver.sensitivity(problem, solution.a))
+        except FactorizationFailed:
+            l_inc = None
     kind = np.array([problem.region_kind[n] for n in problem.region_names])[problem.element_region]
     iron = (kind == "stator_iron") | (kind == "rotor_iron")
     t = problem.nodes[problem.triangles[iron]]

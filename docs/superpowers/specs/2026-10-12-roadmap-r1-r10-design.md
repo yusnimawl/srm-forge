@@ -46,16 +46,17 @@ Order chosen by the owner: physics first, with the DXF round trip early because 
 - Open for the R2 spec: how imported shapes enter the cache identity, and whether coils may be edited or stay parametric.
 
 ### R3 — Losses and drive tail
-- [ ] Copper loss: DC at temperature, AC/proximity estimate, end-turn length
-- [ ] Iron loss for SRM flux waveforms (unipolar, DC-biased, minor loops) from B(t) per element; 10JNEX900 loss data with provenance and grade
-- [ ] Drive envelope lets the tail run past aligned and counts the negative torque
-- [ ] Efficiency map
-- [ ] Checked against published SRM loss data
+- [x] Copper loss: DC at temperature, AC/proximity estimate, end-turn length
+- [x] Iron loss for SRM flux waveforms (unipolar, DC-biased, minor loops) from B(t) per element; 10JNEX900 loss data with provenance and grade
+- [x] Drive envelope lets the tail run past aligned and counts the negative torque
+- [x] Efficiency map
+- [x] Checked against published SRM loss data
 - Done when: efficiency at any operating point, compared with a published case and the error reported.
+- Status 2026-10-19: built (PR #4, 0.6.0). Materu 6/4 check at `full`: computed iron loss 18-78 % below the measurement, outside the stated uncertainty on 7 of 10 rows; likely cause no manufacturing build factor (not confirmed). See `docs/r3-loss-results.md`.
 
 ### R3b — Run report (added 2026-10-18)
-- [ ] One self-contained HTML file per case (opens offline, can be emailed): inputs, outline, key numbers, map plots, before/after table for DXF cases, losses and efficiency from R3, validation checks and budget, and the flux animation playing inline
-- [ ] A print layout so the static parts save as PDF from the browser (a PDF cannot play the animation)
+- [x] One self-contained HTML file per case (opens offline, can be emailed): inputs, outline, key numbers, map plots, before/after table for DXF cases, losses and efficiency from R3, validation checks and budget, and the flux animation playing inline
+- [x] A print layout so the static parts save as PDF from the browser (a PDF cannot play the animation) (2026-10-19, branch r3b-run-report)
 - Done when: one click on an evaluated case gives the file, and it renders the same with the server stopped.
 
 Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shaped loading spinner, job queue panel and step-by-step job progress (spec `2026-10-18-ui-polish-queue-design.md`).

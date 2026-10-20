@@ -16,7 +16,8 @@ from srmcore.model.design import RadialSRMParams
 N_THETA = 181                 # angle points over one rotor pole pitch
 N_CURRENT = 121               # current points over 0..current limit
 ON_RANGE = (0.25, 0.80)       # turn-on search range, fraction of the pitch
-OFF_RANGE = (0.45, 0.995)      # turn-off search range
+OFF_RANGE = (0.45, 1.25)       # turn-off search range, fraction of the pitch from the table start (above 1 wraps)
+OFF_ALIGNED_END = 0.995        # the turn-off grid has n_off points up to here, and continues at the same spacing
 N_ON, N_OFF = 80, 80
 _EPS = 1e-9
 
@@ -38,7 +39,8 @@ class Waveforms:
 class Envelope:
     """Per-speed best stroke. `torque` is the revolution average over all phases. `work_torque` is ∫T dθ and
     `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation. `i_rms` is the phase RMS current
-    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid).
+    over one rotor pole pitch of the chosen stroke (0 where no stroke is valid). `theta_off` may exceed one pitch: the
+    flux tail runs past alignment, and `theta_off` is then measured from the start of the table.
 
     `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
     stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the
@@ -103,36 +105,81 @@ def power_factor(power: np.ndarray, voltage: np.ndarray, current: np.ndarray, n_
 
 def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray,
               trace: bool = False):
-    """One stroke for every (on, off) index pair. Returns (work_torque, work_loop, ∫i² dθ, valid), and with `trace`
-    also ψ and i at every grid point, shape (n_theta, n_pairs)."""
-    n = on.size
-    psi, i = np.zeros(n), np.zeros(n)
-    w_t, w_l, i2, peak = np.zeros(n), np.zeros(n), np.zeros(n), np.zeros(n)
+    """One stroke for every (on, off) index pair, each simulated from its turn-on over exactly one period on the
+    periodic table (the flux tail runs past alignment into the start of the next period). `off` may exceed the table
+    end. Returns (work_torque, work_loop, ∫i² dθ, valid), and with `trace` also ψ and i at every step from turn-on,
+    shape (n_theta, n_pairs). A stroke is valid when its flux is back to 1 % of its peak before the same phase turns
+    on again."""
+    n = t.theta.size - 1
+    psi, i = np.zeros(on.size), np.zeros(on.size)
+    w_t, w_l, i2, peak = np.zeros(on.size), np.zeros(on.size), np.zeros(on.size), np.zeros(on.size)
     dth = t.theta[1] - t.theta[0]
-    psi_t, i_t = [psi], [i]
-    for k in range(t.theta.size - 1):
-        pulse = k < off
-        started = k >= on
+    psi_t, i_t = np.zeros((n + 1, on.size)), np.zeros((n + 1, on.size))
+    for a in range(int(on.max()) + n):
+        k = a % n
+        active = (a >= on) & (a < on + n)
+        pulse = a < off
         v = np.where(pulse, volts, -volts)
-        new = np.where(started, psi + (v - r * i) / omega * dth, 0.0)
+        new = psi + (v - r * i) / omega * dth
         new = np.where(pulse, np.minimum(new, t.psi[k + 1, -1]), new)     # current limit while the pulse is on
         new = np.maximum(new, 0.0)
         # zero flux is zero current even when the map row has tied leading zeros
         i_new = np.where(new > 0, np.interp(new, t.psi[k + 1], t.current), 0.0)
         tq_old = np.interp(i, t.current, t.torque[k])
         tq_new = np.interp(i_new, t.current, t.torque[k + 1])
-        w_t += 0.5 * (tq_old + tq_new) * dth * started
+        new, i_new = np.where(active, new, psi), np.where(active, i_new, i)
+        w_t += 0.5 * (tq_old + tq_new) * dth * active
         w_l += 0.5 * (i + i_new) * (new - psi)
-        i2 += 0.5 * (i**2 + i_new**2) * dth * started
+        i2 += 0.5 * (i**2 + i_new**2) * dth * active
         psi, i = new, i_new
         peak = np.maximum(peak, psi)
-        psi_t.append(psi)
-        i_t.append(i)
-    # the residual tail after alignment (up to 1 % of the peak flux) is not counted
-    valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # flux must be gone by alignment
+        if trace:
+            j = a + 1 - on
+            hit = np.flatnonzero(active)
+            psi_t[j[hit], hit] = psi[hit]
+            i_t[j[hit], hit] = i[hit]
+    valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # the flux must be gone before the next turn-on
     if trace:
-        return w_t, w_l, i2, valid, np.array(psi_t), np.array(i_t)
+        return w_t, w_l, i2, valid, psi_t, i_t
     return w_t, w_l, i2, valid
+
+
+def _stroke_waveforms(t: _Tables, omega: float, volts: float, r: float, on: int, off: int):
+    """Current, flux, average phase voltage, torque and dc-link current of one stroke, each shape (n,) on the table
+    angles (the tail wraps into the start of the period)."""
+    n = t.theta.size - 1
+    *_, psi_r, i_r = _simulate(t, omega, volts, r, np.array([on]), np.array([off]), trace=True)
+    psi_r, i_r = psi_r[:, 0], i_r[:, 0]
+    i_bar = 0.5 * (i_r[:-1] + i_r[1:])
+    v = omega * np.diff(psi_r) / (t.theta[1] - t.theta[0]) + r * i_bar
+    rows = (on + np.arange(n)) % n
+    tq = np.array([np.interp(i_r[j], t.current, t.torque[rows[j]]) for j in range(n)])
+    out = []
+    for w in (i_r[:-1], psi_r[:-1], v, tq, v * i_bar / volts):
+        a = np.empty(n)
+        a[rows] = w
+        out.append(a)
+    return tuple(out)
+
+
+def _theta(t: _Tables, index: int) -> float:
+    """Angle of a (possibly wrapped) stroke index, unwrapped past the table end."""
+    n = t.theta.size - 1
+    return float(t.theta[index % n] + (index // n) * t.theta[-1])
+
+
+def _stroke_pairs(n_theta: int, n_on: int, n_off: int) -> tuple[np.ndarray, np.ndarray]:
+    """Table indices (on, off) of every candidate stroke with off after on. The turn-off axis has `n_off` points up to
+    OFF_ALIGNED_END and goes on at that spacing to OFF_RANGE[1], so it holds every point of an axis that stops at
+    alignment."""
+    top = n_theta - 1
+    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
+    step = (OFF_ALIGNED_END - OFF_RANGE[0]) / (n_off - 1)
+    n_pts = int(math.floor((OFF_RANGE[1] - OFF_RANGE[0]) / step + 1e-9)) + 1
+    off_axis = np.unique(np.round((OFF_RANGE[0] + step * np.arange(n_pts)) * top).astype(int))
+    on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
+    keep = off > on
+    return on[keep], off[keep]
 
 
 def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
@@ -151,12 +198,7 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
         raise ValueError(f"current limit {i_top} A is outside the map's range (0, {top_current}] A")
     period = 2 * math.pi / machine.n_rotor_poles
     t = _tables(result, period, i_top, n_theta)
-    top = n_theta - 1
-    on_axis = np.unique(np.round(np.linspace(*ON_RANGE, n_on) * top).astype(int))
-    off_axis = np.unique(np.round(np.linspace(*OFF_RANGE, n_off) * top).astype(int))
-    on, off = (a.ravel() for a in np.meshgrid(on_axis, off_axis, indexing="ij"))
-    keep = off > on
-    on, off = on[keep], off[keep]
+    on, off = _stroke_pairs(n_theta, n_on, n_off)
     speeds = np.asarray(speeds_rpm, float)
     rows = []
     n = n_theta - 1
@@ -170,19 +212,14 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
             valid &= i2 / period <= rms_limit**2 * (1 + _EPS)
         best = int(np.argmax(np.where(valid, w_t, -np.inf))) if valid.any() else -1
         if best < 0 or w_t[best] <= 0:
-            rows.append((0.0, 0.0, t.theta[on[0]], t.theta[off[0]], 0.0, 0.0, 0.0))
+            rows.append((0.0, 0.0, _theta(t, on[0]), _theta(t, off[0]), 0.0, 0.0, 0.0))
             traces.append((zero,) * 5)
             continue
-        *_, psi_g, i_g = _simulate(t, omega, bus_voltage, resistance, on[[best]], off[[best]], trace=True)
-        psi_g, i_g = psi_g[:, 0], i_g[:, 0]
-        i_bar = 0.5 * (i_g[:-1] + i_g[1:])
-        v = omega * np.diff(psi_g) / (t.theta[1] - t.theta[0]) + resistance * i_bar
-        tq = np.array([np.interp(i_g[k], t.current, t.torque[k]) for k in range(n)])
-        traces.append((i_g[:-1], psi_g[:-1], v, tq, v * i_bar / bus_voltage))
+        traces.append(_stroke_waveforms(t, omega, bus_voltage, resistance, int(on[best]), int(off[best])))
         strokes_per_rev = machine.n_phases * machine.n_rotor_poles
         rows.append((strokes_per_rev * w_t[best] / (2 * math.pi),
                      machine.n_phases * resistance * i2[best] / period,
-                     t.theta[on[best]], t.theta[off[best]], w_t[best], w_l[best],
+                     _theta(t, on[best]), _theta(t, off[best]), w_t[best], w_l[best],
                      math.sqrt(i2[best] / period)))
     torque, copper, th_on, th_off, work_t, work_l, i_rms = (np.array(c) for c in zip(*rows))
     cur, psi_w, volt, tq_w, bus = (np.array(c) for c in zip(*traces))
@@ -191,3 +228,81 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     return Envelope(speeds, torque, power, copper, th_on, th_off, work_t, work_l, i_rms, wave,
                     wave.line.mean(axis=1), np.sqrt((wave.line**2).mean(axis=1)),
                     power_factor(power, volt, cur, q))
+
+
+@dataclass(frozen=True)
+class StrokeTrace:
+    """One stroke of phase A on the table angles (n,), tail wrapped into the start of the period. `current_limit`
+    is the hysteresis limit (A), `torque_avg` the revolution average over all phases, `copper_dc_w` = q·R·i_rms²."""
+    theta_on: float
+    theta_off: float
+    current_limit: float
+    current: np.ndarray
+    psi: np.ndarray
+    torque_avg: float
+    i_rms: float
+    copper_dc_w: float
+    valid: bool = True
+
+
+def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
+                      rpm: float, torque_nm: float, *, n_limits: int = 8, n_theta: int = N_THETA,
+                      n_on: int = N_ON, n_off: int = N_OFF) -> StrokeTrace | None:
+    """The valid stroke with average torque of at least `torque_nm` and the least copper loss, over turn-on, turn-off
+    and current limits k/n_limits of the map's top current; None when no stroke reaches the torque."""
+    require_complete(result)
+    if result.excited != "A":
+        raise ValueError("the envelope needs the phase A map (excited='A')")
+    if not torque_nm > 0:
+        raise ValueError(f"torque {torque_nm} N·m must be positive")
+    top_current = float(result.currents[-1])
+    period = 2 * math.pi / machine.n_rotor_poles
+    on, off = _stroke_pairs(n_theta, n_on, n_off)
+    omega = rpm * 2 * math.pi / 60
+    per_rev = machine.n_phases * machine.n_rotor_poles / (2 * math.pi)
+    best = None
+    for k in range(1, n_limits + 1):
+        limit = k / n_limits * top_current
+        t = _tables(result, period, limit, n_theta)
+        w_t, _, i2, valid = _simulate(t, omega, bus_voltage, resistance, on, off)
+        ok = valid & (per_rev * w_t >= torque_nm)
+        if not ok.any():
+            continue
+        j = int(np.argmin(np.where(ok, i2, np.inf)))
+        if best is None or i2[j] < best[0]:
+            best = (i2[j], t, limit, int(on[j]), int(off[j]), per_rev * w_t[j])
+    if best is None:
+        return None
+    i2, t, limit, o, f, tq = best
+    return _trace(t, machine, omega, bus_voltage, resistance, limit, o, f, tq, i2, True)
+
+
+def _trace(t: _Tables, machine: RadialSRMParams, omega: float, volts: float, resistance: float, limit: float,
+           on: int, off: int, torque: float, i2: float, valid: bool) -> StrokeTrace:
+    period = t.theta[-1]
+    cur, psi, *_ = _stroke_waveforms(t, omega, volts, resistance, on, off)
+    return StrokeTrace(_theta(t, on), _theta(t, off), limit, cur, psi, torque, math.sqrt(i2 / period),
+                       machine.n_phases * resistance * i2 / period, valid)
+
+
+def fixed_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float, rpm: float,
+                 theta_on: float, theta_off: float, current_limit: float, *, n_theta: int = N_THETA) -> StrokeTrace:
+    """The single pulse from `theta_on` to `theta_off` (rad on the table, 0 = aligned; `theta_off` may exceed one rotor
+    pole pitch) with the hysteresis limit `current_limit` (A, at most the map's top current), snapped to the table
+    angles. `valid` is False when the flux has not died away before the next turn-on."""
+    require_complete(result)
+    if result.excited != "A":
+        raise ValueError("the envelope needs the phase A map (excited='A')")
+    if not 0 < current_limit <= float(result.currents[-1]) * (1 + 1e-6):
+        raise ValueError(f"current limit {current_limit} A is outside the map's range (0, {result.currents[-1]}] A")
+    period = 2 * math.pi / machine.n_rotor_poles
+    n = n_theta - 1
+    on, off = round(theta_on / period * n), round(theta_off / period * n)
+    if not 0 <= on < off:
+        raise ValueError(f"the pulse needs 0 <= theta_on < theta_off, got {theta_on} and {theta_off} rad")
+    t = _tables(result, period, current_limit, n_theta)
+    omega = rpm * 2 * math.pi / 60
+    w_t, _, i2, valid = _simulate(t, omega, bus_voltage, resistance, np.array([on]), np.array([off]))
+    per_rev = machine.n_phases * machine.n_rotor_poles / (2 * math.pi)
+    return _trace(t, machine, omega, bus_voltage, resistance, current_limit, on, off, per_rev * w_t[0], i2[0],
+                  bool(valid[0]))

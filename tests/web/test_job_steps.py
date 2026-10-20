@@ -17,6 +17,7 @@ SEQUENCES = {
     "animate": ["queued", "frames", "saved"],
     "control": ["queued", "compile", "simulate", "saved"],
     "search": ["queued", "sampling", "designs", "pareto", "saved"],
+    "losses": ["queued", "strokes", "fields", "losses", "saved"],
 }
 
 

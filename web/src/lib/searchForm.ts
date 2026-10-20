@@ -21,6 +21,7 @@ export type SearchFormValues = {
   maxSlotFill: Num
   windingMode: "density" | "wires"
   phaseCurrentA: Num
+  windingTemperatureC: Num
   wires: WireForm[]
   nCandidates: Num
   shortlist: Num
@@ -41,6 +42,7 @@ export const defaultSearchForm = (): SearchFormValues => ({
   maxSlotFill: "0.6",
   windingMode: "density",
   phaseCurrentA: "",
+  windingTemperatureC: "120",
   wires: [],
   nCandidates: "200",
   shortlist: "40",
@@ -88,6 +90,7 @@ export function toSearchRequest(v: SearchFormValues): SearchRequest {
       max_slot_fill: num(v.maxSlotFill),
       wires: wireMode ? v.wires.map(wireToSI) : [],
       phase_current_a: wireMode ? optional(v.phaseCurrentA) : null,
+      winding_temperature_c: num(v.windingTemperatureC),
     },
     settings: {
       n_candidates: num(v.nCandidates),
@@ -137,6 +140,7 @@ export function validateForm(v: SearchFormValues): Record<string, string> {
   check("requirements.max_outer_diameter_m", v.maxOuterDiameterMm, { optional: true })
   check("requirements.max_mass_kg", v.maxMassKg, { optional: true })
   check("requirements.max_slot_fill", v.maxSlotFill)
+  check("requirements.winding_temperature_c", v.windingTemperatureC)
   check("settings.n_candidates", v.nCandidates, { integer: true })
   check("settings.shortlist", v.shortlist, { integer: true })
   check("settings.seed", v.seed, { integer: true })

@@ -35,3 +35,7 @@ class SolverAdapter(Protocol):
         """dA/di_k = K_T(A)⁻¹·∂f/∂i_k for every circuit k at the converged field `a`: shape
         (n_nodes, n_circuits), zero on the Dirichlet nodes."""
         ...
+
+
+class FactorizationFailed(RuntimeError):
+    """A direct solver could not factorize the tangent (typically out of memory)."""

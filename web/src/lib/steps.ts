@@ -8,6 +8,7 @@ const LABELS: Record<string, Record<string, string>> = {
   validate: { queued: "Queued", map: "Map (cache)", checks: "Checks and budget", saved: "Saved" },
   animate: { queued: "Queued", frames: "Frames", saved: "Saved" },
   control: { queued: "Queued", compile: "Compiling the controller", simulate: "Simulating", saved: "Saved" },
+  losses: { queued: "Queued", strokes: "Stroke choices", fields: "Field solves", losses: "Losses", saved: "Saved" },
   search: { queued: "Queued", sampling: "Sampling", designs: "Designs", pareto: "Pareto set", saved: "Saved" },
 }
 
@@ -24,11 +25,11 @@ export function fmtAbout(seconds: number): string {
   return seconds < 60 ? "under 1 min" : `about ${Math.round(seconds / 60)} min`
 }
 
-function detailOf(job: JobOut, id: string): string | undefined {
+function detailOf(job: JobOut, id: string, active: boolean): string | undefined {
   const p = job.progress ?? {}
   const done = num(p.points_done)
   const total = num(p.points_total)
-  if (id === "mapping" && done !== null && total) {
+  if ((id === "mapping" || id === "fields") && done !== null && total) {
     const parts = [`${done} / ${total} points`]
     const elapsed = num(p.elapsed_s)
     if (elapsed !== null) parts.push(`${fmtSpan(elapsed)} elapsed`)
@@ -36,7 +37,7 @@ function detailOf(job: JobOut, id: string): string | undefined {
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
-  if (id === "frames" && done !== null && total) return `${done} / ${total}`
+  if ((id === "frames" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
   if (id === "designs") {
     const dd = num(p.designs_done)
     const dt = num(p.designs_total)
@@ -46,6 +47,9 @@ function detailOf(job: JobOut, id: string): string | undefined {
       return parts.join(" · ")
     }
   }
+  // steps that report no counts (mesh, winding, checks) still show the job's running time
+  const elapsed = num(p.elapsed_s)
+  if (active && elapsed !== null && id !== "queued" && id !== "saved") return `${fmtSpan(elapsed)} elapsed`
   return undefined
 }
 
@@ -70,7 +74,7 @@ export function stepStates(job: JobOut): StepRow[] {
     if (job.status === "done" || i < current) state = "done"
     else if (i === current) state = stop ?? "active"
     else state = "waiting"
-    const detail = state === "active" || state === "failed" || state === "cancelled" ? detailOf(job, id) : undefined
+    const detail = state === "active" || state === "failed" || state === "cancelled" ? detailOf(job, id, state === "active") : undefined
     return { id, label: labels[id] ?? id, state, ...(detail ? { detail } : {}) }
   })
 }

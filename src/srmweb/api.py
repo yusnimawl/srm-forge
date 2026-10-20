@@ -8,6 +8,7 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -24,29 +25,34 @@ from scipy.io import savemat
 
 import srmcore
 import srmweb
+import srmapp
 from srmapp import field
 from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
+from srmapp.losses import N_ANGLES, check_loss_data
+from srmapp.report import findings
 from srmapp.sizing.estimates import active_mass
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
+from srmcore.materials.loss import MissingLossData
 from srmcore.materials.schema import SoftMagneticMaterial
 from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMaterials
 from srmcore.model.errors import InputError
 from srmcore.topology.dxf_io import import_dxf, write_dxf
 from srmsil import build as sil_build, run as sil_run, tables as sil_tables
 from srmweb.auth import Sessions, auth_router, require_auth
-from srmweb.cases import check_case, estimate as estimate_case, resolved_margin
+from srmweb.cases import check_case, estimate as estimate_case, losses_estimate, resolved_margin
 from srmweb.config import Settings, is_loopback
-from srmweb.frames import FieldContext, frame_task, mesh_task, pack
+from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.jobs import CUSTOM_REFUSED, KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
-from srmweb.results import CaseOut, DxfImportOut, CaseSummaryOut, MaterialOut, ReferenceOut, SearchResultOut
-from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest, ControllerOut,
-                            MotorIn, TargetCheckIn, TargetCheckOut, EditCase, EstimateOut,
-                            EvaluateBody, EvaluateRequest, FieldIn, IssuesOut, JobCreated, JobIn, JobOut, ReferenceCase,
-                            ValidateIn, ValidateRequest)
+from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, FindingOut, LossesOut,
+                            MaterialOut, ReferenceOut, ReportOut, SearchResultOut)
+from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest,
+                            ControllerOut, EditCase, EstimateOut, EvaluateBody, EvaluateRequest, FieldIn, IssuesOut,
+                            JobCreated, JobIn, JobOut, LossesBody, LossesEstimateOut, LossesRequest, MotorIn,
+                            ReferenceCase, TargetCheckIn, TargetCheckOut, ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
                           setup_from_case, setup_loc)
 from srmweb.serialize import to_json
@@ -84,6 +90,16 @@ DXF_MAX_BYTES = 10 * 1024 * 1024
 def _file_name(label: str) -> str:
     """`label` as a header-safe file name stem."""
     return re.sub(r"[^A-Za-z0-9 ._()+-]", "", label.replace("/", "-")).strip() or "case"
+
+
+def _evaluated_since_0_6(evaluation: dict) -> bool:
+    """False for an evaluation without a recorded srmapp version or made by one below 0.6.0 (its winding
+    resistance was made at 100 °C without the drive tail)."""
+    version = evaluation.get("srmapp_version")
+    try:
+        return version is not None and tuple(int(x) for x in version.split(".")[:2]) >= (0, 6)
+    except ValueError:
+        return False
 
 
 def _invalid(errors: list[dict], warnings: list[dict]) -> JSONResponse:
@@ -180,7 +196,8 @@ def create_app(settings: Settings,
                 if job["status"] not in ACTIVE:
                     yield _sse("end", out)
                     return
-                key = (job["status"], live[0] if live else None)
+                # the whole second of the elapsed time is part of the key, so the clock ticks between progress reports
+                key = (job["status"], live[0] if live else None, int(live[1]["elapsed_s"]) if live else None)
                 if key != seen:
                     seen = key
                     yield _sse("progress", out)
@@ -392,6 +409,74 @@ def create_app(settings: Settings,
             return _invalid(errors, warnings)
         return estimate_case(inputs, store, settings.cache_dir)
 
+    def evaluated_inputs(case_id: str) -> CaseInputs | JSONResponse:
+        """The inputs of an evaluated case with a winding; 409 for a draft or a stale case, 422 for inputs that fail
+        the case check."""
+        case = case_or_404(case_id)
+        evaluation = None if case["stale"] else store.case_result(case_id, "evaluate")
+        if evaluation is None or evaluation.get("status") != "ok" or not evaluation.get("winding"):
+            raise HTTPException(409, "evaluate this case first")
+        inputs, errors, warnings = check_case(case["inputs"])
+        return _invalid(errors, warnings) if inputs is None else inputs
+
+    @router.post("/cases/{case_id}/losses", status_code=201, response_model=JobCreated)
+    def losses_job(case_id: str, body: LossesBody | None = None):
+        inputs = evaluated_inputs(case_id)
+        if isinstance(inputs, JSONResponse):
+            return inputs
+        if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
+            raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
+        if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
+            raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
+        try:
+            check_loss_data(inputs.design)
+        except MissingLossData as exc:
+            return _invalid([{"loc": ["design", "machine", "materials"], "msg": str(exc)}], [])
+        idle_or_409(case_id)
+        body = body or LossesBody()
+        request = LossesRequest(case_id=case_id, inputs=inputs, **body.model_dump())
+        return {"job_id": _submit(runner, "losses", request.model_dump(mode="json"))["id"]}
+
+    @router.get("/cases/{case_id}/losses", response_model=LossesOut)
+    def get_losses(case_id: str):
+        case_or_404(case_id)
+        result = store.case_result(case_id, "losses")
+        if result is None or result.get("cancelled"):
+            raise HTTPException(404, "no losses for this case")
+        return result
+
+    @router.get("/cases/{case_id}/losses/estimate", response_model=LossesEstimateOut)
+    def losses_estimate_route(case_id: str, n_speeds: Annotated[int, Query(ge=2, le=12)] = 6,
+                              n_torques: Annotated[int, Query(ge=1, le=10)] = 5):
+        inputs, errors, warnings = check_case(case_or_404(case_id)["inputs"])
+        if inputs is None:
+            return _invalid(errors, warnings)
+        return losses_estimate(inputs, store, n_speeds, n_torques)
+
+    @router.get("/cases/{case_id}/losses/b", response_model=BWaveformOut)
+    def losses_b(case_id: str, point: int, x: float, y: float):
+        """B(t) in the lamination at the iron element nearest (x, y) metres (stator frame, rotor at angle 0) for
+        operating point `point`, from the cached stroke."""
+        case = case_or_404(case_id)
+        result = store.case_result(case_id, "losses")
+        if result is None or result.get("cancelled") or not 0 <= point < len(result["points"]):
+            raise HTTPException(404, "no such operating point")
+        op = result["points"][point]
+        if not op["reached"] or not op["stroke_key"]:
+            raise HTTPException(404, "this operating point was not reached")
+        if not (settings.cache_dir / "strokes" / f"{op['stroke_key']}.npz").is_file():
+            raise HTTPException(410, "the stroke fields were cleared; run the losses again")
+        design = reference_design(CaseInputs.model_validate(case["inputs"]))
+        try:
+            return to_json(runner.quick.run(b_task, design, op["stroke_key"], N_ANGLES, op["speed_rpm"], x, y,
+                                            settings.cache_dir))
+        except FileNotFoundError as exc:
+            raise HTTPException(410, "the stroke fields were cleared; run the losses again") from exc
+        except LaneTimeout as exc:
+            raise HTTPException(504, "the lookup took longer than 120 s") from exc
+        except Exception as exc:
+            raise HTTPException(500, f"{type(exc).__name__}: {exc}") from exc
+
     @router.get("/cases/{case_id}/setup", response_model=SetupFile,
                 response_model_exclude=NO_MACHINE_MATERIALS | {"search": True})
     def case_setup(case_id: str, response: Response):
@@ -467,16 +552,30 @@ def create_app(settings: Settings,
                                  coil_current=body.current_a * ctx.k, k=ctx.k, frames=body.frames)
         return {"job_id": _submit(runner, "animate", request.model_dump(mode="json"))["id"]}
 
+    def cached_frames(job: dict, result: dict) -> list:
+        """The cached frame of every angle of an animate job's result (None for a cleared frame)."""
+        request = AnimateRequest.model_validate(job["request"])
+        design = reference_design(request.inputs)
+        return [field.cached_frame(design, angle, request.coil_current, cache_dir=settings.cache_dir)
+                for angle in result["angles"]]
+
+    def frames_cached(job: dict) -> bool:
+        """True when the animate job's result exists and all its frames are still cached."""
+        result = store.get_result(job["id"])
+        if result is None or result.get("cancelled"):
+            return False
+        try:
+            return all(f is not None for f in cached_frames(job, result))
+        except (ValidationError, InputError):
+            return False
+
     @router.get("/jobs/{job_id}/frames")
     def job_frames(job_id: str):
         job = job_or_404(job_id)
         result = store.get_result(job_id) if job["kind"] == "animate" else None
         if result is None or result.get("cancelled"):
             raise HTTPException(404, "no frames")
-        request = AnimateRequest.model_validate(job["request"])
-        design = reference_design(request.inputs)
-        frames = [field.cached_frame(design, angle, request.coil_current, cache_dir=settings.cache_dir)
-                  for angle in result["angles"]]
+        frames = cached_frames(job, result)
         if any(f is None for f in frames):
             raise HTTPException(410, "the frames were cleared; animate again")
         arrays = {}
@@ -613,11 +712,10 @@ def create_app(settings: Settings,
                                 parent_case_id=parent["id"], stale=True)
         return DxfImportOut(case=case_out(store.get_case(new)), warnings=found)
 
-    @router.get("/cases/{case_id}/compare", response_model=CompareOut)
-    def compare(case_id: str):
-        case = case_or_404(case_id)
+    def compare_rows(case: dict) -> list[dict] | None:
+        """Before/after rows against the case's parent, None for a case without a parent."""
         if case["parent_case_id"] is None:
-            raise HTTPException(404, "this case has no parent to compare with")
+            return None
         parent = case_or_404(case["parent_case_id"])
 
         def column(c: dict) -> list[float | None]:
@@ -637,8 +735,41 @@ def create_app(settings: Settings,
         before, after = column(parent), column(case)
         names = [("La", "mH"), ("Lu", "mH"), ("Peak torque", "N·m"), ("Flux linkage max", "Wb"),
                  ("Stator iron", "kg"), ("Rotor iron", "kg"), ("Total mass", "kg")]
-        rows = [{"name": n, "unit": u, "before": b, "after": a} for (n, u), b, a in zip(names, before, after)]
-        return CompareOut(parent_id=parent["id"], parent_evaluated=before[0] is not None, rows=rows)
+        return [{"name": n, "unit": u, "before": b, "after": a} for (n, u), b, a in zip(names, before, after)]
+
+    @router.get("/cases/{case_id}/compare", response_model=CompareOut)
+    def compare(case_id: str):
+        case = case_or_404(case_id)
+        rows = compare_rows(case)
+        if rows is None:
+            raise HTTPException(404, "this case has no parent to compare with")
+        return CompareOut(parent_id=case["parent_case_id"], parent_evaluated=rows[0]["before"] is not None, rows=rows)
+
+    @router.get("/cases/{case_id}/report", response_model=ReportOut)
+    def report(case_id: str):
+        case = case_or_404(case_id)
+        evaluation = store.case_result(case_id, "evaluate")
+        if evaluation is None:
+            raise HTTPException(409, "the case has no evaluation")
+        losses = store.case_result(case_id, "losses")
+        if losses is not None and losses.get("cancelled"):
+            losses = None
+        animate = [j for j in store.case_jobs(case_id) if j["kind"] == "animate" and j["status"] == "done"
+                   and not (store.get_result(j["id"]) or {"cancelled": True}).get("cancelled")]
+        chosen = next((j for j in animate if frames_cached(store.get_job(j["id"]))), None)
+        missing = (None if chosen else "no animation run" if not animate
+                   else "the frames were cleared from the cache; animate again")
+        validation = store.case_result(case_id, "validate")
+        if validation is not None and validation.get("cancelled"):
+            validation = None
+        found = findings(CaseInputs.model_validate(case["inputs"]), evaluation, validation,
+                         losses, compare_rows(case) if case["origin"] == "dxf" and store.get_case(case["parent_case_id"] or "") else None, missing)
+        return ReportOut(
+            findings=[FindingOut(**vars(f)) for f in found],
+            versions={"srmcore": srmcore.__version__, "srmapp": srmapp.__version__, "srmweb": srmweb.__version__},
+            generated=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            animation_job_id=chosen["id"] if chosen else None,
+            animation_current_a=store.get_result(chosen["id"])["current_a"] if chosen else None)
 
     @router.get("/cases/{case_id}/map.mat")
     def map_mat(case_id: str):
@@ -665,7 +796,8 @@ def create_app(settings: Settings,
         if not settings.cache_dir.is_dir():
             return []
         sil = settings.cache_dir / "sil"
-        found = [*settings.cache_dir.glob("*.h5"), *(settings.cache_dir / "fields").glob("*.npz"),
+        found = [*settings.cache_dir.glob("*.h5"),
+                 *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")),
                  *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*")]
         return [f for f in found if f.is_file() and ".tmp." not in f.name]
 

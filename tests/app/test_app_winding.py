@@ -40,7 +40,7 @@ def test_wire_windings_fill_the_slot_with_the_most_strands():
         assert w.copper_area == pytest.approx(w.strands * req.wires[0].copper_area)
         assert w.current == 100.0 and w.coil_current == 100.0 / w.paths and w.wire == 0
         assert w.current_density <= 20e6 * (1 + 1e-9)
-        assert w.resistance == pytest.approx(est.series_resistance(P, w.turns, w.copper_area) / w.paths**2)
+        assert w.resistance == pytest.approx(est.series_resistance(P, w.turns, w.copper_area, req.winding_temperature_c) / w.paths**2)
         assert w.copper_mass == pytest.approx(est.copper_mass(P, w.turns, w.copper_area))
 
 

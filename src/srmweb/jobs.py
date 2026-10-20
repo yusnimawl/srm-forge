@@ -1,6 +1,6 @@
 """Job runner: one thread per lane, FIFO within a lane, progress kept in memory.
 
-The main lane runs search, evaluate and validate; the quick lane runs animate, so an animation never waits behind
+The main lane runs search, evaluate, validate and losses; the quick lane runs animate, so an animation never waits behind
 a map build."""
 from __future__ import annotations
 
@@ -11,20 +11,24 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import numpy as np
 from pydantic import BaseModel
 
 from srmapp.case import LIMIT_FIELDS, evaluate_design, reference_design, validate_case
 from srmapp.evaluate import StageTwoGrid
+from srmapp.losses import efficiency_map
 from srmapp.pipeline import SearchSettings, run_search
+from srmapp.sizing.estimates import J_LIMIT
+from srmapp.sizing.winding import Winding
 from srmcore.model.design import RegionMaterials
 from srmsil import run as sil_run
 from srmsil.tables import MotorData
 from srmweb.config import Settings, is_loopback
 from srmweb.quick import QuickLane
 from srmweb.frames import frame_task
-from srmweb.schemas import AnimateRequest, ControlRequest, EvaluateRequest, SearchRequest, ValidateRequest
+from srmweb.schemas import AnimateRequest, ControlRequest, EvaluateRequest, LossesRequest, SearchRequest, ValidateRequest
 from srmweb.serialize import evaluation_json, search_result_json, to_json
 from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
 
@@ -42,9 +46,10 @@ STEPS: dict[str, tuple[str, ...]] = {
     "animate": ("queued", "frames", "saved"),
     "control": ("queued", "compile", "simulate", "saved"),
     "search": ("queued", "sampling", "designs", "pareto", "saved"),
+    "losses": ("queued", "strokes", "fields", "losses", "saved"),
 }
 _ETA_MIN_FRACTION = 0.05
-_ETA_STEPS = ("mapping", "frames")   # the steps whose point counts are the work done
+_ETA_STEPS = ("mapping", "frames", "fields")   # the steps whose point counts are the work done
 
 
 def initial_progress(kind: str) -> dict:
@@ -360,10 +365,32 @@ def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) ->
 CUSTOM_REFUSED = "custom controllers run only when srmweb is bound to a loopback host"
 
 
+def run_losses_job(req: LossesRequest, reporter: Reporter, ctx: JobContext) -> dict:
+    """Efficiency map of an evaluated case. `efficiency_map` reads only the status, the winding and the current-density
+    limit of the evaluation, which are rebuilt from the stored one."""
+    body = reporter.store.case_result(req.case_id, "evaluate")
+    if body is None or body.get("status") != "ok" or not body.get("winding"):
+        raise ValueError("the case has no evaluation")
+    evaluation = SimpleNamespace(status=body["status"], winding=Winding(**body["winding"]),
+                                 j_limit=body.get("j_limit") or J_LIMIT)
+
+    def on_progress(step: str, done: int, total: int) -> None:
+        reporter.progress(step=step, points_done=done, points_total=total, message=f"{step} {done}/{total}")
+
+    try:
+        result = efficiency_map(req.inputs, evaluation, n_speeds=req.n_speeds, n_torques=req.n_torques,
+                                workers=ctx.settings.workers, cache_dir=ctx.settings.cache_dir,
+                                progress=on_progress, cancel=reporter.cancelled)
+    except InterruptedError:
+        return {"cancelled": True}
+    return to_json(result)
+
+
 KINDS: dict[str, tuple[type[BaseModel], Callable[[BaseModel, Reporter, JobContext], dict]]] = {
     "search": (SearchRequest, run_search_job),
     "evaluate": (EvaluateRequest, run_evaluate_job),
     "validate": (ValidateRequest, run_validate_job),
     "animate": (AnimateRequest, run_animate_job),
     "control": (ControlRequest, run_control_job),
+    "losses": (LossesRequest, run_losses_job),
 }

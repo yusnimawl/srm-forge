@@ -114,3 +114,15 @@ describe("validateForm", () => {
     })
   })
 })
+
+describe("winding temperature", () => {
+  it("is sent from the form, 120 by default", () => {
+    expect(toSearchRequest(defaultSearchForm()).requirements.winding_temperature_c).toBe(120)
+    const v = { ...defaultSearchForm(), windingTemperatureC: "95" }
+    expect(toSearchRequest(v).requirements.winding_temperature_c).toBe(95)
+  })
+  it("must be a number", () => {
+    const v = { ...defaultSearchForm(), windingTemperatureC: "hot" }
+    expect(validateForm(v)).toEqual({ "requirements.winding_temperature_c": "Enter a number" })
+  })
+})

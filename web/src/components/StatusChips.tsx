@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 
 const DOT: Record<ChipTone, string> = { ok: "bg-feasible", warn: "bg-warn", none: "" }
 
-function Chip({ text, tone }: { text: string; tone: ChipTone }) {
+export function Chip({ text, tone }: { text: string; tone: ChipTone }) {
   return (
     <span className="inline-flex items-center gap-[7px] rounded-md border border-border px-2.5 py-1 text-[12.5px] text-muted-foreground">
       {tone !== "none" && <span aria-hidden className={cn("size-1.5 rounded-full", DOT[tone])} />}

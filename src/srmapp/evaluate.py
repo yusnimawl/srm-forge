@@ -11,6 +11,7 @@ from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
+from . import __version__
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .requirements import Requirements
@@ -63,6 +64,7 @@ class Evaluation:
     map: MapArrays | None = None  # set with status "ok"
     curves: MapCurves | None = None  # set with status "ok"
     j_limit: float = J_LIMIT    # A/m², the RMS current-density limit the winding choice used
+    srmapp_version: str = __version__   # the version that made the evaluation
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limit: float) -> Evaluation:

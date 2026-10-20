@@ -39,6 +39,16 @@ describe("stepStates", () => {
       stepStates(job({ kind: "search" }, { steps: ["queued", "sampling", "designs", "pareto", "saved"], step: "designs" })).map((r) => r.label),
     ).toEqual(["Queued", "Sampling", "Designs", "Pareto set", "Saved"])
   })
+  it("a step without counts shows the elapsed time", () => {
+    const r = stepStates(job({}, { step: "winding", elapsed_s: 125 }))[3]
+    expect(r.state).toBe("active")
+    expect(r.detail).toBe("2 min elapsed")
+  })
+  it("a failed step without counts shows no elapsed time", () => {
+    const r = stepStates(job({ status: "failed", active: false }, { step: "winding", elapsed_s: 125 }))[3]
+    expect(r.state).toBe("failed")
+    expect(r.detail).toBeUndefined()
+  })
   it("mapping detail with points, elapsed and time left", () => {
     const r = stepStates(job({}, { points_done: 412, points_total: 960, elapsed_s: 420, eta_s: 540 }))[2]
     expect(r.detail).toBe("412 / 960 points · 7 min elapsed · about 9 min left")
@@ -63,5 +73,13 @@ describe("stepStates", () => {
     expect(states(job({ status: "failed" }, { step: undefined }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
     expect(states(job({ status: "failed" }, { step: "nope" }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
     expect(states(job({ status: "done" }, { step: undefined }))).toEqual(["done", "done", "done", "done", "done"])
+  })
+})
+
+describe("losses job steps", () => {
+  it("labels the five steps", () => {
+    const j = job({ kind: "losses" }, { steps: ["queued", "strokes", "fields", "losses", "saved"], step: "fields", points_done: 10, points_total: 60 })
+    expect(stepStates(j).map((r) => r.label)).toEqual(["Queued", "Stroke choices", "Field solves", "Losses", "Saved"])
+    expect(stepStates(j)[2].detail).toContain("10 / 60")
   })
 })

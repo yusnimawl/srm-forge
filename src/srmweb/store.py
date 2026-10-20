@@ -15,7 +15,7 @@ from pathlib import Path
 SCHEMA_VERSION = 2
 
 CASE_ORIGINS = ("candidate", "reference", "import", "edit", "dxf")
-RESULT_KINDS = ("search", "evaluate", "validate", "animate", "control")
+RESULT_KINDS = ("search", "evaluate", "validate", "animate", "losses", "control")
 
 # Job status groups; the runner, the store and the routes all read these.
 ACTIVE = ("queued", "running")
