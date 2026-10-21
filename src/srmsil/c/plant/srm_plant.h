@@ -55,12 +55,21 @@ typedef struct {
 typedef struct {
     double theta, omega, ttot;
     double psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
+    /* Lookup constants of the float-table build, set by srm_plant_init: phase shift, table period and its inverse,
+       inverse grid steps. */
+    double k_eps, k_period, k_inv_period;
+    float k_inv_theta, k_inv_psi;
 } srm_plant_t;
 
 /* Motor: bilinear lookup of i, T and field energy W at a phase angle (wrapped here) and flux. W is 0 without a
    w_field table. */
 void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi, double *i, double *torque,
                     double *w);
+#ifdef SRM_TABLE_FLOAT
+/* Float-table build: i, T and W at the table coordinates u = phase angle / theta_step in [0, n_theta] and
+   s = psi / psi_step >= 0. */
+void srm_motor_lookup_f(const srm_sim_tables_t *tab, float u, float s, double *i, double *torque, double *w);
+#endif
 /* i, T and W of every phase at rotor angle theta and fluxes psi; returns the total torque. */
 double srm_plant_eval(const srm_sim_config_t *c, const srm_sim_tables_t *t, double theta, const double *psi,
                       double *i, double *trq, double *w);

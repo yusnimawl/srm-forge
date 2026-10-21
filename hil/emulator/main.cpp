@@ -1,17 +1,13 @@
-// Teensy 4.1 motor emulator. Answers HIL_HELLO over USB serial.
+// Teensy 4.1 motor emulator (see emu.h).
 #include <Arduino.h>
-extern "C" {
-#include "hil_hello.h"
+
+#include "emu.h"
+
+void setup()
+{
+    safety_begin();
+    link_begin();
+    gates_begin();
 }
 
-static hil_hello_t link_state;
-
-void setup() { Serial.begin(115200); }
-
-void loop() {
-    uint8_t out[HIL_FRAME_MAX(sizeof(hil_build_info_t))];
-    while (Serial.available()) {
-        size_t n = hil_hello_feed(&link_state, 1, (uint8_t)Serial.read(), out);
-        if (n) Serial.write(out, n);
-    }
-}
+void loop() { link_poll(); }

@@ -5,6 +5,7 @@ void srm_gate_avg_init(srm_gate_avg_t *g, int64_t rise_ticks, int64_t fall_ticks
     g->cmd = g->eff = initial;
     for (int s = 0; s < 16; s++) g->pending_t[s] = 0;
     g->pending_valid = 0;
+    g->cache_ticks = 0;
     g->rise_ticks = rise_ticks;
     g->fall_ticks = fall_ticks;
 }
@@ -13,11 +14,12 @@ void srm_gate_avg_init(srm_gate_avg_t *g, int64_t rise_ticks, int64_t fall_ticks
    restarts from this tick. */
 static void command(srm_gate_avg_t *g, uint16_t word, uint64_t t)
 {
-    uint16_t changed = (uint16_t)(word ^ g->cmd);
+    unsigned changed = (uint16_t)(word ^ g->cmd);
     g->cmd = word;
-    for (int s = 0; s < 16; s++) {
+    while (changed) {
+        int s = __builtin_ctz(changed);
         uint16_t bit = (uint16_t)(1u << s);
-        if (!(changed & bit)) continue;
+        changed &= changed - 1u;
         if (((word ^ g->eff) & bit) == 0) {
             g->pending_valid &= (uint16_t)~bit;
         } else {
@@ -32,16 +34,19 @@ static void command(srm_gate_avg_t *g, uint16_t word, uint64_t t)
 static uint64_t next_pending(const srm_gate_avg_t *g)
 {
     uint64_t best = UINT64_MAX;
-    for (int s = 0; s < 16; s++)
-        if ((g->pending_valid & (1u << s)) && g->pending_t[s] < best) best = g->pending_t[s];
+    for (unsigned m = g->pending_valid; m; m &= m - 1u) {
+        int s = __builtin_ctz(m);
+        if (g->pending_t[s] < best) best = g->pending_t[s];
+    }
     return best;
 }
 
 static void mature(srm_gate_avg_t *g, uint64_t t)
 {
-    for (int s = 0; s < 16; s++) {
+    for (unsigned m = g->pending_valid; m; m &= m - 1u) {
+        int s = __builtin_ctz(m);
         uint16_t bit = (uint16_t)(1u << s);
-        if ((g->pending_valid & bit) && g->pending_t[s] <= t) {
+        if (g->pending_t[s] <= t) {
             g->eff = (uint16_t)((g->eff & ~bit) | (g->cmd & bit));
             g->pending_valid &= (uint16_t)~bit;
         }
@@ -53,9 +58,10 @@ static void mature(srm_gate_avg_t *g, uint64_t t)
 static void accumulate(const srm_gate_avg_t *g, const srm_sim_config_t *c, double tick_s, double span, double *psi,
                        float *on_upper, float *on_lower)
 {
+    const double tau = span * tick_s;
     for (int k = 0; k < c->n_phases; k++) {
         int u = (g->eff >> k) & 1, l = (g->eff >> (8 + k)) & 1;
-        double tau = span * tick_s;
+        if (!u && !l && !(psi[k] > 0.0)) continue;      /* idle winding: no voltage, no flux change */
         double v = srm_ahb_voltage(c, u, l, psi[k] > 0.0 ? 1.0 : 0.0);
         if (v >= 0.0 || psi[k] > -v * tau) psi[k] += v * tau;
         else psi[k] = 0.0;
@@ -64,13 +70,23 @@ static void accumulate(const srm_gate_avg_t *g, const srm_sim_config_t *c, doubl
     }
 }
 
+/* A tick count as double; a 32-bit conversion is one instruction on the Cortex-M7, a 64-bit one a library call. */
+static double span_ticks(uint64_t n) { return n <= UINT32_MAX ? (double)(uint32_t)n : (double)n; }
+
 void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm_edge_t *edges, int n, uint64_t t0,
                          uint64_t dt, const double *psi0, double *v_out, float *on_upper, float *on_lower)
 {
     const uint64_t t1 = t0 + dt;
     uint64_t now = t0;
     int e = 0;
-    const double tick_s = c->dt / (double)dt;
+    if (g->cache_ticks != dt || g->cache_dt != c->dt) {     /* per-window constants, divided once */
+        g->cache_ticks = dt;
+        g->cache_dt = c->dt;
+        g->tick_s = c->dt / span_ticks(dt);
+        g->inv_ticks = 1.0 / span_ticks(dt);
+        g->inv_dt = 1.0 / c->dt;
+    }
+    const double tick_s = g->tick_s;
     double psi[SRM_SIM_MAX_PHASES];
     for (int k = 0; k < c->n_phases; k++) {
         psi[k] = psi0[k];
@@ -83,18 +99,22 @@ void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm
         uint64_t ts = te < tp ? te : tp;      /* an edge at the same tick as a maturing change comes first */
         if (ts >= t1) break;
         if (ts < now) ts = now;
-        if (ts > now) accumulate(g, c, tick_s, (double)(ts - now), psi, on_upper, on_lower);
+        if (ts > now) accumulate(g, c, tick_s, span_ticks(ts - now), psi, on_upper, on_lower);
         now = ts;
         if (te <= tp) {
             while (e < n && edges[e].t <= ts) command(g, edges[e++].gates, ts);
         }
         mature(g, ts);
     }
-    if (t1 > now) accumulate(g, c, tick_s, (double)(t1 - now), psi, on_upper, on_lower);
+    if (t1 > now) accumulate(g, c, tick_s, span_ticks(t1 - now), psi, on_upper, on_lower);
 
-    const double inv = 1.0 / (double)dt;
+    const double inv = g->inv_ticks;
     for (int k = 0; k < c->n_phases; k++) {
+#ifdef SRM_TABLE_FLOAT
+        v_out[k] = (psi[k] - psi0[k]) * g->inv_dt;      /* the emulator build multiplies instead of dividing */
+#else
         v_out[k] = (psi[k] - psi0[k]) / c->dt;
+#endif
         on_upper[k] = (float)(on_upper[k] * inv);
         on_lower[k] = (float)(on_lower[k] * inv);
     }

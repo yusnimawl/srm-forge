@@ -16,7 +16,41 @@ Bench (2026-10-21, modes ad7606 + encoder, hysteresis reference controller, anal
 
 ## Bench checks
 
-Pending.
+### Emulator core (2026-10-21, Teensy 4.1 at 600 MHz, mode ad7606 + encoder, boards not wired to each other)
+
+`examples/hil_emu_selftest.py`: the analytic motor at a fixed 1000 rpm, tables uploaded on the 180 x 192 grid, the
+default converter delays, and the emulator's software gate pattern (`HIL_COMMAND` mode 2: phase A, both switches,
+20 kHz, 50 %, first rise 1000 cycles into step 0) in place of the gate inputs and RUN.
+
+| Item | Result | Target |
+|---|---|---|
+| Step time, mean | 3.86 us (77 % of dt) | - |
+| Step time, max | 5.6 us | < 4 us (80 %) - **not met** |
+| Overruns (step longer than 5 us) | about 10 % of steps | 0 - **not met** |
+| Buffered capture, 8000 steps | all samples, contiguous, no sequence gap; `valid = 0` (overruns during it) | valid |
+| Streamed capture, 100 000 steps | ring full after 8556 samples (`dropped` 1, `valid = 0`) | valid |
+| Phase-A current vs `srmsil.emumodel.run_model` on the same edges, RMS at the step instants | +0.002 % (buffered), +0.002 % (streamed part); max sample difference 0.64 mA = half a count | within 1 % - met |
+| Live statistics | 20 Hz, one packet per 10 000 steps | - |
+| Output latency (last edge to the end of the output stage, stubbed) | 8.7 us | - |
+
+Profile with the cycle counter (mean / max cycles of the 3000 per step): gate averaging 767 / 1338, plant step
+1189 / 1243, the rest (edge take, statistics, safety) about 350 mean; a capture sample adds about 200. One phase
+carries flux in this test; each further conducting phase adds about 250 cycles to the plant step.
+
+Changes made after the first measurement (plant 7400 and gate averaging 2600 cycles max, the loop fell behind and
+starved USB): int instead of int64 table indices, the per-window divisions of the averager done once, idle windings
+skipped in the averager, and in the float-table build only (firmware and its PC model `srm_emu.c`) the table lookup in
+single precision with one angle wrap per evaluation and zero-flux phases skipped; -O3. The double (SIL) build is
+unchanged in its results (`tests/hil/test_hil_plant_split.py` golden at 1e-12). The step loop stops itself and
+reports `HIL_ERROR` when a step finishes 20 steps late, so an overload cannot wedge the USB link.
+
+Owner decision needed for the timing: a 816 MHz core clock (about 1.36 x), a single-precision plant step, or a
+longer step. At 600 MHz the core does not leave room for two conducting phases, the Task 9 output stage or
+streaming.
+
+Pending wiring: edge jitter on the GPIO path against a Nucleo pattern (< 150 ns target) and the Nucleo test-pattern
+mode; the RUN/READY interlock with the controller. The self-test pattern bypasses the gate inputs, so its jitter
+reads 0.
 
 ## Acceptance
 

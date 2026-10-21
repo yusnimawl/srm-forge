@@ -55,10 +55,15 @@ typedef struct {
     int8_t status;
 } hil_param_reply_t;
 
+/* Controller: mode 0 torque (N*m), 1 speed (rad/s). Emulator: mode HIL_CMD_EMU_SELFTEST. */
 typedef struct {
-    uint8_t mode;            /* 0 torque (N*m), 1 speed (rad/s) */
+    uint8_t mode;
     float value;
 } hil_command_t;
+
+/* Emulator command: a software gate pattern on phase A (both switches, 20 kHz, duty = value, 0 = off) replaces the
+ * gate inputs and the RUN input. */
+#define HIL_CMD_EMU_SELFTEST 2
 
 typedef struct {
     uint32_t step;
@@ -85,6 +90,17 @@ typedef struct {
     uint8_t n_phases;
 } hil_capture_hdr_t;
 
+typedef struct {
+    uint32_t n_steps;        /* 0 = the config's capture_steps */
+} hil_capture_req_t;
+
+typedef struct {
+    uint8_t valid;           /* 0 after a dropped sample, an overrun or a stop during the capture */
+    uint32_t n_steps;        /* samples recorded */
+} hil_capture_end_t;
+
+/* theta is the rotor angle in [0, 2 pi) as theta / (2 pi) * 65536; the other fields are counts of the header's scales.
+ * The sample of step n holds the state at the start of the step and the winding voltage averaged over it. */
 typedef struct {
     uint32_t step;
     int16_t i[4], psi[4], v[4], torque;

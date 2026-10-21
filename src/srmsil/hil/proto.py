@@ -118,6 +118,9 @@ BUILD_INFO = struct.Struct("<HBBBBI")
 PARAM_SET = struct.Struct("<24sf")
 PARAM_REPLY = struct.Struct("<24sb")
 COMMAND = struct.Struct("<Bf")
+CMD_EMU_SELFTEST = 2       # emulator command: phase-A software gate pattern, 20 kHz, duty = value (0 = off)
+CAPTURE_REQ = struct.Struct("<I")
+CAPTURE_END = struct.Struct("<BI")
 LIVE_EMU = struct.Struct("<I9f2I2f")
 LIVE_CTRL = struct.Struct("<2fIf4f")
 CAPTURE_HDR = struct.Struct("<6fIB")
@@ -147,6 +150,7 @@ PAYLOAD_SIZE = {
     Type.BUILD_INFO: BUILD_INFO.size, Type.EMU_CONFIG: EMU_CONFIG.size, Type.TABLE_CHUNK: TABLE_CHUNK.size,
     Type.PARAM_SET: PARAM_SET.size, Type.PARAM_REPLY: PARAM_REPLY.size, Type.COMMAND: COMMAND.size,
     Type.LIVE_EMU: LIVE_EMU.size, Type.LIVE_CTRL: LIVE_CTRL.size, Type.CAPTURE_HDR: CAPTURE_HDR.size,
+    Type.CAPTURE_REQ: CAPTURE_REQ.size, Type.CAPTURE_END: CAPTURE_END.size,
 }
 
 

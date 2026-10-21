@@ -118,6 +118,8 @@ size_t hil_payload_size(uint8_t type)
     case HIL_LIVE_EMU: return sizeof(hil_live_emu_t);
     case HIL_LIVE_CTRL: return sizeof(hil_live_ctrl_t);
     case HIL_CAPTURE_HDR: return sizeof(hil_capture_hdr_t);
+    case HIL_CAPTURE_REQ: return sizeof(hil_capture_req_t);
+    case HIL_CAPTURE_END: return sizeof(hil_capture_end_t);
     default: return 0;
     }
 }
