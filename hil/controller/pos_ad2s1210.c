@@ -37,7 +37,8 @@
 
 static uint8_t rx[32] __attribute__((aligned(32)));      /* DMA target, one cache line */
 static volatile uint16_t word;
-static uint16_t cached_word = 1;          /* never a position word at 10..16 bits, so the first call computes */
+static uint16_t cached_word;
+static bool cached_valid;
 static int16_t cached_s, cached_c;
 static volatile bool reading;
 static char err[96];
@@ -187,11 +188,12 @@ void DMA1_Stream2_IRQHandler(void)
 void rdc_sincos(int16_t *s, int16_t *c)
 {
     const uint16_t w = word;
-    if (w != cached_word) {
-        const float a = (float)ad2s1210_angle(w, 16);
+    if (!cached_valid || w != cached_word) {
+        const float a = (float)ad2s1210_angle(w, HIL_RDC_BITS);
         cached_s = (int16_t)lroundf(32767.0f * sinf(a));
         cached_c = (int16_t)lroundf(32767.0f * cosf(a));
         cached_word = w;
+        cached_valid = true;
     }
     *s = cached_s;
     *c = cached_c;

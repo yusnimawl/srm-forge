@@ -177,6 +177,7 @@ void link_poll(void)
         l.command = s.command;
         for (int k = 0; k < 4; k++) l.i_meas[k] = s.i_rms[k];
         l.sample_us = s.sample_us;
+        l.tx_dropped = tx_dropped;
         l.state = s.state;
         send(HIL_LIVE_CTRL, seq_out++, &l, sizeof l);
     }

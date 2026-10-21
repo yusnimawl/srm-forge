@@ -86,6 +86,7 @@ typedef struct {
     float command;           /* the last ctrl_command value */
     float i_meas[4];         /* A rms of the sampled phase currents */
     float sample_us;         /* mean time from the trigger to the start of ctrl_isr */
+    uint32_t tx_dropped;     /* frames the controller could not queue for sending, since boot */
     uint8_t state;           /* HIL_CTRL_* bits */
 } hil_live_ctrl_t;
 
@@ -94,6 +95,7 @@ typedef struct {
 #define HIL_CTRL_READY_STOP 4u     /* READY fell during the last run and stopped it */
 #define HIL_CTRL_STALL_STOP 8u     /* the last run stopped because the sample chain stalled */
 #define HIL_CTRL_INDEX 16u         /* an encoder index pulse was seen since the start */
+#define HIL_CTRL_HANG_STOP 32u     /* the last run stopped because ctrl_isr did not return */
 
 typedef struct {
     float dt;                /* s per step */

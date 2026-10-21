@@ -77,6 +77,10 @@ def write_hil_config(modes: HilModes, scenario: Scenario, m: MotorData, path: Pa
     sensing chain of `modes` (AD7606 codes are handed over as offset binary, 16 bits; the Nucleo ADC reads the DACs at
     16 bits and has no voltage channels)."""
     se = scenario.sensors
+    k = scenario.pwm_hz / scenario.resolved_isr_hz
+    if not (abs(k - round(k)) <= 1e-6 * k and round(k) % 2 == 1 and round(k) <= 127):
+        raise ValueError(f"isr_hz {scenario.resolved_isr_hz:g} Hz: the HIL samples at the carrier centre, so isr_hz must "
+                         f"be pwm_hz / k with k odd (1..127); pwm_hz / isr_hz is {k:g}")
     if modes.position in ("ad2s1210", "both") and se.resolver_bits not in (10, 12, 14, 16):
         raise ValueError(f"resolver_bits {se.resolver_bits}: the AD2S1210 has 10, 12, 14 or 16 bits")
     if modes.position in ("encoder", "both") and not 1 <= se.encoder_cpr <= 65536:

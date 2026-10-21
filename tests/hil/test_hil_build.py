@@ -58,6 +58,11 @@ def test_hil_config_sensor_scales(tmp_path):
     assert d["HIL_ADC_AMPS_PER_COUNT"] == pytest.approx(3.3 / 65536 / v_per_a)
     with pytest.raises(ValueError, match="AD2S1210"):
         write_hil_config(HilModes(position="both"), Scenario(sensors={"resolver_bits": 11}), m, p)
+    for isr in (40000.0, 10000.0, 5000.0):        # 2 x pwm, k = 2 and 4: not the carrier centre
+        with pytest.raises(ValueError, match="k odd"):
+            write_hil_config(HilModes(), Scenario(pwm_hz=20000.0, isr_hz=isr), m, p)
+    write_hil_config(HilModes(), Scenario(pwm_hz=30000.0, isr_hz=10000.0), m, p)
+    assert "#define HIL_ISR_HZ 10000.0f" in p.read_text()
     with pytest.raises(ValueError, match="encoder_cpr"):
         write_hil_config(HilModes(position="encoder"), Scenario(sensors={"encoder_cpr": 0}), m, p)
     write_hil_config(HilModes(position="ad2s1210"), Scenario(sensors={"encoder_cpr": 0}), m, p)

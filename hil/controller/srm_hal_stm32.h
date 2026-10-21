@@ -16,8 +16,12 @@
  *
  * Safety: the gate outputs idle low (TIM1/TIM8 MOE = 0, OSSI = 1) except while running. RUN (PD6) goes high only
  * after drv_start's checks; READY (PD4) falling, or READY found low at a trigger, turns every gate off at once (MOE
- * cleared, every compare 0) and stops the run. Two triggers in a row with the previous sample chain unfinished stop
- * the run as well ("stall"). */
+ * cleared, every compare 0) and stops the run. Three triggers in a row with the previous sample chain unfinished stop
+ * the run as well ("stall"), and so do three triggers in a row that find ctrl_isr still running ("hang"): the hung
+ * ctrl_isr is then abandoned (its interrupt returns through a longjmp to drv_data_done), so the link keeps working.
+ *
+ * Rates: isr_hz = pwm_hz / k with k odd (k = 1, 3, 5, ...): every update at the underflow is then the centre of a
+ * carrier period, where the SIL samples (t = (j + 1/2) / isr_hz). */
 #ifndef SRM_HAL_STM32_H
 #define SRM_HAL_STM32_H
 
@@ -46,7 +50,7 @@ void srm_hal_stm32_init(srm_hal_t *hal);
 const char *drv_start(void);
 void drv_stop(void);
 bool drv_running(void);
-/* A reason the last run stopped by itself (READY low, stall), once; NULL when none is new. */
+/* A reason the last run stopped by itself (READY low, stall, hang), once; NULL when none is new. */
 const char *drv_take_stop_reason(void);
 
 /* ctrl_param / ctrl_command with the ctrl_isr priority masked; the command is kept and re-applied after ctrl_init. */

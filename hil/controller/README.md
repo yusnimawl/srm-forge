@@ -18,12 +18,17 @@ the starting point for the motor controller board (spec D11, §14). Pins: `docs/
 
 - PWM: both timers count 0..ARR..0 at 200 MHz, ARR = 200 MHz / (2 pwm_hz), PWM mode 1 with compare preload, no dead
   time, outputs idle low (MOE = 0, OSSI = 1). The update event is at the counter underflow, the centre of the
-  on-pulses, as the SIL's sampling instant; `isr_hz` may be 2 x `pwm_hz` or `pwm_hz / k`.
+  on-pulses. The SIL samples at t = (j + 1/2) / isr_hz, which is a carrier centre only for `isr_hz = pwm_hz / k` with
+  k odd, so the HIL accepts only those rates (`write_hil_config` raises before a build, the firmware refuses the
+  start). The hysteresis controller drives its gates directly; the carrier only times its ISR, so HIL runs of it set
+  `pwm_hz = isr_hz`.
 - Sample chain per trigger (TIM1 update, priority 1): `ad7606` CONVST pulse, BUSY falling, 128-bit SPI1 read;
   `internal` TRGO2 starts the ADCs in hardware; `ad2s1210` SAMPLE pulse and an SPI3 read 2 us later. `ctrl_isr`
   (priority 3) runs when every source has its data; its compare values take effect at the next update.
 - Overrun: a trigger that finds `ctrl_isr` still running, or the previous chain unfinished (restarted). Three triggers
-  in a row with an unfinished chain stop the run ("stall").
+  in a row with an unfinished chain stop the run ("stall"); three in a row that find `ctrl_isr` still running stop it
+  ("hang"), and the hung `ctrl_isr` is abandoned: the trigger interrupt makes the interrupted data interrupt return
+  through a `longjmp` to `drv_data_done`, so the link and later starts keep working.
 
 ## Run control and safety
 
@@ -39,7 +44,7 @@ the starting point for the motor controller board (spec D11, §14). Pins: `docs/
 
 ISR time mean (window) and maximum (since start) from the DWT cycle counter, overruns since start, the last command,
 RMS of the sampled phase currents, the mean trigger-to-`ctrl_isr` time, and the state bits (`HIL_CTRL_*`: running,
-READY high, READY stop, stall stop, encoder index seen).
+READY high, READY stop, stall stop, encoder index seen, hang stop) and the frames the link could not queue.
 
 ## Build
 

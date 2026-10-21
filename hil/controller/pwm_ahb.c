@@ -76,11 +76,11 @@ const char *pwm_init(float pwm_hz, float isr_hz)
     if (!(pwm_hz > 0.0f) || !(isr_hz > 0.0f)) return "setup refused: pwm_hz and isr_hz must be positive";
     const float a = (float)DRV_TIMER_HZ / (2.0f * pwm_hz);
     if (!(a >= 100.0f && a <= 65534.0f)) return "setup refused: pwm_hz out of range (1527 Hz .. 1 MHz)";
-    const float halves = 2.0f * pwm_hz / isr_hz;     /* carrier half periods per ISR period */
-    const uint32_t n = (uint32_t)(halves + 0.5f);
-    if (!(halves > 0.5f) || n > 256u || (n != 1u && (n & 1u)) || halves - (float)n > 1e-3f * (float)n ||
-        (float)n - halves > 1e-3f * (float)n)
-        return "setup refused: isr_hz must be 2 x pwm_hz or pwm_hz / k (k = 1..128)";
+    const float k = pwm_hz / isr_hz;                 /* carrier periods per ISR period */
+    const uint32_t ki = (uint32_t)(k + 0.5f);
+    if (!(k > 0.5f) || ki > 127u || !(ki & 1u) || k - (float)ki > 1e-3f * (float)ki || (float)ki - k > 1e-3f * (float)ki)
+        return "setup refused: isr_hz must be pwm_hz / k with k odd (1..127)";
+    const uint32_t n = 2u * ki;                      /* carrier half periods per ISR period */
     arr = (uint16_t)(a + 0.5f);
 
     __HAL_RCC_TIM1_CLK_ENABLE();
@@ -100,7 +100,7 @@ const char *pwm_init(float pwm_hz, float isr_hz)
     phase_ok = true;
     for (int k = 0; k < 3; k++) {
         const bool u1 = update_at_underflow(TIM1), u8 = update_at_underflow(TIM8);
-        if (n != 1u && !(u1 && u8)) phase_ok = false;
+        if (!(u1 && u8)) phase_ok = false;
     }
     TIM1->SR = 0;
     TIM1->DIER = TIM_DIER_UIE;

@@ -257,6 +257,38 @@ Pending wiring: the `open_loop` spin test at 1000 rpm in `ad7606` + encoder (ISR
 time on the logic analyser (required within one PWM period; not measured yet), the AD7606 and AD2S1210
 data on SPI (and the highest reliable SPI clock), the encoder count direction and the index reset.
 
+### Controller driver, fix round 1 and first wired runs (2026-10-22, boards wired per docs/r8b-hil-wiring.md)
+
+Both boards were flashed with the same modes (ad7606, encoder; hash 0xbb2cda56, the first Teensy upload needed the
+usual retry) before any run; BUILD_INFO on COM4 and COM6 agree.
+
+Fix round 1:
+- Hang stop: three triggers in a row that find `ctrl_isr` still running stop the run (gates off, RUN low, HIL_ERROR
+  "stopped: ctrl_isr did not return for 3 triggers (abandoned)", live state bit HANG_STOP = 32). The trigger
+  interrupt then makes the interrupted data interrupt return through a longjmp to `drv_data_done`, so the link and
+  later starts keep working. Wired bench with `tests/sil/controllers/hang` (emulator running, fixed 1000 rpm): the run
+  stopped with 3 overruns, live state 34 (READY + HANG_STOP), the link answered HELLO afterwards, and a second START
+  hung and stopped the same way.
+- Rates: the HIL accepts only `isr_hz = pwm_hz / k` with k odd (the SIL samples at (j + 1/2) / isr_hz, a carrier
+  centre only then): `write_hil_config` raises before a build, the firmware refuses the start.
+- LIVE_CTRL gained `tx_dropped` (41 bytes). The RDC angle uses `HIL_RDC_BITS`; the start enables the outputs with
+  interrupts off after re-reading READY.
+- All 30 builds (6 modes x hysteresis, pwm_current, tsf, open_loop, hang) compile without warnings; tests/hil 68 passed.
+
+Wired, `open_loop` (theta 0.1-0.45 rad), analytic motor, fixed 1000 rpm, ad7606 + encoder, 20 kHz:
+- AD7606 chain works on the wire: `ctrl_isr` runs on every trigger, 0 overruns, ISR mean 2.18 us, max 2.59 us;
+  trigger to `ctrl_isr` 16.9 us (CONVST, the 4.15 us conversion and 128 bits at 12.5 MHz = 10.2 us, plus the
+  emulator's latency). Emulator step mean 2.05 us, max 3.54 us, 0 overruns.
+- **Encoder: no A/B signal at the Nucleo.** TIM4 CNT stayed 0. PD12 (A) and PD13 (B) read 0 in 300 of 300 samples of
+  GPIOD IDR (OpenOCD) while the emulator ran at 1000 rpm (4096 CPR, about 68 000 edges/s; random samples would read
+  high about half the time). TIM4 configuration read back as intended (SMCR 3, CCMR1 0x101, PD12/PD13 in AF2). The
+  index bit was set once after the start (Z on PG14), so Z may be connected. With the count stuck at 0, open_loop keeps
+  phase D on and A-C off: the emulator showed phase D at 94.6 A rms (beyond the map) and the Nucleo read 30.8 A rms on
+  V4, the AD7606 clipping at 31.25 A. Stopped here as instructed: check the A/B wires (Teensy 2 -> PD12 = Zio D29 /
+  CN10-21, Teensy 3 -> PD13 = Zio D28 / CN10-19) and that the emulator drives pins 2/3 before the remaining wired
+  items (READY timing, encoder direction and index, AD7606/AD2S1210 code comparison and SPI clock, the spin test, the
+  HSE measurement) are run.
+
 ## Acceptance
 
 Pending.

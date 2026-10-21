@@ -3,6 +3,7 @@
 #include "srm_hal_stm32.h"
 
 #include <math.h>
+#include <setjmp.h>
 
 #include "hil_config.h"
 #include "srm_ctrl.h"
@@ -26,12 +27,14 @@
 #define PIN_RUN GPIO_PIN_6       /* PD6 */
 #define PIN_READY GPIO_PIN_4     /* PD4, EXTI4 */
 #define STALL_TRIGGERS 3u        /* triggers in a row that find the previous chain unfinished stop the run */
+#define HANG_TRIGGERS 3u         /* triggers in a row that find ctrl_isr still running stop the run */
 #define PRIO_CTRL 3u
 
 static const srm_hal_t *hal_;
 static const char *setup_err;
-static volatile bool running, in_ctrl, ready_stop, stall_stop;
-static volatile uint32_t pending, stalls, t_trigger;
+static volatile bool running, in_ctrl, ready_stop, stall_stop, hang_stop, unwind_pending;
+static volatile uint32_t pending, stalls, hangs, t_trigger;
+static jmp_buf ctrl_jmp;              /* the context drv_data_done returns to when a hung ctrl_isr is abandoned */
 static const char *volatile stop_reason;
 static bool has_cmd;
 static uint8_t cmd_mode;
@@ -182,10 +185,11 @@ const char *drv_start(void)
     sense_abort();
     rdc_abort();
     drv_delay_cycles((uint32_t)(2.0f * (float)DRV_CPU_HZ / HIL_ISR_HZ));
+    if (unwind_pending) return "start refused: the last ctrl_isr has not been abandoned yet";
     pending = 0;
-    stalls = 0;
+    stalls = hangs = 0;
     in_ctrl = false;
-    ready_stop = stall_stop = false;
+    ready_stop = stall_stop = hang_stop = false;
     stop_reason = NULL;
     const uint32_t m = mask_ctrl();
     w_n = w_exec = w_lat = exec_max = overruns = 0;
@@ -196,12 +200,15 @@ const char *drv_start(void)
     if (has_cmd) ctrl_command(cmd_mode ? SRM_CMD_SPEED : SRM_CMD_TORQUE, cmd_value);
     run_pin(true);
     drv_delay_cycles(DRV_CPU_HZ / 50000u);     /* 20 us: the emulator sees RUN before the first trigger */
+    __disable_irq();          /* READY checked and the outputs enabled with no READY interrupt in between */
     if (!ready_high()) {
+        __enable_irq();
         run_pin(false);
         return "start refused: READY fell during the start";
     }
     running = true;
     pwm_enable();
+    __enable_irq();
     return NULL;
 }
 
@@ -216,9 +223,7 @@ bool drv_running(void) { return running; }
 
 const char *drv_take_stop_reason(void)
 {
-    const char *r = stop_reason;
-    stop_reason = NULL;
-    return r;
+    return __atomic_exchange_n(&stop_reason, NULL, __ATOMIC_RELAXED);
 }
 
 int drv_param(const char *name, float value)
@@ -258,7 +263,7 @@ void drv_stats(drv_stats_t *s)
     for (int k = 0; k < 4; k++) s->i_rms[k] = n ? sqrtf(i2[k] / (float)n) : 0.0f;
     s->command = cmd_value;
     s->state = (uint8_t)((running ? 1u : 0u) | (ready_high() ? 2u : 0u) | (ready_stop ? 4u : 0u) |
-                         (stall_stop ? 8u : 0u) | (enc_index_seen() ? 16u : 0u));
+                         (stall_stop ? 8u : 0u) | (enc_index_seen() ? 16u : 0u) | (hang_stop ? 32u : 0u));
 }
 
 bool drv_sample_wanted(uint32_t src) { return (pending & src) != 0; }
@@ -268,6 +273,11 @@ void drv_data_done(uint32_t src)
     const uint32_t old = __atomic_fetch_and(&pending, ~src, __ATOMIC_RELAXED);
     if (!(old & src) || (old & ~src) || !running) return;
     stalls = 0;
+    if (setjmp(ctrl_jmp)) {   /* the trigger abandoned a hung ctrl_isr (abandon_ctrl_isr) */
+        in_ctrl = false;
+        unwind_pending = false;
+        return;
+    }
     const uint32_t t0 = DWT->CYCCNT;
     in_ctrl = true;
     ctrl_isr();
@@ -283,11 +293,32 @@ void drv_data_done(uint32_t src)
     }
 }
 
-/* The sample trigger: TIM1 update at the counter underflow. */
-void TIM1_UP_IRQHandler(void)
+static void unwind_target(void) { longjmp(ctrl_jmp, 1); }
+
+/* ctrl_isr runs in the data interrupt this trigger interrupted when none of the priority 2 interrupts is active in
+ * between (they are short: a later trigger finds it on top). */
+static bool ctrl_frame_on_top(void)
+{
+    return !NVIC_GetActive(EXTI3_IRQn) && !NVIC_GetActive(TIM7_IRQn) && !NVIC_GetActive(EXTI15_10_IRQn);
+}
+
+/* Abandon a hung ctrl_isr: the interrupted frame (the data interrupt running ctrl_isr) returns into unwind_target,
+ * which longjmps back to drv_data_done, so that interrupt ends normally. frame: the exception frame on the MSP. */
+static void abandon_ctrl_isr(uint32_t *frame)
+{
+    frame[6] = (uint32_t)&unwind_target & ~1u;     /* stacked PC (bit 0 clear) */
+    frame[7] &= ~0x0600FC00u;                      /* stacked xPSR: clear IT/ICI, the new PC starts no IT block */
+}
+
+/* The sample trigger: TIM1 update at the counter underflow. Entered through TIM1_UP_IRQHandler with the frame. */
+__attribute__((used)) void trigger_irq(uint32_t *frame)
 {
     TIM1->SR = ~TIM_SR_UIF;
     __DSB();
+    if (unwind_pending && in_ctrl && ctrl_frame_on_top()) {
+        abandon_ctrl_isr(frame);
+        return;
+    }
     if (!running) return;
     if (!ready_high()) {
         fault_stop("stopped: READY low (emulator stopped or faulted)", &ready_stop);
@@ -295,8 +326,14 @@ void TIM1_UP_IRQHandler(void)
     }
     if (in_ctrl) {               /* ctrl_isr still runs: this sample is skipped */
         overruns++;
+        if (++hangs >= HANG_TRIGGERS) {
+            fault_stop("stopped: ctrl_isr did not return for 3 triggers (abandoned)", &hang_stop);
+            unwind_pending = true;
+            if (ctrl_frame_on_top()) abandon_ctrl_isr(frame);
+        }
         return;
     }
+    hangs = 0;
     if (pending) {               /* the previous chain has not finished: restart it */
         overruns++;
         if (++stalls >= STALL_TRIGGERS) {
@@ -310,6 +347,11 @@ void TIM1_UP_IRQHandler(void)
     pending = SRC_MASK;
     sense_trigger();
     rdc_trigger();
+}
+
+__attribute__((naked)) void TIM1_UP_IRQHandler(void)
+{
+    __asm volatile("mrs r0, msp\n\tb trigger_irq\n");
 }
 
 /* READY falling: gates off within the interrupt latency. */
