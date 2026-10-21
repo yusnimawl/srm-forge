@@ -48,7 +48,7 @@ static void row_eval_f(const srm_sim_tables_t *tab, int row, float s, float *i, 
     *w = cw ? cw[k] + f * (cw[k + 1] - cw[k]) : 0.0f;
 }
 
-void srm_motor_lookup_f(const srm_sim_tables_t *tab, float u, float s, double *i, double *torque, double *w)
+void srm_motor_lookup_f(const srm_sim_tables_t *tab, float u, float s, float *i, float *torque, float *w)
 {
     const int n_theta = (int)tab->n_theta;
     if (!(u >= 0.0f)) u = 0.0f;
@@ -75,7 +75,11 @@ void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi,
     const double period = tab->theta_step * (double)tab->n_theta;
     double th = theta_phase - period * floor(theta_phase / period);
     if (!isfinite(th)) th = 0.0;
-    srm_motor_lookup_f(tab, (float)th / (float)tab->theta_step, (float)psi / (float)tab->psi_step, i, torque, w);
+    float fi, ft, fw;
+    srm_motor_lookup_f(tab, (float)th / (float)tab->theta_step, (float)psi / (float)tab->psi_step, &fi, &ft, &fw);
+    *i = (double)fi;
+    *torque = (double)ft;
+    *w = (double)fw;
 }
 
 #else

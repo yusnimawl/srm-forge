@@ -49,7 +49,8 @@ static uint64_t prof_ga_sum, prof_pl_sum, prof_exec_sum, prof_n;
 struct Window {
     uint32_t calls, steps, lat_n;
     uint64_t exec_sum, lat_sum;
-    double t_sum, t_min, t_max, i2[EMU_MAX_PHASES], per_n, per_sum, per_sq;
+    float t_sum, t_min, t_max, i2[EMU_MAX_PHASES];      // per step, single precision
+    double per_n, per_sum, per_sq;                        // per gate edge
 };
 static Window w;
 static hil_live_emu_t pub[2];
@@ -79,14 +80,15 @@ static void publish()
 {
     hil_live_emu_t &o = pub[pub_idx ^ 1];
     const double f = (double)F_CPU_ACTUAL;
-    const double n = w.steps ? (double)w.steps : NAN;
+    const double n = w.steps ? (double)w.steps : (double)NAN;
     o.step = (uint32_t)n_step;
-    o.mean_torque = (float)(w.t_sum / n);
-    o.ripple_pct = fabs(o.mean_torque) > 1e-12f ? (float)(100.0 * (w.t_max - w.t_min) / fabs(w.t_sum / n)) : NAN;
-    for (int k = 0; k < EMU_MAX_PHASES; k++) o.i_rms[k] = (float)sqrt(w.i2[k] / n);
-    o.speed_rpm = (float)(pl.omega * 60.0 / EMU_TWO_PI);
+    o.mean_torque = (float)((double)w.t_sum / n);
+    o.ripple_pct = fabsf(o.mean_torque) > 1e-12f ? (float)(100.0 * (double)(w.t_max - w.t_min) / fabs((double)w.t_sum / n))
+                                                : NAN;
+    for (int k = 0; k < EMU_MAX_PHASES; k++) o.i_rms[k] = (float)sqrt((double)w.i2[k] / n);
+    o.speed_rpm = (float)((double)pl.omega * 60.0 / EMU_TWO_PI);
     o.step_mean_us = (float)((double)w.exec_sum / (double)w.calls / f * 1e6);
-    o.step_max_us = (float)(step_max / f * 1e6);
+    o.step_max_us = (float)((double)step_max / f * 1e6);
     o.overruns = overruns;
     o.dropped = cap_dropped();
     if (w.per_n > 1) {
@@ -137,7 +139,7 @@ static void step_isr()
         }
         last_word = e[j].gates;
     }
-    double v[SRM_SIM_MAX_PHASES];
+    srm_real_t v[SRM_SIM_MAX_PHASES];
     float on_u[SRM_SIM_MAX_PHASES], on_l[SRM_SIM_MAX_PHASES];
     uint32_t c_ga = ARM_DWT_CYCCNT;
     srm_gate_avg_window(&ga, &sim, e, ne, t0, P, pl.psi, v, on_u, on_l);
@@ -152,14 +154,14 @@ static void step_isr()
             memset(&s, 0, sizeof s);
             s.step = (uint32_t)n_step;
             for (int k = 0; k < q; k++) {
-                s.i[k] = sat16((float)pl.cur[k] * inv_i);
-                s.psi[k] = sat16((float)pl.psi[k] * inv_psi);
-                s.v[k] = sat16((float)v[k] * inv_v);
+                s.i[k] = sat16(pl.cur[k] * inv_i);
+                s.psi[k] = sat16(pl.psi[k] * inv_psi);
+                s.v[k] = sat16(v[k] * inv_v);
             }
-            s.torque = sat16((float)pl.ttot * inv_t);
+            s.torque = sat16(pl.ttot * inv_t);
             const double turns = pl.theta * (1.0 / EMU_TWO_PI);
             s.theta = (uint16_t)((uint32_t)((turns - floor(turns)) * 65536.0) & 0xFFFF);
-            s.omega = sat16((float)pl.omega * inv_w);
+            s.omega = sat16(pl.omega * inv_w);
             s.gates = ga.cmd;
             cap_push(&s);
         }
@@ -297,7 +299,7 @@ const char *emu_start(void)
     inv_w = 1.0f / w_scale;
     P = F_CPU_ACTUAL / EMU_STEP_HZ;
     const double f = (double)F_CPU_ACTUAL;
-    srm_gate_avg_init(&ga, llround(((double)cfg.dead_time + cfg.turn_on_delay) * f), llround((double)cfg.turn_off_delay * f), 0);
+    srm_gate_avg_init(&ga, llround(((double)cfg.dead_time + (double)cfg.turn_on_delay) * f), llround((double)cfg.turn_off_delay * f), 0);
     srm_plant_init(&pl, &sim, &tab);
     NVIC_DISABLE_IRQ(IRQ_GPIO6789);
     emu_edge_reset(&g_edges);

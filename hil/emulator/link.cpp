@@ -197,7 +197,7 @@ void link_poll(void)
         uint32_t ga[3], pl[3];
         emu_profile(ga, pl);
         int n = snprintf(msg, sizeof msg, "stopped: the step loop fell behind (step max %.2f us; cycles max/mean: "
-                         "gate averaging %lu/%lu, plant %lu/%lu, step mean %lu)", emu_step_max_us(),
+                         "gate averaging %lu/%lu, plant %lu/%lu, step mean %lu)", (double)emu_step_max_us(),
                          (unsigned long)ga[0], (unsigned long)ga[1], (unsigned long)pl[0], (unsigned long)pl[1],
                          (unsigned long)ga[2]);
         send(HIL_ERROR, seq_out++, msg, (size_t)n);

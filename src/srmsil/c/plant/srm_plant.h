@@ -6,11 +6,19 @@
 
 #define SRM_SIM_MAX_PHASES 8
 
-/* Element type of the flux-grid tables. */
+/* Element type of the flux-grid tables, and the real type of the plant state and arithmetic (fluxes, currents,
+   torques, speed, the gate averager). SRM_TABLE_FLOAT selects float for both: the real-time emulator, whose
+   Cortex-M7 has a fast single-precision FPU, and its PC model srm_emu.c, which uses the same configuration. The SIL
+   builds use double. The rotor angle and the time stay double in both builds: an unwrapped float angle would lose
+   resolution as it grows. SRM_REAL(x) writes a literal of the real type. */
 #ifdef SRM_TABLE_FLOAT
 typedef float srm_table_t;
+typedef float srm_real_t;
+#define SRM_REAL(x) x##f
 #else
 typedef double srm_table_t;
+typedef double srm_real_t;
+#define SRM_REAL(x) x
 #endif
 
 /* A controller parameter set at a simulation time: applied through ctrl_param just before the first ISR at or after t. */
@@ -53,10 +61,12 @@ typedef struct {
 
 /* Rotor angle and speed, total torque, and flux, current, torque and field energy of every phase. */
 typedef struct {
-    double theta, omega, ttot;
-    double psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
-    /* Lookup constants of the float-table build, set by srm_plant_init: phase shift, table period and its inverse,
-       inverse grid steps. */
+    double theta;
+    srm_real_t omega, ttot;
+    srm_real_t psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
+    /* Constants set by srm_plant_init: config values in the real type, and the lookup constants of the float-table
+       build (phase shift, table period and its inverse, inverse grid steps). */
+    srm_real_t k_dt, k_r, k_inertia, k_friction, k_load, k_load_step;
     double k_eps, k_period, k_inv_period;
     float k_inv_theta, k_inv_psi;
 } srm_plant_t;
@@ -68,25 +78,18 @@ void srm_motor_eval(const srm_sim_tables_t *tab, double theta_phase, double psi,
 #ifdef SRM_TABLE_FLOAT
 /* Float-table build: i, T and W at the table coordinates u = phase angle / theta_step in [0, n_theta] and
    s = psi / psi_step >= 0. */
-void srm_motor_lookup_f(const srm_sim_tables_t *tab, float u, float s, double *i, double *torque, double *w);
+void srm_motor_lookup_f(const srm_sim_tables_t *tab, float u, float s, float *i, float *torque, float *w);
 #endif
 /* i, T and W of every phase at rotor angle theta and fluxes psi; returns the total torque. */
-double srm_plant_eval(const srm_sim_config_t *c, const srm_sim_tables_t *t, double theta, const double *psi,
-                      double *i, double *trq, double *w);
+srm_real_t srm_plant_eval(const srm_sim_config_t *c, const srm_sim_tables_t *t, double theta, const srm_real_t *psi,
+                          srm_real_t *i, srm_real_t *trq, srm_real_t *w);
 /* Rotor at theta0 and speed with zero flux. */
 void srm_plant_init(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tables_t *t);
 /* One Heun step of length dt with the winding voltages v held over the step; t_now is the time and n the step
    index (fixed-speed mode places the rotor from n). */
-void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tables_t *t, const double *v,
+void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tables_t *t, const srm_real_t *v,
                     double t_now, int64_t n);
 /* Asymmetric half-bridge winding voltage for the effective switch states and the winding current. */
 double srm_ahb_voltage(const srm_sim_config_t *c, int upper, int lower, double current);
-/* The same, inlined into hot loops. */
-static inline double srm_ahb_voltage_inline(const srm_sim_config_t *c, int upper, int lower, double current)
-{
-    if (upper && lower) return c->bus_voltage - 2.0 * c->v_switch;
-    if (upper || lower) return current > 0.0 ? -(c->v_switch + c->v_diode) : 0.0;
-    return current > 0.0 ? -(c->bus_voltage + 2.0 * c->v_diode) : 0.0;
-}
 
 #endif

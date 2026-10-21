@@ -28,13 +28,13 @@ SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
     srm_gate_avg_init(&g, (int64_t)llround((cfg->dead_time + cfg->turn_on_delay) / tick_s),
                       (int64_t)llround(cfg->turn_off_delay / tick_s), 0);
     memset(sum, 0, sizeof *sum);
-    sum->torque_min = INFINITY;
-    sum->torque_max = -INFINITY;
+    sum->torque_min = (double)INFINITY;
+    sum->torque_max = -(double)INFINITY;
 
     srm_plant_t pl;
     const double dt = cfg->dt, R = cfg->resistance;
     srm_plant_init(&pl, cfg, tab);
-    for (int k = 0; k < q; k++) sum->w_field_start += pl.wf[k];
+    for (int k = 0; k < q; k++) sum->w_field_start += (double)pl.wf[k];
 
     const int64_t window_start = cfg->n_steps / 2;
     int64_t e = 0;
@@ -42,37 +42,39 @@ SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
         const uint64_t t0 = (uint64_t)n * (uint64_t)per_step;
         int64_t first = e;
         while (e < n_edges && edges[e].t < t0 + (uint64_t)per_step) e++;
-        double v[SRM_SIM_MAX_PHASES], pin = 0.0, cu = 0.0;
+        srm_real_t v[SRM_SIM_MAX_PHASES];
+        double pin = 0.0, cu = 0.0;
         float on_u[SRM_SIM_MAX_PHASES], on_l[SRM_SIM_MAX_PHASES];
         srm_gate_avg_window(&g, cfg, edges + first, (int)(e - first), t0, (uint64_t)per_step, pl.psi, v, on_u, on_l);
-        if (i_trace) memcpy(i_trace + (size_t)n * (size_t)q, pl.cur, (size_t)q * sizeof(double));
+        double cur[SRM_SIM_MAX_PHASES];
+        for (int k = 0; k < q; k++) cur[k] = (double)pl.cur[k];
+        if (i_trace) memcpy(i_trace + (size_t)n * (size_t)q, cur, (size_t)q * sizeof(double));
         int beyond = 0;
         for (int k = 0; k < q; k++) {
-            pin += v[k] * pl.cur[k];
-            cu += R * pl.cur[k] * pl.cur[k];
-            if (pl.cur[k] > tab->i_max || pl.psi[k] > tab->psi_max) beyond = 1;
+            pin += (double)v[k] * cur[k];
+            cu += R * cur[k] * cur[k];
+            if (cur[k] > tab->i_max || (double)pl.psi[k] > tab->psi_max) beyond = 1;
         }
         sum->beyond_map_steps += beyond;
-        const double pmech = pl.ttot * pl.omega;
+        const double ttot = (double)pl.ttot, pmech = ttot * (double)pl.omega;
         if (n >= window_start) {
             sum->window_steps++;
-            sum->torque_sum += pl.ttot;
-            if (pl.ttot < sum->torque_min) sum->torque_min = pl.ttot;
-            if (pl.ttot > sum->torque_max) sum->torque_max = pl.ttot;
+            sum->torque_sum += ttot;
+            if (ttot < sum->torque_min) sum->torque_min = ttot;
+            if (ttot > sum->torque_max) sum->torque_max = ttot;
             sum->copper_sum += cu;
             sum->power_in_sum += pin;
             sum->power_mech_sum += pmech;
-            for (int k = 0; k < q; k++) sum->i2_sum[k] += pl.cur[k] * pl.cur[k];
+            for (int k = 0; k < q; k++) sum->i2_sum[k] += cur[k] * cur[k];
         }
-        double i_old[SRM_SIM_MAX_PHASES];
-        memcpy(i_old, pl.cur, sizeof i_old);
         srm_plant_step(&pl, cfg, tab, v, (double)n * dt, n);
         for (int k = 0; k < q; k++) {
-            sum->energy_in += dt * v[k] * 0.5 * (i_old[k] + pl.cur[k]);
-            sum->energy_copper += dt * R * 0.5 * (i_old[k] * i_old[k] + pl.cur[k] * pl.cur[k]);
+            const double c1 = (double)pl.cur[k];
+            sum->energy_in += dt * (double)v[k] * 0.5 * (cur[k] + c1);
+            sum->energy_copper += dt * R * 0.5 * (cur[k] * cur[k] + c1 * c1);
         }
-        sum->energy_mech += dt * 0.5 * (pmech + pl.ttot * pl.omega);
+        sum->energy_mech += dt * 0.5 * (pmech + (double)pl.ttot * (double)pl.omega);
     }
-    for (int k = 0; k < q; k++) sum->w_field_end += pl.wf[k];
+    for (int k = 0; k < q; k++) sum->w_field_end += (double)pl.wf[k];
     return 0;
 }

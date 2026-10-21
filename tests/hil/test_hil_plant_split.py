@@ -47,7 +47,8 @@ def test_plant_split_matches_golden(tmp_path):
             assert got[name][key] == pytest.approx(v, rel=1e-12, abs=1e-300), (name, key)
 
 
-@pytest.mark.parametrize("flags", [[], ["-DSRM_TABLE_FLOAT"]])
+# The float build is the emulator's single-precision plant: no implicit promotion to double.
+@pytest.mark.parametrize("flags", [[], ["-DSRM_TABLE_FLOAT", "-Wdouble-promotion"]])
 def test_plant_compiles_alone(tmp_path, flags):
     plant = Path(__file__).parents[2] / "src" / "srmsil" / "c" / "plant"
     for i, src in enumerate(sorted(plant.glob("*.c"))):

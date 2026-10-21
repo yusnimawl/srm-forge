@@ -61,6 +61,26 @@ Further result-neutral gains are small: the remaining time is double-precision H
 of edge windows, at about 2.5 cycles per instruction. Owner decision needed: a 816 MHz core clock (about 1.36 x:
 two phases about 4.5 us max), a single-precision plant step, or a longer step.
 
+Single-precision plant (owner decision, 2026-10-21): with `SRM_TABLE_FLOAT` the plant state and arithmetic and the
+gate averager use `srm_real_t` = float (the rotor angle and the time stay double); the SIL builds stay double and
+bit-identical (golden at 1e-12). The float build compiles clean with `-Wdouble-promotion` (host test, and the
+firmware's own files on the board build). PC model against the SIL, before / after: open loop 0.030 % / 0.030 %
+torque, 0.004 % / 0.004 % i_rms; soft chop 0.032 % / 0.029 % torque, 0.005 % / 0.003 % i_rms; hard chop at the step
+instants -0.001 % / -0.001 %.
+
+Timing with the single-precision plant, 11 s (2.19 M steps) per case:
+
+| Case | Step mean | Step max | Overruns | Capture |
+|---|---|---|---|---|
+| one phase (A) | 2.88 us (58 %) | 4.21 us | 0 | - |
+| two overlapping phases (A, B) | 3.49 us (70 %) | 5.14 us | 219 006 (1 per 10 steps) | - |
+| one phase, buffered capture of 8000 steps | 2.88 us | 4.70 us | 0 | `valid = 1`, contiguous, phase A +0.002 % vs the PC model |
+| one phase, streamed capture of 100 000 steps | 2.88 us | 4.70 us | 0 | ring full after 10 936 samples, `valid = 0` |
+
+Target (max < 4 us, 0 overruns) still missed: one phase by 0.2 us (0.7 us while a capture records), two phases with
+overruns on the steps with a gate edge. A streamed capture at 200 kHz (7.2 MB/s) does not keep up with the CPU time
+left to the USB loop.
+
 Pending wiring: edge jitter on the GPIO path against a Nucleo pattern (< 150 ns target) and the Nucleo test-pattern
 mode; the RUN/READY interlock with the controller. The self-test pattern bypasses the gate inputs, so its jitter
 reads 0.
