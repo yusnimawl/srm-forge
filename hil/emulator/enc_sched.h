@@ -28,6 +28,19 @@ int enc_edges(double theta0, double theta1, uint32_t cpr, double offset, double 
 /* The same from the count positions c0 = c(theta0) and c1 = c(theta1). */
 int enc_edges_c(double c0, double c1, uint32_t cpr, double t0, double dt, double *times, uint8_t *states, int cap);
 
+/* Output-compare decisions on a free-running 32-bit tick counter (wrap-safe). enc_edge_due: an edge at `tick` is due
+ * or past at counter `now`, so it is put out at once rather than programmed (a compare set in the past would match
+ * only a counter wrap later). enc_compare_missed: the compare programmed for `due` should have matched more than
+ * `slack` ticks before `now`. */
+int enc_edge_due(uint32_t tick, uint32_t now);
+int enc_compare_missed(uint32_t due, uint32_t now, uint32_t slack);
+/* Next queued edge at `tick`, with `last` a tick the counter has reached (the compare that fired): ENC_PUT it now
+ * (due), ENC_PROGRAM the compare (more than `near` ticks ahead), or ENC_CHECK the counter first (enc_edge_due). */
+#define ENC_PUT 0
+#define ENC_PROGRAM 1
+#define ENC_CHECK 2
+int enc_next_action(uint32_t tick, uint32_t last, uint32_t near);
+
 #ifdef __cplusplus
 }
 #endif

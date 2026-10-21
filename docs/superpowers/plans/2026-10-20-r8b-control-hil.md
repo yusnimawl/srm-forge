@@ -17,7 +17,7 @@
 - Converter is the asymmetric half-bridge only. Gate word: `uint16_t`, bit k = upper switch of phase k, bit 8+k = lower switch of phase k.
 - Emulator step dt = 5 µs. Emulator table grid default 180 θ × 192 ψ, `float`.
 - Tolerances: emulator model vs SIL 1 % (mean torque, RMS current); HIL vs matched SIL 3 % (mean torque, RMS current) and ±5 points (ripple %).
-- Encoder edge rate limit 4·CPR·rev/s ≤ 400 000 /s. Step time warning above 80 % of dt; any overrun or dropped capture packet makes the run `valid = False`.
+- Encoder edge rate limit CPR·rev/s ≤ 400 000 /s (one A or B edge per count). Step time warning above 80 % of dt; any overrun or dropped capture packet makes the run `valid = False`.
 - PC links: COBS framing, CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF), little-endian packed payloads, `HIL_PROTOCOL_VERSION = 1`.
 - HIL routes and the session work only on a loopback host (403 otherwise), checked at the route and in the session.
 - Versions are not bumped on the branch (the bump above srmweb 0.9.0 / srmsil 0.8.0 is agreed with the coordinating session at merge). srmcore is unchanged.

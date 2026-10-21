@@ -120,15 +120,20 @@ the worst sensor model costs: encoder eccentricity 2 mrad at harmonic 2, resolve
 
 | Mode | 1 phase | 2 phases | 1 phase, errors | 2 phases, errors |
 |---|---|---|---|---|
-| ad7606, encoder | 3.24 us / 0 | 3.82 us / 0 | 3.31 us / 0 | 3.89 us / 0 |
-| ad7606, ad2s1210 | 2.86 us / 0 | 3.42 us / 0 | 2.98 us / 0 | 3.53 us / 0 |
-| ad7606, both | 3.41 us / 0 | 3.99 us / 0 | 3.52 us / 0 | **4.10 us** / 0 |
-| internal, encoder | 3.43 us / 0 | **4.11 us** / 0 | 3.50 us / 0 | **4.18 us** / 0 |
-| internal, ad2s1210 | 3.00 us / 0 | 3.71 us / 0 | 3.12 us / 0 | 3.82 us / 0 |
-| internal, both | 3.57 us / 0 | **4.28 us** / 0 | 3.68 us / 0 | **4.39 us** / 0 |
+| ad7606, encoder | 3.41 us / 0 | 3.97 us / 0 | 3.48 us / 0 | **4.04 us** / 0 |
+| ad7606, ad2s1210 | 2.87 us / 0 | 3.42 us / 0 | 2.98 us / 0 | 3.54 us / 0 |
+| ad7606, both | 3.54 us / 0 | **4.10 us** / 0 | 3.64 us / 0 | **4.22 us** / 0 |
+| internal, encoder | 3.55 us / 0 | **4.15 us** / 0 | 3.62 us / 0 | **4.22 us** / 0 |
+| internal, ad2s1210 | 3.01 us / 0 | 3.71 us / 0 | 3.12 us / 0 | 3.82 us / 0 |
+| internal, both | 3.81 us / 0 | **4.31 us** / 0 | 3.92 us / 0 | **4.42 us** / 0 |
 
-No overrun in any case; the 2-phase maxima of the DAC + encoder modes and of ad7606 + both with sensor errors exceed
-the 80 % warning level by up to 0.39 us. Means: 2.07-2.61 us (1 phase), 2.43-3.08 us (2 phases); without outputs the
+These are the figures after fix round 1, which started the GPT timers: before it the GPT1/GPT2 configuration
+(oscillator source with EN_24M) left both counters at 0, so no encoder edge was put out and the first figures (up to
+4.39 us) did not include the encoder interrupt. GPT1/GPT2 now count the peripheral clock (CLKSRC 1), 24 MHz from the
+oscillator: 1 200 000 ticks per 50 ms window measured, and 3413 encoder edges per window put out (4096 CPR at
+1000 rpm: 3413.3). The encoder compare interrupt costs up to about 340 cycles (peripheral register accesses).
+No overrun in any case; the 2-phase maxima of the modes with the encoder exceed the 80 % warning level by up to
+0.42 us. Means: 2.08-2.58 us (1 phase), 2.44-3.06 us (2 phases); without outputs the
 2-phase maximum was 3.06 us. Output latency (last gate edge to the end of the output stage, self-test edges) 7.1-8.2
 us. In the bench the DAC frames run with their pads released (RUN is not wired, so it is low; see the interlock
 below), so a wired run adds the LDAC pulse (about 0.15 us per step). Die temperature 62-67 C.
@@ -144,8 +149,12 @@ Interlock (safety rule): the DAC build drives Teensy 13 (SCK) and 11 (SDO) only 
 The pads are switched to LPSPI4 at the start of a DAC sequence in a critical section that reads RUN; the RUN falling
 edge (combined GPIO interrupt, priority 0) switches them back to GPIO inputs and raises every DAC chip select. The
 self-test does not count as RUN. While RUN is low the DACs keep the last code written while it was high (they cannot
-be written then); spec 5.4's "DAC outputs go to the zero-current code" therefore holds only for a stop while RUN is
-still high. In the AD7606 build LPSPI4 is a slave with CFGR1.OUTCFG = 1.
+be written then; spec 5.4 says so since 2026-10-21); a stop while RUN is still high writes the zero-current code. In
+the AD7606 build LPSPI4 is a slave with CFGR1.OUTCFG = 1.
+
+Encoder faults: an edge whose compare tick has already passed is put out at once (never programmed in the past); a
+compare that has not matched a step after its tick is pended by the step loop; that, a full edge queue or a step with
+more edges than the schedule holds (a forced count jump) counts as an overrun, so the run is invalid.
 
 LPSPI register semantics: the IMXRT1060RM PDF (pjrc.com copy, rev 3) is larger than the 10 MB the fetch tool reads,
 so CFGR1 was not read in the manual itself. Evidence used instead: the NXP MCUXpresso SDK LPSPI driver
@@ -165,6 +174,25 @@ Pending wiring (spec section 15, `docs/r8b-hil-wiring.md` section 5), not measur
   mode 3 (CPOL 1, CPHA 1), DAC mode 0; the AD7606 frame is 128 bits (V1..V8, MSB first), the AD2S1210 normal-mode
   frame 24 bits (16-bit word, then the fault register 0), configuration frames 8 bits;
 - the encoder A/B/Z edges and the DAC/LDAC sequence on the logic analyser, and the RUN-falling release of pins 13/11.
+
+### Notes for the Nucleo driver (Task 10)
+
+- SPI modes: AD7606 mode 2 (CPOL 1, CPHA 0; DB15 is out when CS falls), AD2S1210 mode 3 (CPOL 1, CPHA 1). AD7606:
+  one 128-bit frame, V1..V8 as 16-bit two's complement, MSB first. AD2S1210 normal mode: a 24-bit frame (the 16-bit
+  word MSB-aligned at the resolution, then the fault register 0); it can be read up to 8 times per SAMPLE or A0/A1
+  change.
+- CONVST is taken on its rising edge and SAMPLE on its falling edge, both latched by the GPIO edge detector in
+  hardware, so the pulse need not last until the interrupt runs. Give each pulse at least 100 ns (the guaranteed
+  minimum is not measured yet; real chips need about 25 ns for CONVST and 2 t_ck for SAMPLE), and space two CONVST
+  or SAMPLE edges at least 1 us apart (edges within one interrupt latency count once).
+- The AD7606 emulator loads the conversion into the SPI FIFO at the CONVST edge, so a read during BUSY already
+  returns it; the driver must still read only after BUSY falls, as on the real chip.
+- AD2S1210 configuration mode (A0 = A1 = 1): 8-bit frames, one per chip-select cycle, with a gap of at least 1 us
+  between frames (the next byte is queued by an interrupt); an address byte (bit 7 set) makes the next frame return
+  that register; position and velocity reads in configuration mode return 0. Only control register 0x92 RES1/RES0 is
+  used (resolution 10, 12, 14, 16 bits).
+- Encoder: one A or B edge per count (x4 encoder mode, ARR = cpr - 1); edges come out two steps (10 us) after the
+  step that crossed them.
 
 ## Acceptance
 

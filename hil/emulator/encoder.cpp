@@ -1,11 +1,12 @@
 // Emulated quadrature encoder: A/B/Z on Teensy 2/3/4 (GPIO9 bits 4, 5, 6).
 //
 // Each step computes the count boundaries crossed from the measured angle before the step to the one after it
-// (outputs.cpp measured_turns, the SIL encoder model; enc_sched.c) and schedules their edges on GPT2 (24 MHz
-// oscillator, compare 1, priority EMU_PRIO_ENCODER) at the interpolated times, shifted by two steps: the edges of step call k go out over [g0 + (k + 2) P, g0 + (k + 3) P), P =
-// EMU_GPT_STEP ticks, where g0 is the GPT2 count at the first call after a start. The step timer runs on the same
-// oscillator, so the schedule does not drift, and a step call always ends well before its edges are due. While RUN is
-// low the plant holds and so does the encoder.
+// (outputs.cpp measured_turns, the SIL encoder model; enc_sched.c) and schedules their edges on GPT2 (compare 1,
+// priority EMU_PRIO_ENCODER) at the interpolated times, shifted by two steps: the edges of step call k go out over
+// [g0 + (k + 2) P, g0 + (k + 3) P), P = EMU_GPT_STEP ticks, where g0 is the GPT2 count at the first call after a
+// start. GPT2 counts the peripheral clock, which the Teensy core takes from the 24 MHz oscillator as it does for the
+// step timer's PIT (measured: 1 200 000 ticks per 50 ms), so the schedule does not drift, and a step call always ends
+// well before its edges are due. While RUN is low the plant holds and so does the encoder.
 #include <Arduino.h>
 #include <math.h>
 
@@ -14,7 +15,7 @@
 
 #ifdef EMU_ENCODER
 
-#define EDGES_PER_STEP 8         // 4 * cpr * rev/s <= 400 000 /s gives at most 2 per 5 us step
+#define EDGES_PER_STEP 8         // cpr * rev/s <= 400 000 /s gives at most 2 per 5 us step
 #define QUEUE 32                  // power of two
 #define EDGE_RATE_MAX 400000.0
 #define NEAR 48                   // ticks, 2 us
@@ -38,10 +39,11 @@ static inline void put(uint8_t s)
     GPIO9_DR_SET = bits;
 }
 
-// Compare match at `due`: puts every edge due by then, and programs the next one. GPT2 register reads are slow (the
-// peripheral bus), so the counter is read only for an edge within NEAR ticks of the last compare; a later one is
-// programmed directly, since this interrupt never runs that late (priority EMU_PRIO_ENCODER, below only the short
-// pin interrupt and critical sections).
+// Compare match at `due`: puts every queued edge that is due and programs the next one, never in the past
+// (enc_edge_due). GPT2 register accesses cost about 100 cycles each on the peripheral bus, so `due` stands in for the
+// counter (it is at or before it): an edge at or before `due` is put at once, one more than NEAR ticks after it is
+// programmed directly, and only one in between reads the counter. Programming directly is safe while this interrupt
+// runs less than NEAR ticks late; were it later, the step loop's watchdog (next_base) pends it and counts a fault.
 static void enc_isr()
 {
     GPT2_SR = GPT_SR_OF1;
@@ -56,16 +58,12 @@ static void enc_isr()
             break;
         }
         const Edge &e = queue[t & (QUEUE - 1)];
-        const int32_t ahead = (int32_t)(e.tick - due);
-        if (ahead > NEAR) {
+        const int act = enc_next_action(e.tick, due, NEAR);
+        if (act == ENC_PROGRAM || (act == ENC_CHECK && !enc_edge_due(e.tick, GPT2_CNT))) {
             GPT2_OCR1 = e.tick;
             due = e.tick;
-            break;
-        }
-        if (ahead > 0 && (int32_t)(e.tick - GPT2_CNT) > 0) {
-            GPT2_OCR1 = e.tick;
-            due = e.tick;
-            if ((int32_t)(e.tick - GPT2_CNT) > 0) break;     // else it passed while the compare was set
+            if (act == ENC_PROGRAM || !enc_edge_due(e.tick, GPT2_CNT)) break;
+            // else it came due while the compare was set
         }
         put(e.state);
         tail = t + 1;
@@ -84,7 +82,7 @@ void encoder_begin(void)
     GPT2_CR = GPT_CR_SWR;
     while (GPT2_CR & GPT_CR_SWR) {}
     GPT2_PR = 0;
-    GPT2_CR = GPT_CR_CLKSRC(5) | GPT_CR_EN_24M | GPT_CR_FRR | GPT_CR_ENMOD;
+    GPT2_CR = GPT_CR_CLKSRC(1) | GPT_CR_FRR | GPT_CR_ENMOD;
     GPT2_CR |= GPT_CR_EN;
     GPT2_OCR1 = 0xFFFFFFFF;
     GPT2_IR = GPT_IR_OF1IE;
@@ -97,8 +95,8 @@ const char *encoder_configure(const hil_emu_config_t *c)
 {
     if (c->encoder_cpr < 1) return "config refused: encoder_cpr";
     // fixed speed: the edge rate is known now (dynamic runs are the host's check, srmsil.hil.config.check_encoder_rate)
-    if (c->mode == 0 && 4.0 * c->encoder_cpr * fabs((double)c->speed) / (2.0 * M_PI) > EDGE_RATE_MAX)
-        return "config refused: encoder edge rate 4 * cpr * rev/s exceeds 400000 /s";
+    if (c->mode == 0 && c->encoder_cpr * fabs((double)c->speed) / (2.0 * M_PI) > EDGE_RATE_MAX)
+        return "config refused: encoder edge rate cpr * rev/s exceeds 400000 /s";
     cpr = c->encoder_cpr;
     return NULL;
 }
@@ -119,11 +117,18 @@ void encoder_start(double turns)
     put(state_at(c_prev));
 }
 
-// Base tick of this step call's edges.
+// Base tick of this step call's edges. Also the watchdog of the compare: g0 + calls * P is this call's own time
+// (within its interrupt latency), and a compare that has not matched a step after its tick is pended by hand and
+// counted as a fault.
 static uint32_t next_base()
 {
     if (calls == 0) g0 = GPT2_CNT;
-    return g0 + (calls++ + 2) * EMU_GPT_STEP;
+    const uint32_t now = g0 + calls++ * EMU_GPT_STEP;
+    if (armed && enc_compare_missed(due, now, EMU_GPT_STEP)) {
+        NVIC_SET_PENDING(IRQ_GPT2);
+        emu_output_fault();
+    }
+    return now + 2 * EMU_GPT_STEP;
 }
 
 void encoder_update(double turns)
@@ -139,14 +144,17 @@ void encoder_update(double turns)
     const int n = enc_edges_c(c_prev, c, cpr, 0.0, (double)EMU_GPT_STEP, t, s, EDGES_PER_STEP);
     c_prev = c;
     if (n < 0 || head - tail + (uint32_t)n > QUEUE) {
-        // faster than the rate check allows (or a full queue): jump to the count after the step
+        // faster than the rate check allows, or a full queue: jump to the count after the step (an illegal
+        // quadrature step for the reader), a fault that invalidates the run
         put(state_at(c));
+        emu_output_fault();
     } else {
         for (int j = 0; j < n; j++) {
             Edge &e = queue[(head + j) & (QUEUE - 1)];
             e.tick = base + (uint32_t)t[j];
             e.state = s[j];
         }
+        __asm__ volatile("" ::: "memory");      // the entries before the index that publishes them
         head += n;
         // Unarmed, the interrupt cannot run (it only follows a programmed compare), so this does not race with it;
         // armed, it will find the new head. The first queued edge is at least a step ahead (next_base), so the

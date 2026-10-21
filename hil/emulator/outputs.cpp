@@ -37,13 +37,27 @@ static double measured_turns(double theta)
     return m;
 }
 
-static void edge_irq(uint8_t pin, volatile uint32_t &edge_sel, volatile uint32_t &isr, volatile uint32_t &imr,
-                     uint32_t mask, uint32_t &bits)
+#define EDGE_RISING 2u        // GPIO ICR field values; EDGE_BOTH uses EDGE_SEL instead
+#define EDGE_FALLING 3u
+#define EDGE_BOTH 4u
+
+// The GPIO block latches the selected edge in hardware, so a pulse shorter than the interrupt latency still counts;
+// only A0/A1, whose level is the information, use both edges.
+static void pin_irq(uint8_t pin, IMXRT_GPIO_t &g, uint32_t bit, uint32_t edge, uint32_t &bits)
 {
+    const uint32_t mask = 1u << bit;
     pinMode(pin, INPUT_PULLDOWN);
-    edge_sel |= mask;
-    isr = mask;
-    imr |= mask;
+    g.IMR &= ~mask;
+    if (edge == EDGE_BOTH) {
+        g.EDGE_SEL |= mask;
+    } else {
+        g.EDGE_SEL &= ~mask;
+        volatile uint32_t &icr = bit < 16 ? g.ICR1 : g.ICR2;
+        const uint32_t sh = 2 * (bit & 15);
+        icr = (icr & ~(3u << sh)) | edge << sh;
+    }
+    g.ISR = mask;
+    g.IMR |= mask;
     bits |= mask;
 }
 
@@ -52,17 +66,17 @@ void outputs_begin(void)
     for (int j = 0; j <= SIN_TAB; j++) sin_tab[j] = (float)sin(2.0 * M_PI * j / SIN_TAB);
 #ifdef EMU_AD7606
     ad7606_begin();
-    edge_irq(PIN_CONVST, GPIO9_EDGE_SEL, GPIO9_ISR, GPIO9_IMR, CORE_PIN5_BITMASK, bits9);
+    pin_irq(PIN_CONVST, IMXRT_GPIO9, CORE_PIN5_BIT, EDGE_RISING, bits9);
 #endif
 #ifdef EMU_DAC
     dac_begin();
-    edge_irq(PIN_RUN, GPIO7_EDGE_SEL, GPIO7_ISR, GPIO7_IMR, CORE_PIN7_BITMASK, bits7);
+    pin_irq(PIN_RUN, IMXRT_GPIO7, CORE_PIN7_BIT, EDGE_FALLING, bits7);
 #endif
 #ifdef EMU_RDC
     rdc_begin();
-    edge_irq(PIN_SAMPLE, GPIO7_EDGE_SEL, GPIO7_ISR, GPIO7_IMR, CORE_PIN9_BITMASK, bits7);
-    edge_irq(PIN_RDC_A0, GPIO6_EDGE_SEL, GPIO6_ISR, GPIO6_IMR, CORE_PIN22_BITMASK, bits6);
-    edge_irq(PIN_RDC_A1, GPIO6_EDGE_SEL, GPIO6_ISR, GPIO6_IMR, CORE_PIN23_BITMASK, bits6);
+    pin_irq(PIN_SAMPLE, IMXRT_GPIO7, CORE_PIN9_BIT, EDGE_FALLING, bits7);
+    pin_irq(PIN_RDC_A0, IMXRT_GPIO6, CORE_PIN22_BIT, EDGE_BOTH, bits6);
+    pin_irq(PIN_RDC_A1, IMXRT_GPIO6, CORE_PIN23_BIT, EDGE_BOTH, bits6);
 #endif
 #ifdef EMU_ENCODER
     encoder_begin();
@@ -76,13 +90,13 @@ void outputs_pins_isr(void)
     if (f7) GPIO7_ISR = f7;
     if (f9) GPIO9_ISR = f9;
 #ifdef EMU_DAC
-    if ((f7 & CORE_PIN7_BITMASK) && !(GPIO7_PSR & CORE_PIN7_BITMASK)) dac_run_low();
+    if (f7 & CORE_PIN7_BITMASK) dac_run_low();
 #endif
 #ifdef EMU_AD7606
-    if ((f9 & CORE_PIN5_BITMASK) && (GPIO9_PSR & CORE_PIN5_BITMASK)) ad7606_convst();
+    if (f9 & CORE_PIN5_BITMASK) ad7606_convst();
 #endif
 #ifdef EMU_RDC
-    if ((f7 & CORE_PIN9_BITMASK) && !(GPIO7_PSR & CORE_PIN9_BITMASK)) rdc_sample();
+    if (f7 & CORE_PIN9_BITMASK) rdc_sample();
     if (f6) rdc_select();
 #endif
 }
@@ -92,8 +106,8 @@ const char *outputs_configure(const hil_emu_config_t *c)
     if (!isfinite(c->encoder_offset) || !isfinite(c->encoder_ecc_amp) ||
         (c->encoder_ecc_amp != 0.0f && c->encoder_ecc_harmonic < 1))
         return "config refused: encoder offset or eccentricity";
-    off_turns = c->encoder_offset / (2.0 * M_PI);
-    ecc_turns = c->encoder_ecc_amp / (2.0 * M_PI);
+    off_turns = (double)c->encoder_offset / (2.0 * M_PI);
+    ecc_turns = (double)c->encoder_ecc_amp / (2.0 * M_PI);
     ecc_harm = c->encoder_ecc_harmonic;
     const char *err = NULL;
 #ifdef EMU_AD7606

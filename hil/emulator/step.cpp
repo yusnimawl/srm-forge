@@ -400,4 +400,10 @@ void emu_profile(uint32_t *ga, uint32_t *plant)
     plant[1] = prof_n ? (uint32_t)(prof_pl_sum / prof_n) : 0;
     ga[2] = prof_n ? (uint32_t)(prof_exec_sum / prof_n) : 0;
 }
+void emu_output_fault(void)
+{
+    overruns++;
+    fault = true;
+}
+
 float emu_step_max_us(void) { return (float)(step_max / (double)F_CPU_ACTUAL * 1e6); }

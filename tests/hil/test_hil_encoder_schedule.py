@@ -109,9 +109,32 @@ def test_enc_sched_compiles_strict(tmp_path):
 
 
 def test_encoder_rate_limit():
-    check_encoder_rate(1000, 6000.0)            # 4 * 1000 * 100 rev/s = 400 000 edges/s, the limit
-    check_encoder_rate(1000, -6000.0)
+    check_encoder_rate(1000, 24000.0)           # 1000 * 400 rev/s = 400 000 edges/s, the limit
+    check_encoder_rate(1000, -24000.0)
     with pytest.raises(ValueError, match="400"):
-        check_encoder_rate(1000, 6001.0)
+        check_encoder_rate(1000, 24001.0)
     with pytest.raises(ValueError):
-        check_encoder_rate(4096, -1500.0)
+        check_encoder_rate(4096, -6000.0)
+
+
+def _decisions(lib):
+    d = C.CDLL(str(lib))
+    d.enc_edge_due.argtypes = [C.c_uint32, C.c_uint32]
+    d.enc_compare_missed.argtypes = [C.c_uint32, C.c_uint32, C.c_uint32]
+    w = 2**32
+    due = [d.enc_edge_due(t % w, n % w) for t, n in ((100, 99), (100, 100), (100, 101), (w - 10, 5), (5, w - 10))]
+    missed = [d.enc_compare_missed(due % w, now % w, 120)
+              for due, now in ((1000, 1120), (1000, 1121), (w - 50, 100), (w - 50, 40), (1000, 900))]
+    d.enc_next_action.argtypes = [C.c_uint32] * 3
+    action = [d.enc_next_action(t % w, last % w, 48) for t, last in ((100, 100), (90, 100), (148, 100), (149, 100),
+                                                                     (20, w - 30), (17, w - 30), (w - 40, 10))]
+    return due, missed, action
+
+
+def test_encoder_compare_decisions_wrap():
+    due, missed, action = run_in_child(_decisions, _lib())
+    # an edge is due at or after its tick, across the 32-bit wrap; a compare is missed only when a step overdue
+    assert due == [0, 1, 1, 1, 0]
+    assert missed == [0, 1, 1, 0, 0]
+    # 0 put now, 1 program the compare (more than 48 ticks ahead of the fired compare), 2 read the counter first
+    assert action == [0, 0, 2, 1, 1, 2, 0]

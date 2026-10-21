@@ -152,6 +152,7 @@ void rdc_update(double turns, float omega)
     uint16_t *w = words[cur ^ 1];
     w[0] = ad2s1210_position_turns(e, b);
     w[1] = vel_word;
+    __asm__ volatile("" ::: "memory");      // the words before the index that publishes them
     cur ^= 1;
 }
 

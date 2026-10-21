@@ -55,3 +55,13 @@ int enc_edges_c(double c0, double c1, uint32_t cpr, double t0, double dt, double
     }
     return n;
 }
+
+int enc_edge_due(uint32_t tick, uint32_t now) { return (int32_t)(tick - now) <= 0; }
+
+int enc_compare_missed(uint32_t due, uint32_t now, uint32_t slack) { return (int32_t)(now - due) > (int32_t)slack; }
+
+int enc_next_action(uint32_t tick, uint32_t last, uint32_t near)
+{
+    if (enc_edge_due(tick, last)) return ENC_PUT;
+    return enc_edge_due(tick, last + near) ? ENC_CHECK : ENC_PROGRAM;
+}

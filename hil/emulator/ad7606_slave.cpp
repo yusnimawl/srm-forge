@@ -41,13 +41,13 @@ void ad7606_begin(void)
     pinMode(PIN_BUSY, OUTPUT);
     digitalWriteFast(PIN_BUSY, LOW);
 
-    // BUSY timer: GPT1 free-running on the 24 MHz oscillator, compare 1.
+    // BUSY timer: GPT1 free-running on the peripheral clock (24 MHz, as GPT2 in encoder.cpp), compare 1.
     CCM_CCGR1 |= CCM_CCGR1_GPT1_BUS(CCM_CCGR_ON) | CCM_CCGR1_GPT1_SERIAL(CCM_CCGR_ON);
     GPT1_CR = 0;
     GPT1_CR = GPT_CR_SWR;
     while (GPT1_CR & GPT_CR_SWR) {}
     GPT1_PR = 0;
-    GPT1_CR = GPT_CR_CLKSRC(5) | GPT_CR_EN_24M | GPT_CR_FRR | GPT_CR_ENMOD;
+    GPT1_CR = GPT_CR_CLKSRC(1) | GPT_CR_FRR | GPT_CR_ENMOD;
     GPT1_CR |= GPT_CR_EN;
     GPT1_IR = 0;
     attachInterruptVector(IRQ_GPT1, busy_isr);
@@ -100,6 +100,7 @@ static void publish(const int16_t *code)
 {
     uint32_t *w = words[cur ^ 1];
     for (int j = 0; j < N_CH / 2; j++) w[j] = (uint32_t)(uint16_t)code[2 * j] << 16 | (uint16_t)code[2 * j + 1];
+    __asm__ volatile("" ::: "memory");      // the words before the index that publishes them
     cur ^= 1;
 }
 

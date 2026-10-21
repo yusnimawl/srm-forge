@@ -36,7 +36,7 @@ extern "C" {
 #define EMU_SELFTEST_OFFSET 1000       /* cycles from the start of the first pattern window to its first rise */
 #define EMU_TEMP_MAX_C 85.0f           /* die temperature that stops a run */
 #define EMU_CAPTURE_RING 8192          /* samples, the largest power of two whose ring fits in DMAMEM */
-#define EMU_GPT_HZ 24000000            /* output timers (GPT1, GPT2): the 24 MHz oscillator, as the step timer's PIT */
+#define EMU_GPT_HZ 24000000            /* output timers (GPT1, GPT2): the peripheral clock, the 24 MHz oscillator as for the step timer's PIT */
 #define EMU_GPT_STEP 120               /* GPT ticks per step */
 
 /* Output modes of the build (hil_hello.h codes the same macros; no macro means ad7606 and encoder). */
@@ -78,6 +78,7 @@ hil_capture_hdr_t emu_capture_header(uint32_t n_steps);
 uint32_t emu_capture_default_steps(void);
 uint32_t emu_overruns(void);
 float emu_step_max_us(void);
+void emu_output_fault(void);                      /* step interrupt: an output fault, counted as an overrun */
 /* Cycles since start: gate_avg[0] max, [1] mean, [2] mean of the whole step; plant[0] max, [1] mean. */
 void emu_profile(uint32_t gate_avg[3], uint32_t plant[3]);
 
