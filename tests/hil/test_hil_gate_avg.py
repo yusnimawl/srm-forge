@@ -154,3 +154,26 @@ def test_matches_sil_converter(tmp_path):
     assert ok[:, 0].sum() > 50
     diff = np.abs(v - sil_v.mean(axis=2).T)[ok]
     assert diff.max() <= 1e-6 * 48.0, diff.max()      # the SIL trace is float32
+
+
+def _lib_general():
+    return compile_host([SHIM, PLANT / "srm_gate_avg.c", PLANT / "srm_plant.c", PLANT / "srm_motor.c"],
+                        [PLANT], CACHE, defines=("SRM_GATE_AVG_NO_FAST_PATH",))
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_fast_path_identical_to_general_walk(seed):
+    """Windows with no edge and no pending change take a fused path; random edge streams with delays, idle windows,
+    zero and positive fluxes and switch drops give bit-identical outputs with and without it."""
+    rng = np.random.default_rng(seed)
+    q, dt, n_w = 4, 10, 400
+    t = np.sort(rng.choice(n_w * dt, 300, replace=False))
+    t = t[(t // dt) % 3 != 0]                       # every third window has no edges
+    words = rng.integers(0, 16, len(t)) | (rng.integers(0, 16, len(t)) << 8)
+    edges = list(zip(t.tolist(), words.tolist()))
+    psi0 = np.where(rng.random((n_w, q)) < 0.4, 0.0, rng.random((n_w, q)) * 1e-4)
+    args = (q, 48.0, 1.0, 0.8, 3, 2, 0x0101, edges, n_w, dt, psi0)
+    fast = run_in_child(_windows, _lib(), *args)
+    slow = run_in_child(_windows, _lib_general(), *args)
+    for a, b in zip(fast, slow):
+        assert a.tobytes() == b.tobytes()

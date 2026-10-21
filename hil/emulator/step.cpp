@@ -35,6 +35,7 @@ static emu_pattern_t pat;
 static bool pat_on;
 static volatile bool st_pending;
 static volatile float st_duty;
+static volatile uint16_t st_word = 0x0101;     // both switches of the pattern's phases
 static float i_scale, psi_scale, v_scale, t_scale, w_scale;
 static float inv_i, inv_psi, inv_v, inv_t, inv_w;     // inverse scales, for the step interrupt
 static uint32_t edge_overflows_seen;
@@ -115,7 +116,7 @@ static void step_isr()
         const float d = st_duty;
         pat_on = d > 0.0f;
         const uint64_t period = F_CPU_ACTUAL / EMU_SELFTEST_HZ;
-        if (pat_on) emu_pattern_init(&pat, t0 + EMU_SELFTEST_OFFSET, period, (uint64_t)llround(d * period), 0x0101);
+        if (pat_on) emu_pattern_init(&pat, t0 + EMU_SELFTEST_OFFSET, period, (uint64_t)llround(d * period), st_word);
         else {
             emu_edge_push(&g_edges, (uint32_t)t0, 0);     // all off; the gate inputs take over after this edge
             g_selftest = false;
@@ -352,6 +353,12 @@ void emu_set_selftest(float duty)
     // the flag itself.
     if (duty > 0.0f || !running) g_selftest = duty > 0.0f;
     if (running) st_pending = true;
+}
+
+void emu_set_selftest_phases(unsigned mask)
+{
+    mask &= 0x0F;
+    st_word = (uint16_t)(mask | mask << 8);
 }
 
 bool emu_live_take(hil_live_emu_t *out)

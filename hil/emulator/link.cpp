@@ -151,6 +151,11 @@ static void dispatch(uint8_t type, uint16_t seq, const uint8_t *p, long len)
     case HIL_COMMAND: {
         hil_command_t c;
         memcpy(&c, p, sizeof c);
+        if (c.mode == HIL_CMD_EMU_SELFTEST_PHASES && c.value >= 1.0f && c.value <= 15.0f) {
+            emu_set_selftest_phases((unsigned)c.value);
+            reply(type, seq, NULL);
+            break;
+        }
         if (c.mode != HIL_CMD_EMU_SELFTEST || !(c.value == c.value)) {
             reply(type, seq, "command refused: unknown mode");
             break;

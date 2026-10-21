@@ -45,6 +45,7 @@ void emu_stop(void);
 bool emu_running(void);
 bool emu_take_overload(void);                      /* the step loop stopped itself, once */
 void emu_set_selftest(float duty);
+void emu_set_selftest_phases(unsigned mask);       /* phases of the pattern, bit k = phase k; from the next start of it */
 bool emu_live_take(hil_live_emu_t *out);           /* the latest finished statistics window, once */
 hil_capture_hdr_t emu_capture_header(uint32_t n_steps);
 uint32_t emu_capture_default_steps(void);

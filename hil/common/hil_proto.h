@@ -55,15 +55,17 @@ typedef struct {
     int8_t status;
 } hil_param_reply_t;
 
-/* Controller: mode 0 torque (N*m), 1 speed (rad/s). Emulator: mode HIL_CMD_EMU_SELFTEST. */
+/* Controller: mode 0 torque (N*m), 1 speed (rad/s). Emulator: the HIL_CMD_EMU_* modes. */
 typedef struct {
     uint8_t mode;
     float value;
 } hil_command_t;
 
-/* Emulator command: a software gate pattern on phase A (both switches, 20 kHz, duty = value, 0 = off) replaces the
- * gate inputs and the RUN input. */
+/* Emulator command: a software gate pattern (both switches of the selected phases, 20 kHz, duty = value, 0 = off)
+ * replaces the gate inputs and the RUN input. */
 #define HIL_CMD_EMU_SELFTEST 2
+/* Emulator command: the phases of that pattern (value = bit mask 1..15, default 1 = phase A), set before it starts. */
+#define HIL_CMD_EMU_SELFTEST_PHASES 3
 
 typedef struct {
     uint32_t step;

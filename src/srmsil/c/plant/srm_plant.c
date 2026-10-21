@@ -27,7 +27,7 @@ static double eval_k(const srm_plant_t *k, const srm_sim_config_t *c, const srm_
 {
     double sum = 0.0, th0 = NAN;
     for (int q = 0; q < c->n_phases; q++) {
-        if (!(psi[q] > 0.0) || !isfinite(psi[q])) {
+        if (!(psi[q] > 0.0 && psi[q] < INFINITY)) {      /* zero, negative, infinite or NaN flux */
             i[q] = trq[q] = w[q] = 0.0;
             continue;
         }
@@ -77,6 +77,9 @@ void srm_plant_init(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tab
     p->ttot = EVAL(c, t, p->theta, p->psi, p->cur, p->trq, p->wf);
 }
 
+/* A step count as double; a 32-bit conversion is one instruction on the Cortex-M7, a 64-bit one a library call. */
+static double step_count(int64_t n) { return (n >= INT32_MIN && n <= INT32_MAX) ? (double)(int32_t)n : (double)n; }
+
 static double load_torque(const srm_sim_config_t *c, double t)
 {
     return c->load + (t >= c->load_step_time ? c->load_step : 0.0);
@@ -104,7 +107,7 @@ void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tab
         p->psi[k] = psi > 0.0 ? psi : 0.0;
     }
     const double theta_new = dynamic ? p->theta + 0.5 * dt * (p->omega + omega_p)
-                                     : c->theta0 + c->speed * (double)(n + 1) * dt;
+                                     : c->theta0 + c->speed * step_count(n + 1) * dt;
     const double omega_new = p->omega + 0.5 * dt * (a1 + a2);
     p->ttot = EVAL(c, t, theta_new, p->psi, p->cur, p->trq, p->wf);
     p->theta = theta_new;
@@ -113,7 +116,5 @@ void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tab
 
 double srm_ahb_voltage(const srm_sim_config_t *c, int upper, int lower, double current)
 {
-    if (upper && lower) return c->bus_voltage - 2.0 * c->v_switch;
-    if (upper || lower) return current > 0.0 ? -(c->v_switch + c->v_diode) : 0.0;
-    return current > 0.0 ? -(c->bus_voltage + 2.0 * c->v_diode) : 0.0;
+    return srm_ahb_voltage_inline(c, upper, lower, current);
 }

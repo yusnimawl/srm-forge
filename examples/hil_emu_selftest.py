@@ -127,6 +127,7 @@ def main() -> None:
         flat = np.ascontiguousarray(arr, np.float32).ravel()
         for off in range(0, flat.size, proto.TABLE_CHUNK_FLOATS):
             link.send(Type.TABLE_CHUNK, proto.pack_table_chunk(which, off, flat[off:off + proto.TABLE_CHUNK_FLOATS]))
+    link.request(Type.COMMAND, proto.pack_command(proto.CMD_EMU_SELFTEST_PHASES, 1))
     link.request(Type.COMMAND, proto.pack_command(proto.CMD_EMU_SELFTEST, 0.5))
     link.request(Type.START)
     live: list = []

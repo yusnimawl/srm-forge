@@ -81,5 +81,12 @@ void srm_plant_step(srm_plant_t *p, const srm_sim_config_t *c, const srm_sim_tab
                     double t_now, int64_t n);
 /* Asymmetric half-bridge winding voltage for the effective switch states and the winding current. */
 double srm_ahb_voltage(const srm_sim_config_t *c, int upper, int lower, double current);
+/* The same, inlined into hot loops. */
+static inline double srm_ahb_voltage_inline(const srm_sim_config_t *c, int upper, int lower, double current)
+{
+    if (upper && lower) return c->bus_voltage - 2.0 * c->v_switch;
+    if (upper || lower) return current > 0.0 ? -(c->v_switch + c->v_diode) : 0.0;
+    return current > 0.0 ? -(c->bus_voltage + 2.0 * c->v_diode) : 0.0;
+}
 
 #endif

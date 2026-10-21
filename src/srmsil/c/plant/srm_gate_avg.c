@@ -62,7 +62,7 @@ static void accumulate(const srm_gate_avg_t *g, const srm_sim_config_t *c, doubl
     for (int k = 0; k < c->n_phases; k++) {
         int u = (g->eff >> k) & 1, l = (g->eff >> (8 + k)) & 1;
         if (!u && !l && !(psi[k] > 0.0)) continue;      /* idle winding: no voltage, no flux change */
-        double v = srm_ahb_voltage(c, u, l, psi[k] > 0.0 ? 1.0 : 0.0);
+        double v = srm_ahb_voltage_inline(c, u, l, psi[k] > 0.0 ? 1.0 : 0.0);
         if (v >= 0.0 || psi[k] > -v * tau) psi[k] += v * tau;
         else psi[k] = 0.0;
         on_upper[k] += (float)(u * span);
@@ -87,6 +87,33 @@ void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm
         g->inv_dt = 1.0 / c->dt;
     }
     const double tick_s = g->tick_s;
+#ifndef SRM_GATE_AVG_NO_FAST_PATH     /* defined only by the test that compares both paths */
+    if (n == 0 && !g->pending_valid) {
+        /* No edge and no pending change: one segment over the whole window. The same arithmetic as accumulate and
+           the closing loop below, fused. */
+        const double span = span_ticks(dt), tau = span * tick_s, inv = g->inv_ticks;
+        for (int k = 0; k < c->n_phases; k++) {
+            int u = (g->eff >> k) & 1, l = (g->eff >> (8 + k)) & 1;
+            double psi = psi0[k];
+            float ou = 0.0f, ol = 0.0f;
+            if (u || l || psi > 0.0) {
+                double v = srm_ahb_voltage_inline(c, u, l, psi > 0.0 ? 1.0 : 0.0);
+                if (v >= 0.0 || psi > -v * tau) psi += v * tau;
+                else psi = 0.0;
+                ou += (float)(u * span);
+                ol += (float)(l * span);
+            }
+#ifdef SRM_TABLE_FLOAT
+            v_out[k] = (psi - psi0[k]) * g->inv_dt;
+#else
+            v_out[k] = (psi - psi0[k]) / c->dt;
+#endif
+            on_upper[k] = (float)(ou * inv);
+            on_lower[k] = (float)(ol * inv);
+        }
+        return;
+    }
+#endif
     double psi[SRM_SIM_MAX_PHASES];
     for (int k = 0; k < c->n_phases; k++) {
         psi[k] = psi0[k];

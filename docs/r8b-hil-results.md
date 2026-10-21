@@ -22,31 +22,44 @@ Bench (2026-10-21, modes ad7606 + encoder, hysteresis reference controller, anal
 default converter delays, and the emulator's software gate pattern (`HIL_COMMAND` mode 2: phase A, both switches,
 20 kHz, 50 %, first rise 1000 cycles into step 0) in place of the gate inputs and RUN.
 
+Timing over 11 s (2.19 M steps) per case, after the result-neutral speedups (no capture running):
+
+| Self-test phases | Step mean | Step max | Overruns | Target |
+|---|---|---|---|---|
+| one (A) | 3.41 us (68 %) | 4.90 us | 0 | max < 4 us, 0 overruns: max **not met** |
+| two overlapping (A, B) | 4.17 us (83 %) | 6.16 us | 438 000 (2 per 10 steps, the edge windows) | **not met** |
+
+Cycles per step (mean / max of the 3000 per step), one phase: gate averaging 534 / 1281, plant 1156 / 1211, the rest
+about 350; two phases: gate averaging 645 / 1620, plant 1501 / 1630. Benchmarks on the board: an idle plant step (no
+flux) costs 640 cycles, each conducting phase about 400 more (two table lookups of 128 each plus the wrap), a gate
+window with one edge about 1225, a capture sample about 200. The maxima are the windows with a gate edge.
+
+Captures with one phase (`examples/hil_emu_selftest.py`):
+
 | Item | Result | Target |
 |---|---|---|
-| Step time, mean | 3.86 us (77 % of dt) | - |
-| Step time, max | 5.6 us | < 4 us (80 %) - **not met** |
-| Overruns (step longer than 5 us) | about 10 % of steps | 0 - **not met** |
-| Buffered capture, 8000 steps | all samples, contiguous, no sequence gap; `valid = 0` (overruns during it) | valid |
-| Streamed capture, 100 000 steps | ring full after 8556 samples (`dropped` 1, `valid = 0`) | valid |
-| Phase-A current vs `srmsil.emumodel.run_model` on the same edges, RMS at the step instants | +0.002 % (buffered), +0.002 % (streamed part); max sample difference 0.64 mA = half a count | within 1 % - met |
+| Buffered capture, 8000 steps | all samples, contiguous, no sequence gap; `valid = 0` (overruns while recording: max 5.5 us) | valid |
+| Streamed capture, 100 000 steps | ring full after 9592 samples (`dropped` 1, `valid = 0`) | valid |
+| Phase-A current vs `srmsil.emumodel.run_model` on the same edges, RMS at the step instants | +0.002 % (buffered and streamed); max sample difference 0.64 mA = half a count | within 1 % - met |
 | Live statistics | 20 Hz, one packet per 10 000 steps | - |
-| Output latency (last edge to the end of the output stage, stubbed) | 8.7 us | - |
+| Output latency (last edge to the end of the output stage, stubbed) | 8.6 us | - |
 
-Profile with the cycle counter (mean / max cycles of the 3000 per step): gate averaging 767 / 1338, plant step
-1189 / 1243, the rest (edge take, statistics, safety) about 350 mean; a capture sample adds about 200. One phase
-carries flux in this test; each further conducting phase adds about 250 cycles to the plant step.
+Speedups applied, in order (first measurement: plant 7400 and gate averaging 2600 cycles max; the loop fell behind
+and starved USB):
+- result-neutral in both builds: int instead of int64 table indices and step counts, the averager's per-window
+  divisions done once, its loops over changed or pending switches only, idle windings skipped, a fused one-segment
+  path for windows with no edge and no pending change (`test_fast_path_identical_to_general_walk` checks it bit for
+  bit against the general walk), the converter voltage inlined, -O3;
+- in the float-table build only (the firmware and its PC model `srm_emu.c`, which stay identical): single-precision
+  table lookup, one angle wrap per evaluation, zero-flux phases skip the lookup, the averaged voltage multiplied by
+  1/dt.
 
-Changes made after the first measurement (plant 7400 and gate averaging 2600 cycles max, the loop fell behind and
-starved USB): int instead of int64 table indices, the per-window divisions of the averager done once, idle windings
-skipped in the averager, and in the float-table build only (firmware and its PC model `srm_emu.c`) the table lookup in
-single precision with one angle wrap per evaluation and zero-flux phases skipped; -O3. The double (SIL) build is
-unchanged in its results (`tests/hil/test_hil_plant_split.py` golden at 1e-12). The step loop stops itself and
-reports `HIL_ERROR` when a step finishes 20 steps late, so an overload cannot wedge the USB link.
+The double (SIL) build is unchanged in its results (`tests/hil/test_hil_plant_split.py` golden at 1e-12). The step loop
+stops itself and reports `HIL_ERROR` when a step finishes 20 steps late, so an overload cannot wedge the USB link.
 
-Owner decision needed for the timing: a 816 MHz core clock (about 1.36 x), a single-precision plant step, or a
-longer step. At 600 MHz the core does not leave room for two conducting phases, the Task 9 output stage or
-streaming.
+Further result-neutral gains are small: the remaining time is double-precision Heun arithmetic and the per-switch walk
+of edge windows, at about 2.5 cycles per instruction. Owner decision needed: a 816 MHz core clock (about 1.36 x:
+two phases about 4.5 us max), a single-precision plant step, or a longer step.
 
 Pending wiring: edge jitter on the GPIO path against a Nucleo pattern (< 150 ns target) and the Nucleo test-pattern
 mode; the RUN/READY interlock with the controller. The self-test pattern bypasses the gate inputs, so its jitter
