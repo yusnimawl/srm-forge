@@ -2,7 +2,7 @@
 //
 // EMU_CONFIG, START, STOP and COMMAND are acknowledged with an empty frame of the same type and sequence number; a
 // refused request (and a refused TABLE_CHUNK) gets HIL_ERROR with a text and the request's sequence number.
-// CAPTURE_REQ (hil_capture_req_t) starts a capture at the next step while running: CAPTURE_HDR, CAPTURE_DATA packets
+// CAPTURE_REQ (hil_capture_req_t; n_steps 0 = the config's capture_steps) starts a capture at the next step while running: CAPTURE_HDR, CAPTURE_DATA packets
 // with sequence numbers 0, 1, 2, ... and CAPTURE_END (hil_capture_end_t). A capture that fits the ring is sent after
 // it is recorded; a longer one is sent while it records, and a full ring ends it as invalid.
 #include <Arduino.h>
@@ -21,6 +21,7 @@ static volatile uint32_t head, tail, remaining, recorded, dropped;
 static volatile bool cap_on, cap_bad;
 static bool sending, buffered;
 static uint32_t cap_n, overruns_at_start;
+static volatile uint32_t overruns_at_end;     // taken by the step interrupt as it records the last sample
 static uint16_t data_seq, seq_out;
 
 static uint8_t rx[HIL_FRAME_MAX(HIL_PAYLOAD_MAX)];
@@ -53,12 +54,17 @@ void cap_push(const hil_sample_t *s)
         return;
     }
     ring[h & RING_MASK] = *s;
+    asm volatile("" ::: "memory");      // the sample is written before the consumer can see it
     head = h + 1;
     recorded++;
-    if (--remaining == 0) cap_on = false;
+    if (--remaining == 0) {
+        overruns_at_end = emu_overruns();
+        cap_on = false;
+    }
 }
 
 uint32_t cap_dropped(void) { return dropped; }
+void cap_reset_dropped(void) { dropped = 0; }
 
 void cap_abort(void)
 {
@@ -68,13 +74,12 @@ void cap_abort(void)
     }
 }
 
-static const char *capture_start(const uint8_t *p, long len)
+static const char *capture_start(const uint8_t *p)
 {
     if (!emu_running()) return "capture refused: not running";
     if (sending) return "capture refused: a capture is in progress";
-    hil_capture_req_t r = {0};
-    if (len == (long)sizeof r) memcpy(&r, p, sizeof r);
-    else if (len != 0) return "capture refused: bad request";
+    hil_capture_req_t r;
+    memcpy(&r, p, sizeof r);           // dispatch has checked the size
     uint32_t n = r.n_steps ? r.n_steps : emu_capture_default_steps();
     if (n == 0) return "capture refused: zero steps";
     hil_capture_hdr_t hdr = emu_capture_header(n);
@@ -111,7 +116,7 @@ static void capture_pump(void)
     if (done && head == tail) {
         hil_capture_end_t e;
         e.n_steps = recorded;
-        e.valid = !cap_bad && recorded == cap_n && emu_overruns() == overruns_at_start;
+        e.valid = !cap_bad && recorded == cap_n && overruns_at_end == overruns_at_start;
         send(HIL_CAPTURE_END, data_seq, &e, sizeof e);
         sending = false;
     }
@@ -151,7 +156,11 @@ static void dispatch(uint8_t type, uint16_t seq, const uint8_t *p, long len)
     case HIL_COMMAND: {
         hil_command_t c;
         memcpy(&c, p, sizeof c);
-        if (c.mode == HIL_CMD_EMU_SELFTEST_PHASES && c.value >= 1.0f && c.value <= 15.0f) {
+        if (c.mode == HIL_CMD_EMU_SELFTEST_PHASES) {
+            if (!(c.value >= 1.0f && c.value <= 15.0f) || c.value != floorf(c.value)) {
+                reply(type, seq, "command refused: self-test phase mask must be an integer 1..15");
+                break;
+            }
             emu_set_selftest_phases((unsigned)c.value);
             reply(type, seq, NULL);
             break;
@@ -165,7 +174,7 @@ static void dispatch(uint8_t type, uint16_t seq, const uint8_t *p, long len)
         break;
     }
     case HIL_CAPTURE_REQ: {
-        const char *err = capture_start(p, len);
+        const char *err = capture_start(p);
         if (err) reply(type, seq, err);
         break;
     }

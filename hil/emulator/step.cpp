@@ -19,7 +19,7 @@ static hil_emu_config_t cfg;
 static bool cfg_ok;
 static srm_sim_config_t sim;
 static srm_sim_tables_t tab;
-static uint32_t got[2];          // table entries received since the config
+static uint32_t got[2];          // entries [0, got) of each table received in order since the config
 static IntervalTimer timer;
 static volatile bool running;
 static volatile bool overloaded;
@@ -67,6 +67,14 @@ static inline int16_t sat16(float x)
     int32_t n = (int32_t)(x + copysignf(0.5f, x));
     asm("ssat %0, #16, %1" : "=r"(n) : "r"(n));
     return (int16_t)n;
+}
+
+// With the step timer stopped: a pending pattern change is dropped and the self-test flag follows the duty, so a
+// pattern switched off just before a stop cannot leave the gate inputs and RUN overridden.
+static void selftest_settle()
+{
+    st_pending = false;
+    g_selftest = st_duty > 0.0f;
 }
 
 static void window_reset()
@@ -203,6 +211,7 @@ static void step_isr()
     if (end > t1 + (uint64_t)EMU_OVERLOAD_STEPS * P) {     // persistently behind: stop before USB starves
         timer.end();
         running = false;
+        selftest_settle();
         overloaded = true;
         safety_ready(false);
         emu_outputs_zero();
@@ -274,8 +283,10 @@ const char *emu_table_chunk(const hil_table_chunk_t *c)
     const uint32_t size = cfg.n_theta * cfg.n_psi;
     if (c->which > 1 || c->n > HIL_TABLE_CHUNK_FLOATS || c->offset > size || c->n > size - c->offset)
         return "table refused: chunk outside the grid";
+    // Chunks of a table arrive in order: offset 0 starts it again, any other offset continues where the last ended.
+    if (c->offset != 0 && c->offset != got[c->which]) return "table refused: chunk out of order";
     memcpy((c->which ? g_torque : g_current) + c->offset, c->data, c->n * sizeof(float));
-    got[c->which] += c->n;
+    got[c->which] = c->offset + c->n;
     return NULL;
 }
 
@@ -301,6 +312,7 @@ const char *emu_start(void)
     const double f = (double)F_CPU_ACTUAL;
     srm_gate_avg_init(&ga, llround(((double)cfg.dead_time + (double)cfg.turn_on_delay) * f), llround((double)cfg.turn_off_delay * f), 0);
     srm_plant_init(&pl, &sim, &tab);
+    selftest_settle();
     NVIC_DISABLE_IRQ(IRQ_GPIO6789);
     emu_edge_reset(&g_edges);
     NVIC_ENABLE_IRQ(IRQ_GPIO6789);
@@ -314,6 +326,7 @@ const char *emu_start(void)
     pat_on = false;
     st_pending = st_duty > 0.0f;
     overruns = 0;
+    cap_reset_dropped();
     step_max = prof_ga = prof_pl = 0;
     prof_ga_sum = prof_pl_sum = prof_exec_sum = prof_n = 0;
     window_reset();
@@ -333,6 +346,7 @@ void emu_stop(void)
 {
     timer.end();
     running = false;
+    selftest_settle();
     safety_ready(false);
     cap_abort();
     emu_outputs_zero();

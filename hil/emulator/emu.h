@@ -61,7 +61,8 @@ void link_begin(void);
 void link_poll(void);
 bool cap_wants_sample(void);                      /* step interrupt: is a capture recording */
 void cap_push(const hil_sample_t *s);             /* step interrupt */
-uint32_t cap_dropped(void);
+uint32_t cap_dropped(void);                       /* samples a full ring refused since the last start */
+void cap_reset_dropped(void);
 void cap_abort(void);                             /* stop during a capture */
 
 /* gates.cpp */

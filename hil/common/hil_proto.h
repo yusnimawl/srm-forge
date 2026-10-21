@@ -114,7 +114,7 @@ typedef struct {
 
 typedef struct {
     uint8_t which;           /* 0 current, 1 torque */
-    uint32_t offset;         /* index of data[0] in the flattened table */
+    uint32_t offset;         /* index of data[0] in the flattened table; chunks of a table go in order from 0 */
     uint16_t n;              /* valid entries of data */
     float data[HIL_TABLE_CHUNK_FLOATS];
 } hil_table_chunk_t;
