@@ -5,6 +5,30 @@
 Print the SVG on A4 landscape. Pin source: [r8b-hil-wiring.md](r8b-hil-wiring.md). Wire colours below match the drawing's groups (suggestions only).
 Nucleo pins are Zio labels (CN7-CN10 side headers). Teensy pins are the printed numbers.
 
+## Cable cut list (27 cables, 54 crimps)
+
+Each cable: 1 housing and 1 crimp at each end (2 per cable).
+
+| Colour | Group | Cables | Crimps |
+|---|---|---|---|
+| Red | Gates | 8 | 16 |
+| Green | Encoder | 3 | 6 |
+| Orange | AD7606 | 5 | 10 |
+| Purple | AD2S1210 | 7 | 14 |
+| Yellow | RUN / READY | 2 | 4 |
+| Black | GND | 2 | 4 |
+| **Total** | | **27** | **54** |
+
+- Cut length: 15 cm suggested for every cable (boards side by side). Measure your bench first.
+- Wire: 22-26 AWG stranded, match the crimp's wire range.
+- SCK cable (orange): solder the 330 ohm resistor in the middle, cover with heat shrink. It is still 1 cable, 2 crimps.
+- Spares: buy 10 % extra crimps.
+- DAC group (step 9) is not in this count.
+
+**Check before crimping:**
+- [ ] Nucleo Zio sockets are female: that end needs a male pin (e.g. Dupont male crimp), not a female C-Grid housing.
+- [ ] Teensy end: female housing fits only if the Teensy has male header pins soldered. If not, solder them first.
+
 ## Step 0: safety
 
 - [ ] Unplug USB from both boards.
