@@ -35,9 +35,11 @@ from srmsil.hil.proto import Type
 from srmsil.scenario import Scenario
 from srmsil.tables import emu_tables
 
-F_CPU = 600e6
+F_CPU = float(sys.argv[2]) if len(sys.argv) > 2 else 816e6
 STEP = 5e-6
-PERIOD, ON, OFFSET = 30_000, 15_000, 1000       # cycles: 20 kHz, 50 %, first rise (emu.h EMU_SELFTEST_OFFSET)
+PERIOD = round(F_CPU / 20_000)                   # cycles: 20 kHz (emu.h EMU_SELFTEST_HZ), 50 % duty
+ON, OFFSET = PERIOD // 2, 1000                   # first rise 1000 cycles into step 0 (emu.h EMU_SELFTEST_OFFSET)
+STEP_TICKS = round(F_CPU * STEP)
 
 
 class Link:
@@ -45,6 +47,7 @@ class Link:
         self.s = serial.Serial(port, timeout=0.05)
         self.buf = bytearray()
         self.seq = 0
+        self.bad = 0
 
     def send(self, t: int, payload: bytes = b"") -> int:
         self.seq += 1
@@ -59,7 +62,12 @@ class Link:
             while (k := self.buf.find(0)) >= 0:
                 raw, self.buf = bytes(self.buf[:k]), self.buf[k + 1:]
                 if raw:
-                    yield proto.unframe(raw)
+                    try:
+                        frame = proto.unframe(raw)
+                    except proto.ProtoError:
+                        self.bad += 1          # e.g. the tail of a frame from before the port was opened
+                        continue
+                    yield frame
 
     def request(self, t: int, payload: bytes = b"", timeout: float = 2.0):
         seq = self.send(t, payload)
@@ -141,16 +149,17 @@ def main() -> None:
         if t == Type.LIVE_EMU:
             live.append(proto.unpack_live_emu(p))
     link.request(Type.STOP)
+    print(f"bad frames skipped: {link.bad}")
 
     last = live[-1]
     print(f"live packets {len(live)}; last: step {last.step}, step mean {last.step_mean_us:.3f} us, "
           f"max {last.step_max_us:.3f} us, overruns {last.overruns}, dropped {last.dropped}, "
-          f"jitter {last.edge_jitter_ns:.1f} ns, latency {last.latency_us:.3f} us, speed {last.speed_rpm:.2f} rpm, "
+          f"jitter {last.edge_jitter_ns:.1f} ns, latency {last.latency_us:.3f} us, temp {last.temp_c:.1f} C, speed {last.speed_rpm:.2f} rpm, "
           f"mean torque {last.mean_torque:.5f}, i_rms {[round(x, 5) for x in last.i_rms]}")
     print("step_mean_us over windows: min %.3f max %.3f" % (min(x.step_mean_us for x in live),
                                                            max(x.step_mean_us for x in live)))
     n_model = max(int(c[1]["step"][-1]) for c in caps.values() if len(c[1])) + 2
-    k = np.arange(0, n_model * 3000 // PERIOD + 2)
+    k = np.arange(0, n_model * STEP_TICKS // PERIOD + 2)
     edges = np.zeros(2 * len(k), EDGE_DTYPE)
     edges["t"][0::2], edges["gates"][0::2] = OFFSET + k * PERIOD, 0x0101
     edges["t"][1::2], edges["gates"][1::2] = OFFSET + k * PERIOD + ON, 0

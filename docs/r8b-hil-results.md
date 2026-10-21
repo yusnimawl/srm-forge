@@ -81,6 +81,25 @@ Target (max < 4 us, 0 overruns) still missed: one phase by 0.2 us (0.7 us while 
 overruns on the steps with a gate edge. A streamed capture at 200 kHz (7.2 MB/s) does not keep up with the CPU time
 left to the USB loop.
 
+Core clock (owner decision, 2026-10-21, heatsink fitted): `board_build.f_cpu` in `hil/platformio.ini` sets the
+clock at boot (default 816 MHz); every cycle constant is derived from `F_CPU_ACTUAL`. The die temperature
+(`tempmonGetTemp`) is reported in the live statistics (`temp_c`), and a run stops (READY low, `HIL_ERROR`) above
+85 C. Single-precision plant, self-test pattern, 11 s per timing case:
+
+| Case | 816 MHz | 1008 MHz |
+|---|---|---|
+| one phase: step mean / max, overruns | 2.12 / 3.10 us, 0 | 1.72 / 2.51 us, 0 |
+| two overlapping phases: mean / max, overruns | 2.57 / 3.78 us, 0 | 2.08 / 3.06 us, 0 |
+| one phase, buffered capture (8000 steps) | valid, contiguous, -0.001 % vs the PC model | valid, contiguous, -0.007 % vs the PC model |
+| one phase, streamed capture | ring full after 35 380 samples (`valid = 0`); sustained output 154 k samples/s = 5.5 MB/s, 77 % of the 7.2 MB/s needed | 400 000 samples (2 s), `valid = 1` with a raw-reading host |
+| two-phase soak, 2 min (24 M steps): max, overruns, die temperature start / end | 3.78 us, 0, 56.1 / 56.8 C | 3.06 us, 0, 66.7 / 66.7 C |
+
+Streaming notes: the streamed rows use a host that reads raw bytes into a 16 MB buffer and parses afterwards. The
+example script, which decodes every frame as it arrives, ends its streamed captures early (`valid = 0`) at either
+clock. At 1008 MHz one buffered capture in five had a sequence gap of five packets (140 samples) on the host. The
+emulator's capture end said valid, and no frame failed its CRC. One run at 816 MHz hit a CRC error on the first frame
+read after a flash. The other runs were clean. No resets, USB drops or wedges at either clock.
+
 Pending wiring: edge jitter on the GPIO path against a Nucleo pattern (< 150 ns target) and the Nucleo test-pattern
 mode; the RUN/READY interlock with the controller. The self-test pattern bypasses the gate inputs, so its jitter
 reads 0.

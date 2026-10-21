@@ -122,7 +122,7 @@ CMD_EMU_SELFTEST = 2       # emulator command: software gate pattern, 20 kHz, du
 CMD_EMU_SELFTEST_PHASES = 3   # emulator command: phases of the pattern, value = bit mask (default 1, phase A)
 CAPTURE_REQ = struct.Struct("<I")
 CAPTURE_END = struct.Struct("<BI")
-LIVE_EMU = struct.Struct("<I9f2I2f")
+LIVE_EMU = struct.Struct("<I9f2I3f")
 LIVE_CTRL = struct.Struct("<2fIf4f")
 CAPTURE_HDR = struct.Struct("<6fIB")
 TABLE_CHUNK_HEAD = struct.Struct("<BIH")
@@ -178,6 +178,7 @@ class LiveEmu:
     dropped: int
     edge_jitter_ns: float
     latency_us: float
+    temp_c: float           # die temperature
 
 
 @dataclass(frozen=True)
@@ -249,7 +250,7 @@ def unpack_live_emu(data: bytes) -> LiveEmu:
 
 def pack_live_emu(s: LiveEmu) -> bytes:
     return LIVE_EMU.pack(s.step, s.mean_torque, s.ripple_pct, *s.i_rms, s.speed_rpm, s.step_mean_us, s.step_max_us,
-                         s.overruns, s.dropped, s.edge_jitter_ns, s.latency_us)
+                         s.overruns, s.dropped, s.edge_jitter_ns, s.latency_us, s.temp_c)
 
 
 def unpack_live_ctrl(data: bytes) -> LiveCtrl:

@@ -202,7 +202,23 @@ void link_poll(void)
                          (unsigned long)ga[2]);
         send(HIL_ERROR, seq_out++, msg, (size_t)n);
     }
+    static uint32_t temp_ms;
+    static float temp_c;
+    if (millis() - temp_ms >= 50) {
+        temp_ms = millis();
+        temp_c = tempmonGetTemp();
+        if (emu_running() && temp_c > EMU_TEMP_MAX_C) {
+            emu_stop();
+            char msg[64];
+            int n = snprintf(msg, sizeof msg, "stopped: die temperature %.1f C above %.0f C", (double)temp_c,
+                             (double)EMU_TEMP_MAX_C);
+            send(HIL_ERROR, seq_out++, msg, (size_t)n);
+        }
+    }
     hil_live_emu_t live;
-    if (emu_running() && emu_live_take(&live)) send(HIL_LIVE_EMU, seq_out++, &live, sizeof live);
+    if (emu_running() && emu_live_take(&live)) {
+        live.temp_c = temp_c;
+        send(HIL_LIVE_EMU, seq_out++, &live, sizeof live);
+    }
     capture_pump();
 }

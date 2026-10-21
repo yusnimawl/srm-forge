@@ -6,7 +6,8 @@
  * safety.cpp  RUN input (pin 7) and READY output (pin 8)
  *
  * Interrupt priorities (lower is more urgent): gates, then the encoder timer, then the step timer; USB stays at the
- * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL), extended to 64 bits by the step interrupt. */
+ * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 816 MHz from platformio.ini; every cycle constant
+ * is derived from it), extended to 64 bits by the step interrupt. */
 #ifndef EMU_H
 #define EMU_H
 
@@ -31,6 +32,7 @@ extern "C" {
 #define EMU_STATS_STEPS 10000          /* one live-statistics window: 50 ms, 20 Hz */
 #define EMU_SELFTEST_HZ 20000
 #define EMU_SELFTEST_OFFSET 1000       /* cycles from the start of the first pattern window to its first rise */
+#define EMU_TEMP_MAX_C 85.0f           /* die temperature that stops a run */
 #define EMU_CAPTURE_RING 8192          /* samples, the largest power of two whose ring fits in DMAMEM */
 
 extern srm_table_t g_current[EMU_MAX_THETA * EMU_MAX_PSI], g_torque[EMU_MAX_THETA * EMU_MAX_PSI];

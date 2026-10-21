@@ -76,6 +76,7 @@ typedef struct {
     float step_mean_us, step_max_us;
     uint32_t overruns, dropped;
     float edge_jitter_ns, latency_us;
+    float temp_c;            /* die temperature */
 } hil_live_emu_t;
 
 typedef struct {
