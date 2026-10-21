@@ -194,6 +194,69 @@ Pending wiring (spec section 15, `docs/r8b-hil-wiring.md` section 5), not measur
 - Encoder: one A or B edge per count (x4 encoder mode, ARR = cpr - 1); edges come out two steps (10 us) after the
   step that crossed them.
 
+### Controller driver (2026-10-21, Nucleo-H723ZG alone, boards not wired to each other)
+
+`hil/controller/` (README there). `pio run -e controller` compiles without warnings in all six modes (ad7606 and
+internal x encoder, ad2s1210, both) with hysteresis, pwm_current, tsf and `tests/sil/controllers/open_loop`: flash
+16-29 KB with open_loop, 66-79 KB with the reference controllers (their tables). Hard-float ABI and -O2: the board
+package passed only `-mcpu` (software floating point) and its `-Os` overrode the `-O2` of `platformio.ini`; both are
+fixed in `platformio.ini` and `scripts/add_sources.py`.
+
+Register readback through OpenOCD while the firmware runs (20 kHz, ARR 5000):
+
+| Item | Read | Expected |
+|---|---|---|
+| TIM1 CR1 / TIM8 CR1 | 0xA1 / 0xA1 | CEN, centre-aligned, ARR preload |
+| TIM1 CR2 | 0x00200010 | MMS = enable (starts TIM8), MMS2 = update (ADC trigger) |
+| TIM8 SMCR | 0x6 | trigger mode, ITR0 = tim1_trgo |
+| CCMR1/2 (both) | 0x6868 | PWM mode 1, compare preload, CH1-CH4 |
+| CCER (both) | 0x1111 | CH1-CH4 on, active high, no CHxN |
+| BDTR stopped / running | 0x0C00 / 0x8C00 | OSSI, OSSR, dead time 0; MOE only while running |
+| ARR / RCR | 5000 / 1 | 200 MHz / (2 x 20 kHz); one update per period |
+| update at the underflow (`phase_ok`) | 1 on both timers | the counter counts up after each update |
+| TIM1 - TIM8 count right after the start (`pwm_skew_ticks`) | 0 | (resolution: the register read time, several ticks) |
+| SPI1 CFG1 / CFG2 (ad7606) | 0x3000400F / 0x86440000 | 12.5 MHz, RX DMA, 16 bits / master, mode 2, receive only |
+| SPI3 CFG1 / CFG2 (ad2s1210) | 0x30000007 / 0x87440000 | 12.5 MHz, 8 bits / master, mode 3, receive only |
+| GPIOD PD4 (READY) | input, pull-down, reads 0 unwired | a missing emulator reads "not ready" |
+| RUN (PD6) | low until a start is accepted | |
+
+Found by the readback and fixed: the repetition counter written after the counters started put the update events on
+the overflows (the RM0468 note reads the other way), so it is now loaded before the start and checked at boot; SPI1
+and SPI3 had lost MASTER (set while the internal SS was low, a mode fault); ADC2 calibration never finished when run
+after the dual mode was set, so both ADCs are calibrated before it.
+
+Link (COM6, 921600 baud): HELLO -> BUILD_INFO (board 2 and the build's modes); PARAM_SET `theta_on` -> 0, an unknown
+name -> -1, `resolver_pole_pairs` after a start -> -2, a NaN value -> HIL_ERROR; COMMAND torque -> ack, mode 7 ->
+HIL_ERROR; LIVE_CTRL 20 Hz (203 in 10 s); START with READY low -> "start refused: READY is low"; RUN stays low.
+
+Runs with READY pulled up through the debugger (GPIOD PUPDR), `internal` + encoder (the ADCs convert the floating
+inputs, so the whole chain runs without the emulator); 20 kHz, analytic 8/6 case, 10 s each:
+
+| Controller | ISR mean | ISR max | Trigger to ctrl_isr | Overruns |
+|---|---|---|---|---|
+| open_loop (theta 0.1-0.45 rad) | 2.13 us | 2.59 us | 1.78 us | 0 |
+| hysteresis (torque 1 N m) | 3.53 us | 4.70 us | 1.81 us | 0 |
+| pwm_current (torque 2 N m) | 4.55 us | 4.74 us | 1.79 us | 0 |
+| tsf (torque 2 N m) | 4.81 us | 5.26 us | 1.81 us | 0 |
+
+While running, the compares follow the controller (hysteresis: phase B on, TIM1/TIM8 CCR2 = 5001 = ARR + 1, PE11 and
+PC7 read high; pwm_current at full duty with soft chopping: upper and lower CCR = 5001). READY pulled low through the
+debugger during a run: BDTR 0x0C00, every CCR 0, all eight gate pins low, RUN low, live state READY_STOP and
+HIL_ERROR "stopped: READY low". `ad7606` + encoder without the emulator: the start is accepted with READY pulled up,
+CONVST goes out, no BUSY comes, and the run stops after three triggers ("the sample chain stalled"), gates off.
+`ad2s1210`: the start is refused, "AD2S1210 control register reads 0, wrote 0x75 (is it wired?)".
+
+Board clock (owner decision needed): the 8 MHz bypass clock from the ST-LINK runs 1.40 % fast. TIM2 (`micros`)
+counted 1.0140 us per host us over 10 s, and LIVE_CTRL arrives at 20.28 Hz; the host clock agrees with the Teensy's
+crystal to 3e-5 (emulator steps per host second 200 005.5). So the Nucleo runs at about 405.6 MHz, the PWM at about
+20.28 kHz and `micros` 1.4 % fast (the controller's speed estimate reads 1.4 % high). RCC was read back as configured
+(HSE bypass, PLL1 M 1, N 100, P 2). Options: fit a crystal (X3) and use HSE crystal mode, or give the ST-LINK MCO its
+measured frequency, or let the matched SIL use the measured rates.
+
+Pending wiring: the `open_loop` spin test at 1000 rpm in `ad7606` + encoder (ISR time, 0 overruns), the READY-to-gates
+time on the logic analyser (required within one PWM period; not measured yet), the AD7606 and AD2S1210
+data on SPI (and the highest reliable SPI clock), the encoder count direction and the index reset.
+
 ## Acceptance
 
 Pending.

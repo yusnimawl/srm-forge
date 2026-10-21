@@ -27,6 +27,8 @@ add_folder(os.path.join(HERE, "common"), "hil_common")
 if name == "emulator":
     add_folder(os.path.join(C_DIR, "plant"), "plant")
 else:
+    # platformio.ini compiles the controller with the hard-float ABI; the board package links with -mcpu only
+    env.Append(LINKFLAGS=["-mfpu=fpv5-d16", "-mfloat-abi=hard"])  # noqa: F821
     for i, d in enumerate(filter(None, os.environ.get("SRM_CTRL_DIR", "").split(os.pathsep))):
         add_folder(d, f"ctrl{i}")
 

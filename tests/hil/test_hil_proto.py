@@ -60,6 +60,9 @@ def test_struct_sizes():
     data = proto.pack_capture_data(100, s)
     first, back = proto.unpack_capture_data(data)
     assert first == 100 and back.tobytes() == s.tobytes()
+    live = proto.LiveCtrl(1.5, 3.25, 2, 0.5, (1.0, 2.0, 3.0, 4.0), 12.5, proto.CTRL_RUNNING | proto.CTRL_READY)
+    assert proto.LIVE_CTRL.size == 37
+    assert proto.unpack_live_ctrl(proto.pack_live_ctrl(live)) == live
 
 
 def _lib():

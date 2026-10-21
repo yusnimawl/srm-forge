@@ -7,7 +7,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from srmsil.run import ADC_HEADROOM
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData
 
@@ -49,17 +48,60 @@ def mode_defines(modes: HilModes) -> list[str]:
     return d
 
 
+AD7606_RANGE_V = 10.0
+"""V, the AD7606 input range (+-)."""
+AD7606_T_CONV_US = 4.15
+"""us, the AD7606 conversion time (datasheet maximum without oversampling)."""
+SENSE_TOP_V = 8.0
+"""V at the AD7606 inputs for 1.25 x the top map current, and for 1.25 x the bus voltage."""
+DAC_V_MID = 0.2
+"""V at the DAC output for 0 A."""
+DAC_VREF = 3.3
+"""V, reference of the DACs and of the Nucleo's ADC (VDDA)."""
+NUCLEO_ADC_BITS = 16
+
+
+def sensor_chain(m: MotorData, scenario: Scenario) -> dict[str, float]:
+    """Gains of the emulated sensor chain, shared by the emulator config and the controller's `hil_config.h`: the AD7606
+    sees 8 V at 1.25 x the top map current and at 1.25 x the bus voltage; the DACs put out 0.2 V at 0 A and 3.3 V at
+    1.2 x the top current."""
+    i_top = float(m.currents[-1])
+    vbus = scenario.bus_voltage or m.bus_voltage
+    return {"ad7606_range_v": AD7606_RANGE_V, "ad7606_t_conv_us": AD7606_T_CONV_US,
+            "sense_v_per_a": SENSE_TOP_V / (1.25 * i_top), "volt_divider": SENSE_TOP_V / (1.25 * vbus),
+            "dac_v_mid": DAC_V_MID, "dac_v_per_a": (DAC_VREF - DAC_V_MID) / (1.2 * i_top)}
+
+
 def write_hil_config(modes: HilModes, scenario: Scenario, m: MotorData, path: Path) -> None:
-    ad = scenario.adc
-    full_scale = ad.full_scale or ADC_HEADROOM * float(m.currents[-1])
+    """The controller firmware's build constants: modes, PWM and ISR rates, bus voltage, and the ADC scales of the
+    sensing chain of `modes` (AD7606 codes are handed over as offset binary, 16 bits; the Nucleo ADC reads the DACs at
+    16 bits and has no voltage channels)."""
+    se = scenario.sensors
+    if modes.position in ("ad2s1210", "both") and se.resolver_bits not in (10, 12, 14, 16):
+        raise ValueError(f"resolver_bits {se.resolver_bits}: the AD2S1210 has 10, 12, 14 or 16 bits")
+    if modes.position in ("encoder", "both") and not 1 <= se.encoder_cpr <= 65536:
+        raise ValueError(f"encoder_cpr {se.encoder_cpr}: the controller's 16-bit encoder timer takes 1..65536")
+    c = sensor_chain(m, scenario)
+    if modes.current_sense == "ad7606":
+        lsb = c["ad7606_range_v"] / 32768
+        bits, amps, offset = 16, lsb / c["sense_v_per_a"], 32768
+        volts, volt_offset = lsb / c["volt_divider"], 32768
+    else:
+        lsb = DAC_VREF / 2**NUCLEO_ADC_BITS
+        bits, amps, offset = NUCLEO_ADC_BITS, lsb / c["dac_v_per_a"], round(c["dac_v_mid"] / lsb)
+        volts, volt_offset = 0.0, 0
     lines = [f"#define {n} 1" for n in mode_defines(modes)]
     lines += [
         f"#define HIL_PWM_HZ {scenario.pwm_hz!r}f",
         f"#define HIL_ISR_HZ {scenario.resolved_isr_hz!r}f",
         f"#define HIL_N_PHASES {m.n_phases}",
-        f"#define HIL_ADC_BITS {ad.bits}",
-        f"#define HIL_ADC_AMPS_PER_COUNT {full_scale / (2**ad.bits - 1)!r}f",
-        f"#define HIL_ADC_OFFSET_COUNTS {ad.offset_counts}",
-        f"#define HIL_ENCODER_CPR {scenario.sensors.encoder_cpr}",
+        f"#define HIL_VBUS_V {float(scenario.bus_voltage or m.bus_voltage)!r}f",
+        f"#define HIL_ADC_BITS {bits}",
+        f"#define HIL_ADC_AMPS_PER_COUNT {amps!r}f",
+        f"#define HIL_ADC_OFFSET_COUNTS {offset}",
+        f"#define HIL_ADC_VOLTS_PER_COUNT {volts!r}f",
+        f"#define HIL_ADC_VOLT_OFFSET_COUNTS {volt_offset}",
+        f"#define HIL_ENCODER_CPR {se.encoder_cpr}",
+        f"#define HIL_RDC_BITS {se.resolver_bits}",
     ]
     Path(path).write_text("#ifndef HIL_CONFIG_H\n#define HIL_CONFIG_H\n\n" + "\n".join(lines) + "\n\n#endif\n")

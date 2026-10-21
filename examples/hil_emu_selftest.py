@@ -31,6 +31,7 @@ from sil_fixtures import analytic_motor
 
 from srmsil.emumodel import EDGE_DTYPE, run_model
 from srmsil.hil import proto
+from srmsil.hil.config import sensor_chain
 from srmsil.hil.proto import Type
 from srmsil.scenario import Scenario
 from srmsil.tables import emu_tables
@@ -96,11 +97,10 @@ def config(m, scn: Scenario, tab, capture_steps: int) -> bytes:
              n_theta=tab.current.shape[0], n_psi=tab.current.shape[1], capture_steps=capture_steps,
              n_phases=m.n_phases, n_rotor_poles=m.n_rotor_poles, mode=0)
     se = scn.sensors
-    # output stage: AD7606 +-10 V, currents to 8 V and the bus to 8 V at 1.25 x their top values; DACs 0.2 V at 0 A and
-    # 3.3 V at 1.2 x the top current; the resolver and encoder settings of the scenario
-    c.update(ad7606_range_v=10.0, ad7606_t_conv_us=4.15, sense_v_per_a=8.0 / (1.25 * tab.i_max),
-             volt_divider=8.0 / (1.25 * m.bus_voltage), volt_rc_tau=scn.adc.volt_rc_tau, dac_v_mid=0.2,
-             dac_v_per_a=3.1 / (1.2 * tab.i_max), encoder_cpr=se.encoder_cpr, encoder_offset=se.encoder_offset,
+    # output stage: the shared sensor chain (srmsil.hil.config.sensor_chain); the resolver and encoder settings of the
+    # scenario
+    c.update(sensor_chain(m, scn))
+    c.update(volt_rc_tau=scn.adc.volt_rc_tau, encoder_cpr=se.encoder_cpr, encoder_offset=se.encoder_offset,
              encoder_ecc_amp=se.encoder_ecc_amp, encoder_ecc_harmonic=se.encoder_ecc_harmonic,
              rdc_bits=se.resolver_bits, resolver_pole_pairs=se.resolver_pole_pairs,
              resolver_gain_mismatch=se.resolver_gain_mismatch, resolver_phase_error=se.resolver_phase_error)

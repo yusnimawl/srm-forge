@@ -123,7 +123,7 @@ CMD_EMU_SELFTEST_PHASES = 3   # emulator command: phases of the pattern, value =
 CAPTURE_REQ = struct.Struct("<I")       # n_steps; 0 = the config's capture_steps
 CAPTURE_END = struct.Struct("<BI")
 LIVE_EMU = struct.Struct("<I9f2I3f")
-LIVE_CTRL = struct.Struct("<2fIf4f")
+LIVE_CTRL = struct.Struct("<2fIf4ffB")
 CAPTURE_HDR = struct.Struct("<6fIB")
 TABLE_CHUNK_HEAD = struct.Struct("<BIH")
 TABLE_CHUNK = struct.Struct("<BIH200f")
@@ -187,7 +187,16 @@ class LiveCtrl:
     isr_max_us: float
     isr_overruns: int
     command: float
-    i_meas: tuple[float, ...]
+    i_meas: tuple[float, ...]   # A rms over the window
+    sample_us: float            # mean time from the trigger to ctrl_isr
+    state: int                  # CTRL_* bits
+
+
+CTRL_RUNNING = 1        # the controller runs (RUN is high)
+CTRL_READY = 2          # the READY input is high
+CTRL_READY_STOP = 4     # READY fell during the last run and stopped it
+CTRL_STALL_STOP = 8     # the last run stopped because the sample chain stalled
+CTRL_INDEX = 16         # an encoder index pulse was seen since the start
 
 
 @dataclass(frozen=True)
@@ -255,11 +264,11 @@ def pack_live_emu(s: LiveEmu) -> bytes:
 
 def unpack_live_ctrl(data: bytes) -> LiveCtrl:
     f = LIVE_CTRL.unpack(data)
-    return LiveCtrl(f[0], f[1], f[2], f[3], tuple(f[4:8]))
+    return LiveCtrl(f[0], f[1], f[2], f[3], tuple(f[4:8]), f[8], f[9])
 
 
 def pack_live_ctrl(s: LiveCtrl) -> bytes:
-    return LIVE_CTRL.pack(s.isr_mean_us, s.isr_max_us, s.isr_overruns, s.command, *s.i_meas)
+    return LIVE_CTRL.pack(s.isr_mean_us, s.isr_max_us, s.isr_overruns, s.command, *s.i_meas, s.sample_us, s.state)
 
 
 def pack_capture_hdr(h: CaptureHeader) -> bytes:

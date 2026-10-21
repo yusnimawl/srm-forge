@@ -32,6 +32,37 @@ def test_hil_config_header(tmp_path):
     assert "HIL_POSITION_ENCODER 1" in t and "HIL_POSITION_AD2S1210 1" in t
 
 
+def _macros(path):
+    out = {}
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == "#define":
+            out[parts[1]] = float(parts[2].rstrip("f"))
+    return out
+
+
+def test_hil_config_sensor_scales(tmp_path):
+    m, p = analytic_motor(), tmp_path / "hil_config.h"
+    write_hil_config(HilModes(current_sense="ad7606"), Scenario(), m, p)
+    d = _macros(p)
+    i_top = float(m.currents[-1])
+    assert d["HIL_ADC_BITS"] == 16 and d["HIL_ADC_OFFSET_COUNTS"] == 32768 and d["HIL_ADC_VOLT_OFFSET_COUNTS"] == 32768
+    assert d["HIL_ADC_AMPS_PER_COUNT"] == pytest.approx(10.0 / 32768 * 1.25 * i_top / 8.0)
+    assert d["HIL_ADC_VOLTS_PER_COUNT"] == pytest.approx(10.0 / 32768 * 1.25 * m.bus_voltage / 8.0)
+    assert d["HIL_VBUS_V"] == pytest.approx(m.bus_voltage) and d["HIL_RDC_BITS"] == 12
+    write_hil_config(HilModes(current_sense="internal"), Scenario(bus_voltage=60.0), m, p)
+    d = _macros(p)
+    assert d["HIL_ADC_VOLTS_PER_COUNT"] == 0 and d["HIL_VBUS_V"] == 60.0
+    v_per_a = 3.1 / (1.2 * i_top)
+    assert d["HIL_ADC_OFFSET_COUNTS"] == round(0.2 / 3.3 * 65536)
+    assert d["HIL_ADC_AMPS_PER_COUNT"] == pytest.approx(3.3 / 65536 / v_per_a)
+    with pytest.raises(ValueError, match="AD2S1210"):
+        write_hil_config(HilModes(position="both"), Scenario(sensors={"resolver_bits": 11}), m, p)
+    with pytest.raises(ValueError, match="encoder_cpr"):
+        write_hil_config(HilModes(position="encoder"), Scenario(sensors={"encoder_cpr": 0}), m, p)
+    write_hil_config(HilModes(position="ad2s1210"), Scenario(sensors={"encoder_cpr": 0}), m, p)
+
+
 def test_modes_reject_unknown():
     for kw in ({"current_sense": "x"}, {"position": "x"}, {"dac": "x"}, {"other": 1}):
         with pytest.raises(ValidationError):

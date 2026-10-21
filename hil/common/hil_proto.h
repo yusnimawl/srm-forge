@@ -79,12 +79,21 @@ typedef struct {
     float temp_c;            /* die temperature */
 } hil_live_emu_t;
 
+/* Controller statistics over one 50 ms window (the maximum and the overruns since the start). */
 typedef struct {
-    float isr_mean_us, isr_max_us;
+    float isr_mean_us, isr_max_us;   /* ctrl_isr execution time */
     uint32_t isr_overruns;
-    float command;
-    float i_meas[4];         /* A */
+    float command;           /* the last ctrl_command value */
+    float i_meas[4];         /* A rms of the sampled phase currents */
+    float sample_us;         /* mean time from the trigger to the start of ctrl_isr */
+    uint8_t state;           /* HIL_CTRL_* bits */
 } hil_live_ctrl_t;
+
+#define HIL_CTRL_RUNNING 1u        /* the controller runs (RUN is high) */
+#define HIL_CTRL_READY 2u          /* the READY input is high */
+#define HIL_CTRL_READY_STOP 4u     /* READY fell during the last run and stopped it */
+#define HIL_CTRL_STALL_STOP 8u     /* the last run stopped because the sample chain stalled */
+#define HIL_CTRL_INDEX 16u         /* an encoder index pulse was seen since the start */
 
 typedef struct {
     float dt;                /* s per step */
