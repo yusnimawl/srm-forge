@@ -6,7 +6,8 @@
 
 static double round_away(double x) { return x < 0.0 ? -floor(-x + 0.5) : floor(x + 0.5); }
 
-static double clip(double x, double lo, double hi) { return x < lo ? lo : (x > hi ? hi : x); }
+/* NaN clips to 0, which lies inside every code range used here: converting NaN to an integer is undefined in C. */
+static double clip(double x, double lo, double hi) { return x != x ? 0.0 : (x < lo ? lo : (x > hi ? hi : x)); }
 
 static int clamp_bits(int bits) { return bits < 10 ? 10 : (bits > 16 ? 16 : bits); }
 
@@ -17,14 +18,15 @@ int16_t ad7606_code(double volts, double range_v)
 
 uint16_t ad7606_to_unsigned(int16_t code) { return (uint16_t)((int32_t)code + 32768); }
 
-uint16_t ad2s1210_position(double elec_angle, int bits)
+uint16_t ad2s1210_position(double elec_angle, int bits) { return ad2s1210_position_turns(elec_angle / TWO_PI, bits); }
+
+uint16_t ad2s1210_position_turns(double turns, int bits)
 {
     bits = clamp_bits(bits);
     double n = (double)(1u << bits);
-    double turns = elec_angle / TWO_PI;
     turns -= floor(turns);
     double code = round_away(turns * n);
-    if (code >= n)
+    if (!(code < n))      /* a full turn, or NaN */
         code = 0.0;
     return (uint16_t)((uint32_t)code << (16 - bits));
 }

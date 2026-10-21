@@ -1,6 +1,6 @@
 /* Coding of the converter chips the emulator imitates: AD7606 (ADC), AD2S1210 (resolver-to-digital),
    MCP4921/4922 (DAC). Plain C99, no allocation, no platform headers. Codes round half away from zero
-   and clip at the code range. */
+   and clip at the code range; a NaN input gives code 0. */
 #ifndef HIL_CHIPS_H
 #define HIL_CHIPS_H
 
@@ -13,6 +13,8 @@ uint16_t ad7606_to_unsigned(int16_t code);
 
 /* Electrical angle wrapped to [0, 2 pi), quantised to `bits` (10..16), MSB-aligned in 16 bits. */
 uint16_t ad2s1210_position(double elec_angle, int bits);
+/* The same from the angle in electrical turns (no division). */
+uint16_t ad2s1210_position_turns(double turns, int bits);
 /* Angle in [0, 2 pi) of a position word at `bits` resolution. */
 double ad2s1210_angle(uint16_t word, int bits);
 /* Two's complement velocity, full scale +-max_rps, quantised to `bits`, MSB-aligned in 16 bits. */

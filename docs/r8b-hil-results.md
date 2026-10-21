@@ -105,6 +105,67 @@ Pending wiring: edge jitter on the GPIO path against a Nucleo pattern (< 150 ns 
 mode; the RUN/READY interlock with the controller. The self-test pattern bypasses the gate inputs, so its jitter
 reads 0.
 
+### Emulator outputs (2026-10-21, Teensy 4.1 at 1008 MHz, boards not wired to each other)
+
+Output stage per mode (`hil/emulator/outputs.cpp`): emulated AD7606 on LPSPI4 as a slave (`ad7606_slave.cpp`),
+MCP4922 x 2 / MCP4921 x 4 written by LPSPI4 as a master (`dac.cpp`), emulated AD2S1210 on LPSPI3 as a slave
+(`ad2s1210_slave.cpp`) and the quadrature encoder scheduled on GPT2 (`encoder.cpp`, edge times from the host-tested
+`enc_sched.c`). All eight builds compile (ad7606 and internal x encoder, ad2s1210, both; internal also with
+mcp4921x4), clean with `-Wall -Wextra -Wdouble-promotion` in the emulator's own files.
+
+Step time with the outputs on (`examples/hil_emu_selftest.py` configuration: analytic motor, fixed 1000 rpm, 180 x 192
+tables, self-test pattern 20 kHz 50 %, encoder 4096 CPR, RDC 12 bits; 10.5 s = 2.09 M steps per case). "Errors" adds
+the worst sensor model costs: encoder eccentricity 2 mrad at harmonic 2, resolver gain mismatch 1 % and phase error
+0.01 rad. Max / overruns; target max < 4 us (80 % of dt), 0 overruns:
+
+| Mode | 1 phase | 2 phases | 1 phase, errors | 2 phases, errors |
+|---|---|---|---|---|
+| ad7606, encoder | 3.24 us / 0 | 3.82 us / 0 | 3.31 us / 0 | 3.89 us / 0 |
+| ad7606, ad2s1210 | 2.86 us / 0 | 3.42 us / 0 | 2.98 us / 0 | 3.53 us / 0 |
+| ad7606, both | 3.41 us / 0 | 3.99 us / 0 | 3.52 us / 0 | **4.10 us** / 0 |
+| internal, encoder | 3.43 us / 0 | **4.11 us** / 0 | 3.50 us / 0 | **4.18 us** / 0 |
+| internal, ad2s1210 | 3.00 us / 0 | 3.71 us / 0 | 3.12 us / 0 | 3.82 us / 0 |
+| internal, both | 3.57 us / 0 | **4.28 us** / 0 | 3.68 us / 0 | **4.39 us** / 0 |
+
+No overrun in any case; the 2-phase maxima of the DAC + encoder modes and of ad7606 + both with sensor errors exceed
+the 80 % warning level by up to 0.39 us. Means: 2.07-2.61 us (1 phase), 2.43-3.08 us (2 phases); without outputs the
+2-phase maximum was 3.06 us. Output latency (last gate edge to the end of the output stage, self-test edges) 7.1-8.2
+us. In the bench the DAC frames run with their pads released (RUN is not wired, so it is low; see the interlock
+below), so a wired run adds the LDAC pulse (about 0.15 us per step). Die temperature 62-67 C.
+
+Cost reductions applied (all on the board, measured with the cycle counter): one measured-angle computation per step
+shared by the encoder and the RDC, the eccentricity sine from a 1024-point table (error below 5e-6 of the amplitude),
+the resolver gain/phase error as a 1024-point table of the tracked-angle error over an electrical turn (about 1e-7
+turn at 5 % / 0.05 rad, 1/150 of a 16-bit count), the velocity word cached while omega is constant, no 64-bit
+integer arithmetic or division on the encoder's no-edge path, and GPT2 register reads only for edges within 2 us of
+the last compare.
+
+Interlock (safety rule): the DAC build drives Teensy 13 (SCK) and 11 (SDO) only while the RUN input itself is high.
+The pads are switched to LPSPI4 at the start of a DAC sequence in a critical section that reads RUN; the RUN falling
+edge (combined GPIO interrupt, priority 0) switches them back to GPIO inputs and raises every DAC chip select. The
+self-test does not count as RUN. While RUN is low the DACs keep the last code written while it was high (they cannot
+be written then); spec 5.4's "DAC outputs go to the zero-current code" therefore holds only for a stop while RUN is
+still high. In the AD7606 build LPSPI4 is a slave with CFGR1.OUTCFG = 1.
+
+LPSPI register semantics: the IMXRT1060RM PDF (pjrc.com copy, rev 3) is larger than the 10 MB the fetch tool reads,
+so CFGR1 was not read in the manual itself. Evidence used instead: the NXP MCUXpresso SDK LPSPI driver
+(`fsl_lpspi.h`, same LPSPI IP): `kLpspiDataOutTristate = 1U` "Data out is tristated when chip select is de-asserted"
+(CFGR1.OUTCFG) and `kLPSPI_SdiInSdoOut = 0U` "LPSPI SDI input, SDO output" (CFGR1.PINCFG, both master and slave
+configurations); the Teensy core's `imxrt.h` places OUTCFG at CFGR1 bit 26. Still to read in IMXRT1060RM (LPSPI
+chapter, CFGR1 register description) and to confirm on the wire.
+
+Pending wiring (spec section 15, `docs/r8b-hil-wiring.md` section 5), not measurable with the boards unwired:
+- LPSPI4 SDO (Teensy 11) tri-state with CS (Teensy 10) high, on the scope or logic analyser;
+- the highest reliable slave SCK for LPSPI4 (AD7606) and LPSPI3 (AD2S1210): start 8 MHz, step to 15 MHz, 10 000
+  transfers without a CRC-checked mismatch; the Nucleo SPI1/SPI3 prescalers are set to that clock in the controller
+  driver (Task 10);
+- the pin-13 LED load on SCK edges at that clock, and on the 20 MHz DAC SCK;
+- the Teensy GND pads (beside pin 0, and between VIN and 3.3V) against the printed pinout card;
+- the SPI modes the controller driver must use: AD7606 mode 2 (CPOL 1, CPHA 0: DB15 out at CS falling), AD2S1210
+  mode 3 (CPOL 1, CPHA 1), DAC mode 0; the AD7606 frame is 128 bits (V1..V8, MSB first), the AD2S1210 normal-mode
+  frame 24 bits (16-bit word, then the fault register 0), configuration frames 8 bits;
+- the encoder A/B/Z edges and the DAC/LDAC sequence on the logic analyser, and the RUN-falling release of pins 13/11.
+
 ## Acceptance
 
 Pending.

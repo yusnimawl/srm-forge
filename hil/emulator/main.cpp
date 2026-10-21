@@ -7,6 +7,7 @@ void setup()
 {
     safety_begin();
     link_begin();
+    outputs_begin();
     gates_begin();
 }
 

@@ -4,6 +4,8 @@
  * gates.cpp   gate inputs (pins 14..21, fast GPIO6) on the combined GPIO6-9 interrupt, cycle-counter stamps
  * link.cpp    USB framing, config and table upload, live statistics, capture ring and its transfer
  * safety.cpp  RUN input (pin 7) and READY output (pin 8)
+ * outputs.cpp the output stage of the build's modes, and the output pins on the combined GPIO interrupt
+ * ad7606_slave.cpp, ad2s1210_slave.cpp, dac.cpp, encoder.cpp  the emulated sensor chips (one per mode)
  *
  * Interrupt priorities (lower is more urgent): gates, then the encoder timer, then the step timer; USB stays at the
  * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 1008 MHz from platformio.ini; every cycle constant
@@ -34,6 +36,29 @@ extern "C" {
 #define EMU_SELFTEST_OFFSET 1000       /* cycles from the start of the first pattern window to its first rise */
 #define EMU_TEMP_MAX_C 85.0f           /* die temperature that stops a run */
 #define EMU_CAPTURE_RING 8192          /* samples, the largest power of two whose ring fits in DMAMEM */
+#define EMU_GPT_HZ 24000000            /* output timers (GPT1, GPT2): the 24 MHz oscillator, as the step timer's PIT */
+#define EMU_GPT_STEP 120               /* GPT ticks per step */
+
+/* Output modes of the build (hil_hello.h codes the same macros; no macro means ad7606 and encoder). */
+#ifdef HIL_CURRENT_SENSE_INTERNAL
+#define EMU_DAC 1
+#else
+#define EMU_AD7606 1
+#endif
+#if defined(HIL_POSITION_ENCODER) || !defined(HIL_POSITION_AD2S1210)
+#define EMU_ENCODER 1
+#endif
+#ifdef HIL_POSITION_AD2S1210
+#define EMU_RDC 1
+#endif
+
+/* x rounded half away from zero and saturated to int16 without branches (float to int saturates; NaN gives 0). */
+static inline int16_t emu_sat16(float x)
+{
+    int32_t n = (int32_t)(x + __builtin_copysignf(0.5f, x));
+    asm("ssat %0, #16, %1" : "=r"(n) : "r"(n));
+    return (int16_t)n;
+}
 
 extern srm_table_t g_current[EMU_MAX_THETA * EMU_MAX_PSI], g_torque[EMU_MAX_THETA * EMU_MAX_PSI];
 extern emu_edge_ring_t g_edges;
@@ -73,9 +98,38 @@ void safety_begin(void);
 bool safety_run(void);                             /* RUN high, or the self-test pattern active */
 void safety_ready(bool on);
 
-/* Output stage of a step: sensed values, encoder schedule, resolver registers. emu_outputs_zero presents the
- * zero-current state while RUN is low. */
-void emu_outputs_update(const srm_plant_t *p);
+/* outputs.cpp: the output stage of a step (sensed values, encoder schedule, resolver registers) from the plant state
+ * after the step and the winding voltages averaged over it. emu_outputs_zero presents the zero-current state (RUN
+ * low, stop). Each step interrupt calls exactly one of the two. */
+void outputs_begin(void);
+const char *outputs_configure(const hil_emu_config_t *c);
+void outputs_start(const srm_plant_t *p);
+void emu_outputs_update(const srm_plant_t *p, const srm_real_t *v);
 void emu_outputs_zero(void);
+void outputs_pins_isr(void);                      /* combined GPIO interrupt: the output modes' input pins */
+
+/* The chips, one file each, compiled in their modes only. */
+void ad7606_begin(void);
+const char *ad7606_configure(const hil_emu_config_t *c);
+void ad7606_start(void);
+void ad7606_update(const srm_plant_t *p, const srm_real_t *v);
+void ad7606_zero(void);
+void ad7606_convst(void);                         /* CONVST rising edge */
+void rdc_begin(void);
+const char *rdc_configure(const hil_emu_config_t *c);
+void rdc_start(double turns, float omega);       /* turns: measured mechanical angle (outputs.cpp) */
+void rdc_update(double turns, float omega);
+void rdc_sample(void);                            /* SAMPLE falling edge */
+void rdc_select(void);                            /* A0 or A1 changed */
+void dac_begin(void);
+const char *dac_configure(const hil_emu_config_t *c);
+void dac_update(const srm_plant_t *p);
+void dac_zero(void);
+void dac_run_low(void);                           /* RUN falling edge: release the shared SPI wires */
+void encoder_begin(void);
+const char *encoder_configure(const hil_emu_config_t *c);
+void encoder_start(double turns);
+void encoder_update(double turns);
+void encoder_hold(void);
 
 #endif

@@ -50,6 +50,12 @@ def _checks(lib):
     out["vel"] = [d.ad2s1210_velocity(r, 12, 1000.0) for r in (0.0, TWO_PI * 500, -TWO_PI * 1000, TWO_PI * 5000, -TWO_PI * 5000)]
     out["mcp"] = [d.mcp492x_word(1, 0xABC), d.mcp492x_word(0, 0xABC), d.mcp492x_word(0, 0x1FFF)]
     out["dac"] = [d.dac_code(-1e3, 1.65, 0.1, 3.3), d.dac_code(1e3, 1.65, 0.1, 3.3), d.dac_code(0, 1.65, 0.1, 3.3)]
+    d.ad2s1210_position_turns.restype = C.c_uint16
+    d.ad2s1210_position_turns.argtypes = [C.c_double, C.c_int]
+    out["turns"] = [d.ad2s1210_position_turns(t, 12) for t in (0.25, 1.75, -0.5, float("nan"))]
+    nan = float("nan")
+    out["nan"] = [d.ad7606_code(nan, 10.0), d.ad2s1210_position(nan, 12), d.ad2s1210_velocity(nan, 12, 1000.0),
+                  d.dac_code(nan, 1.65, 0.1, 3.3)]
     return out
 
 
@@ -64,6 +70,8 @@ def test_chip_coding():
     assert o["vel"] == [0, 16384, -32768, 32752, -32768]
     assert o["mcp"] == [0xBABC, 0x3ABC, 0x3FFF]
     assert o["dac"] == [0, 4095, 2048]
+    assert o["nan"] == [0, 0, 0, 0]
+    assert o["turns"] == [0x4000, 0xC000, 0x8000, 0]
 
 
 def test_chips_compile_strict(tmp_path):

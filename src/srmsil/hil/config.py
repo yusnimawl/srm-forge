@@ -12,6 +12,18 @@ from srmsil.scenario import Scenario
 from srmsil.tables import MotorData
 
 
+ENCODER_EDGE_RATE_MAX = 400_000.0
+"""Edges per second the emulator's encoder output may schedule, as 4 * cpr * rev/s."""
+
+
+def check_encoder_rate(cpr: int, rpm: float) -> None:
+    """Raise ValueError when 4 * cpr * rev/s exceeds ENCODER_EDGE_RATE_MAX."""
+    rate = 4.0 * cpr * abs(rpm) / 60.0
+    if rate > ENCODER_EDGE_RATE_MAX:
+        raise ValueError(f"encoder edge rate 4 * {cpr} * {abs(rpm) / 60.0:g} rev/s = {rate:.0f} /s exceeds "
+                         f"{ENCODER_EDGE_RATE_MAX:.0f} /s")
+
+
 class HilModes(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 

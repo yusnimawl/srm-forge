@@ -57,18 +57,6 @@ static hil_live_emu_t pub[2];
 static volatile uint8_t pub_idx;
 static volatile bool pub_new;
 
-__attribute__((weak)) void emu_outputs_update(const srm_plant_t *) {}
-__attribute__((weak)) void emu_outputs_zero(void) {}
-
-// Count of a sample field: x times the inverse scale, rounded half away from zero, saturated to 16 bits without
-// branches (the float to int conversion saturates and gives 0 for NaN).
-static inline int16_t sat16(float x)
-{
-    int32_t n = (int32_t)(x + copysignf(0.5f, x));
-    asm("ssat %0, #16, %1" : "=r"(n) : "r"(n));
-    return (int16_t)n;
-}
-
 // With the step timer stopped: a pending pattern change is dropped and the self-test flag follows the duty, so a
 // pattern switched off just before a stop cannot leave the gate inputs and RUN overridden.
 static void selftest_settle()
@@ -162,14 +150,14 @@ static void step_isr()
             memset(&s, 0, sizeof s);
             s.step = (uint32_t)n_step;
             for (int k = 0; k < q; k++) {
-                s.i[k] = sat16(pl.cur[k] * inv_i);
-                s.psi[k] = sat16(pl.psi[k] * inv_psi);
-                s.v[k] = sat16(v[k] * inv_v);
+                s.i[k] = emu_sat16(pl.cur[k] * inv_i);
+                s.psi[k] = emu_sat16(pl.psi[k] * inv_psi);
+                s.v[k] = emu_sat16(v[k] * inv_v);
             }
-            s.torque = sat16(pl.ttot * inv_t);
+            s.torque = emu_sat16(pl.ttot * inv_t);
             const double turns = pl.theta * (1.0 / EMU_TWO_PI);
             s.theta = (uint16_t)((uint32_t)((turns - floor(turns)) * 65536.0) & 0xFFFF);
-            s.omega = sat16(pl.omega * inv_w);
+            s.omega = emu_sat16(pl.omega * inv_w);
             s.gates = ga.cmd;
             cap_push(&s);
         }
@@ -184,7 +172,7 @@ static void step_isr()
         if (c_pl > prof_pl) prof_pl = c_pl;
         prof_pl_sum += c_pl;
         n_step++;
-        emu_outputs_update(&pl);
+        emu_outputs_update(&pl, v);
         if (ne) {
             w.lat_sum += emu_clock_extend(clk, ARM_DWT_CYCCNT) - e[ne - 1].t;
             w.lat_n++;
@@ -242,6 +230,8 @@ const char *emu_configure(const hil_emu_config_t *c)
     if (!finite_nonneg(c->dead_time) || !finite_nonneg(c->turn_on_delay) || !finite_nonneg(c->turn_off_delay) ||
         !finite_nonneg(c->v_switch) || !finite_nonneg(c->v_diode))
         return "config refused: converter settings";
+    const char *err = outputs_configure(c);
+    if (err) return err;
     cfg = *c;
     memset(&sim, 0, sizeof sim);
     sim.resistance = c->resistance;
@@ -312,6 +302,7 @@ const char *emu_start(void)
     const double f = (double)F_CPU_ACTUAL;
     srm_gate_avg_init(&ga, llround(((double)cfg.dead_time + (double)cfg.turn_on_delay) * f), llround((double)cfg.turn_off_delay * f), 0);
     srm_plant_init(&pl, &sim, &tab);
+    outputs_start(&pl);
     selftest_settle();
     NVIC_DISABLE_IRQ(IRQ_GPIO6789);
     emu_edge_reset(&g_edges);

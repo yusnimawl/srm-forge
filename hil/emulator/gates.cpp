@@ -1,5 +1,6 @@
 // Gate inputs: Teensy pins 14..21 are fast GPIO6 bits 16..19, 22, 23, 26, 27 and share the combined GPIO6-9
-// interrupt, which this file owns (attachInterrupt() would replace the handler).
+// interrupt, which this file owns (attachInterrupt() would replace the handler); the output modes' input pins on the
+// same interrupt are handled after the gate stamp (outputs.cpp).
 #include <Arduino.h>
 
 #include "emu.h"
@@ -10,9 +11,13 @@ static const uint32_t GATE_BITS = (1u << 16) | (1u << 17) | (1u << 18) | (1u << 
 static void gate_isr()
 {
     const uint32_t t = ARM_DWT_CYCCNT;
-    GPIO6_ISR = GPIO6_ISR & GATE_BITS;      // clear first, so a change while reading raises the interrupt again
-    const uint32_t psr = GPIO6_PSR;
-    if (!g_selftest) emu_edge_push(&g_edges, t, emu_gate_word(psr));
+    const uint32_t flags = GPIO6_ISR & GATE_BITS;
+    if (flags) {
+        GPIO6_ISR = flags;                   // clear first, so a change while reading raises the interrupt again
+        const uint32_t psr = GPIO6_PSR;
+        if (!g_selftest) emu_edge_push(&g_edges, t, emu_gate_word(psr));
+    }
+    outputs_pins_isr();
     asm volatile("dsb");
 }
 
