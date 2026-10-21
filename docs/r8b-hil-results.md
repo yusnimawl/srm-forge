@@ -81,8 +81,9 @@ Target (max < 4 us, 0 overruns) still missed: one phase by 0.2 us (0.7 us while 
 overruns on the steps with a gate edge. A streamed capture at 200 kHz (7.2 MB/s) does not keep up with the CPU time
 left to the USB loop.
 
-Core clock (owner decision, 2026-10-21, heatsink fitted): `board_build.f_cpu` in `hil/platformio.ini` sets the
-clock at boot (default 816 MHz); every cycle constant is derived from `F_CPU_ACTUAL`. The die temperature
+Core clock (owner decision, 2026-10-21): 1008 MHz, chosen from the table below. `board_build.f_cpu` in
+`hil/platformio.ini` sets it at boot; the iMXRT1062 needs a heatsink at this clock. Every cycle constant is derived
+from `F_CPU_ACTUAL`. The die temperature
 (`tempmonGetTemp`) is reported in the live statistics (`temp_c`), and a run stops (READY low, `HIL_ERROR`) above
 85 C. Single-precision plant, self-test pattern, 11 s per timing case:
 

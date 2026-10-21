@@ -6,7 +6,7 @@
  * safety.cpp  RUN input (pin 7) and READY output (pin 8)
  *
  * Interrupt priorities (lower is more urgent): gates, then the encoder timer, then the step timer; USB stays at the
- * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 816 MHz from platformio.ini; every cycle constant
+ * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 1008 MHz from platformio.ini; every cycle constant
  * is derived from it), extended to 64 bits by the step interrupt. */
 #ifndef EMU_H
 #define EMU_H
