@@ -387,9 +387,7 @@ def _capture_problem(n_steps, hdr, seqs, parts, end, bad, errors) -> str:
 
 def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenario, *, settle_s: float = 0.2) -> SimResult:
     """Configure, start, settle, capture `scenario.duration` of steps, stop. The result's traces and summary come
-    from the capture (summary over its second half); `hil` holds the health numbers over the run's live windows, the
-    measured controller clock, `window_s` (the summary's window in s since the controller's start, for the matched SIL:
-    compare.matched_scenario(..., end_s=window_s[1])) and `valid`."""
+    from the capture (summary over its second half); `hil` is `capture_health` of the run."""
     info = session.info or session.connect()
     session.configure(m, scenario, info.modes)
     n = round(scenario.duration / EMU_DT)
@@ -405,6 +403,13 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
             pass                         # the run's own error is the one to report
         raise
     session.stop()
+    return replace(cap.result, controller=controller, hil=capture_health(session, cap, scenario.resolved_isr_hz))
+
+
+def capture_health(session: HilSession, cap: Capture, isr_hz: float) -> dict:
+    """The `SimResult.hil` block of a capture: the health numbers over the session's live windows since `start`, the
+    measured controller clock, `window_s` (the summary's window in s since the controller's start, for the matched
+    SIL: compare.matched_scenario(..., end_s=window_s[1])), `valid` and `reason`."""
     ew, cw = session.emu_windows, session.ctrl_windows
     t = cap.result.traces.get("t")
     # the summary's window, the second half of the captured steps, in s since the controller's start
@@ -414,7 +419,7 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
         xs = [x for x in xs if math.isfinite(x)]
         return float(np.mean(xs)) if xs else math.nan
 
-    ratio, measured, spread = clock_stats([w.trigger_hz for w in ew], scenario.resolved_isr_hz)
+    ratio, measured, spread = clock_stats([w.trigger_hz for w in ew], isr_hz)
     hil = {
         "step_mean_us": mean([w.step_mean_us for w in ew]),
         "step_max_us": max((w.step_max_us for w in ew), default=math.nan),
@@ -443,4 +448,4 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
             reason = f"a board reported: {session.errors[0]}"
     hil["valid"] = not reason
     hil["reason"] = reason
-    return replace(cap.result, controller=controller, hil=hil)
+    return hil

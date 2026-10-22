@@ -86,7 +86,7 @@ def test_matched_scenario():
     assert scn.controller_clock == 1.011
     assert scn.compute_delay == pytest.approx(1 / (20000.0 * 1.011))
     assert scn.duration == 0.25
-    one = matched_scenario(SCN, 0.0, HilModes(current_sense="internal"), m=m)
+    one = matched_scenario(SCN, 0.0, HilModes(current_sense="internal"), m=m, end_s=None)
     assert one.sensors.delay == 0.0 and one.controller_clock == 1.0 and one.compute_delay == pytest.approx(5e-5)
     assert one.command_value == SCN.command_value and one.duration == SCN.duration
 
@@ -103,7 +103,7 @@ def test_matched_adc_equals_hil_config(tmp_path, modes):
         if line.startswith("#define HIL_ADC"):
             _, name, value = line.split()
             h[name] = float(value.rstrip("f"))
-    cfg = make_config(m, matched_scenario(scn, 0.0, modes, m=m), None, 0, 1)
+    cfg = make_config(m, matched_scenario(scn, 0.0, modes, m=m, end_s=None), None, 0, 1)
     assert cfg.adc_bits == h["HIL_ADC_BITS"]
     assert cfg.adc_offset_counts == h["HIL_ADC_OFFSET_COUNTS"]
     assert np.float32(cfg.adc_amps_per_count) == np.float32(h["HIL_ADC_AMPS_PER_COUNT"])
@@ -154,3 +154,21 @@ def test_clipped_capture_fails_comparison():
     c = compare(result(2.0, 10.0, 40.0, clipped=0.0123), result(2.0, 10.0, 40.0))
     assert not c.passed and c.reason == "capture clipped (1.2 % of samples)"
     assert c.d_torque_pct == 0.0
+
+
+def test_compare_sil_short_of_window():
+    """A SIL run that ends before (or has no samples in) the HIL window gives passed False, never an exception."""
+    t = np.arange(100) * 1e-4
+    sil = SimResult({"t": t, "torque": np.full(100, 2.0), "i": np.full((4, 100), 10.0, np.float32)},
+                    result(2.0, 10.0, 0.0).summary, SCN, "hysteresis", "", "")
+    hil = replace(result(2.0, 10.0, 0.0), hil={"valid": True, "window_s": (0.02, 0.03)})
+    c = compare(hil, sil)
+    assert not c.passed and c.reason == "SIL does not cover the HIL window"
+    partial = replace(hil, hil={"valid": True, "window_s": (0.005, 0.02)})
+    assert compare(partial, sil).reason == "SIL does not cover the HIL window"
+    assert compare(replace(hil, hil={"valid": True, "window_s": (0.002, 0.008)}), sil).passed
+
+
+def test_matched_scenario_end_s_is_required():
+    with pytest.raises(TypeError):
+        matched_scenario(SCN, 0.0, HilModes(), m=analytic_motor())

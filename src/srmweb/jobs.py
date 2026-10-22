@@ -1,7 +1,7 @@
 """Job runner: one thread per lane, FIFO within a lane, progress kept in memory.
 
-The main lane runs search, evaluate, validate, losses and control; the quick lane runs animate, so an animation never waits behind
-a map build."""
+The main lane runs search, evaluate, validate, losses, control and hil_flash; the quick lane runs animate, so an
+animation never waits behind a map build."""
 from __future__ import annotations
 
 import logging
@@ -24,11 +24,14 @@ from srmapp.sizing.estimates import J_LIMIT
 from srmapp.sizing.winding import Winding
 from srmcore.model.design import RegionMaterials
 from srmsil import run as sil_run
+from srmsil.hil import HilError
+from srmsil.hil.build import build_and_flash
 from srmsil.tables import MotorData
 from srmweb.config import Settings, is_loopback
 from srmweb.quick import QuickLane
 from srmweb.frames import frame_task
-from srmweb.schemas import AnimateRequest, ControlRequest, EvaluateRequest, LossesRequest, SearchRequest, ValidateRequest
+from srmweb.schemas import (AnimateRequest, ControlRequest, EvaluateRequest, HilFlashRequest, LossesRequest, MotorIn,
+                             SearchRequest, ValidateRequest)
 from srmweb.serialize import evaluation_json, search_result_json, to_json
 from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
 
@@ -47,6 +50,7 @@ STEPS: dict[str, tuple[str, ...]] = {
     "control": ("queued", "compile", "simulate", "saved"),
     "search": ("queued", "sampling", "designs", "pareto", "saved"),
     "losses": ("queued", "strokes", "fields", "losses", "saved"),
+    "hil_flash": ("queued", "build", "flash", "saved"),
 }
 _ETA_MIN_FRACTION = 0.05
 _ETA_STEPS = ("mapping", "frames", "fields")   # the steps whose point counts are the work done
@@ -239,8 +243,8 @@ class JobRunner:
                 self._store.put_result(job_id, result, kind=job["kind"])
             elif job["kind"] == "evaluate":
                 self._store.attach_evaluation(job["request"]["case_id"], job_id, result)
-            else:   # an animation or a control run belongs to its job, not to the case
-                case_id = None if job["kind"] in ("animate", "control") else job["request"].get("case_id")
+            else:   # an animation, a control run or a flash belongs to its job
+                case_id = None if job["kind"] in ("animate", "control", "hil_flash") else job["request"].get("case_id")
                 self._store.put_result(job_id, result, kind=job["kind"], case_id=case_id)
             if cancelled:
                 status = "interrupted" if self._stopping else "cancelled"
@@ -345,9 +349,7 @@ def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) ->
     """Compile the controller and run the scenario in a child process; the run is stored beside the cache."""
     if req.controller not in sil_run.REFERENCE and not is_loopback(ctx.settings.host):
         raise ValueError(CUSTOM_REFUSED)
-    m = MotorData(np.asarray(req.motor.angles), np.asarray(req.motor.currents), np.asarray(req.motor.psi),
-                  np.asarray(req.motor.torque), req.motor.resistance, req.motor.n_phases,
-                  req.motor.n_rotor_poles, req.motor.bus_voltage)
+    m = motor_data(req.motor)
     reporter.progress(step="compile", message="compiling the controller")
     try:
         res = sil_run.run(m, req.controller, req.scenario, cache_dir=ctx.settings.cache_dir,
@@ -363,6 +365,32 @@ def run_control_job(req: ControlRequest, reporter: Reporter, ctx: JobContext) ->
 
 
 CUSTOM_REFUSED = "custom controllers run only when srmweb is bound to a loopback host"
+HIL_REFUSED = "the HIL rig runs only when srmweb is bound to a loopback host"
+LOG_TAIL = 4000
+
+
+def motor_data(motor: MotorIn) -> MotorData:
+    return MotorData(np.asarray(motor.angles), np.asarray(motor.currents), np.asarray(motor.psi),
+                     np.asarray(motor.torque), motor.resistance, motor.n_phases, motor.n_rotor_poles,
+                     motor.bus_voltage)
+
+
+def run_hil_flash_job(req: HilFlashRequest, reporter: Reporter, ctx: JobContext) -> dict:
+    """Compile both firmwares, then compile and upload them (PlatformIO, srmsil.hil.build). A failed build or upload
+    fails the job with the end of the PlatformIO log."""
+    if not is_loopback(ctx.settings.host):
+        raise ValueError(HIL_REFUSED)
+    m = motor_data(req.motor)
+    for step, upload in (("build", False), ("flash", True)):
+        if reporter.cancelled():
+            return {"cancelled": True}
+        reporter.progress(step=step, message="compiling the firmware" if step == "build" else "flashing both boards")
+        res = build_and_flash(req.controller, m, req.scenario, req.modes, cache_dir=ctx.settings.cache_dir,
+                              upload=upload)
+        if not res.ok:
+            raise HilError(f"{step} failed:\n{res.log[-LOG_TAIL:]}")
+    return {"case_id": req.case_id, "controller": req.controller, "modes": req.modes.model_dump(),
+            "firmware_hash": res.firmware_hash, "log": res.log[-LOG_TAIL:]}
 
 
 def run_losses_job(req: LossesRequest, reporter: Reporter, ctx: JobContext) -> dict:
@@ -393,4 +421,5 @@ KINDS: dict[str, tuple[type[BaseModel], Callable[[BaseModel, Reporter, JobContex
     "animate": (AnimateRequest, run_animate_job),
     "control": (ControlRequest, run_control_job),
     "losses": (LossesRequest, run_losses_job),
+    "hil_flash": (HilFlashRequest, run_hil_flash_job),
 }

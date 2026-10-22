@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import tempfile
 import re
 import time
@@ -40,17 +41,22 @@ from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMa
 from srmcore.model.errors import InputError
 from srmcore.topology.dxf_io import import_dxf, write_dxf
 from srmsil import build as sil_build, run as sil_run, tables as sil_tables
+from srmsil.hil.config import check_isr_rate
+from srmsil.hil.transport import Transport
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.cases import check_case, estimate as estimate_case, losses_estimate, resolved_margin
 from srmweb.config import Settings, is_loopback
 from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
+from srmweb.hil import POLL_S as HIL_POLL_S, HilManager, check_loopback, serial_transports
 from srmweb.jobs import CUSTOM_REFUSED, KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
 from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, FindingOut, LossesOut,
                             MaterialOut, ReferenceOut, ReportOut, SearchResultOut)
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest,
-                            ControllerOut, EditCase, EstimateOut, EvaluateBody, EvaluateRequest, FieldIn, IssuesOut,
+                            ComparisonOut, ControllerOut, EditCase, EstimateOut, EvaluateBody, EvaluateRequest, FieldIn,
+                            HilCaptureIn, HilCaptureOut, HilCommandIn, HilFlashIn, HilFlashRequest, HilOpenIn,
+                            HilParamIn, HilParamOut, HilSessionOut, IssuesOut,
                             JobCreated, JobIn, JobOut, LossesBody, LossesEstimateOut, LossesRequest, MotorIn,
                             ReferenceCase, TargetCheckIn, TargetCheckOut, ValidateIn, ValidateRequest)
 from srmweb.setup import (NO_MACHINE_MATERIALS, ImportCase, SetupFile, case_inputs_from_setup,
@@ -129,14 +135,24 @@ def _submit(runner: JobRunner, kind: str, request: dict) -> dict:
 
 
 def create_app(settings: Settings,
-               runner_factory: Callable[[Store, Settings], JobRunner] = JobRunner) -> FastAPI:
+               runner_factory: Callable[[Store, Settings], JobRunner] = JobRunner,
+               hil_transports: Callable[[], tuple[Transport, Transport]] | None = None) -> FastAPI:
+    """`hil_transports` opens the (emulator, controller) links of the HIL rig; the default finds the boards' USB
+    serial ports."""
     store = Store(settings.db)
     runner = runner_factory(store, settings)
+
+    def flash_active() -> bool:
+        return any(j["kind"] == "hil_flash" and j["status"] in ACTIVE for j in store.list_jobs())
+
+    hil = HilManager(settings, hil_transports or serial_transports, flash_active)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         runner.start()
         yield
+        if is_loopback(settings.host):
+            hil.close()
         runner.stop()
 
     app = FastAPI(title="srmweb", version=srmweb.__version__, lifespan=lifespan, docs_url=None, redoc_url=None,
@@ -153,7 +169,7 @@ def create_app(settings: Settings,
                 del e["loc"][1]
         return JSONResponse({"detail": errors}, status_code=422)
 
-    app.state.settings, app.state.store, app.state.runner = settings, store, runner
+    app.state.settings, app.state.store, app.state.runner, app.state.hil = settings, store, runner, hil
     app.state.sessions = Sessions()
     router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
@@ -235,6 +251,12 @@ def create_app(settings: Settings,
             raise HTTPException(409, f"cannot resume a {job['status']} job")
         if job["kind"] == "control":
             controller_folders(job["request"]["controller"])
+        if job["kind"] == "hil_flash":
+            check_loopback(settings)
+            with hil.gate:
+                if hil.is_open():
+                    raise HTTPException(409, "close the HIL session before flashing")
+                return _submit(runner, job["kind"], job["request"])
         if job["kind"] != "search":
             case = store.get_case(job["request"]["case_id"])
             if case is None:
@@ -584,6 +606,11 @@ def create_app(settings: Settings,
                        f"a.{n}": f.a.astype(np.float32)}
         return binary(result, arrays)
 
+    def motor_json(motor: sil_tables.MotorData) -> dict:
+        return {"angles": motor.angles.tolist(), "currents": motor.currents.tolist(), "psi": motor.psi.tolist(),
+                "torque": motor.torque.tolist(), "resistance": motor.resistance, "n_phases": motor.n_phases,
+                "n_rotor_poles": motor.n_rotor_poles, "bus_voltage": motor.bus_voltage}
+
     def control_motor(case_id: str, bus_voltage: float | None = None) -> sil_tables.MotorData:
         """The case's map and winding as simulator motor data; 409 unless the case is evaluated."""
         field_context(case_id)
@@ -617,12 +644,27 @@ def create_app(settings: Settings,
     def control_case(case_id: str, body: ControlIn):
         motor = control_motor(case_id, body.scenario.bus_voltage)
         controller_folders(body.controller)
-        request = ControlRequest(case_id=case_id, motor=MotorIn(**{
-            "angles": motor.angles.tolist(), "currents": motor.currents.tolist(), "psi": motor.psi.tolist(),
-            "torque": motor.torque.tolist(), "resistance": motor.resistance, "n_phases": motor.n_phases,
-            "n_rotor_poles": motor.n_rotor_poles, "bus_voltage": motor.bus_voltage}),
-            controller=body.controller, scenario=body.scenario)
+        request = ControlRequest(case_id=case_id, motor=MotorIn(**motor_json(motor)), controller=body.controller,
+                                 scenario=body.scenario)
         return {"job_id": _submit(runner, "control", request.model_dump(mode="json"))["id"]}
+
+    def traces_arrays(res: sil_run.SimResult, n_px: int, prefix: str = "",
+                      span: tuple[float, float] | None = None) -> dict:
+        """Every trace of a run decimated to n_px buckets as `t.<prefix><name>[.<phase>]` and `y.<prefix>...`,
+        restricted to the samples with span[0] <= t <= span[1] when a span is given."""
+        if not res.traces:
+            return {}
+        t_all = res.traces["t"]
+        keep = slice(None) if span is None else (t_all >= span[0] - 1e-12) & (t_all <= span[1] + 1e-12)
+        arrays = {}
+        for name, trace in res.traces.items():
+            if name == "t":
+                continue
+            for k, y in (enumerate(trace) if trace.ndim == 2 else [(None, trace)]):
+                label = prefix + (name if k is None else f"{name}.{k}")
+                t, y = sil_run.decimate(t_all[keep], y[keep], n_px)
+                arrays[f"t.{label}"], arrays[f"y.{label}"] = t.astype(np.float32), y.astype(np.float32)
+        return arrays
 
     @router.get("/jobs/{job_id}/control")
     def job_control(job_id: str, n_px: Annotated[int, Query(ge=100, le=10000)] = 1500):
@@ -634,14 +676,7 @@ def create_app(settings: Settings,
         if not run_file.is_file():
             raise HTTPException(410, "the run was cleared; run the controller again")
         res = sil_run.load(run_file)
-        arrays = {}
-        for name, trace in res.traces.items():
-            if name == "t":
-                continue
-            for k, y in (enumerate(trace) if trace.ndim == 2 else [(None, trace)]):
-                label = name if k is None else f"{name}.{k}"
-                t, y = sil_run.decimate(res.traces["t"], y, n_px)
-                arrays[f"t.{label}"], arrays[f"y.{label}"] = t.astype(np.float32), y.astype(np.float32)
+        arrays = traces_arrays(res, n_px)
         meta = {"summary": result["summary"], "scenario": res.scenario.model_dump(mode="json"),
                 "controller": res.controller, "n_phases": res.traces["i"].shape[0]}
         return binary(meta, arrays)
@@ -798,7 +833,8 @@ def create_app(settings: Settings,
         sil = settings.cache_dir / "sil"
         found = [*settings.cache_dir.glob("*.h5"),
                  *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")),
-                 *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*")]
+                 *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*"),
+                 *(sil / "hil").rglob("*")]
         return [f for f in found if f.is_file() and ".tmp." not in f.name]
 
     @router.get("/settings/cache")
@@ -811,6 +847,8 @@ def create_app(settings: Settings,
     def clear_cache():
         if runner.busy() or runner.busy("quick") or runner.quick.busy():
             raise HTTPException(409, "a job is running; wait for it or cancel it")
+        if hil.is_open():
+            raise HTTPException(409, "a HIL session is open; close it first")
         for f in cache_files():
             f.unlink(missing_ok=True)
         return Response(status_code=204)
@@ -823,8 +861,109 @@ def create_app(settings: Settings,
     def swagger():
         return get_swagger_ui_html(openapi_url="/api/openapi.json", title="srmweb API")
 
+    hil_router = APIRouter(prefix="/api", dependencies=[Depends(require_auth),
+                                                        Depends(lambda: check_loopback(settings))])
+
+    def hil_setup(case_id: str, body: HilFlashIn) -> sil_tables.MotorData:
+        """The case's motor for a HIL setup; 409 unless the case is evaluated, 422 for an invalid controller folder or
+        an ISR rate the HIL cannot sample at."""
+        motor = control_motor(case_id, body.scenario.bus_voltage)
+        controller_folders(body.controller)
+        try:
+            check_isr_rate(body.scenario)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return motor
+
+    @hil_router.post("/cases/{case_id}/hil/flash", status_code=201, response_model=JobCreated)
+    def hil_flash(case_id: str, body: HilFlashIn):
+        motor = hil_setup(case_id, body)
+        request = HilFlashRequest(case_id=case_id, motor=MotorIn(**motor_json(motor)), controller=body.controller,
+                                  scenario=body.scenario, modes=body.modes)
+        with hil.gate:
+            if hil.is_open():
+                raise HTTPException(409, "close the HIL session before flashing")
+            return {"job_id": _submit(runner, "hil_flash", request.model_dump(mode="json"))["id"]}
+
+    @hil_router.post("/hil/session", status_code=201, response_model=HilSessionOut)
+    def hil_open(body: HilOpenIn):
+        motor = control_motor(body.case_id, body.scenario.bus_voltage)
+        controller_folders(body.controller)
+        return hil.open(body.case_id, body, motor)
+
+    @hil_router.delete("/hil/session", status_code=204)
+    def hil_close():
+        hil.close()
+        return Response(status_code=204)
+
+    @hil_router.get("/hil/session/events")
+    async def hil_events(request: Request):
+        """Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when
+        they change; `event: end` once the session is closed."""
+        if not hil.is_open():
+            raise HTTPException(409, "no HIL session is open")
+
+        async def stream():
+            seen, last_send = None, time.monotonic()
+            while not await request.is_disconnected():
+                event = await asyncio.to_thread(hil.poll)
+                if event is None:
+                    yield "event: end\ndata: {}\n\n"
+                    return
+                if event != seen:
+                    seen = event
+                    yield f"event: live\ndata: {json.dumps(event)}\n\n"
+                    last_send = time.monotonic()
+                elif time.monotonic() - last_send >= _KEEPALIVE_S:
+                    yield ": keep-alive\n\n"
+                    last_send = time.monotonic()
+                await asyncio.sleep(HIL_POLL_S)
+
+        return StreamingResponse(stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+    @hil_router.post("/hil/session/param", response_model=HilParamOut, response_model_exclude_none=True)
+    def hil_param(body: HilParamIn):
+        return hil.param(body.name, body.value)
+
+    @hil_router.post("/hil/session/command", response_model=HilSessionOut)
+    def hil_command(body: HilCommandIn):
+        return hil.command(body.mode, body.value)
+
+    @hil_router.post("/hil/session/start", response_model=HilSessionOut)
+    def hil_start():
+        return hil.start()
+
+    @hil_router.post("/hil/session/stop", response_model=HilSessionOut)
+    def hil_stop():
+        return hil.stop()
+
+    @hil_router.post("/hil/session/capture", status_code=201, response_model=HilCaptureOut)
+    def hil_capture(body: HilCaptureIn):
+        return hil.capture(body.n_steps)
+
+    @hil_router.get("/hil/captures/{capture_id}")
+    def hil_capture_traces(capture_id: str, n_px: Annotated[int, Query(ge=100, le=10000)] = 1500):
+        """The capture's traces decimated to n_px buckets (`t.<trace>`, `y.<trace>`), and once compared the matched
+        SIL run's over the capture's time span (`t.sil.<trace>`, `y.sil.<trace>`)."""
+        path = hil.capture_file(capture_id)
+        res = sil_run.load(path)
+        arrays = traces_arrays(res, n_px)
+        sil_file = path.with_name(f"{capture_id}.sil.npz")
+        compared = sil_file.is_file()
+        if compared and res.traces:
+            t = res.traces["t"]
+            arrays |= traces_arrays(sil_run.load(sil_file), n_px, "sil.", (float(t[0]), float(t[-1])))
+        meta = {"summary": res.summary, "scenario": res.scenario.model_dump(mode="json"), "controller": res.controller,
+                "hil": res.hil, "compared": compared, "n_phases": len(res.summary.i_rms)}
+        return binary(meta, arrays)
+
+    @hil_router.get("/hil/captures/{capture_id}/compare", response_model=ComparisonOut)
+    def hil_compare(capture_id: str):
+        return hil.compare(capture_id, control_motor)
+
     app.include_router(auth_router)
     app.include_router(router)
+    app.include_router(hil_router)
     _mount_frontend(app, settings.static_dir)
     return app
 

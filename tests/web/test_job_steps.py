@@ -18,6 +18,7 @@ SEQUENCES = {
     "control": ["queued", "compile", "simulate", "saved"],
     "search": ["queued", "sampling", "designs", "pareto", "saved"],
     "losses": ["queued", "strokes", "fields", "losses", "saved"],
+    "hil_flash": ["queued", "build", "flash", "saved"],
 }
 
 

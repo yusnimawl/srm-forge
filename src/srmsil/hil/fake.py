@@ -65,7 +65,7 @@ class _Rig:
                 encoder_ecc_harmonic=c["encoder_ecc_harmonic"], resolver=bool(c["resolver"]),
                 resolver_pole_pairs=c["resolver_pole_pairs"], resolver_bits=c["rdc_bits"],
                 resolver_gain_mismatch=c["resolver_gain_mismatch"], resolver_phase_error=c["resolver_phase_error"]))
-        return matched_scenario(base, LATENCY_US * 1e-6, self.modes, self.clock_ratio, m=self.m)
+        return matched_scenario(base, LATENCY_US * 1e-6, self.modes, self.clock_ratio, m=self.m, end_s=None)
 
     def capture(self, seq: int, n: int) -> list[tuple[int, int, bytes]]:
         start = self.step_now()

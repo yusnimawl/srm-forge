@@ -11,6 +11,7 @@ from srmapp.case import CaseInputs
 from srmapp.references import REFERENCES
 from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
+from srmsil.hil.config import HilModes
 from srmsil.scenario import Scenario
 
 
@@ -294,3 +295,78 @@ class ControllerParamOut(BaseModel):
 class ControllerOut(BaseModel):
     name: str
     params: list[ControllerParamOut]
+
+
+class HilFlashIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    controller: str   # a reference name or an absolute folder path
+    scenario: Scenario = Scenario()
+    modes: HilModes = HilModes()
+
+
+class HilFlashRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    motor: MotorIn
+    controller: str
+    scenario: Scenario
+    modes: HilModes
+
+
+class HilOpenIn(HilFlashIn):
+    case_id: str
+
+
+class HilSessionOut(BaseModel):
+    case_id: str
+    controller: str
+    modes: HilModes
+    scenario: Scenario
+    emulator_hash: int
+    controller_hash: int
+    running: bool
+
+
+class HilParamIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=23)
+    value: float = Field(allow_inf_nan=False)
+
+
+class HilParamOut(BaseModel):
+    status: int                 # ctrl_param's return: 0 accepted, -1 unknown, -2 not changeable while running
+    message: str | None = None
+
+
+class HilCommandIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["torque", "speed"]
+    value: float = Field(allow_inf_nan=False)   # N*m or rpm
+
+
+class HilCaptureIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    n_steps: int = Field(ge=100, le=200_000)    # emulator steps of 5 us
+
+
+class HilCaptureOut(BaseModel):
+    capture_id: str
+    valid: bool
+    reason: str
+    clipped: float
+
+
+class ComparisonOut(BaseModel):
+    """`srmsil.hil.compare.Comparison`; a difference is None when it is not finite."""
+    d_torque_pct: float | None
+    d_irms_pct: float | None
+    d_ripple_pts: float | None
+    passed: bool
+    clock_ratio: float | None
+    clock_measured: bool
+    reason: str
