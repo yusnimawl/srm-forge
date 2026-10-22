@@ -340,8 +340,8 @@ No logic analyser is attached to this PC.
   - 0.1-0.45 rad: 16.47-16.82 A on the Nucleo, 16.74 A from the capture;
   - 0.6-0.95 rad: 14.96-15.12 A on the Nucleo, 15.00-15.08 A from the capture.
 
-**(c) AD2S1210: blocked by the SCK wire (Nucleo PC10 = Zio D45 / CN8-6 -> Teensy 27).**
-- The start is refused: "AD2S1210 control register reads 255, wrote 0x75". This happens with and without the scratch
+**(c) AD2S1210, first attempt: an open SCK wire (Nucleo PC10 = Zio D45 / CN8-6 -> Teensy 27).**
+- The start was refused: "AD2S1210 control register reads 255, wrote 0x75". This happens with and without the scratch
   patches.
 - Evidence:
   1. Transfers driven by hand from the halted Nucleo through OpenOCD read 0xFF in every frame: normal-mode position
@@ -364,8 +364,50 @@ No logic analyser is attached to this PC.
      The Nucleo's IDR confirmed that PC10 was driven.
 - The Teensy's LPSPI3 mux and input select (pins 0/1/26/27; select inputs 0/0/1/1) match the Teensy SPI library's
   LPSPI3 table.
-- To do: the owner checks or replaces the SCK wire. Then rerun the start (configuration readback), the pattern test in
-  ad7606 + both, and the SPI clock search for SPI3.
+- The owner fixed the wire. No firmware was changed.
+
+**(c) AD2S1210 with the fixed wire: configuration readback, position, velocity and SPI3 clock all correct.**
+- The start is accepted in ad7606 + ad2s1210 and in ad7606 + both, so control register 0x92 reads back 0x75 (12 bits).
+- Position against the emulator's theta, in `both` mode at 1000 rpm, with a scratch controller (not in the tree). It is
+  open_loop driven by the angle from `resolver_sincos` (atan2), window 0.6-0.95 rad, and it also logs, on every
+  sample, the resolver angle minus the encoder angle in counts of 4096.
+  - Default sensors (no resolver errors):
+    - The gate edges arrive 50-105 us (on) and 48-98 us (off) after the window marks, the same as the
+      encoder-driven run.
+    - Over 163 598 samples, RDC minus encoder is -1.01 to +1.01 counts (mean -0.21, std 0.41). That is the 12-bit
+      rounding plus the encoder's floor and its 10-15 us lag.
+    - Torque +2.83 N m (encoder-driven: +2.80).
+  - Gain mismatch 1 %, phase error 0.01 rad:
+    - Over 162 579 samples, RDC minus encoder is -2.01 to +8.01 counts (mean +3.06).
+    - The expected value is the error of atan2(sin x, 1.01 cos(x + 0.01)), -1.32 to +7.87 counts (mean +3.28), plus
+      the zero-error spread above, which gives about -2.3 to +8.9 (mean +3.07).
+- Velocity, read by hand through OpenOCD after a run. The Nucleo was stopped and the emulator held its last step, with
+  A0/A1 = 0/1 and a SAMPLE pulse.
+
+  | Speed | Velocity frame | Expected (12 bits, 1000 rps full scale) |
+  |---|---|---|
+  | +1000 rpm | 0x02 0x20 0x00 | 0x0220 = 34 << 4, fault 0 |
+  | -1000 rpm | 0xFD 0xE0 0x00 | 0xFDE0 = -34 << 4 |
+  | +3000 rpm | 0x06 0x60 0x00 | 0x0660 = 102 << 4 |
+
+  A second read returns the same frame. Position frames are MSB-aligned at 12 bits (low nibble 0).
+- SPI3 clock: the scratch counter-and-hash pattern as for the AD7606. The position word steps by 40503 on each
+  SAMPLE, and the fault byte is a hash of the word; every frame is checked on the Nucleo.
+
+  | HIL_SPI_MBR | SCK (nominal) | Mode | SPI3 frames: ok / bad | AD7606 frames: ok / bad |
+  |---|---|---|---|---|
+  | 3 (default) | 12.5 MHz | ad7606 + ad2s1210 | 101 605 / 0 | 101 605 / 0 |
+  | 3 (default) | 12.5 MHz | ad7606 + both | 204 330 / 0 | 204 330 / 0 |
+  | 2 | 25 MHz | ad7606 + ad2s1210 | 102 954 / 0 | 102 954 / 0 |
+  | 2 | 25 MHz | ad7606 + both | 202 631 / 0 | 202 631 / 0 |
+  | 1 | 50 MHz | ad7606 + ad2s1210 | 101 316 / 0 | 94 355 / 6 961 |
+  | 0 | 100 MHz | ad7606 + ad2s1210 | start refused: the control register reads 58 | - |
+
+- The highest reliable clock is 50 MHz for SPI3 and 25 MHz for SPI1 (AD7606). `HIL_SPI_MBR` sets both, so the default
+  stays at MBR 3 (12.5 MHz): a factor of 2 below the AD7606 limit and a factor of 4 below the SPI3 limit.
+- In ad7606 + ad2s1210, `tests/sil/controllers/open_loop` leaves every gate off. It needs an encoder:
+  `encoder_cpr` is 0 there, so its angle is 0/0 = NaN. That is expected, not a driver fault.
+- Both boards are flashed back to the committed ad7606 + encoder + open_loop (the same build on both).
 
 **(d) Spin test, open_loop, ad7606 + encoder, 1000 rpm fixed: 0 overruns.**
 
