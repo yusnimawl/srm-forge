@@ -289,6 +289,109 @@ Wired, `open_loop` (theta 0.1-0.45 rad), analytic motor, fixed 1000 rpm, ad7606 
   items (READY timing, encoder direction and index, AD7606/AD2S1210 code comparison and SPI clock, the spin test, the
   HSE measurement) are run.
 
+### Wired bench, continued (2026-10-22)
+
+Both boards run the committed code (HEAD 9e269fb) in ad7606 + encoder with `tests/sil/controllers/open_loop`,
+analytic motor, fixed 1000 rpm, 4096 CPR, 20 kHz. The timing and SPI measurements used scratch instrumentation that
+is not in the tree (described with each item); the boards were flashed back to the committed code afterwards.
+
+**Encoder: the cause was a wiring fault.** The owner found the encoder A/B wire faulty and replaced it. No firmware
+was changed. With the new wire (OpenOCD, 300 samples while running):
+- PD12 (A) was high in 149 samples and PD13 (B) in 138. TIM4 CNT took 291 distinct values, rising by about 115 per
+  sample and wrapping at 4096 with no jump, and the index was seen (live state 19 = READY + RUNNING + INDEX).
+- Count against the emulator's true theta: the gate edges in three 8000-step captures, as
+  p = (theta - k pitch/4) mod pitch, 12 on and 12 off edges per phase:
+
+  | Phase | On at p (rad) | Delay after 0.1 rad | Off at p (rad) | Delay after 0.45 rad |
+  |---|---|---|---|---|
+  | A | 0.1052-0.1109 | 50-104 us | 0.4560-0.4607 | 58-102 us |
+  | B | 0.1057-0.1099 | 55-95 us | 0.4560-0.4602 | 57-98 us |
+  | C | 0.1063-0.1104 | 60-100 us | 0.4560-0.4608 | 58-103 us |
+  | D | 0.1052-0.1099 | 50-95 us | 0.4555-0.4602 | 52-97 us |
+
+  The expected delay is 42-102 us. That is the encoder lag (10-15 us), plus the wait for the ctrl_isr count read
+  (0-49.3 us), plus the time from the read to the next PWM update (about 32 us), plus the 5 us capture step. So the
+  count matches theta to within about one count (1.53 mrad, which is 14.6 us at 1000 rpm). The count is 0 at theta = 0
+  after the index, and the direction is counter-clockwise (the count rises; the motoring window gives positive torque,
+  below). Upper and lower gates were equal in every sample.
+
+**(a) READY to gates off: 0.232-0.252 us (mean 0.245 us) over 40 stops.** This is far inside one PWM period (49 us).
+It was timed on the Teensy (CYCCNT, 1008 MHz) from the write that lowers READY to the gate interrupt that first sees
+all eight gates low, so it includes the Teensy's gate interrupt latency. A gate was on at the READY edge in all 40
+stops. Scratch patch: `emu_stop` stamps the READY write, `gate_isr` stamps the all-low word, and HELLO reports both.
+No logic analyser is attached to this PC.
+
+**(c) AD7606 on the wire: bit-exact; highest reliable SCK 25 MHz (HIL_SPI_MBR 2).**
+- Scratch pattern test: on each CONVST the emulator sends V1 = a 16-bit counter and V2-V8 = a hash of
+  (counter, channel). The Nucleo checks every frame in the DMA-complete interrupt (all 7 hashes, and counter =
+  previous + 1), and the counts are read through OpenOCD.
+- The SPI kernel clock runs 1.07 % fast (item e), so the real clocks are 1.07 % above the nominal values below.
+
+  | HIL_SPI_MBR | SCK (nominal) | Frames checked | Bad frames | Counter breaks | Trigger to ctrl_isr |
+  |---|---|---|---|---|---|
+  | 3 (default) | 12.5 MHz | 102 792 | 0 | 0 | 17.5 us |
+  | 2 | 25 MHz | 102 034 + 1 214 568 | 0 | 0 | 12.2 us |
+  | 1 | 50 MHz | 102 850 | 15 | 15 | 9.6 us |
+
+- The default stays at MBR 3 (12.5 MHz). 25 MHz passes, but it has only a factor of 2 to the failing step, and it is
+  at or above the serial clock rating of a real AD7606 (check the datasheet before raising it).
+- Real data agree with the emulator, as far as the AD7606 full scale (31.25 A) allows. The Nucleo's rms current
+  (`i_meas`) is compared with the emulator capture clipped at 31.25 A:
+  - 0.1-0.45 rad: 16.47-16.82 A on the Nucleo, 16.74 A from the capture;
+  - 0.6-0.95 rad: 14.96-15.12 A on the Nucleo, 15.00-15.08 A from the capture.
+
+**(c) AD2S1210: blocked by the SCK wire (Nucleo PC10 = Zio D45 / CN8-6 -> Teensy 27).**
+- The start is refused: "AD2S1210 control register reads 255, wrote 0x75". This happens with and without the scratch
+  patches.
+- Evidence:
+  1. Transfers driven by hand from the halted Nucleo through OpenOCD read 0xFF in every frame: normal-mode position
+     (expected 0x0000) and configuration mode.
+  2. With FSYNC held high, the same transfer follows the Nucleo's own pull (pull-down 0x00, pull-up 0xFF), so the
+     Nucleo receive path works. MISO goes high when FSYNC goes low.
+  3. The Teensy's LPSPI3 then shows SR = FCF only, and its TX FIFO count stays at 8. The slave sees the chip select,
+     but no clock edge.
+  4. Each Nucleo RDC output was driven as a GPIO 0/1/0/1, with each Teensy pin read as a GPIO (scratch HELLO dump):
+
+     | Nucleo pin | Teensy pin | Result |
+     |---|---|---|
+     | PC12 MOSI | 1 | follows |
+     | PD2 FSYNC | 0 | follows |
+     | PG2 SAMPLE | 9 | follows |
+     | PG3 A0 | 22 | follows |
+     | PD7 A1 | 23 | follows |
+     | PC10 SCK | 27 | stays 1 (pad keeper) |
+
+     The Nucleo's IDR confirmed that PC10 was driven.
+- The Teensy's LPSPI3 mux and input select (pins 0/1/26/27; select inputs 0/0/1/1) match the Teensy SPI library's
+  LPSPI3 table.
+- To do: the owner checks or replaces the SCK wire. Then rerun the start (configuration readback), the pattern test in
+  ad7606 + both, and the SPI clock search for SPI3.
+
+**(d) Spin test, open_loop, ad7606 + encoder, 1000 rpm fixed: 0 overruns.**
+
+| Window (rad) | Mean torque | Emulator i_rms (true) | Nucleo i_meas (clipped at 31.25 A) | ISR mean / max | Trigger to ctrl_isr | Emulator step mean / max |
+|---|---|---|---|---|---|---|
+| 0.1-0.45 | -7.78 N m | 30.4 A | 16.5-16.8 A | 2.92 / 3.27 us | 16.9 us | 2.38 / 4.25 us |
+| 0.6-0.95 | +2.80 N m | 21.1-21.4 A | 15.0-15.1 A | 2.72 / 3.24 us | 16.9 us | 2.47 / 4.50 us |
+
+- 0 overruns on both boards and no errors (10 s runs plus a capture).
+- The 0.1-0.45 rad window lies after alignment (L(theta) of the analytic motor peaks at p = 0), so at a fixed speed it
+  generates; 0.6-0.95 rad motors.
+- Open loop at 48 V has no current limit, so the peaks exceed the map (20 A; the capture clips at 2 i_max = 40 A),
+  and the AD7606 clips at 31.25 A. So the rms on the Nucleo is lower than the true rms in both runs; with clipping taken
+  into account, the two agree (item c).
+- One motoring capture had a host-side packet gap (7972 of 8000 samples).
+- The emulator step max (4.25-4.50 us) is above the 4 us budget, as in the Task 9 encoder modes, but there are no
+  overruns.
+
+**(e) Nucleo clock against the Teensy crystal: +10 650 ppm.** This is recorded only; HSE_VALUE is unchanged and the
+owner decision is pending.
+- TIM2 (`micros`) was read through OpenOCD every 2 s for 80 s with host timestamps: 1.0106336 per host second. The
+  Teensy step counter gave 0.9999841 per host second over the same run.
+- The LIVE_CTRL arrivals (every 50 SysTicks) over 90 s give +10 869 ppm (host jitter 22 ms rms).
+- On 2026-10-21 the error was +14 000 ppm. So the ST-LINK's 8 MHz output drifts by thousands of ppm, which fits an
+  RC-derived source rather than a crystal. A fixed HSE_VALUE would not hold; an HSE crystal (X3) would.
+
 ## Acceptance
 
 Pending.
