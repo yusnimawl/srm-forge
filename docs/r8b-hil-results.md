@@ -434,6 +434,32 @@ owner decision is pending.
 - On 2026-10-21 the error was +14 000 ppm. So the ST-LINK's 8 MHz output drifts by thousands of ppm, which fits an
   RC-derived source rather than a crystal. A fixed HSE_VALUE would not hold; an HSE crystal (X3) would.
 
+### Trigger-rate clock measurement (2026-10-22, Teensy 4.1 at 1008 MHz, boards wired)
+
+The owner kept HSE_VALUE; every HIL run measures the Nucleo clock instead. LIVE_EMU `trigger_hz` is the controller's
+sample-trigger rate per 50 ms window by the Teensy's cycle counter, (n - 1) / (t_last - t_first): CONVST in AD7606
+builds, else SAMPLE in AD2S1210 builds, NaN below 2 triggers. Both boards ran the same modes, `open_loop`
+(0.6-0.95 rad), analytic motor, fixed 1000 rpm, nominal isr_hz = pwm_hz = 20 kHz. Cross-checks over the same run:
+the LIVE_CTRL arrival rate and TIM2 (`micros`) read through OpenOCD every 2 s, each against the Teensy step counter.
+
+| Modes (both boards) | Run | Source | trigger_hz mean (window std) | Ratio to 20 kHz | LIVE_CTRL | TIM2 |
+|---|---|---|---|---|---|---|
+| ad7606 + encoder | 90 s | CONVST | 20 222.31 Hz (7.3 Hz) | 1.011115 | 1.011125 | 1.011135 |
+| ad7606 + ad2s1210 | 45 s | CONVST | 20 224.43 Hz (6.7 Hz) | 1.011221 | 1.011130 | 1.011199 |
+| ad7606 + ad2s1210, scratch build counting SAMPLE | 45 s | SAMPLE | 20 223.07 Hz (6.3 Hz) | 1.011154 | 1.011047 | 1.011148 |
+| ad7606 + encoder (committed, last) | 40 s | CONVST | 20 222.14 Hz (8.6 Hz) | 1.011107 | 1.011105 | 1.011019 |
+
+- The run means agree with both cross-checks to within 0.01 % (+11 107 to +11 221 ppm; earlier +10 650 and
+  +14 000 ppm).
+- The window-to-window spread (6-9 Hz, about 400 ppm) is the Nucleo clock wandering, not measurement noise: consecutive
+  windows correlate at 0.79 and 1 s means still spread by 4.5 Hz. A single window is good to about 0.04 %; a matched
+  SIL should use the run mean.
+- With the controller stopped, every window reports NaN. 0 overruns on both boards in every run.
+- The internal + ad2s1210 build (which counts SAMPLE without a scratch change) was not run. Internal sensing needs the
+  DAC wiring and the Teensy driving the shared SCK wire, and no wired run has used it yet. The scratch build only moved
+  the stamp from CONVST to SAMPLE. Both boards were flashed back to the committed
+  ad7606 + encoder build.
+
 ## Acceptance
 
 Pending.
