@@ -1,5 +1,7 @@
 import ctypes as C
+import dataclasses
 import json
+import math
 import subprocess
 import tempfile
 from pathlib import Path
@@ -63,6 +65,16 @@ def test_struct_sizes():
     live = proto.LiveCtrl(1.5, 3.25, 2, 0.5, (1.0, 2.0, 3.0, 4.0), 12.5, 7, proto.CTRL_RUNNING | proto.CTRL_HANG_STOP)
     assert proto.LIVE_CTRL.size == 41
     assert proto.unpack_live_ctrl(proto.pack_live_ctrl(live)) == live
+
+
+def test_live_emu_trigger_hz():
+    assert proto.LIVE_EMU.size == 64
+    vec = next(v for v in json.loads(VECTORS.read_text()) if v["type"] == Type.LIVE_EMU)
+    live = proto.unpack_live_emu(bytes.fromhex(vec["payload"]))
+    assert live.temp_c == 42.5 and live.trigger_hz == 20214.5
+    assert proto.pack_live_emu(live).hex() == vec["payload"]
+    nan = proto.unpack_live_emu(proto.pack_live_emu(dataclasses.replace(live, trigger_hz=float("nan"))))
+    assert math.isnan(nan.trigger_hz) and nan.temp_c == 42.5
 
 
 def _lib():

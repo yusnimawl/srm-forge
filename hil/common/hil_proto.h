@@ -77,6 +77,7 @@ typedef struct {
     uint32_t overruns, dropped;
     float edge_jitter_ns, latency_us;
     float temp_c;            /* die temperature */
+    float trigger_hz;        /* controller sample triggers per s by the emulator clock; NaN below 2 */
 } hil_live_emu_t;
 
 /* Controller statistics over one 50 ms window (the maximum and the overruns since the start). */

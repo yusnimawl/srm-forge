@@ -15,6 +15,39 @@
 
 #define SIN_TAB 1024
 
+// The controller's sample triggers, one per controller ISR: CONVST in AD7606 builds, else SAMPLE in AD2S1210 builds,
+// else none. The pins interrupt stamps them into trig[trig_sel]; outputs_trigger_hz (step interrupt, less urgent, so
+// it never preempts a stamp) switches trig_sel and then reads the other buffer, which no stamp writes any more.
+struct Trig {
+    uint32_t n, first, last;      // count, first and last cycle stamp
+};
+static volatile Trig trig[2];
+static volatile uint8_t trig_sel;
+
+static inline void trig_stamp(uint32_t t)
+{
+    volatile Trig &b = trig[trig_sel];
+    if (b.n++ == 0) b.first = t;
+    b.last = t;
+}
+
+void outputs_trigger_reset(void)
+{
+    trig[0].n = trig[1].n = 0;
+    trig_sel = 0;
+}
+
+// last - first is exact in 32 bits while the window is shorter than the cycle-counter wrap (4.26 s at 1008 MHz).
+float outputs_trigger_hz(void)
+{
+    const uint8_t s = trig_sel;
+    trig_sel = s ^ 1;             // the other buffer was emptied when it was last read
+    volatile Trig &b = trig[s];
+    const uint32_t n = b.n, span = b.last - b.first;
+    b.n = 0;
+    return n >= 2 && span ? (float)((double)(n - 1) * (double)F_CPU_ACTUAL / (double)span) : NAN;
+}
+
 static uint32_t bits6, bits7, bits9;     // the enabled pins of each port
 static float sin_tab[SIN_TAB + 1];       // sin over one turn
 static double off_turns, ecc_turns;      // encoder offset and eccentricity amplitude, in turns
@@ -83,7 +116,7 @@ void outputs_begin(void)
 #endif
 }
 
-void outputs_pins_isr(void)
+void outputs_pins_isr(uint32_t t)
 {
     const uint32_t f6 = GPIO6_ISR & bits6, f7 = GPIO7_ISR & bits7, f9 = GPIO9_ISR & bits9;
     if (f6) GPIO6_ISR = f6;
@@ -93,12 +126,21 @@ void outputs_pins_isr(void)
     if (f7 & CORE_PIN7_BITMASK) dac_run_low();
 #endif
 #ifdef EMU_AD7606
-    if (f9 & CORE_PIN5_BITMASK) ad7606_convst();
+    if (f9 & CORE_PIN5_BITMASK) {
+        trig_stamp(t);
+        ad7606_convst();
+    }
 #endif
 #ifdef EMU_RDC
-    if (f7 & CORE_PIN9_BITMASK) rdc_sample();
+    if (f7 & CORE_PIN9_BITMASK) {
+#ifndef EMU_AD7606
+        trig_stamp(t);
+#endif
+        rdc_sample();
+    }
     if (f6) rdc_select();
 #endif
+    (void)t;
 }
 
 const char *outputs_configure(const hil_emu_config_t *c)

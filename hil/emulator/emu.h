@@ -107,7 +107,9 @@ const char *outputs_configure(const hil_emu_config_t *c);
 void outputs_start(const srm_plant_t *p);
 void emu_outputs_update(const srm_plant_t *p, const srm_real_t *v);
 void emu_outputs_zero(void);
-void outputs_pins_isr(void);                      /* combined GPIO interrupt: the output modes' input pins */
+void outputs_pins_isr(uint32_t t);                /* combined GPIO interrupt entered at cycle t: input pins */
+void outputs_trigger_reset(void);                 /* with the GPIO interrupt disabled */
+float outputs_trigger_hz(void);                   /* step interrupt: triggers per s since the last call */
 
 /* The chips, one file each, compiled in their modes only. */
 void ad7606_begin(void);

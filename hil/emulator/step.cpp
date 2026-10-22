@@ -94,6 +94,7 @@ static void publish()
         o.edge_jitter_ns = NAN;
     }
     o.latency_us = w.lat_n ? (float)((double)w.lat_sum / w.lat_n / f * 1e6) : NAN;
+    o.trigger_hz = outputs_trigger_hz();
     pub_idx ^= 1;
     pub_new = true;
     window_reset();
@@ -306,6 +307,7 @@ const char *emu_start(void)
     selftest_settle();
     NVIC_DISABLE_IRQ(IRQ_GPIO6789);
     emu_edge_reset(&g_edges);
+    outputs_trigger_reset();
     NVIC_ENABLE_IRQ(IRQ_GPIO6789);
     edge_overflows_seen = 0;
     last_word = 0;

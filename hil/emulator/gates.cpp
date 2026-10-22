@@ -17,7 +17,7 @@ static void gate_isr()
         const uint32_t psr = GPIO6_PSR;
         if (!g_selftest) emu_edge_push(&g_edges, t, emu_gate_word(psr));
     }
-    outputs_pins_isr();
+    outputs_pins_isr(t);
     asm volatile("dsb");
 }
 
