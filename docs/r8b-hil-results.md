@@ -507,6 +507,41 @@ on the host, together with the frame it merges into), the packet is missing and 
 valid. On this PC the Windows USB serial driver kept accepting data through a 2 s host stall, so that path was not
 reached. The host marks any gap or bad frame during a capture invalid, so a recurrence cannot pass unnoticed.
 
+#### Revised matched SIL and emulator short-write count (2026-10-22, same rig)
+
+The runs above used the first matched SIL (sensors.delay = latency + AD7606 conversion and SPI time, the SIL's own
+12-bit ADC, the SIL run from t = 0 over the capture's duration). The matched SIL is now (`compare.matched_scenario`):
+- compute_delay = 1 / (isr_hz x r): the sample is latched at the trigger, conversion and SPI only delay ctrl_isr, and
+  the preloaded compares load at the next underflow, one controller ISR period later;
+- sensors.delay = the emulator's measured `latency_us`: it runs from the last gate edge of a step's window to the end
+  of that step's output stage, so for gate edges asynchronous to the emulator steps it already averages the age of a
+  value latched at a random trigger (output delay D plus dt/2);
+- the ADC of the HIL chain (`config.hil_adc`: for the AD7606, 16 bits, offset 32768, the amps and volts per count of
+  `hil_config.h`, clipping at the range);
+- the SIL runs from the controller's start to the end of the capture, and both sides are compared over the same
+  window, the second half of the captured steps (`hil["window_s"]`, s since the controller's start; the emulator's
+  step count runs only while RUN is high).
+
+The emulator (`hil/emulator/link.cpp`) now checks every USB write; a short write counts in LIVE_EMU `dropped` (so the
+run is invalid) and marks a capture being sent invalid. Both firmwares rebuilt and flashed with the same modes
+(ad7606 + encoder, open_loop, 24 V; hash 0x5acbb3e0), then the 24 V run_hil + compare of the table above:
+
+| Runs | valid | clock_ratio | d_torque | d_irms | d_ripple | Passed |
+|---|---|---|---|---|---|---|
+| first confirmation run | yes | 1.010912 (348 ppm) | +1.23 % | +0.65 % | +1.27 pts | yes |
+| 25 further runs (one process each; 13 compared) | 23 | 1.01098-1.01230 | -1.69 to +1.44 % | -1.01 to +1.00 % | -3.11 to +1.27 pts | all 13 |
+
+- Health in every run: emulator step mean 2.49 us, max 4.19-4.40 us, 0 overruns, `dropped` 0; ISR 2.74-2.75 / 3.1 us,
+  0 overruns; latency 6.35-6.45 us; no clipped samples. The ratio rose to 1.0123 in one run (ST-LINK clock drift).
+- Two of those runs were invalid with a 1-packet capture gap and 1 bad frame ("sequence gap: CAPTURE_DATA 129
+  missing"), while the emulator's `dropped` stayed 0: so the loss is not a short write that the Teensy core reports.
+  20 run_hil runs in one session and 20 in separate processes (bad-frame lengths recorded) showed no gap. The loss
+  is rare (2 in about 280 captures with this firmware and host) and its side is still open; the host marks it invalid.
+- Against a SIL at the nominal clock, the first run gave +1.18 % torque and +2.59 points ripple, and the run at
+  r = 1.0123 +0.39 % and +2.02 points against -1.69 % and -1.05 points matched: in the revised model the measured
+  clock changes this angle-driven controller's result mostly in the ripple, and the run-to-run spread (about +-1.5 %
+  torque) is larger than the clock's effect on the mean.
+
 ## Acceptance
 
 Pending.

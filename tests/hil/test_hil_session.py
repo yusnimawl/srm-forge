@@ -4,7 +4,9 @@ import math
 import sys
 import time
 import types
+from pathlib import Path
 
+import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
@@ -12,7 +14,7 @@ from srmsil.hil import HilError, proto
 from srmsil.hil.config import HilModes
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.proto import Type
-from srmsil.hil.session import HilSession, clock_stats
+from srmsil.hil.session import HilSession, _capture_problem, clock_stats, run_hil
 from srmsil.scenario import Scenario
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.004, command_value=1.0)
@@ -81,12 +83,14 @@ def test_capture_complete_is_valid(cache):
 
 
 def test_capture_reports_clipped_current(cache):
-    s, _, _ = session(cache)
+    open_loop = str(Path(__file__).parents[1] / "sil" / "controllers" / "open_loop")
+    s, _, _ = session(cache, controller=open_loop)
     s.connect()
-    s.configure(analytic_motor(), SCN.model_copy(update={"bus_voltage": 400.0}), HilModes())   # runs far past 2 i_max
+    scn = Scenario(speed_rpm=1000.0, duration=0.01, params={"theta_on": 0.6, "theta_off": 0.95})   # peaks far past 2 i_max
+    s.configure(analytic_motor(), scn, HilModes())
     s.start()
     try:
-        cap = s.capture(800)
+        cap = s.capture(2000)
     finally:
         s.stop()
     assert cap.valid and 0.0 < cap.clipped < 1.0
@@ -212,3 +216,52 @@ def test_serial_reader_counts_bad_frames(monkeypatch):
         assert proto.unframe(bytes(port.written)) == (Type.HELLO, seq, b"")
     finally:
         t.close()
+
+
+def test_failed_reconnect_clears_rig_info(cache):
+    s, _, ctrl = session(cache)
+    assert s.connect().modes == HilModes()
+    ctrl._rig.codes[2] = (1, 0, 1)                      # the controller board now reports internal sensing
+    with pytest.raises(HilError, match="board modes differ"):
+        s.connect()
+    assert s.info is None
+    with pytest.raises(HilError, match="board modes differ"):
+        run_hil(s, analytic_motor(), "hysteresis", SCN)
+
+
+def test_run_hil_keeps_the_run_error_when_stop_fails(cache):
+    s, _, _ = session(cache)
+    s.connect()
+
+    def failing_stop():
+        raise HilError("stop failed")
+
+    def failing_capture(n):
+        s.stop = failing_stop
+        raise HilError("capture failed")
+
+    s.capture = failing_capture
+    with pytest.raises(HilError, match="capture failed"):
+        run_hil(s, analytic_motor(), "hysteresis", SCN)
+
+
+def test_short_capture_invalid():
+    hdr = proto.CaptureHeader(5e-6, 1, 1, 1, 1, 1, 100, 4)
+    parts = [np.zeros(28, proto.SAMPLE_DTYPE) for _ in range(3)]
+    for k, p in enumerate(parts):
+        p["step"] = 28 * k + np.arange(28)
+    assert _capture_problem(84, hdr, [0, 1, 2], parts, (3, 1, 84), 0, []) == ""
+    assert _capture_problem(100, hdr, [0, 1, 2], parts, (3, 1, 84), 0, []) == "short capture: 84 of 100 samples"
+
+
+@pytest.mark.parametrize("field", [{"adc": {"offset_error": 1.0}}, {"adc": {"gain_error": 0.01}},
+                                   {"adc": {"noise": 0.5}}, {"adc": {"rc_tau": 1e-6}}, {"sensors": {"delay": 1e-6}}])
+def test_configure_refuses_settings_the_hil_does_not_emulate(cache, field):
+    s, emu, _ = session(cache)
+    s.connect()
+    scn = Scenario(speed_rpm=1000.0, duration=0.004, **field)
+    (group, values), = field.items()
+    (name, _), = values.items()
+    with pytest.raises(HilError, match=f"does not emulate {group}.{name}"):
+        s.configure(analytic_motor(), scn, HilModes())
+    assert Type.EMU_CONFIG not in emu.requests

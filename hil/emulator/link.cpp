@@ -20,6 +20,7 @@ DMAMEM static hil_sample_t ring[EMU_CAPTURE_RING];
 static volatile uint32_t head, tail, remaining, recorded, dropped;
 static volatile bool cap_on, cap_bad;
 static bool sending, buffered;
+static volatile uint32_t tx_short;                 // frames cut by a short USB write, since the last start (loop context)
 static uint32_t cap_n, overruns_at_start;
 static volatile uint32_t overruns_at_end;     // taken by the step interrupt as it records the last sample
 static uint16_t data_seq, seq_out;
@@ -30,10 +31,15 @@ static bool rx_overflow;
 static uint8_t tx[HIL_FRAME_MAX(HIL_PAYLOAD_MAX)];
 static uint8_t pkt[HIL_PAYLOAD_MAX];
 
+// A short USB write (the core gives up after the host has taken nothing for 120 ms) cuts the frame; it counts as a
+// dropped sample in the live statistics, and a capture being sent is marked invalid.
 static void send(uint8_t type, uint16_t seq, const void *p, size_t n)
 {
     size_t m = hil_frame(type, seq, p, n, tx);
-    Serial.write(tx, m);
+    if (Serial.write(tx, m) != m) {
+        tx_short++;
+        if (sending) cap_bad = true;
+    }
 }
 
 static void reply(uint8_t type, uint16_t seq, const char *err)
@@ -63,8 +69,12 @@ void cap_push(const hil_sample_t *s)
     }
 }
 
-uint32_t cap_dropped(void) { return dropped; }
-void cap_reset_dropped(void) { dropped = 0; }
+uint32_t cap_dropped(void) { return dropped + tx_short; }
+void cap_reset_dropped(void)
+{
+    dropped = 0;
+    tx_short = 0;
+}
 
 void cap_abort(void)
 {

@@ -7,11 +7,11 @@ import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
-from srmsil.hil.compare import compare, matched_scenario, sense_latency
-from srmsil.hil.config import HilModes
+from srmsil.hil.compare import compare, matched_scenario
+from srmsil.hil.config import HilModes, write_hil_config
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.session import HilSession, run_hil
-from srmsil.run import SimResult, SimSummary, run
+from srmsil.run import SimResult, SimSummary, make_config, run
 from srmsil.scenario import Scenario
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.02, command_value=1.0)
@@ -23,16 +23,17 @@ def cache(tmp_path_factory):
     return tmp_path_factory.mktemp("hil_compare")
 
 
-def hil_run(cache, clock_ratio):
+def hil_run(cache, clock_ratio, scn=SCN):
     m = analytic_motor()
     s = HilSession(*FakeRig(m, clock_ratio=clock_ratio, cache_dir=cache))
     s.connect()
-    return run_hil(s, m, "hysteresis", SCN)
+    return run_hil(s, m, "hysteresis", scn)
 
 
-def matched(cache, res, clock_ratio):
-    scn = matched_scenario(SCN, res.hil["latency_us"] * 1e-6, HilModes(), clock_ratio)
-    return run(analytic_motor(), "hysteresis", scn, cache_dir=cache)
+def matched(cache, res, clock_ratio, scn=SCN, end_s=True):
+    end = res.hil["window_s"][1] if end_s else None
+    ms = matched_scenario(scn, res.hil["latency_us"] * 1e-6, HilModes(), clock_ratio, m=analytic_motor(), end_s=end)
+    return run(analytic_motor(), "hysteresis", ms, cache_dir=cache)
 
 
 @pytest.mark.parametrize("r", [1.0, R])
@@ -48,6 +49,9 @@ def test_run_hil_on_fake_matches_sil(cache, r):
         assert math.isfinite(h[k]), k
     assert res.controller == "hysteresis"
     assert res.traces["i"].shape == (4, 4000)
+    t0, t1 = h["window_s"]
+    assert t0 > 0.2 and t1 - t0 == pytest.approx(0.01)
+    assert res.traces["t"][2000] == t0
     assert res.summary.mean_torque > 0.5
     c = compare(res, matched(cache, res, h["clock_ratio"]))
     assert c.passed, c
@@ -62,22 +66,59 @@ def test_clock_ratio_matters(cache):
                                                                               abs(good.d_irms_pct))
 
 
+def test_window_matches_a_changing_run(cache):
+    """Dynamic run that accelerates: only the SIL from the controller's start over the HIL's window matches."""
+    scn = Scenario(mode="dynamic", speed_rpm=200.0, inertia=2e-3, duration=0.02, command_value=1.0)
+    res = hil_run(cache, 1.0, scn)
+    w = res.traces["omega"]
+    assert w[-1] > 2 * 200.0 * 2 * math.pi / 60        # it has sped up well past the start speed by the capture
+    good = compare(res, matched(cache, res, 1.0, scn))
+    assert good.passed, good
+    old = compare(replace(res, hil={**res.hil, "window_s": None}), matched(cache, res, 1.0, scn, end_s=False))
+    assert not old.passed
+    assert abs(old.d_torque_pct) + abs(old.d_irms_pct) > 10 * (abs(good.d_torque_pct) + abs(good.d_irms_pct))
+
+
 def test_matched_scenario():
-    scn = matched_scenario(SCN, 8e-6, HilModes(), 1.011)
-    assert scn.sensors.delay == pytest.approx(8e-6 + 4.15e-6 + 128 / 12.5e6)
+    m = analytic_motor()
+    scn = matched_scenario(SCN, 8e-6, HilModes(), 1.011, m=m, end_s=0.25)
+    assert scn.sensors.delay == 8e-6
     assert scn.controller_clock == 1.011
-    assert sense_latency("internal") == 0.0
-    assert sense_latency(HilModes()) == pytest.approx(4.15e-6 + 128 / 12.5e6)
-    one = matched_scenario(SCN, 0.0, HilModes(current_sense="internal"))
-    assert one.sensors.delay == 0.0 and one.controller_clock == 1.0
+    assert scn.compute_delay == pytest.approx(1 / (20000.0 * 1.011))
+    assert scn.duration == 0.25
+    one = matched_scenario(SCN, 0.0, HilModes(current_sense="internal"), m=m)
+    assert one.sensors.delay == 0.0 and one.controller_clock == 1.0 and one.compute_delay == pytest.approx(5e-5)
     assert one.command_value == SCN.command_value and one.duration == SCN.duration
 
 
-def result(torque, irms, ripple, valid=True):
+@pytest.mark.parametrize("modes", [HilModes(), HilModes(current_sense="internal"),
+                                   HilModes(current_sense="internal", dac="mcp4921x4")])
+def test_matched_adc_equals_hil_config(tmp_path, modes):
+    """The matched SIL hands the controller the HAL ADC constants that hil_config.h gives it on the Nucleo."""
+    m = analytic_motor()
+    scn = Scenario(bus_voltage=36.0)
+    write_hil_config(modes, scn, m, tmp_path / "hil_config.h")
+    h = {}
+    for line in (tmp_path / "hil_config.h").read_text().splitlines():
+        if line.startswith("#define HIL_ADC"):
+            _, name, value = line.split()
+            h[name] = float(value.rstrip("f"))
+    cfg = make_config(m, matched_scenario(scn, 0.0, modes, m=m), None, 0, 1)
+    assert cfg.adc_bits == h["HIL_ADC_BITS"]
+    assert cfg.adc_offset_counts == h["HIL_ADC_OFFSET_COUNTS"]
+    assert np.float32(cfg.adc_amps_per_count) == np.float32(h["HIL_ADC_AMPS_PER_COUNT"])
+    vfs = cfg.volt_full_scale
+    sil_volts = 2 * vfs / (2**cfg.adc_bits - 1) if vfs else 0.0      # srm_sim.c: the HAL's adc_volts_per_count
+    assert np.float32(sil_volts) == np.float32(h["HIL_ADC_VOLTS_PER_COUNT"])
+    if vfs:
+        assert h["HIL_ADC_VOLT_OFFSET_COUNTS"] == 2 ** (cfg.adc_bits - 1)
+
+
+def result(torque, irms, ripple, valid=True, clipped=0.0):
     s = SimSummary(mean_torque=torque, ripple_pct=ripple, i_rms=np.full(4, irms), copper_loss=0.0, power_in=0.0,
                    power_mech=0.0, beyond_map_fraction=0.0, energy_error=0.0, roundtrip_error=0.0)
     return SimResult({}, s, SCN, "hysteresis", "", "", hil={"valid": valid, "clock_ratio": 1.01,
-                                                            "clock_measured": True})
+                                                            "clock_measured": True, "capture_clipped": clipped})
 
 
 def test_compare_bounds():
@@ -92,6 +133,8 @@ def test_compare_bounds():
     assert c.d_torque_pct == pytest.approx(3.1) and c.d_irms_pct == pytest.approx(-2.0)
     assert c.d_ripple_pts == pytest.approx(5.1)
     assert c.clock_ratio == 1.01 and c.clock_measured
+    assert compare(result(2.0, 10.0, 40.0), sil).reason == ""
+    assert "mean torque +3.10 %" in c.reason and "ripple +5.10 points" in c.reason
     assert not compare(result(2.0, 10.0, 40.0, valid=False), sil).passed
     assert not compare(replace(result(2.0, 10.0, 40.0), hil=None), sil).passed
     assert not compare(result(math.nan, 10.0, 40.0), sil).passed
@@ -105,3 +148,9 @@ def test_hil_block_survives_save(tmp_path):
     assert load(tmp_path / "r.npz").hil == {"valid": True, "edge_jitter_ns": None, "errors": ["x"]}
     save(replace(r, hil=None), tmp_path / "p.npz")
     assert load(tmp_path / "p.npz").hil is None
+
+
+def test_clipped_capture_fails_comparison():
+    c = compare(result(2.0, 10.0, 40.0, clipped=0.0123), result(2.0, 10.0, 40.0))
+    assert not c.passed and c.reason == "capture clipped (1.2 % of samples)"
+    assert c.d_torque_pct == 0.0

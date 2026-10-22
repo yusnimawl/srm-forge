@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from srmsil.scenario import Scenario
+from srmsil.scenario import AdcSettings, Scenario
 from srmsil.tables import MotorData
 
 
@@ -60,8 +60,6 @@ AD7606_RANGE_V = 10.0
 """V, the AD7606 input range (+-)."""
 AD7606_T_CONV_US = 4.15
 """us, the AD7606 conversion time (datasheet maximum without oversampling)."""
-AD7606_SPI_HZ = 12.5e6
-"""Hz, the controller's SPI1 clock for the AD7606 read at the default HIL_SPI_MBR 3 (200 MHz / 16)."""
 SENSE_TOP_V = 8.0
 """V at the AD7606 inputs for 1.25 x the top map current, and for 1.25 x the bus voltage."""
 DAC_V_MID = 0.2
@@ -82,6 +80,28 @@ def sensor_chain(m: MotorData, scenario: Scenario) -> dict[str, float]:
             "dac_v_mid": DAC_V_MID, "dac_v_per_a": (DAC_VREF - DAC_V_MID) / (1.2 * i_top)}
 
 
+def adc_constants(modes: HilModes, scenario: Scenario, m: MotorData) -> tuple[int, float, int, float, int]:
+    """The controller's ADC HAL constants of the sensing chain of `modes`: (bits, amps per count, offset counts, volts
+    per count, volt offset counts). AD7606 codes are handed over as offset binary, 16 bits; the Nucleo ADC reads the
+    DACs at 16 bits and has no voltage channels (volts per count 0)."""
+    c = sensor_chain(m, scenario)
+    if modes.current_sense == "ad7606":
+        lsb = c["ad7606_range_v"] / 32768
+        return 16, lsb / c["sense_v_per_a"], 32768, lsb / c["volt_divider"], 32768
+    lsb = DAC_VREF / 2**NUCLEO_ADC_BITS
+    return NUCLEO_ADC_BITS, lsb / c["dac_v_per_a"], round(c["dac_v_mid"] / lsb), 0.0, 0
+
+
+def hil_adc(modes: HilModes, scenario: Scenario, m: MotorData) -> AdcSettings:
+    """SIL ADC settings with the HAL constants and code range of the HIL's sensing chain (`adc_constants`): the SIL's
+    amps per count is full_scale / (2^bits - 1), and its bipolar voltage channels have 2 volt_full_scale /
+    (2^bits - 1) volts per count about the mid code. The scenario's volt_rc_tau is kept (the emulator applies it)."""
+    bits, amps, offset, volts, _ = adc_constants(modes, scenario, m)
+    top = 2**bits - 1
+    return AdcSettings(bits=bits, full_scale=amps * top, offset_counts=offset,
+                       volt_full_scale=volts * top / 2 if volts else None, volt_rc_tau=scenario.adc.volt_rc_tau)
+
+
 def write_hil_config(modes: HilModes, scenario: Scenario, m: MotorData, path: Path) -> None:
     """The controller firmware's build constants: modes, PWM and ISR rates, bus voltage, and the ADC scales of the
     sensing chain of `modes` (AD7606 codes are handed over as offset binary, 16 bits; the Nucleo ADC reads the DACs at
@@ -92,15 +112,7 @@ def write_hil_config(modes: HilModes, scenario: Scenario, m: MotorData, path: Pa
         raise ValueError(f"resolver_bits {se.resolver_bits}: the AD2S1210 has 10, 12, 14 or 16 bits")
     if modes.position in ("encoder", "both") and not 1 <= se.encoder_cpr <= 65536:
         raise ValueError(f"encoder_cpr {se.encoder_cpr}: the controller's 16-bit encoder timer takes 1..65536")
-    c = sensor_chain(m, scenario)
-    if modes.current_sense == "ad7606":
-        lsb = c["ad7606_range_v"] / 32768
-        bits, amps, offset = 16, lsb / c["sense_v_per_a"], 32768
-        volts, volt_offset = lsb / c["volt_divider"], 32768
-    else:
-        lsb = DAC_VREF / 2**NUCLEO_ADC_BITS
-        bits, amps, offset = NUCLEO_ADC_BITS, lsb / c["dac_v_per_a"], round(c["dac_v_mid"] / lsb)
-        volts, volt_offset = 0.0, 0
+    bits, amps, offset, volts, volt_offset = adc_constants(modes, scenario, m)
     lines = [f"#define {n} 1" for n in mode_defines(modes)]
     lines += [
         f"#define HIL_PWM_HZ {scenario.pwm_hz!r}f",

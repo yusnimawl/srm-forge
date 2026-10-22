@@ -12,18 +12,18 @@ from pathlib import Path
 import numpy as np
 
 from srmsil.hil import proto
-from srmsil.hil.compare import sense_latency
+from srmsil.hil.compare import matched_scenario
 from srmsil.hil.config import HilModes
 from srmsil.hil.proto import Type
 from srmsil.hil.session import EMU_DT, RPM, build_codes
-from srmsil.run import PARAMS, SimResult, run
+from srmsil.run import PARAMS, TRACE_CAP, SimResult, run
 from srmsil.scenario import ConverterSettings, Scenario, SensorSettings
 from srmsil.tables import MotorData
 
 FAKE_PWM_HZ = 20000.0        # the fake firmware's build constants: pwm_hz = isr_hz
 FAKE_HASH = 0x5EED0001
 LIVE_S = 0.05
-LATENCY_US = 8.0             # reported output latency; the fake's SIL uses it as the sensed-value delay
+LATENCY_US = 8.0             # reported output latency; the fake's SIL runs with the matched timing for it
 SIL_DT = 0.5e-6
 
 
@@ -40,35 +40,42 @@ class _Rig:
         self.params: dict[str, float] = {}
         self.cmd = (0, 0.0)
         self.sil: SimResult | None = None
-        self.n_step = 0
+        self.ctrl_t0 = 0.0         # monotonic time of the controller's start: emulator step 0
 
     def build_info(self, board: int) -> bytes:
         return proto.pack_build_info(proto.BuildInfo(proto.PROTOCOL_VERSION, board, *self.codes[board], FAKE_HASH))
 
+    def step_now(self) -> int:
+        return round((time.monotonic() - self.ctrl_t0) / EMU_DT) if self.started else 0
+
     def scenario(self, n_steps: int) -> Scenario:
+        """The run since the controller's start, on the rig's timing and ADC chain (as matched_scenario models it)."""
         c = self.cfg
         mode, value = self.cmd
-        return Scenario(
+        base = Scenario(
             mode="dynamic" if c["mode"] else "fixed", speed_rpm=c["speed"] / RPM, duration=n_steps * EMU_DT,
             dt=SIL_DT, command_mode="speed" if mode else "torque", command_value=value / RPM if mode else value,
             inertia=c["inertia"], friction=c["friction"], load=c["load"], load_step=c["load_step"],
             load_step_time=c["load_step_time"], theta0=c["theta0"], bus_voltage=c["bus_voltage"], pwm_hz=FAKE_PWM_HZ,
-            controller_clock=self.clock_ratio, seed=c["seed"], params=dict(self.params),
+            seed=c["seed"], params=dict(self.params),
             converter=ConverterSettings(v_switch=c["v_switch"], v_diode=c["v_diode"], dead_time=c["dead_time"],
                                         turn_on_delay=c["turn_on_delay"], turn_off_delay=c["turn_off_delay"]),
             sensors=SensorSettings(
                 encoder_cpr=c["encoder_cpr"], encoder_offset=c["encoder_offset"], encoder_ecc_amp=c["encoder_ecc_amp"],
                 encoder_ecc_harmonic=c["encoder_ecc_harmonic"], resolver=bool(c["resolver"]),
                 resolver_pole_pairs=c["resolver_pole_pairs"], resolver_bits=c["rdc_bits"],
-                resolver_gain_mismatch=c["resolver_gain_mismatch"], resolver_phase_error=c["resolver_phase_error"],
-                delay=LATENCY_US * 1e-6 + sense_latency(self.modes)))
+                resolver_gain_mismatch=c["resolver_gain_mismatch"], resolver_phase_error=c["resolver_phase_error"]))
+        return matched_scenario(base, LATENCY_US * 1e-6, self.modes, self.clock_ratio, m=self.m)
 
     def capture(self, seq: int, n: int) -> list[tuple[int, int, bytes]]:
-        res = run(self.m, self.controller, self.scenario(n), cache_dir=self.cache_dir)
+        start = self.step_now()
+        k = round(EMU_DT / SIL_DT)
+        if (start + n) * k > TRACE_CAP:
+            raise RuntimeError("fake rig: a capture must end within 1 s of the controller's start")
+        res = run(self.m, self.controller, self.scenario(start + n), cache_dir=self.cache_dir)
         self.sil = res
         c, tr, q = self.cfg, res.traces, self.m.n_phases
-        k = round(EMU_DT / SIL_DT)
-        idx = np.arange(n) * k
+        idx = (start + np.arange(n)) * k
         scales = (2 * c["i_max"] / 32767, 2 * c["psi_max"] / 32767, 1.25 * (c["bus_voltage"] + 2 * c["v_diode"]) / 32767,
                   1.25 * (self.t_max or 1.0) / 32767, max(2 * abs(c["speed"]), 100.0) / 32767)
         hdr = proto.CaptureHeader(EMU_DT, *scales, n, q)
@@ -77,10 +84,10 @@ class _Rig:
             return np.clip(np.round(x / scale), -32767, 32767).astype(np.int16)
 
         s = np.zeros(n, proto.SAMPLE_DTYPE)
-        s["step"] = self.n_step + np.arange(n)
+        s["step"] = start + np.arange(n)
         s["i"][:, :q] = i16(tr["i"][:, idx], hdr.i_scale).T
         s["psi"][:, :q] = i16(tr["psi"][:, idx], hdr.psi_scale).T
-        v = tr["v"][:, : n * k].reshape(q, n, k).mean(axis=2)          # averaged over each emulator step
+        v = tr["v"][:, start * k: (start + n) * k].reshape(q, n, k).mean(axis=2)   # averaged over each emulator step
         s["v"][:, :q] = i16(v, hdr.v_scale).T
         s["torque"] = i16(tr["torque"][idx], hdr.t_scale)
         s["theta"] = (np.mod(tr["theta"][idx] / (2 * math.pi), 1.0) * 65536).astype(np.uint32) & 0xFFFF
@@ -100,13 +107,12 @@ class _Rig:
 
     def live_emu(self) -> bytes:
         trig = FAKE_PWM_HZ * self.clock_ratio if self.ctrl_on else math.nan
-        self.n_step += round(LIVE_S / EMU_DT)
         if self.sil is not None:
             s = self.sil.summary
             phys = (s.mean_torque, s.ripple_pct, (*s.i_rms, *[0.0] * (4 - len(s.i_rms))))
         else:
             phys = (math.nan, math.nan, (math.nan,) * 4)
-        return proto.pack_live_emu(proto.LiveEmu(self.n_step, phys[0], phys[1], phys[2], self.cfg["speed"] / RPM,
+        return proto.pack_live_emu(proto.LiveEmu(self.step_now(), phys[0], phys[1], phys[2], self.cfg["speed"] / RPM,
                                                  2.0, 3.5, 0, 0, 20.0, LATENCY_US, 60.0, trig))
 
     def live_ctrl(self) -> bytes:
@@ -181,6 +187,7 @@ class _Rig:
             if not self.emu_on:
                 return ack("start refused: READY is low (start the emulator first)")
             self.ctrl_on = self.started = True
+            self.ctrl_t0 = time.monotonic()
             return ack()
         if t == Type.STOP:
             self.ctrl_on = False

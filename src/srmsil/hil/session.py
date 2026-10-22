@@ -102,7 +102,7 @@ def capture_traces(hdr: proto.CaptureHeader, s: np.ndarray) -> dict[str, np.ndar
     k = np.arange(q)[:, None]
     g = s["gates"].astype(np.uint16)[None, :]
     return {
-        "t": (s["step"] - s["step"][0]).astype(np.float64) * hdr.dt,
+        "t": s["step"].astype(np.float64) * hdr.dt,       # since the controller's start: the plant steps only while RUN is high
         "theta": s["theta"].astype(np.float64) * (2 * math.pi / 65536),
         "omega": s["omega"] * float(hdr.omega_scale),
         "torque": s["torque"] * float(hdr.t_scale),
@@ -210,6 +210,7 @@ class HilSession:
     def connect(self) -> RigInfo:
         """Ask both boards for their build; raises before anything else is sent when the protocol, the board roles or
         the build modes do not match."""
+        self.info = None
         infos = []
         for tr, board, name in ((self.emu, 1, "emulator"), (self.ctrl, 2, "controller")):
             b = proto.unpack_build_info(self._request(tr, Type.HELLO, reply=Type.BUILD_INFO))
@@ -233,7 +234,8 @@ class HilSession:
 
     def configure(self, m: MotorData, scenario: Scenario, modes: HilModes) -> None:
         """Check the scenario against the HIL's rules, stop both boards, upload the emulator config and tables, set
-        the controller parameters and command. Setup errors raise ValueError before anything is sent."""
+        the controller parameters and command. Rule checks raise ValueError, and modes or settings the HIL does not
+        emulate raise HilError, before anything is sent."""
         info = self._connected()
         if mode_defines(modes) != mode_defines(info.modes):
             raise HilError(f"modes {modes.env_string} differ from the boards' build {info.modes.env_string}")
@@ -245,6 +247,13 @@ class HilSession:
             check_encoder_rate(scenario.sensors.encoder_cpr, rpm)
         if scenario.param_steps:
             raise ValueError("param_steps are not timed on the HIL; set parameters live with set_param")
+        ad, se = scenario.adc, scenario.sensors
+        unsupported = [name for name, v in (("adc.offset_error", ad.offset_error), ("adc.gain_error", ad.gain_error),
+                                            ("adc.noise", ad.noise), ("adc.rc_tau", ad.rc_tau),
+                                            ("sensors.delay", se.delay)) if v != 0]
+        if unsupported:
+            raise HilError(f"the HIL does not emulate {', '.join(unsupported)}; set them to 0 (the sensed-value delay "
+                           "and the ADC are those of the rig)")
         n = round(scenario.duration / EMU_DT)
         self.stop()
         self._request(self.emu, Type.EMU_CONFIG, proto.pack_emu_config(emu_config(m, scenario, n)))
@@ -378,8 +387,9 @@ def _capture_problem(n_steps, hdr, seqs, parts, end, bad, errors) -> str:
 
 def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenario, *, settle_s: float = 0.2) -> SimResult:
     """Configure, start, settle, capture `scenario.duration` of steps, stop. The result's traces and summary come
-    from the capture (summary over its second half, as the SIL's); `hil` holds the health numbers over the run's live
-    windows, the measured controller clock and `valid`."""
+    from the capture (summary over its second half); `hil` holds the health numbers over the run's live windows, the
+    measured controller clock, `window_s` (the summary's window in s since the controller's start, for the matched SIL:
+    compare.matched_scenario(..., end_s=window_s[1])) and `valid`."""
     info = session.info or session.connect()
     session.configure(m, scenario, info.modes)
     n = round(scenario.duration / EMU_DT)
@@ -388,9 +398,17 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
         session.wait(settle_s)
         cap = session.capture(n)
         session.wait(0.06)               # the window in which the capture ended
-    finally:
-        session.stop()
+    except BaseException:
+        try:
+            session.stop()
+        except HilError:
+            pass                         # the run's own error is the one to report
+        raise
+    session.stop()
     ew, cw = session.emu_windows, session.ctrl_windows
+    t = cap.result.traces.get("t")
+    # the summary's window, the second half of the captured steps, in s since the controller's start
+    window = (float(t[len(t) // 2]), float(t[-1]) + EMU_DT) if t is not None and len(t) else None
 
     def mean(xs):
         xs = [x for x in xs if math.isfinite(x)]
@@ -412,6 +430,7 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
         "clock_spread_ppm": spread,
         "bad_frames": session.emu.bad_frames + session.ctrl.bad_frames,
         "capture_clipped": cap.clipped,
+        "window_s": window,
         "errors": list(session.errors),
     }
     reason = cap.reason
