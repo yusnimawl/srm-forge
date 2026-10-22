@@ -460,6 +460,53 @@ the LIVE_CTRL arrival rate and TIM2 (`micros`) read through OpenOCD every 2 s, e
   the stamp from CONVST to SAMPLE. Both boards were flashed back to the committed
   ad7606 + encoder build.
 
+### Host session, run_hil and the matched SIL (2026-10-22, Teensy 4.1 at 1008 MHz, boards wired)
+
+`srmsil.hil.session` (`HilSession`, `run_hil`) over `srmsil.hil.transport.SerialTransport` (a reader thread appends raw
+bytes to a buffer; `recv` splits on 0x00 and unframes; a 4 MB driver receive buffer is asked for on Windows) and
+`discover()` (COM4 Teensy, COM6 ST-LINK). Both boards flashed with the same build (ad7606 + encoder,
+`tests/sil/controllers/open_loop`, analytic motor, scenario bus 24 V; hash 0xaca15dd5 on both; the first Teensy upload
+needed the usual retry). `run_hil`: fixed 1000 rpm, window 0.6-0.95 rad, 20 kHz, duration 0.02 s (a 4000-step buffered
+capture after 0.2 s settling), summary over the capture's second half. The matched SIL is
+`matched_scenario(scenario, latency_us, modes, clock_ratio)`: `sensors.delay` = latency + 4.15 us + 128 / 12.5 MHz,
+`controller_clock` = the measured ratio.
+
+| Bus | valid | clock_ratio (spread) | Emulator step mean / max, overruns | ISR mean / max, overruns | Latency | d_torque | d_irms | d_ripple | Passed |
+|---|---|---|---|---|---|---|---|---|---|
+| 24 V, run 1 | yes | 1.010967 (259 ppm) | 2.49 / 4.40 us, 0 | 2.74 / 3.10 us, 0 | 6.41 us | -0.31 % | -0.73 % | +0.42 pts | yes |
+| 24 V, run 2 | yes | 1.010882 (175 ppm) | 2.49 / 4.36 us, 0 | 2.74 / 3.21 us, 0 | 6.47 us | +0.13 % | -0.22 % | -0.50 pts | yes |
+| 48 V (the spin-test setting, same build) | yes | 1.010999 (151 ppm) | 2.49 / 4.37 us, 0 | 2.74 / 3.10 us, 0 | 6.56 us | +0.48 % | **-18.4 %** | +0.63 pts | **no** |
+
+- 24 V: HIL 0.604-0.606 N m, ripple 36.6-37.5 %, 4.9-5.0 A rms; matched SIL 0.606 N m, 37.1 %, 4.9-5.0 A rms. Against
+  a SIL at the nominal clock (controller_clock 1.0) the differences grow to +1.27 / +1.59 % torque and +2.85 / +1.93
+  points ripple, so the measured clock ratio matters even for this angle-driven controller.
+- 48 V fails on the RMS current: open loop at 48 V has no current limit, the peaks reach about 69 A (SIL), beyond the
+  map (20 A) and beyond the capture's int16 range (2 x the table i_max = 40 A), so the captured currents clip. The
+  capture now reports the share of clipped samples (`Capture.clipped`, `hil["capture_clipped"]`: 0.43 at 48 V, 0 at
+  24 V on a repeat run, which again gave -18.4 % and -0.26 %); it does not change
+  `valid`. Torque (+0.48 %) and ripple agree. Recorded, tolerances unchanged.
+- `edge_jitter_ns` is the spread of the phase-A rise-to-rise period, which for open_loop is the stroke timing (14-20 us
+  here), not gate-input jitter against a fixed carrier.
+
+Capture sequence gaps (carried from the emulator-core and spin-test runs: one buffered capture in three to five had a
+1- or 5-packet gap with CRC-bad frames on the host while the emulator reported valid). Buffered captures of 8000
+steps on the run above:
+
+| Host reader | Condition | Captures | Gaps | Bad frames |
+|---|---|---|---|---|
+| raw reader thread (`SerialTransport`) | idle host | 20 + 60 | 0 | 0 |
+| decode-as-read in the caller's thread (as `examples/hil_emu_selftest.py`) | idle host | 20 + 60 | 0 | 0 |
+| raw reader thread | 16 CPU-bound processes on the host | 30 | 0 | 0 |
+| decode-as-read | 16 CPU-bound processes on the host | 30 | 0 | 0 |
+| raw reader thread, the reader stalled 0.5 s / 2 s after the first capture bytes (4 MB and 4 KB driver buffer) | | 15 | 0 | 0 |
+
+The loss did not reproduce in 235 captures with either reader, so neither side was changed. A Teensy-side mechanism
+that matches the old symptom exists: `usb_serial_write` (teensy4 core) returns fewer bytes than asked once the host
+has not taken data for 120 ms (TX_TIMEOUT_MSEC), and `link.cpp` does not check the count, so a frame is cut (CRC-bad
+on the host, together with the frame it merges into), the packet is missing and the emulator's capture end still says
+valid. On this PC the Windows USB serial driver kept accepting data through a 2 s host stall, so that path was not
+reached. The host marks any gap or bad frame during a capture invalid, so a recurrence cannot pass unnoticed.
+
 ## Acceptance
 
 Pending.
