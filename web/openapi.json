@@ -2229,6 +2229,39 @@
         "title": "HilFlashIn",
         "type": "object"
       },
+      "HilFlashResultOut": {
+        "description": "The result of a finished `hil_flash` job: the end of the PlatformIO log of the upload.",
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "controller": {
+            "title": "Controller",
+            "type": "string"
+          },
+          "firmware_hash": {
+            "title": "Firmware Hash",
+            "type": "integer"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "modes": {
+            "$ref": "#/components/schemas/HilModes"
+          }
+        },
+        "required": [
+          "case_id",
+          "controller",
+          "modes",
+          "firmware_hash",
+          "log"
+        ],
+        "title": "HilFlashResultOut",
+        "type": "object"
+      },
       "HilModes": {
         "additionalProperties": false,
         "properties": {
@@ -7169,6 +7202,46 @@
           }
         },
         "summary": "Job Frames"
+      }
+    },
+    "/api/jobs/{job_id}/hil-flash": {
+      "get": {
+        "description": "The build log and firmware hash of a finished Build & Flash job.",
+        "operationId": "hil_flash_result_api_jobs__job_id__hil_flash_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HilFlashResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hil Flash Result"
       }
     },
     "/api/jobs/{job_id}/result": {

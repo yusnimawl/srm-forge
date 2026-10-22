@@ -17,6 +17,8 @@ class FakeEventSource {
   static all: FakeEventSource[] = []
   listeners: Record<string, (e: Event) => void> = {}
   closed = false
+  readyState = 1
+  onerror: (() => void) | null = null
   url: string
   constructor(url: string) { this.url = url; FakeEventSource.all.push(this) }
   addEventListener(n: string, f: (e: Event) => void) { this.listeners[n] = f }
@@ -72,7 +74,7 @@ async function mount(props: Partial<React.ComponentProps<typeof HilPanel>> = {})
   const root = createRoot(host)
   roots.push(root)
   await act(async () => {
-    root.render(<HilPanel caseId="c1" controller="hysteresis" scenario={scenario} params={PARAMS} invalid={false} {...props} />)
+    root.render(<HilPanel caseId="c1" controller="hysteresis" scenario={scenario} params={PARAMS} custom={false} invalid={false} {...props} />)
   })
 }
 
@@ -121,6 +123,31 @@ describe("HilPanel", () => {
     expect(document.querySelector('[aria-label="Job steps"]')).not.toBeNull()
     await act(async () => { stream().emit("end", { id: "j7", kind: "hil_flash", status: "failed", active: false, error: "build failed:\nmain.cpp:3: error", progress }) })
     expect(document.body.querySelector("pre")?.textContent).toContain("main.cpp:3")
+    expect((document.querySelector("details") as HTMLDetailsElement).open).toBe(true)
+  })
+
+  it("shows the build log, collapsed, after a successful flash and keeps Build & Flash off while it runs", async () => {
+    routes["POST /api/cases/c1/hil/flash"] = () => json(201, { job_id: "j7" })
+    routes["GET /api/jobs/j7/hil-flash"] = () => json(200, { case_id: "c1", controller: "hysteresis", modes: {}, firmware_hash: 4660, log: "Uploading .pio/build/nucleo\nSUCCESS" })
+    await mount()
+    await act(async () => { button("Build & Flash").click() })
+    const progress = { steps: ["queued", "build", "flash", "saved"], step: "flash" }
+    await act(async () => { stream().emit("progress", { id: "j7", kind: "hil_flash", status: "running", active: true, progress }) })
+    expect(button("Build & Flash").disabled).toBe(true)
+    expect(button("Open session").disabled).toBe(true)
+    await act(async () => { stream().emit("end", { id: "j7", kind: "hil_flash", status: "done", active: false, progress: { ...progress, step: "saved" } }) })
+    await vi.waitFor(() => expect(document.querySelector("details pre")?.textContent).toContain("SUCCESS"))
+    expect((document.querySelector("details") as HTMLDetailsElement).open).toBe(false)
+    expect(button("Build & Flash").disabled).toBe(false)
+  })
+
+  it("shows a running flash job of the case again after a reload", async () => {
+    await mount({ activeFlashId: "j9" })
+    expect(stream().url).toBe("/api/jobs/j9/events")
+    const progress = { steps: ["queued", "build", "flash", "saved"], step: "build" }
+    await act(async () => { stream().emit("progress", { id: "j9", kind: "hil_flash", status: "running", active: true, progress }) })
+    expect(document.querySelector('[aria-label="Job steps"]')).not.toBeNull()
+    expect(button("Build & Flash").disabled).toBe(true)
   })
 
   it("shows the server text of a refused open and the loopback text of a 403", async () => {
@@ -155,6 +182,34 @@ describe("HilPanel", () => {
     expect(document.querySelector('[data-testid="hil-invalid"]')).not.toBeNull()
   })
 
+  it("counts dropped frames only after the run started", async () => {
+    await mount()
+    await emitLive({ ...live({}, { tx_dropped: 3 }), session: { ...SESSION, running: false } })
+    expect(document.querySelector('[data-testid="hil-invalid"]')).toBeNull()
+    await emitLive(live({}, { tx_dropped: 3 }))
+    expect(document.querySelector('[data-testid="hil-invalid"]')).toBeNull()
+    await emitLive(live({}, { tx_dropped: 4 }))
+    expect(document.querySelector('[data-testid="hil-invalid"]')).not.toBeNull()
+  })
+
+  it("closes the session view when the connection breaks after events, and reconnects", async () => {
+    await mount()
+    await act(async () => { stream().readyState = 2; stream().onerror!() })
+    expect(text()).not.toContain("The live connection closed")      // never had a session: the quiet 409 case
+    await emitLive(live())
+    expect(button("Stop").disabled).toBe(false)
+    const first = stream()
+    await act(async () => { first.readyState = 2; first.onerror!() })
+    expect(text()).toContain("No session open")
+    expect(button("Stop").disabled).toBe(true)
+    expect(button("Start").disabled).toBe(true)
+    expect(text()).toContain("The live connection closed")
+    await act(async () => { button("Reconnect").click() })
+    expect(stream()).not.toBe(first)
+    await emitLive(live())
+    expect(text()).not.toContain("The live connection closed")
+  })
+
   it("sends a parameter on blur and shows refused (not live) for status -2", async () => {
     routes["POST /api/hil/session/param"] = () => json(200, { status: -2, message: "not changeable while running" })
     await mount()
@@ -177,6 +232,77 @@ describe("HilPanel", () => {
       await blur(input)
       expect(document.getElementById("hil-p-band-status")?.textContent).toBe(shown)
     }
+  })
+
+  it("sends a refused value again but not an applied one", async () => {
+    let status = -2
+    routes["POST /api/hil/session/param"] = () => json(200, { status })
+    await mount()
+    await emitLive(live())
+    const input = document.getElementById("hil-p-band") as HTMLInputElement
+    await setValue(input, "0.2")
+    await blur(input)
+    await blur(input)
+    expect(calls.filter((c) => c.url === "/api/hil/session/param")).toHaveLength(2)
+    status = 0
+    await blur(input)
+    await blur(input)
+    expect(calls.filter((c) => c.url === "/api/hil/session/param")).toHaveLength(3)
+  })
+
+  it("sends the same value again in a new session", async () => {
+    routes["POST /api/hil/session/param"] = () => json(200, { status: 0 })
+    await mount()
+    await emitLive(live())
+    const input = document.getElementById("hil-p-band") as HTMLInputElement
+    await setValue(input, "0.2")
+    await blur(input)
+    await act(async () => { stream().emit("end", {}) })
+    await emitLive(live())
+    await blur(document.getElementById("hil-p-band")!)
+    expect(calls.filter((c) => c.url === "/api/hil/session/param")).toHaveLength(2)
+  })
+
+  it("sends the command in the scenario's mode and shows the reply or the error", async () => {
+    routes["POST /api/hil/session/command"] = (init) => json(200, { ...SESSION, scenario: { ...scenario, command_value: JSON.parse(init!.body as string).value } })
+    await mount()
+    expect((document.getElementById("hil-cmd-value") as HTMLInputElement).disabled).toBe(true)
+    await emitLive(live())
+    const value = document.getElementById("hil-cmd-value") as HTMLInputElement
+    expect(value.value).toBe("0.6")
+    await setValue(value, "1.2")
+    await blur(value)
+    expect(calls.find((c) => c.url === "/api/hil/session/command")!.body).toEqual({ mode: "torque", value: 1.2 })
+    expect(document.getElementById("hil-cmd-status")?.textContent).toBe("commanded 1.2 N·m")
+    await setValue(document.getElementById("hil-cmd-mode") as HTMLSelectElement, "speed")
+    routes["POST /api/hil/session/command"] = () => json(409, { detail: "a dynamic run takes no speed command" })
+    await setValue(value, "800")
+    await blur(value)
+    expect(calls.filter((c) => c.url === "/api/hil/session/command").pop()!.body).toEqual({ mode: "speed", value: 800 })
+    expect(document.getElementById("hil-cmd-status")?.textContent).toBe("a dynamic run takes no speed command")
+  })
+
+  it("has free-form live parameter rows for a custom controller, with the same replies", async () => {
+    await mount({ custom: true, params: [] })
+    expect(document.getElementById("hil-p-band")).toBeNull()
+    await act(async () => { button("Add live parameter").click() })
+    await act(async () => { button("Add live parameter").click() })
+    expect(document.querySelector('[aria-label="Live parameter 2 name"]')).not.toBeNull()
+    await emitLive(live())
+    const name1 = document.querySelector('[aria-label="Live parameter 1 name"]') as HTMLInputElement
+    const value1 = document.querySelector('[aria-label="Live parameter 1 value"]') as HTMLInputElement
+    expect(button("Send").disabled).toBe(true)
+    await setValue(name1, "kp")
+    await setValue(value1, "2.5")
+    routes["POST /api/hil/session/param"] = () => json(200, { status: -2, message: "not changeable while running" })
+    await act(async () => { button("Send").click() })
+    expect(calls.find((c) => c.url === "/api/hil/session/param")!.body).toEqual({ name: "kp", value: 2.5 })
+    expect(document.getElementById("hil-fp-1-status")?.textContent).toBe("refused (not live)")
+    routes["POST /api/hil/session/param"] = () => json(200, { status: -1 })
+    await act(async () => { button("Send").click() })
+    expect(document.getElementById("hil-fp-1-status")?.textContent).toBe("unknown")
+    await act(async () => { button("Remove").click() })
+    expect(document.querySelector('[aria-label="Live parameter 2 name"]')).toBeNull()
   })
 
   it("keeps the parameter rows off without a session", async () => {
@@ -236,6 +362,22 @@ describe("HilPanel", () => {
     await vi.waitFor(() => expect(document.querySelector('[data-testid="verdict-fail"]')).not.toBeNull())
     expect(text()).toContain("parameters changed before the capture")
     expect(document.querySelector('[data-testid="verdict-pass"]')).toBeNull()
+  })
+
+  it("keeps a capture whose comparison failed, shows the error and retries", async () => {
+    routes["POST /api/hil/session/capture"] = () => json(201, { capture_id: "abc", valid: true, reason: "", clipped: 0 })
+    routes["GET /api/hil/captures/abc/compare"] = () => json(500, { detail: "the matched SIL run crashed" })
+    await mount()
+    await emitLive(live())
+    await act(async () => { button("Capture").click() })
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("Capture abc is stored")
+    expect(text()).toContain("the matched SIL run crashed")
+    expect(document.querySelector('[data-testid="verdict-pass"]')).toBeNull()
+    routes["GET /api/hil/captures/abc/compare"] = () => json(200, { d_torque_pct: 1, d_irms_pct: 1, d_ripple_pts: 1, passed: true, clock_ratio: 1, clock_measured: true, reason: "" })
+    routes["GET /api/hil/captures/abc?n_px=1500"] = () => Promise.resolve(new Response(traces()))
+    await act(async () => { button("Retry").click() })
+    await vi.waitFor(() => expect(document.querySelector('[data-testid="verdict-pass"]')).not.toBeNull())
+    expect(calls.filter((c) => c.url === "/api/hil/session/capture")).toHaveLength(1)
   })
 
   it("rejects a capture length the server would refuse", async () => {

@@ -674,6 +674,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/hil-flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hil Flash Result
+         * @description The build log and firmware hash of a finished Build & Flash job.
+         */
+        get: operations["hil_flash_result_api_jobs__job_id__hil_flash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/result": {
         parameters: {
             query?: never;
@@ -1568,6 +1588,21 @@ export interface components {
              *     }
              */
             scenario: components["schemas"]["Scenario"];
+        };
+        /**
+         * HilFlashResultOut
+         * @description The result of a finished `hil_flash` job: the end of the PlatformIO log of the upload.
+         */
+        HilFlashResultOut: {
+            /** Case Id */
+            case_id: string;
+            /** Controller */
+            controller: string;
+            /** Firmware Hash */
+            firmware_hash: number;
+            /** Log */
+            log: string;
+            modes: components["schemas"]["HilModes"];
         };
         /** HilModes */
         HilModes: {
@@ -4094,6 +4129,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_flash_result_api_jobs__job_id__hil_flash_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilFlashResultOut"];
                 };
             };
             /** @description Validation Error */

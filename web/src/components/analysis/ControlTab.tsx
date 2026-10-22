@@ -317,7 +317,8 @@ export default function ControlTab({ caseId, busVoltage, peakTorque, baseSpeedRp
             )}
           </>
         ) : (
-          <HilPanel caseId={caseId} controller={controller} scenario={{ ...sc, bus_voltage: bus ?? null, params: sent }} params={info?.params ?? []} invalid={invalid} />
+          <HilPanel caseId={caseId} controller={controller} scenario={{ ...sc, bus_voltage: bus ?? null, params: sent }} params={info?.params ?? []} custom={choice === CUSTOM} invalid={invalid}
+            activeFlashId={(caseQ.data?.jobs ?? []).find((j) => j.kind === "hil_flash" && j.active)?.id} />
         )}
       </section>
 

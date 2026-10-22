@@ -70,7 +70,7 @@ ROUTES = [("post", "/api/cases/{cid}/hil/flash", OPEN), ("post", "/api/hil/sessi
           ("post", "/api/hil/session/command", {"mode": "torque", "value": 1.0}),
           ("post", "/api/hil/session/start", None), ("post", "/api/hil/session/stop", None),
           ("post", "/api/hil/session/capture", {"n_steps": 1000}),
-          ("get", "/api/hil/captures/abc?n_px=500", None), ("get", "/api/hil/captures/abc/compare", None)]
+          ("get", "/api/jobs/abc/hil-flash", None), ("get", "/api/hil/captures/abc?n_px=500", None), ("get", "/api/hil/captures/abc/compare", None)]
 
 
 def test_every_route_refused_off_loopback(tmp_path, rig):
@@ -367,6 +367,11 @@ def test_flash_job_steps(client, monkeypatch):
     assert calls == [False, True]
     result = client.app.state.store.get_result(job["id"])
     assert result["firmware_hash"] == 0x1234 and "upload=True" in result["log"]
+    out = client.get(f"/api/jobs/{job['id']}/hil-flash")
+    assert out.status_code == 200, out.text
+    assert out.json() == {"case_id": cid, "controller": "hysteresis", "firmware_hash": 0x1234,
+                          "modes": {"current_sense": "ad7606", "position": "encoder", "dac": "mcp4922x2"},
+                          "log": result["log"]}
 
 
 def test_flash_job_failure_carries_log(client, monkeypatch):
@@ -376,6 +381,8 @@ def test_flash_job_failure_carries_log(client, monkeypatch):
     cid = _case(client)
     job = _wait(client, client.post(f"/api/cases/{cid}/hil/flash", json=OPEN).json()["job_id"])
     assert job["status"] == "failed" and "undefined ctrl_isr" in job["error"]
+    assert client.get(f"/api/jobs/{job['id']}/hil-flash").status_code == 404
+    assert client.get("/api/jobs/nope/hil-flash").status_code == 404
 
 
 def test_flash_isr_rule_422(client):

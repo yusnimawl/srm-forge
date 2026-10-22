@@ -43,22 +43,8 @@ export type HilLiveCtrl = {
  *  the OpenAPI schema. */
 export type HilLive = { session: HilSession; emu: HilLiveEmu | null; ctrl: HilLiveCtrl | null }
 
-/** The health block of a capture, `srmsil.hil.session.capture_health` plus the case, modes and last change. */
-export type HilHealth = {
-  valid: boolean
-  reason: string
-  overruns: number | null
-  dropped: number | null
-  isr_overruns: number | null
-  step_max_us: number | null
-  isr_max_us: number | null
-  clock_ratio: number | null
-  clock_measured: boolean
-  clock_spread_ppm: number | null
-  capture_clipped: number
-}
-
-export type HilCaptureMeta = ControlMeta & { hil: HilHealth; compared: boolean }
+export type HilCaptureMeta = ControlMeta & { compared: boolean }
+export type HilFlashResult = components["schemas"]["HilFlashResultOut"]
 
 export const LOOPBACK_TEXT = "HIL needs the server on this computer (loopback)"
 
@@ -84,14 +70,15 @@ export function paramStatusText(status: number): string {
   return "refused"
 }
 
-/** Overruns and drops of a live window; any of them makes the numbers unreliable. */
-export function liveProblems(live: HilLive): string[] {
+/** Overruns and drops of a live window; any of them makes the numbers unreliable. `txBase` is the controller's
+ *  `tx_dropped` before the run started: the counter runs since boot, so only the increase counts. */
+export function liveProblems(live: HilLive, txBase = 0): string[] {
   const out: string[] = []
   const { emu, ctrl } = live
   if (emu?.overruns) out.push(`${emu.overruns} emulator step overruns`)
   if (emu?.dropped) out.push(`${emu.dropped} dropped samples`)
   if (ctrl?.isr_overruns) out.push(`${ctrl.isr_overruns} ISR overruns`)
-  if (ctrl?.tx_dropped) out.push(`${ctrl.tx_dropped} frames the controller could not send`)
+  if (ctrl && ctrl.tx_dropped > txBase) out.push(`${ctrl.tx_dropped - txBase} frames the controller could not send`)
   return out
 }
 
@@ -127,6 +114,8 @@ export const hilOpen = (caseId: string, setup: HilSetup) => post<HilSession>("/a
 export const hilClose = () => api<void>("/api/hil/session", { method: "DELETE" })
 export const hilStart = () => post<HilSession>("/api/hil/session/start")
 export const hilStop = () => post<HilSession>("/api/hil/session/stop")
+export const hilCommand = (mode: "torque" | "speed", value: number) => post<HilSession>("/api/hil/session/command", { mode, value })
+export const hilFlashResult = (jobId: string) => api<HilFlashResult>(`/api/jobs/${jobId}/hil-flash`)
 export const hilParam = (name: string, value: number) => post<HilParamReply>("/api/hil/session/param", { name, value })
 export const hilCapture = (nSteps: number) => post<HilCaptureOut>("/api/hil/session/capture", { n_steps: nSteps })
 export const hilCompare = (id: string) => api<HilComparison>(`/api/hil/captures/${id}/compare`)
@@ -140,25 +129,34 @@ export async function hilCaptureTraces(id: string, nPx = 1500) {
   return captureFromWire(await res.arrayBuffer())
 }
 
-/** The live event stream of the open session. `epoch` null keeps it off; a new epoch reconnects (the stream of a
- *  closed session ends, and a stream opened with no session fails once). `live` is the newest event, `ended` is true
- *  after the server closed the session. */
-export function useHilEvents(epoch: number | null): { live: HilLive | null; ended: boolean } {
+/** The live event stream of the open session. A new `epoch` reconnects (the stream of a closed session ends, and a
+ *  stream opened with no session fails once). `live` is the newest event, `ended` is true after the server closed the
+ *  session, and `lost` is true when the connection broke after events had arrived (the session may still be open). */
+export function useHilEvents(epoch: number): { live: HilLive | null; ended: boolean; lost: boolean } {
   const [live, setLive] = useState<HilLive | null>(null)
   const [ended, setEnded] = useState(false)
+  const [lost, setLost] = useState(false)
   useEffect(() => {
-    if (epoch === null) return
     const es = new EventSource("/api/hil/session/events")
+    let seen = false
     es.addEventListener("live", (e) => {
+      seen = true
       setLive(JSON.parse((e as MessageEvent).data) as HilLive)
       setEnded(false)
+      setLost(false)
     })
     es.addEventListener("end", () => {
       setLive(null)
       setEnded(true)
       es.close()
     })
+    // readyState CLOSED (2): the browser gave up, as it does for a 409 when no session is open.
+    es.onerror = () => {
+      if (es.readyState !== 2) return
+      setLive(null)
+      if (seen) setLost(true)
+    }
     return () => es.close()
   }, [epoch])
-  return { live, ended }
+  return { live, ended, lost }
 }

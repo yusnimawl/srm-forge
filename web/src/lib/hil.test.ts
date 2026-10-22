@@ -26,5 +26,9 @@ describe("hil", () => {
     const live = { session: {}, emu: null, ctrl } as unknown as HilLive
     expect(liveProblems(live)).toEqual(["1 ISR overruns"])
     expect(liveProblems({ ...live, ctrl: { ...ctrl, isr_overruns: 0 } })).toEqual([])
+    const dropped = { ...live, ctrl: { ...ctrl, isr_overruns: 0, tx_dropped: 5 } }
+    expect(liveProblems(dropped)).toHaveLength(1)
+    expect(liveProblems(dropped, 5)).toEqual([])
+    expect(liveProblems(dropped, 3)).toEqual(["2 frames the controller could not send"])
   })
 })

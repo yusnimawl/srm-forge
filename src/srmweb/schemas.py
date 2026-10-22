@@ -348,6 +348,15 @@ class HilCommandIn(BaseModel):
     value: float = Field(allow_inf_nan=False)   # N*m or rpm
 
 
+class HilFlashResultOut(BaseModel):
+    """The result of a finished `hil_flash` job: the end of the PlatformIO log of the upload."""
+    case_id: str
+    controller: str
+    modes: HilModes
+    firmware_hash: int
+    log: str
+
+
 class HilCaptureIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

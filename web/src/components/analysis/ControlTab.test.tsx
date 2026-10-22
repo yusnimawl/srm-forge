@@ -162,6 +162,27 @@ describe("ControlTab", () => {
     expect(button("Run")).not.toBeUndefined()
   })
 
+  it("offers typed live parameters for a custom folder and none for a reference controller in HIL mode", async () => {
+    await mount()
+    await act(async () => { button("HIL").click() })
+    expect(document.getElementById("hil-p-band")).not.toBeNull()
+    expect(button("Add live parameter")).toBeUndefined()
+    const select = document.getElementById("ctl-controller") as HTMLSelectElement
+    await act(async () => {
+      select.value = "__custom__"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect(document.getElementById("hil-p-band")).toBeNull()
+    expect(button("Add live parameter")).not.toBeUndefined()
+  })
+
+  it("re-attaches a running flash job of the case in HIL mode", async () => {
+    caseJobs = [{ id: "j5", kind: "hil_flash", status: "running", active: true, created: "2026-10-20" }]
+    await mount()
+    await act(async () => { button("HIL").click() })
+    await waitFor(() => expect(button("Build & Flash").disabled).toBe(true))
+  })
+
   it("attaches to an active job after a reload and re-enables Run when it ends", async () => {
     caseJobs = [{ id: "j9", kind: "control", status: "running", active: true, created: "2026-10-20" }]
     await mount()

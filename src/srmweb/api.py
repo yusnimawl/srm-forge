@@ -56,7 +56,7 @@ from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut,
                             MaterialOut, ReferenceOut, ReportOut, SearchResultOut)
 from srmweb.schemas import (AnimateIn, AnimateRequest, CandidateCase, CasePatch, CompareOut, ControlIn, ControlRequest,
                             ComparisonOut, ControllerOut, EditCase, EstimateOut, EvaluateBody, EvaluateRequest, FieldIn,
-                            HilCaptureIn, HilCaptureOut, HilCommandIn, HilFlashIn, HilFlashRequest, HilOpenIn,
+                            HilCaptureIn, HilCaptureOut, HilCommandIn, HilFlashIn, HilFlashRequest, HilFlashResultOut, HilOpenIn,
                             HilParamIn, HilParamOut, HilSessionOut, IssuesOut,
                             JobCreated, JobIn, JobOut, LossesBody, LossesEstimateOut, LossesRequest, MotorIn,
                             ReferenceCase, TargetCheckIn, TargetCheckOut, ValidateIn, ValidateRequest)
@@ -887,6 +887,15 @@ def create_app(settings: Settings,
             if hil.is_open():
                 raise HTTPException(409, "close the HIL session before flashing")
             return {"job_id": _submit(runner, "hil_flash", request.model_dump(mode="json"))["id"]}
+
+    @hil_router.get("/jobs/{job_id}/hil-flash", response_model=HilFlashResultOut)
+    def hil_flash_result(job_id: str):
+        """The build log and firmware hash of a finished Build & Flash job."""
+        job = job_or_404(job_id)
+        result = store.get_result(job_id) if job["kind"] == "hil_flash" and job["status"] == "done" else None
+        if result is None:
+            raise HTTPException(404, "no flash result")
+        return result
 
     @hil_router.post("/hil/session", status_code=201, response_model=HilSessionOut)
     def hil_open(body: HilOpenIn):
