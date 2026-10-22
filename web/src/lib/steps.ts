@@ -8,6 +8,7 @@ const LABELS: Record<string, Record<string, string>> = {
   validate: { queued: "Queued", map: "Map (cache)", checks: "Checks and budget", saved: "Saved" },
   animate: { queued: "Queued", frames: "Frames", saved: "Saved" },
   control: { queued: "Queued", compile: "Compiling the controller", simulate: "Simulating", saved: "Saved" },
+  hil_flash: { queued: "Queued", build: "Building the firmware", flash: "Flashing both boards", saved: "Saved" },
   losses: { queued: "Queued", strokes: "Stroke choices", fields: "Field solves", losses: "Losses", saved: "Saved" },
   search: { queued: "Queued", sampling: "Sampling", designs: "Designs", pareto: "Pareto set", saved: "Saved" },
 }

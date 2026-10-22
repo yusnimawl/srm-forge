@@ -148,6 +148,20 @@ describe("ControlTab", () => {
     expect(posts[0].body).toMatchObject({ controller: "C:/ctl", scenario: { params: { kp: 2.5 } } })
   })
 
+  it("switches to the HIL panel, keeps the controller and scenario, and back to the SIL run controls", async () => {
+    await mount()
+    expect(document.querySelector('[aria-label="HIL rig"]')).toBeNull()
+    expect(button("SIL").getAttribute("aria-pressed")).toBe("true")
+    await act(async () => { button("HIL").click() })
+    expect(document.querySelector('[aria-label="HIL rig"]')).not.toBeNull()
+    expect(button("HIL").getAttribute("aria-pressed")).toBe("true")
+    expect(button("Run")).toBeUndefined()
+    expect(document.getElementById("ctl-controller")).not.toBeNull()
+    await act(async () => { button("SIL").click() })
+    expect(document.querySelector('[aria-label="HIL rig"]')).toBeNull()
+    expect(button("Run")).not.toBeUndefined()
+  })
+
   it("attaches to an active job after a reload and re-enables Run when it ends", async () => {
     caseJobs = [{ id: "j9", kind: "control", status: "running", active: true, created: "2026-10-20" }]
     await mount()
