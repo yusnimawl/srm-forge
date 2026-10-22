@@ -23,6 +23,14 @@ def check_encoder_rate(cpr: int, rpm: float) -> None:
                          f"{ENCODER_EDGE_RATE_MAX:.0f} /s")
 
 
+def check_isr_rate(scenario: Scenario) -> None:
+    """Raise ValueError unless isr_hz = pwm_hz / k with k odd (1..127): the HIL samples at the carrier centre."""
+    k = scenario.pwm_hz / scenario.resolved_isr_hz
+    if not (abs(k - round(k)) <= 1e-6 * k and round(k) % 2 == 1 and round(k) <= 127):
+        raise ValueError(f"isr_hz {scenario.resolved_isr_hz:g} Hz: the HIL samples at the carrier centre, so isr_hz must "
+                         f"be pwm_hz / k with k odd (1..127); pwm_hz / isr_hz is {k:g}")
+
+
 class HilModes(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -52,6 +60,8 @@ AD7606_RANGE_V = 10.0
 """V, the AD7606 input range (+-)."""
 AD7606_T_CONV_US = 4.15
 """us, the AD7606 conversion time (datasheet maximum without oversampling)."""
+AD7606_SPI_HZ = 12.5e6
+"""Hz, the controller's SPI1 clock for the AD7606 read at the default HIL_SPI_MBR 3 (200 MHz / 16)."""
 SENSE_TOP_V = 8.0
 """V at the AD7606 inputs for 1.25 x the top map current, and for 1.25 x the bus voltage."""
 DAC_V_MID = 0.2
@@ -77,10 +87,7 @@ def write_hil_config(modes: HilModes, scenario: Scenario, m: MotorData, path: Pa
     sensing chain of `modes` (AD7606 codes are handed over as offset binary, 16 bits; the Nucleo ADC reads the DACs at
     16 bits and has no voltage channels)."""
     se = scenario.sensors
-    k = scenario.pwm_hz / scenario.resolved_isr_hz
-    if not (abs(k - round(k)) <= 1e-6 * k and round(k) % 2 == 1 and round(k) <= 127):
-        raise ValueError(f"isr_hz {scenario.resolved_isr_hz:g} Hz: the HIL samples at the carrier centre, so isr_hz must "
-                         f"be pwm_hz / k with k odd (1..127); pwm_hz / isr_hz is {k:g}")
+    check_isr_rate(scenario)
     if modes.position in ("ad2s1210", "both") and se.resolver_bits not in (10, 12, 14, 16):
         raise ValueError(f"resolver_bits {se.resolver_bits}: the AD2S1210 has 10, 12, 14 or 16 bits")
     if modes.position in ("encoder", "both") and not 1 <= se.encoder_cpr <= 65536:

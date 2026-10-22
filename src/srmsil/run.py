@@ -60,6 +60,7 @@ class SimResult:
     controller: str
     source_hash: str
     compile_log: str
+    hil: dict | None = None     # HIL runs: health numbers, validity and the measured clock (srmsil.hil.session.run_hil)
 
 
 def controller_dir(controller: str) -> Path:
@@ -237,7 +238,9 @@ def save(result: SimResult, path: Path) -> None:
     meta = {"scenario": result.scenario.model_dump(mode="json"), "controller": result.controller,
             "source_hash": result.source_hash, "compile_log": result.compile_log,
             "summary": {k: (None if isinstance(v, float) and not math.isfinite(v) else v)
-                        for k, v in vars(s).items() if k != "i_rms"}}
+                        for k, v in vars(s).items() if k != "i_rms"},
+            "hil": None if result.hil is None else {k: (None if isinstance(v, float) and not math.isfinite(v) else v)
+                                                    for k, v in result.hil.items()}}
     path.with_suffix(".json").write_text(json.dumps(meta, allow_nan=False))
     tmp.replace(path)
 
@@ -250,7 +253,7 @@ def load(path: Path) -> SimResult:
         summary = SimSummary(i_rms=z["i_rms"],
                               **{k: math.nan if v is None else v for k, v in meta["summary"].items()})
     return SimResult(traces, summary, Scenario.model_validate(meta["scenario"]), meta["controller"],
-                     meta["source_hash"], meta["compile_log"])
+                     meta["source_hash"], meta["compile_log"], meta.get("hil"))
 
 
 def decimate(t: np.ndarray, y: np.ndarray, n_px: int) -> tuple[np.ndarray, np.ndarray]:
