@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
@@ -16,7 +17,7 @@ from fastapi import HTTPException
 
 from srmsil import run as sil_run
 from srmsil.hil import HilError
-from srmsil.hil.compare import compare, matched_scenario
+from srmsil.hil.compare import compare, match_plan, refused
 from srmsil.hil.config import HilModes
 from srmsil.hil.session import HilSession, LiveStats, capture_health
 from srmsil.hil.transport import SerialTransport, Transport, discover
@@ -29,7 +30,7 @@ from srmweb.serialize import to_json
 NOT_OPEN = "no HIL session is open"
 PARAM_MESSAGES = {-1: "unknown parameter", -2: "not changeable while running"}
 POLL_S = 0.05                     # the event stream's poll period (20 Hz)
-SETTLE_S = 0.06                   # live window in which a capture ends, kept for its health numbers
+END_WAIT_S = 0.06                 # live window in which a capture ends, kept for its health numbers
 _CAPTURE_ID = re.compile(r"[0-9a-f]{32}")
 
 
@@ -64,6 +65,16 @@ class HilManager:
         self._session: HilSession | None = None
         self._out: HilSessionOut | None = None
         self._live: LiveStats | None = None
+        self._started = 0.0               # monotonic time just before the last Start
+        self._last_change: float | None = None   # s after that Start of the last accepted param or command change
+        self._compare_locks: dict[str, threading.Lock] = {}
+        self._comparing = 0
+        self._compare_guard = threading.Lock()
+
+    def comparing(self) -> bool:
+        """True while a compare is running (it writes the matched SIL run into the cache)."""
+        with self._compare_guard:
+            return self._comparing > 0
 
     @property
     def dir(self) -> Path:
@@ -135,7 +146,9 @@ class HilManager:
 
     def start(self) -> HilSessionOut:
         def call(s: HilSession) -> HilSessionOut:
+            started = time.monotonic()
             s.start()
+            self._started, self._last_change = started, None
             return self._update(running=True)
         return self._call(call)
 
@@ -145,6 +158,11 @@ class HilManager:
             return self._update(running=False)
         return self._call(call)
 
+    def _changed(self) -> None:
+        """Note the time since Start of an accepted change made while running (before Start it is in the scenario)."""
+        if self._out.running:
+            self._last_change = time.monotonic() - self._started
+
     def param(self, name: str, value: float) -> HilParamOut:
         """ctrl_param on the controller; an accepted value is kept in the session's scenario for the matched SIL."""
         def call(s: HilSession) -> HilParamOut:
@@ -152,6 +170,7 @@ class HilManager:
             if status == 0:
                 sc = self._out.scenario
                 self._update(scenario=sc.model_copy(update={"params": {**sc.params, name: value}}))
+                self._changed()
                 return HilParamOut(status=0)
             return HilParamOut(status=status, message=PARAM_MESSAGES.get(status, "refused"))
         return self._call(call)
@@ -160,18 +179,25 @@ class HilManager:
         """ctrl_command; the command is kept in the session's scenario for the matched SIL."""
         def call(s: HilSession) -> HilSessionOut:
             s.command(mode, value)
+            self._changed()
             return self._update(scenario=self._out.scenario.model_copy(
                 update={"command_mode": mode, "command_value": value}))
         return self._call(call)
 
     def capture(self, n_steps: int) -> HilCaptureOut:
-        """Record n_steps of the running session and store it with its health numbers (`capture_health`)."""
+        """Record n_steps of the running session and store it with its health numbers (`capture_health`), the case,
+        the modes and `last_change_s` (match_plan); 409 before Start."""
+        check_loopback(self.settings)
+        out = self._out
+        if out is not None and not out.running:
+            raise HTTPException(409, "start the run before capturing")
+
         def call(s: HilSession) -> HilCaptureOut:
             cap = s.capture(n_steps)
-            s.wait(SETTLE_S)
+            s.wait(END_WAIT_S)
             out = self._out
             hil = {**capture_health(s, cap, out.scenario.resolved_isr_hz), "case_id": out.case_id,
-                   "modes": out.modes.model_dump()}
+                   "modes": out.modes.model_dump(), "last_change_s": self._last_change}
             res = replace(cap.result, scenario=out.scenario, controller=out.controller, hil=hil)
             capture_id = uuid.uuid4().hex
             self.dir.mkdir(parents=True, exist_ok=True)
@@ -188,29 +214,41 @@ class HilManager:
         return path
 
     def compare(self, capture_id: str, motor_of: Callable[[str, float | None], MotorData]) -> ComparisonOut:
-        """The capture against its matched SIL run (srmsil.hil.compare), which is run once over the capture's window
-        and stored beside it; `motor_of(case_id, bus_voltage)` is the case's motor. It needs no open session."""
-        hil = sil_run.load(self.capture_file(capture_id))
+        """The capture against its matched SIL run (srmsil.hil.compare.match_plan), which runs once and is stored
+        beside it with its start `t0` in its hil block; `motor_of(case_id, bus_voltage)` is the case's motor. It needs
+        no open session. A capture that cannot be matched, or a SIL run that fails, gives passed False and the
+        reason."""
+        path = self.capture_file(capture_id)
+        with self._compare_guard:
+            self._comparing += 1
+            lock = self._compare_locks.setdefault(capture_id, threading.Lock())
+        try:
+            with lock:              # one SIL run per capture; concurrent compares wait for it
+                return ComparisonOut(**to_json(self._compare(path, capture_id, motor_of)))
+        finally:
+            with self._compare_guard:
+                self._comparing -= 1
+
+    def _compare(self, path: Path, capture_id: str, motor_of: Callable[[str, float | None], MotorData]):
+        hil = sil_run.load(path)
         h = hil.hil
         if not h["valid"]:
-            return ComparisonOut(d_torque_pct=None, d_irms_pct=None, d_ripple_pts=None, passed=False,
-                                 clock_ratio=h.get("clock_ratio"), clock_measured=bool(h.get("clock_measured")),
-                                 reason=f"HIL run not valid: {h['reason']}")
+            return refused(hil, f"HIL run not valid: {h['reason']}")
         sil_file = self.dir / f"{capture_id}.sil.npz"
         if sil_file.is_file():
             sil = sil_run.load(sil_file)
-        else:
-            if h.get("latency_us") is None:
-                raise HTTPException(409, "the capture has no measured output latency to match")
-            m = motor_of(h["case_id"], hil.scenario.bus_voltage)
-            scenario = matched_scenario(hil.scenario, h["latency_us"] * 1e-6, HilModes(**h["modes"]),
-                                        h["clock_ratio"], m=m, end_s=h["window_s"][1])
-            try:
-                sil = sil_run.run(m, hil.controller, scenario, cache_dir=self.settings.cache_dir)
-            except (sil_run.SimError, ValueError) as exc:
-                raise HTTPException(422, str(exc)) from exc
-            sil_run.save(sil, sil_file)
-        return ComparisonOut(**to_json(compare(hil, sil)))
+            return compare(hil, sil, t0=sil.hil["t0"])
+        m = motor_of(h["case_id"], hil.scenario.bus_voltage)
+        plan = match_plan(hil, HilModes(**h["modes"]), m)
+        if plan.scenario is None:
+            return refused(hil, plan.reason)
+        try:
+            sil = sil_run.run(m, hil.controller, plan.scenario, cache_dir=self.settings.cache_dir)
+        except (sil_run.SimError, ValueError) as exc:
+            return refused(hil, f"the matched SIL run failed: {exc}")
+        sil = replace(sil, hil={"t0": plan.t0})
+        sil_run.save(sil, sil_file)
+        return compare(hil, sil, t0=plan.t0)
 
     def poll(self) -> dict | None:
         """The session and the newest live statistics of both boards; None when no session is open."""

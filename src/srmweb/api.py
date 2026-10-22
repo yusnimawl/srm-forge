@@ -9,6 +9,7 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -849,6 +850,8 @@ def create_app(settings: Settings,
             raise HTTPException(409, "a job is running; wait for it or cancel it")
         if hil.is_open():
             raise HTTPException(409, "a HIL session is open; close it first")
+        if hil.comparing():
+            raise HTTPException(409, "a HIL comparison is running; wait for it")
         for f in cache_files():
             f.unlink(missing_ok=True)
         return Response(status_code=204)
@@ -951,8 +954,10 @@ def create_app(settings: Settings,
         sil_file = path.with_name(f"{capture_id}.sil.npz")
         compared = sil_file.is_file()
         if compared and res.traces:
+            sil = sil_run.load(sil_file)
+            sil = replace(sil, traces={**sil.traces, "t": sil.traces["t"] + sil.hil["t0"]})   # the capture's time base
             t = res.traces["t"]
-            arrays |= traces_arrays(sil_run.load(sil_file), n_px, "sil.", (float(t[0]), float(t[-1])))
+            arrays |= traces_arrays(sil, n_px, "sil.", (float(t[0]), float(t[-1])))
         meta = {"summary": res.summary, "scenario": res.scenario.model_dump(mode="json"), "controller": res.controller,
                 "hil": res.hil, "compared": compared, "n_phases": len(res.summary.i_rms)}
         return binary(meta, arrays)

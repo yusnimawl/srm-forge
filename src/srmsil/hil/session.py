@@ -10,6 +10,7 @@ from typing import Literal
 import numpy as np
 
 from srmsil.hil import HilError, proto
+from srmsil.hil.compare import RPM, SETTLE_S
 from srmsil.hil.config import HilModes, check_encoder_rate, check_isr_rate, mode_defines, sensor_chain
 from srmsil.hil.proto import BuildInfo, LiveCtrl, LiveEmu, Type
 from srmsil.hil.transport import Transport
@@ -20,7 +21,6 @@ from srmsil.tables import MotorData, emu_tables
 EMU_DT = 5e-6                 # s, the emulator step and the capture sample period
 REPLY_TIMEOUT_S = 2.0
 CLOCK_SPREAD_WARN_PPM = 500.0
-RPM = 2 * math.pi / 60
 
 CS_CODES = {"ad7606": 0, "internal": 1}
 POS_CODES = {"encoder": 0, "ad2s1210": 1, "both": 2}
@@ -385,7 +385,8 @@ def _capture_problem(n_steps, hdr, seqs, parts, end, bad, errors) -> str:
     return ""
 
 
-def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenario, *, settle_s: float = 0.2) -> SimResult:
+def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenario, *,
+            settle_s: float = SETTLE_S) -> SimResult:
     """Configure, start, settle, capture `scenario.duration` of steps, stop. The result's traces and summary come
     from the capture (summary over its second half); `hil` is `capture_health` of the run."""
     info = session.info or session.connect()

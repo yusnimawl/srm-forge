@@ -8,13 +8,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from srmsil.hil.config import HilModes, hil_adc
-from srmsil.run import SimResult
+from srmsil.run import TRACE_CAP, SimResult
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData
 
 TORQUE_TOL_PCT = 3.0
 IRMS_TOL_PCT = 3.0
 RIPPLE_TOL_PTS = 5.0
+SETTLE_S = 0.2           # s the matched SIL of a fixed-speed capture runs before the capture (and run_hil's settle)
+RPM = 2 * math.pi / 60
 
 
 def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, clock_ratio: float | None = None, *,
@@ -87,13 +89,72 @@ def _summary_stats(r: SimResult) -> tuple[float, float, float]:
     return s.mean_torque, s.ripple_pct, float(np.sqrt(np.mean(np.asarray(s.i_rms, float) ** 2)))
 
 
-def compare(hil: SimResult, sil: SimResult) -> Comparison:
+@dataclass(frozen=True)
+class MatchPlan:
+    scenario: Scenario | None   # the matched SIL scenario; None when the capture cannot be matched
+    t0: float                   # s since the controller's start at which the SIL starts
+    reason: str = ""            # why there is no scenario
+
+
+def match_plan(hil: SimResult, modes: HilModes, m: MotorData) -> MatchPlan:
+    """The matched SIL of a capture taken in a live session (`hil.hil` from session.capture_health plus
+    `last_change_s`, the time since Start of the last accepted parameter or command change, None for none).
+
+    - Fixed speed: the SIL starts SETTLE_S before the capture (at Start when the capture began earlier), at the rotor
+      angle the HIL had then, and runs to the end of the summary window; `compare(..., t0=plan.t0)` shifts the window.
+      A change after the SIL's start cannot be matched.
+    - Dynamic: the speed depends on the whole run, so the SIL runs from Start; a change while running cannot be
+      matched.
+    Either way the SIL must keep every step (at most TRACE_CAP steps of the scenario's dt). Invalid scenarios give a
+    reason, never an exception."""
+    h, sc = hil.hil or {}, hil.scenario
+    win, t = h.get("window_s"), hil.traces.get("t")
+    if not win or t is None or not len(t):
+        return MatchPlan(None, 0.0, "the capture has no window")
+    if h.get("latency_us") is None:
+        return MatchPlan(None, 0.0, "the capture has no measured output latency to match")
+    change = h.get("last_change_s")
+    if sc.mode == "dynamic":
+        t0 = 0.0
+        if change is not None:
+            return MatchPlan(None, t0, "parameters or command changed while running; a dynamic run is matched from "
+                                       "Start, so capture after a fresh Start")
+        if round(win[1] / sc.dt) > TRACE_CAP:
+            return MatchPlan(None, t0, f"dynamic run captured too late for the matched SIL (capture within "
+                                       f"{TRACE_CAP * sc.dt:g} s of Start)")
+    else:
+        t0 = max(0.0, float(t[0]) - SETTLE_S)
+        if change is not None and change >= t0:
+            return MatchPlan(None, t0, f"parameters or command changed within {SETTLE_S:g} s before the capture")
+        if round((win[1] - t0) / sc.dt) > TRACE_CAP:
+            return MatchPlan(None, t0, f"the capture is too long for the matched SIL at dt {sc.dt:g} s (at most "
+                                       f"{TRACE_CAP * sc.dt - SETTLE_S:g} s)")
+    try:
+        start = Scenario.model_validate({**sc.model_dump(),
+                                         "theta0": math.remainder(sc.theta0 + sc.speed_rpm * RPM * t0, 2 * math.pi)})
+        scenario = matched_scenario(start, h["latency_us"] * 1e-6, modes, h.get("clock_ratio"), m=m,
+                                    end_s=win[1] - t0)
+    except ValueError as exc:
+        return MatchPlan(None, t0, f"no matched SIL scenario: {exc}")
+    return MatchPlan(scenario, t0)
+
+
+def refused(hil: SimResult, reason: str) -> Comparison:
+    """A comparison that did not run (the SIL could not be matched or run)."""
+    h = hil.hil or {}
+    n = math.nan
+    return Comparison(n, n, n, False, h.get("clock_ratio"), bool(h.get("clock_measured")), reason)
+
+
+def compare(hil: SimResult, sil: SimResult, *, t0: float = 0.0) -> Comparison:
     """Differences of a HIL run from its matched SIL run, both over the HIL's window (`hil["window_s"]`, times since
-    the controller's start; the summaries when it is absent). It passes when the HIL run is valid, its capture did not
-    clip, the SIL covers the window, and the mean torque and RMS current are within 3 % and the ripple within 5
-    points."""
+    the controller's start; the SIL's times are t0 earlier; the summaries when there is no window). It passes when the
+    HIL run is valid, its capture did not clip, the SIL covers the window, and the mean torque and RMS current are
+    within 3 % and the ripple within 5 points."""
     h = hil.hil or {}
     win = h.get("window_s")
+    if win:
+        win = (win[0] - t0, win[1] - t0)
     uncovered = bool(win) and not covers(sil, *win)
     reasons = ["SIL does not cover the HIL window"] if uncovered else []
     b = (math.nan,) * 3 if uncovered else window_stats(sil, *win) if win else _summary_stats(sil)

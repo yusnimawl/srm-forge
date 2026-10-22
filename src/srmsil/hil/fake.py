@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from srmsil.hil import proto
-from srmsil.hil.compare import matched_scenario
+from srmsil.hil.compare import SETTLE_S, matched_scenario
 from srmsil.hil.config import HilModes
 from srmsil.hil.proto import Type
 from srmsil.hil.session import EMU_DT, RPM, build_codes
@@ -48,16 +48,17 @@ class _Rig:
     def step_now(self) -> int:
         return round((time.monotonic() - self.ctrl_t0) / EMU_DT) if self.started else 0
 
-    def scenario(self, n_steps: int) -> Scenario:
-        """The run since the controller's start, on the rig's timing and ADC chain (as matched_scenario models it)."""
+    def scenario(self, n_steps: int, s0: int = 0) -> Scenario:
+        """n_steps of the run from emulator step s0 since the controller's start (fixed speed: the rotor angle then),
+        on the rig's timing and ADC chain (as matched_scenario models it)."""
         c = self.cfg
         mode, value = self.cmd
         base = Scenario(
             mode="dynamic" if c["mode"] else "fixed", speed_rpm=c["speed"] / RPM, duration=n_steps * EMU_DT,
             dt=SIL_DT, command_mode="speed" if mode else "torque", command_value=value / RPM if mode else value,
             inertia=c["inertia"], friction=c["friction"], load=c["load"], load_step=c["load_step"],
-            load_step_time=c["load_step_time"], theta0=c["theta0"], bus_voltage=c["bus_voltage"], pwm_hz=FAKE_PWM_HZ,
-            seed=c["seed"], params=dict(self.params),
+            load_step_time=c["load_step_time"], theta0=math.remainder(c["theta0"] + c["speed"] * s0 * EMU_DT, 2 * math.pi),
+            bus_voltage=c["bus_voltage"], pwm_hz=FAKE_PWM_HZ, seed=c["seed"], params=dict(self.params),
             converter=ConverterSettings(v_switch=c["v_switch"], v_diode=c["v_diode"], dead_time=c["dead_time"],
                                         turn_on_delay=c["turn_on_delay"], turn_off_delay=c["turn_off_delay"]),
             sensors=SensorSettings(
@@ -70,12 +71,17 @@ class _Rig:
     def capture(self, seq: int, n: int) -> list[tuple[int, int, bytes]]:
         start = self.step_now()
         k = round(EMU_DT / SIL_DT)
-        if (start + n) * k > TRACE_CAP:
-            raise RuntimeError("fake rig: a capture must end within 1 s of the controller's start")
-        res = run(self.m, self.controller, self.scenario(start + n), cache_dir=self.cache_dir)
+        settle = round(SETTLE_S / EMU_DT)
+        # a fixed-speed run is simulated from SETTLE_S before the capture, as the matched SIL does; a dynamic one from
+        # the controller's start
+        s0 = start - settle if not self.cfg["mode"] and start > settle else 0
+        off = start - s0
+        if (off + n) * k > TRACE_CAP:
+            raise RuntimeError("fake rig: a dynamic capture must end within 1 s of the controller's start")
+        res = run(self.m, self.controller, self.scenario(off + n, s0), cache_dir=self.cache_dir)
         self.sil = res
         c, tr, q = self.cfg, res.traces, self.m.n_phases
-        idx = (start + np.arange(n)) * k
+        idx = (off + np.arange(n)) * k
         scales = (2 * c["i_max"] / 32767, 2 * c["psi_max"] / 32767, 1.25 * (c["bus_voltage"] + 2 * c["v_diode"]) / 32767,
                   1.25 * (self.t_max or 1.0) / 32767, max(2 * abs(c["speed"]), 100.0) / 32767)
         hdr = proto.CaptureHeader(EMU_DT, *scales, n, q)
@@ -87,7 +93,7 @@ class _Rig:
         s["step"] = start + np.arange(n)
         s["i"][:, :q] = i16(tr["i"][:, idx], hdr.i_scale).T
         s["psi"][:, :q] = i16(tr["psi"][:, idx], hdr.psi_scale).T
-        v = tr["v"][:, start * k: (start + n) * k].reshape(q, n, k).mean(axis=2)   # averaged over each emulator step
+        v = tr["v"][:, off * k: (off + n) * k].reshape(q, n, k).mean(axis=2)   # averaged over each emulator step
         s["v"][:, :q] = i16(v, hdr.v_scale).T
         s["torque"] = i16(tr["torque"][idx], hdr.t_scale)
         s["theta"] = (np.mod(tr["theta"][idx] / (2 * math.pi), 1.0) * 65536).astype(np.uint32) & 0xFFFF

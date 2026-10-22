@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from sil_fixtures import analytic_motor
 
-from srmsil.hil.compare import compare, matched_scenario
+from srmsil.hil.compare import SETTLE_S, compare, match_plan, matched_scenario
 from srmsil.hil.config import HilModes, write_hil_config
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.session import HilSession, run_hil
@@ -31,9 +31,15 @@ def hil_run(cache, clock_ratio, scn=SCN):
 
 
 def matched(cache, res, clock_ratio, scn=SCN, end_s=True):
-    end = res.hil["window_s"][1] if end_s else None
-    ms = matched_scenario(scn, res.hil["latency_us"] * 1e-6, HilModes(), clock_ratio, m=analytic_motor(), end_s=end)
-    return run(analytic_motor(), "hysteresis", ms, cache_dir=cache)
+    """The comparison of res with its matched SIL at clock_ratio: the route's path (match_plan, the window shifted by
+    its t0), or with end_s False the SIL from Start over the scenario's duration."""
+    if end_s:
+        plan = match_plan(replace(res, hil={**res.hil, "clock_ratio": clock_ratio}), HilModes(), analytic_motor())
+        assert plan.scenario is not None, plan.reason
+        return compare(res, run(analytic_motor(), "hysteresis", plan.scenario, cache_dir=cache), t0=plan.t0)
+    ms = matched_scenario(scn, res.hil["latency_us"] * 1e-6, HilModes(), clock_ratio, m=analytic_motor(), end_s=None)
+    return compare(replace(res, hil={**res.hil, "window_s": None}), run(analytic_motor(), "hysteresis", ms,
+                                                                        cache_dir=cache))
 
 
 @pytest.mark.parametrize("r", [1.0, R])
@@ -53,15 +59,15 @@ def test_run_hil_on_fake_matches_sil(cache, r):
     assert t0 > 0.2 and t1 - t0 == pytest.approx(0.01)
     assert res.traces["t"][2000] == t0
     assert res.summary.mean_torque > 0.5
-    c = compare(res, matched(cache, res, h["clock_ratio"]))
+    c = matched(cache, res, h["clock_ratio"])
     assert c.passed, c
     assert c.clock_measured and c.clock_ratio == h["clock_ratio"]
 
 
 def test_clock_ratio_matters(cache):
     res = hil_run(cache, R)
-    good = compare(res, matched(cache, res, res.hil["clock_ratio"]))
-    nominal = compare(res, matched(cache, res, None))
+    good = matched(cache, res, res.hil["clock_ratio"])
+    nominal = matched(cache, res, None)
     assert max(abs(nominal.d_torque_pct), abs(nominal.d_irms_pct)) > 2 * max(abs(good.d_torque_pct),
                                                                               abs(good.d_irms_pct))
 
@@ -72,9 +78,9 @@ def test_window_matches_a_changing_run(cache):
     res = hil_run(cache, 1.0, scn)
     w = res.traces["omega"]
     assert w[-1] > 2 * 200.0 * 2 * math.pi / 60        # it has sped up well past the start speed by the capture
-    good = compare(res, matched(cache, res, 1.0, scn))
+    good = matched(cache, res, 1.0, scn)
     assert good.passed, good
-    old = compare(replace(res, hil={**res.hil, "window_s": None}), matched(cache, res, 1.0, scn, end_s=False))
+    old = matched(cache, res, 1.0, scn, end_s=False)
     assert not old.passed
     assert abs(old.d_torque_pct) + abs(old.d_irms_pct) > 10 * (abs(good.d_torque_pct) + abs(good.d_irms_pct))
 
@@ -172,3 +178,51 @@ def test_compare_sil_short_of_window():
 def test_matched_scenario_end_s_is_required():
     with pytest.raises(TypeError):
         matched_scenario(SCN, 0.0, HilModes(), m=analytic_motor())
+
+
+def captured(scn, t_start=1.0, n=2000, **hil):
+    """A valid live capture of n emulator steps from t_start s after Start."""
+    t = t_start + np.arange(n) * 5e-6
+    tr = {"t": t, "torque": np.ones(n), "i": np.ones((4, n), np.float32)}
+    h = {"valid": True, "latency_us": 8.0, "clock_ratio": 1.0, "clock_measured": True,
+         "window_s": (float(t[n // 2]), float(t[-1]) + 5e-6), **hil}
+    return SimResult(tr, result(1.0, 1.0, 0.0).summary, scn, "hysteresis", "", "", hil=h)
+
+
+def test_match_plan_fixed_starts_settle_before_capture():
+    scn = Scenario(speed_rpm=600.0, theta0=0.3, duration=0.02)
+    cap = captured(scn, last_change_s=0.5)
+    plan = match_plan(cap, HilModes(), analytic_motor())
+    assert plan.reason == "" and plan.t0 == pytest.approx(1.0 - SETTLE_S)
+    w = cap.hil["window_s"]
+    assert plan.scenario.duration == pytest.approx(w[1] - plan.t0)
+    turn = 600.0 / 60 * plan.t0 * 2 * math.pi
+    assert math.cos(plan.scenario.theta0) == pytest.approx(math.cos(0.3 + turn))
+    assert math.sin(plan.scenario.theta0) == pytest.approx(math.sin(0.3 + turn))
+    early = match_plan(captured(scn, t_start=0.1), HilModes(), analytic_motor())
+    assert early.t0 == 0.0 and early.scenario.theta0 == pytest.approx(0.3)
+
+
+def test_match_plan_refusals():
+    m, fixed = analytic_motor(), Scenario(speed_rpm=600.0)
+    late = match_plan(captured(fixed, last_change_s=0.85), HilModes(), m)
+    assert late.scenario is None and late.reason == "parameters or command changed within 0.2 s before the capture"
+    dyn = Scenario(mode="dynamic", speed_rpm=200.0)
+    assert "changed while running" in match_plan(captured(dyn, t_start=0.1, last_change_s=0.05), HilModes(), m).reason
+    assert match_plan(captured(dyn, t_start=1.2), HilModes(), m).reason == (
+        "dynamic run captured too late for the matched SIL (capture within 1 s of Start)")
+    assert match_plan(captured(dyn, t_start=0.5), HilModes(), m).scenario is not None
+    long = match_plan(captured(fixed, n=200_000), HilModes(), m)
+    assert long.scenario is None and "too long" in long.reason
+    assert "latency" in match_plan(captured(fixed, latency_us=None), HilModes(), m).reason
+    bad = match_plan(captured(fixed, latency_us=1e6), HilModes(), m)
+    assert bad.scenario is None and bad.reason.startswith("no matched SIL scenario")
+
+
+def test_compare_shifts_the_window_by_t0():
+    t = np.arange(100) * 1e-4
+    sil = SimResult({"t": t, "torque": np.full(100, 2.0), "i": np.full((4, 100), 10.0, np.float32)},
+                    result(2.0, 10.0, 0.0).summary, SCN, "hysteresis", "", "")
+    hil = replace(result(2.0, 10.0, 0.0), hil={"valid": True, "window_s": (1.002, 1.008)})
+    assert compare(hil, sil, t0=1.0).passed
+    assert compare(hil, sil).reason == "SIL does not cover the HIL window"

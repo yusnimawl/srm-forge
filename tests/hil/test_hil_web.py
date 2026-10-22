@@ -187,6 +187,126 @@ def test_capture_then_compare_passes(client):
     assert arrays["t.sil.i.0"][0] >= arrays["t.i.0"][0] - 1e-9
 
 
+def _capture(client, n_steps=2000):
+    r = client.post("/api/hil/session/capture", json={"n_steps": n_steps})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _compare(client, cap):
+    r = client.get(f"/api/hil/captures/{cap['capture_id']}/compare")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_late_fixed_capture_matches_from_settle_before(client):
+    """A fixed-speed capture more than 1 s after Start: the matched SIL starts SETTLE_S before it."""
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    time.sleep(1.3)
+    cap = _capture(client)
+    assert cap["valid"], cap["reason"]
+    out = _compare(client, cap)
+    assert out["passed"], out
+    from web_support import unpack
+    _, _, arrays = unpack(client.get(f"/api/hil/captures/{cap['capture_id']}?n_px=500").content)
+    t_hil, t_sil = arrays["t.i.0"], arrays["t.sil.i.0"]
+    assert t_hil[0] > 1.3 and t_sil[0] >= t_hil[0] - 1e-6 and t_sil[-1] <= t_hil[-1] + 1e-6
+
+
+def test_capture_after_restart_matches(client):
+    """Stop and Start again: the boards restart from the scenario's initial state and the change made in the first
+    run is part of the scenario of the second."""
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    assert client.post("/api/hil/session/param", json={"name": "band", "value": 0.6}).json() == {"status": 0}
+    client.post("/api/hil/session/stop")
+    client.post("/api/hil/session/start")
+    out = _compare(client, _capture(client))
+    assert out["passed"], out
+
+
+def test_fixed_change_within_settle_refused(client):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    time.sleep(0.3)
+    client.post("/api/hil/session/command", json={"mode": "torque", "value": 1.2})
+    out = _compare(client, _capture(client))
+    assert not out["passed"] and out["reason"] == "parameters or command changed within 0.2 s before the capture"
+    assert out["d_torque_pct"] is None
+
+
+def test_fixed_change_long_before_capture_matches(client):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    client.post("/api/hil/session/command", json={"mode": "torque", "value": 1.2})
+    time.sleep(0.4)
+    out = _compare(client, _capture(client))
+    assert out["passed"], out
+
+
+def test_dynamic_change_while_running_refused(client):
+    scn = {**SCENARIO, "mode": "dynamic", "speed_rpm": 200.0, "inertia": 2e-3}
+    _open(client, _case(client), {**OPEN, "scenario": scn})
+    client.post("/api/hil/session/start")
+    client.post("/api/hil/session/command", json={"mode": "torque", "value": 1.2})
+    out = _compare(client, _capture(client))
+    assert not out["passed"] and "changed while running" in out["reason"]
+
+
+def test_capture_before_start_409(client):
+    _open(client, _case(client))
+    r = client.post("/api/hil/session/capture", json={"n_steps": 1000})
+    assert r.status_code == 409 and r.json()["detail"] == "start the run before capturing"
+
+
+def test_failed_sil_run_is_a_reason_not_500(client, monkeypatch):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    cap = _capture(client)
+
+    def broken(*a, **k):
+        raise ValueError("controller library missing")
+
+    monkeypatch.setattr("srmweb.hil.sil_run.run", broken)
+    out = _compare(client, cap)
+    assert not out["passed"] and out["reason"] == "the matched SIL run failed: controller library missing"
+
+
+def test_concurrent_compares_run_one_sil_and_block_cache_clear(client, monkeypatch):
+    import threading
+    import srmsil.run as sil_run_module
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    cap = _capture(client)
+    client.delete("/api/hil/session")
+    real, release, calls = sil_run_module.run, threading.Event(), []
+
+    def slow(*a, **k):
+        calls.append(1)
+        release.wait(30)
+        return real(*a, **k)
+
+    monkeypatch.setattr("srmweb.hil.sil_run.run", slow)
+    hil, results = client.app.state.hil, []
+    motor = lambda case_id, bus: analytic_motor()     # noqa: E731
+    threads = [threading.Thread(target=lambda: results.append(hil.compare(cap["capture_id"], motor)))
+               for _ in range(2)]
+    for th in threads:
+        th.start()
+    end = time.time() + 10
+    while not calls and time.time() < end:
+        time.sleep(0.01)
+    r = client.delete("/api/settings/cache")
+    assert r.status_code == 409 and "comparison" in r.json()["detail"]
+    release.set()
+    for th in threads:
+        th.join(60)
+    assert len(calls) == 1 and len(results) == 2 and all(c.passed for c in results), results
+    assert not hil.comparing()
+    assert client.delete("/api/settings/cache").status_code == 204
+
+
 def test_capture_gap_does_not_pass(client, rig):
     rig["drop_after"] = 3
     _open(client, _case(client))
