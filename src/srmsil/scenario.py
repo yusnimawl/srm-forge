@@ -87,6 +87,10 @@ class Scenario(_Model):
     pwm_hz: float = Field(20000.0, gt=0)
     isr_hz: float | None = Field(None, gt=0)        # None = pwm_hz
     compute_delay: float | None = Field(None, ge=0)  # s, None = one ISR period
+    # The controller's clock frequency / its nominal frequency (1 = exact): its ISR, ctrl_slow, PWM carrier and
+    # micros() run this much faster in true time. The HAL constants pwm_hz and isr_hz stay nominal, and
+    # compute_delay, sensors.delay, the plant and the sensors stay in true time.
+    controller_clock: float = Field(1.0, ge=0.9, le=1.1)
     seed: int = Field(0, ge=0, lt=2**32)
     params: dict[str, float] = {}
     converter: ConverterSettings = ConverterSettings()
@@ -113,8 +117,8 @@ class Scenario(_Model):
             raise ValueError(f"duration {self.duration} s is shorter than one step of {self.dt} s")
         if n > MAX_STEPS:
             raise ValueError(f"{n} steps (duration / dt) exceed the limit of {MAX_STEPS}; shorten the run or raise dt")
-        if self.pwm_hz * self.dt > 1 or self.resolved_isr_hz * self.dt > 1:
-            raise ValueError("pwm_hz and isr_hz must not exceed 1 / dt")
+        if max(self.pwm_hz, self.resolved_isr_hz) * self.controller_clock * self.dt > 1:   # true-time rates
+            raise ValueError("pwm_hz and isr_hz (times controller_clock) must not exceed 1 / dt")
         steps = math.floor(self.sensors.delay / self.dt + 0.5)   # the rule of srm_sensor_delay_steps
         if steps > MAX_DELAY_STEPS:
             raise ValueError(f"sensor delay {self.sensors.delay} s is {steps} steps of {self.dt} s, over the limit of "

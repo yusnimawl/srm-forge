@@ -93,7 +93,7 @@ static void hal_resolver_sincos(int16_t *s, int16_t *c)
 
 static uint32_t hal_micros(void)
 {
-    return (uint32_t)(int64_t)llround((double)S.n * S.cfg->dt * 1.0e6);
+    return (uint32_t)(int64_t)llround((double)S.n * S.cfg->dt * 1.0e6 * S.cfg->controller_clock);
 }
 
 static float hal_vbus_volts(void)
@@ -146,7 +146,8 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
         cfg->adc_bits < 1 || cfg->adc_bits > 16 || !(cfg->sensor_delay >= 0.0) || !(cfg->volt_full_scale >= 0.0) ||
         !(cfg->volt_rc_tau >= 0.0) || srm_sensor_delay_steps(cfg) > SRM_DELAY_MAX || cfg->n_param_steps < 0 ||
         (cfg->n_param_steps > 0 && !cfg->param_steps) ||
-        cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1)
+        cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1 ||
+        !(cfg->controller_clock > 0.0))
         return -1;
     memset(&S, 0, sizeof S);
     S.cfg = cfg;
@@ -187,8 +188,10 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     ctrl_init(&hal);
     ctrl_command(cfg->command_mode == 1 ? SRM_CMD_SPEED : SRM_CMD_TORQUE, (float)cfg->command_value);
 
+    /* ISR and ctrl_slow instants in true time, on the controller's clock */
+    const double isr_hz = cfg->isr_hz * cfg->controller_clock, slow_period = SLOW_PERIOD_S / cfg->controller_clock;
     int64_t isr_k = 0, slow_k = 1;
-    int64_t next_isr = step_of(0.5 / cfg->isr_hz, dt), next_slow = step_of(SLOW_PERIOD_S, dt);
+    int64_t next_isr = step_of(0.5 / isr_hz, dt), next_slow = step_of(slow_period, dt);
     const int64_t window_start = cfg->n_steps / 2;
     double adc_hold[SRM_SIM_MAX_PHASES] = {0}, adc_vhold[SRM_SIM_MAX_PHASES] = {0};
     int32_t next_step = 0;
@@ -214,11 +217,11 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
             S.in_isr = 1;
             ctrl_isr();
             S.in_isr = 0;
-            next_isr = step_of(((double)(++isr_k) + 0.5) / cfg->isr_hz, dt);
+            next_isr = step_of(((double)(++isr_k) + 0.5) / isr_hz, dt);
         }
         while (n >= next_slow) {
             ctrl_slow();
-            next_slow = step_of((double)(++slow_k) * SLOW_PERIOD_S, dt);
+            next_slow = step_of((double)(++slow_k) * slow_period, dt);
         }
         while (S.q_head < S.q_tail && S.queue[S.q_head % QUEUE_SIZE].step <= n) apply_event(&S.queue[S.q_head++ % QUEUE_SIZE]);
         if (S.overflow) return -2;

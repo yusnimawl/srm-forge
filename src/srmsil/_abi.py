@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ctypes as C
 
-SRM_SIM_ABI = 3
+SRM_SIM_ABI = 4
 MAX_PHASES = 8
 
 _d, _i32, _u32, _i64 = C.c_double, C.c_int32, C.c_uint32, C.c_int64
@@ -26,7 +26,8 @@ class Config(C.Structure):
         ("n_phases", _i32), ("n_rotor_poles", _i32), ("mode", _i32),
         ("command_mode", _i32), ("encoder_cpr", _u32), ("adc_bits", _i32), ("adc_offset_counts", _i32),
         ("seed", _u32), ("encoder_ecc_harmonic", _i32),
-        ("resolver", _i32), ("resolver_pole_pairs", _i32), ("resolver_bits", _i32), ("n_param_steps", _i32)]
+        ("resolver", _i32), ("resolver_pole_pairs", _i32), ("resolver_bits", _i32), ("n_param_steps", _i32),
+        ("controller_clock", _d)]
 
 
 class Tables(C.Structure):

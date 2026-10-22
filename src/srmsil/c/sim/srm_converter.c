@@ -9,7 +9,7 @@ void srm_conv_init(srm_conv_t *c, const srm_sim_config_t *cfg)
     c->bus = cfg->bus_voltage;
     c->v_switch = cfg->v_switch;
     c->v_diode = cfg->v_diode;
-    c->pwm_hz = cfg->pwm_hz;
+    c->pwm_hz = cfg->pwm_hz * cfg->controller_clock;    /* the carrier runs on the controller's clock */
     c->rise_steps = (int64_t)llround((cfg->dead_time + cfg->turn_on_delay) / cfg->dt);
     c->fall_steps = (int64_t)llround(cfg->turn_off_delay / cfg->dt);
     for (int k = 0; k < SRM_SIM_MAX_PHASES; k++) {

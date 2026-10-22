@@ -25,6 +25,7 @@ EXPORT void shim_sil_states(double duty, int chop_soft, int arr, uint8_t *up, ui
     memset(&cfg, 0, sizeof cfg);
     cfg.n_phases = 1;
     cfg.pwm_hz = 1.0;
+    cfg.controller_clock = 1.0;
     cfg.dt = 1.0;
     srm_conv_init(&conv, &cfg);
     srm_conv_set_pwm(&conv, 0, duty, chop_soft);
