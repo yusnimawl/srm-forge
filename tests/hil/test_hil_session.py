@@ -77,6 +77,19 @@ def test_capture_complete_is_valid(cache):
     tr = cap.result.traces
     assert tr["i"].shape == (4, 800) and tr["gate_u"].shape == (4, 800)
     assert tr["t"][1] - tr["t"][0] == pytest.approx(5e-6)
+    assert cap.clipped == 0.0
+
+
+def test_capture_reports_clipped_current(cache):
+    s, _, _ = session(cache)
+    s.connect()
+    s.configure(analytic_motor(), SCN.model_copy(update={"bus_voltage": 400.0}), HilModes())   # runs far past 2 i_max
+    s.start()
+    try:
+        cap = s.capture(800)
+    finally:
+        s.stop()
+    assert cap.valid and 0.0 < cap.clipped < 1.0
 
 
 def test_bad_frame_during_capture_invalid(cache):

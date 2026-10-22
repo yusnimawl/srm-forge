@@ -43,6 +43,7 @@ def test_run_hil_on_fake_matches_sil(cache, r):
     assert h["clock_measured"] and h["clock_ratio"] == pytest.approx(r, rel=1e-6)
     assert h["clock_spread_ppm"] < 1.0
     assert h["overruns"] == h["isr_overruns"] == h["dropped"] == 0
+    assert h["capture_clipped"] == 0.0
     for k in ("step_mean_us", "step_max_us", "edge_jitter_ns", "latency_us", "isr_mean_us", "isr_max_us"):
         assert math.isfinite(h[k]), k
     assert res.controller == "hysteresis"

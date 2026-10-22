@@ -65,6 +65,7 @@ class Capture:
     result: SimResult       # traces empty and summary NaN unless every sample arrived
     valid: bool
     reason: str             # "" when valid
+    clipped: float = 0.0    # share of samples with a phase current at the capture's int16 limit (2 x the table i_max)
 
 
 def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
@@ -337,7 +338,8 @@ class HilSession:
         samples = np.concatenate(parts)
         traces = capture_traces(hdr, samples)
         res = SimResult(traces, capture_summary(traces, self._m.resistance), self._scenario, "", "", "")
-        return Capture(res, not reason, reason)
+        clipped = float(np.mean(np.any(np.abs(samples["i"][:, :q].astype(np.int32)) >= 32767, axis=1)))
+        return Capture(res, not reason, reason, clipped)
 
     def close(self) -> None:
         self.emu.close()
@@ -409,6 +411,7 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
         "clock_measured": measured,
         "clock_spread_ppm": spread,
         "bad_frames": session.emu.bad_frames + session.ctrl.bad_frames,
+        "capture_clipped": cap.clipped,
         "errors": list(session.errors),
     }
     reason = cap.reason
