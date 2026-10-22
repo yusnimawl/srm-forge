@@ -283,6 +283,7 @@ void drv_data_done(uint32_t src)
     ctrl_isr();
     const uint32_t exec = DWT->CYCCNT - t0;
     in_ctrl = false;
+    unwind_pending = false;   /* a hung ctrl_isr that returned by itself needs no abandon */
     w_n++;
     w_exec += exec;
     w_lat += t0 - t_trigger;
