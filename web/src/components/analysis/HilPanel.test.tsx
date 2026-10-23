@@ -182,6 +182,15 @@ describe("HilPanel", () => {
     expect(document.querySelector('[data-testid="hil-invalid"]')).not.toBeNull()
   })
 
+  it("shows a step time over 80 % of the step as a warning, not as invalid", async () => {
+    await mount()
+    await emitLive(live({ step_max_us: 4.8 }))
+    expect(document.querySelector('[data-testid="hil-warning"]')).toBeNull()
+    await emitLive(live({ step_max_us: 5.04 }))
+    expect(document.querySelector('[data-testid="hil-warning"]')?.textContent).toContain("84 % of the 6 µs step")
+    expect(document.querySelector('[data-testid="hil-invalid"]')).toBeNull()
+  })
+
   it("counts dropped frames only after the run started", async () => {
     await mount()
     await emitLive({ ...live({}, { tx_dropped: 3 }), session: { ...SESSION, running: false } })

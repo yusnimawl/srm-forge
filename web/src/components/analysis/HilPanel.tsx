@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import type { Scenario } from "@/lib/control"
 import {
   captureSteps, hilCapture, hilCaptureTraces, hilClose, hilCommand, hilCompare, hilErrorText, hilFlash, hilFlashResult, hilOpen, hilParam,
-  hilStart, hilStop, liveProblems, livePpm, MAX_CAPTURE_MS, MIN_CAPTURE_MS, paramStatusText, ppmOff, useHilEvents,
+  hilStart, hilStop, liveProblems, livePpm, liveWarnings, MAX_CAPTURE_MS, MIN_CAPTURE_MS, paramStatusText, ppmOff, useHilEvents,
   type HilCaptureOut, type HilComparison, type HilFlashResult, type HilLive, type HilModes, type HilSession,
 } from "@/lib/hil"
 
@@ -44,6 +44,7 @@ function InvalidChip({ id, why }: { id: string; why: string }) {
 function LiveNumbers({ live, txBase }: { live: HilLive; txBase: number }) {
   const { emu, ctrl } = live
   const problems = liveProblems(live, txBase)
+  const warnings = liveWarnings(live)
   const ppm = livePpm(live)
   const rows: [string, string][] = [
     ["Mean torque", num(emu?.mean_torque, 3, "N·m")],
@@ -60,6 +61,7 @@ function LiveNumbers({ live, txBase }: { live: HilLive; txBase: number }) {
       <div className="flex flex-wrap items-center gap-2">
         {problems.length > 0 && <InvalidChip id="hil-invalid" why={problems.join("; ")} />}
         {problems.length > 0 && <span className="text-xs text-destructive">{problems.join("; ")}</span>}
+        {warnings.length > 0 && <span className="text-xs text-warn" data-testid="hil-warning">{warnings.join("; ")}</span>}
       </div>
       <Rows rows={rows} />
     </div>

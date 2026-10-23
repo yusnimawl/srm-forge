@@ -82,6 +82,16 @@ export function liveProblems(live: HilLive, txBase = 0): string[] {
   return out
 }
 
+/** An emulator step max above this share of the step is a warning (`srmsil.hil.session.STEP_WARN_FRACTION`). */
+export const STEP_WARN_FRACTION = 0.8
+
+/** Warnings of a live window; unlike `liveProblems` they do not make a run invalid. */
+export function liveWarnings(live: HilLive): string[] {
+  const max = live.emu?.step_max_us
+  if (max == null || !(max > STEP_WARN_FRACTION * EMU_STEP_US)) return []
+  return [`emulator step max ${max.toFixed(2)} µs is ${Math.round((100 * max) / EMU_STEP_US)} % of the ${EMU_STEP_US} µs step (warning above ${100 * STEP_WARN_FRACTION} %)`]
+}
+
 /** Parts per million that a measured ratio is off its nominal 1. */
 export const ppmOff = (ratio: number) => (ratio - 1) * 1e6
 

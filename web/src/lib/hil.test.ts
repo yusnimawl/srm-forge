@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { ApiError } from "@/api/client"
-import { captureSteps, hilErrorText, liveProblems, paramStatusText, ppmOff, type HilLive } from "./hil"
+import { captureSteps, hilErrorText, liveProblems, liveWarnings, paramStatusText, ppmOff, type HilLive } from "./hil"
 
 describe("hil", () => {
   it("names the ctrl_param statuses", () => {
@@ -30,5 +30,15 @@ describe("hil", () => {
     expect(liveProblems(dropped)).toHaveLength(1)
     expect(liveProblems(dropped, 5)).toEqual([])
     expect(liveProblems(dropped, 3)).toEqual(["2 frames the controller could not send"])
+  })
+
+  it("warns, without a problem, when the emulator step max is above 80 % of the step", () => {
+    const emu = { step_max_us: 4.8, overruns: 0, dropped: 0 }
+    const live = { session: {}, emu, ctrl: null } as unknown as HilLive
+    expect(liveWarnings(live)).toEqual([])
+    const slow = { ...live, emu: { ...emu, step_max_us: 5.04 } } as unknown as HilLive
+    expect(liveWarnings(slow)).toEqual(["emulator step max 5.04 µs is 84 % of the 6 µs step (warning above 80 %)"])
+    expect(liveProblems(slow)).toEqual([])
+    expect(liveWarnings({ ...live, emu: null })).toEqual([])
   })
 })

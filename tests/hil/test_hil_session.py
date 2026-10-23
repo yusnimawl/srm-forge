@@ -370,3 +370,20 @@ def test_fake_rig_reports_the_chosen_hashes(cache):
     s, _, _ = session(cache, emulator_hash=0x11, controller_hash=0x22)
     info = s.connect()
     assert (info.emulator_hash, info.controller_hash) == (0x11, 0x22)
+
+
+def test_step_time_over_80_percent_is_a_warning_not_a_failure(cache):
+    """An emulator step max above 80 % of the step is reported in hil["warnings"]; the run stays valid."""
+    from srmsil.hil.session import Capture, capture_health
+    from srmsil.run import SimResult
+    s, _, _ = session(cache)
+    live = dict(step=1, mean_torque=1.0, ripple_pct=1.0, i_rms=(1.0,) * 4, speed_rpm=1000.0, step_mean_us=2.0,
+                overruns=0, dropped=0, edge_jitter_ns=20.0, latency_us=6.0, temp_c=60.0, trigger_hz=20000.0)
+    s.ctrl_windows = [proto.LiveCtrl(3.0, 4.0, 0, 0.0, (0.0,) * 4, 17.0, 0, proto.CTRL_RUNNING)]
+    cap = Capture(SimResult({}, None, SCN, "", "", ""), True, "")
+    for step_max, warned in ((4.8, False), (4.81, True)):
+        s.emu_windows = [proto.LiveEmu(step_max_us=step_max, **live)]
+        h = capture_health(s, cap, 20000.0)
+        assert h["valid"] and h["reason"] == ""
+        assert bool(h["warnings"]) == warned
+    assert h["warnings"] == ["emulator step max 4.81 us is 80.2 % of the 6 us step (warning above 80 %)"]

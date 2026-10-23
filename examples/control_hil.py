@@ -130,7 +130,8 @@ def run_one(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, 
     else:
         c = compare(res, run(m, controller, plan.scenario, cache_dir=cache_dir), m=m, t0=plan.t0)
     keep = ("valid", "reason", "clock_ratio", "clock_spread_ppm", "step_mean_us", "step_max_us", "overruns", "dropped",
-            "isr_mean_us", "isr_max_us", "isr_overruns", "latency_us", "capture_clipped", "bad_frames", "errors")
+            "isr_mean_us", "isr_max_us", "isr_overruns", "latency_us", "capture_clipped", "bad_frames", "errors",
+            "warnings")
     return {"controller": controller, "firmware_hash": f"{build.firmware_hash:08x}",
             "hil": {"mean_torque": res.summary.mean_torque, "i_rms": float(np.sqrt(np.mean(res.summary.i_rms ** 2))),
                     "ripple_pct": res.summary.ripple_pct},
@@ -151,7 +152,7 @@ def row(r: dict) -> list[str]:
             "yes" if c["passed"] else "no", "yes" if r["valid"] else "no", f(r["clock_ratio"], ".6f"),
             f"{f(r['step_mean_us'], '.2f')}/{f(r['step_max_us'], '.2f')}", str(r["overruns"]), str(r["dropped"]),
             f"{f(r['isr_mean_us'], '.2f')}/{f(r['isr_max_us'], '.2f')}", f(r["latency_us"], ".2f"),
-            c["reason"] or r["reason"] or ""]
+            "; ".join(x for x in (c["reason"] or r["reason"], *(r.get("warnings") or [])) if x)]
 
 
 def main(argv: list[str] | None = None) -> int:

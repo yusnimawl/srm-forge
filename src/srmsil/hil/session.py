@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 REPLY_TIMEOUT_S = 2.0
 CLOCK_SPREAD_WARN_PPM = 500.0
 RESET_TIMEOUT_S = 3.0        # s the controller may take to answer HELLO after a reset
+STEP_WARN_FRACTION = 0.8     # an emulator step max above this share of the step is a warning, not a failure
 
 CS_CODES = {"ad7606": 0, "internal": 1}
 POS_CODES = {"encoder": 0, "ad2s1210": 1, "both": 2}
@@ -475,7 +476,8 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
 def capture_health(session: HilSession, cap: Capture, isr_hz: float) -> dict:
     """The `SimResult.hil` block of a capture: the health numbers over the session's live windows since `start`, the
     measured controller clock, `window_s` (the summary's window in s since the controller's start, for the matched
-    SIL: compare.matched_scenario(..., end_s=window_s[1])), `valid` and `reason`."""
+    SIL: compare.matched_scenario(..., end_s=window_s[1])), `valid` and `reason`, and `warnings` (an emulator step
+    max above STEP_WARN_FRACTION of the step), which never make the run invalid."""
     ew, cw = session.emu_windows, session.ctrl_windows
     t = cap.result.traces.get("t")
     # the summary's window, the second half of the captured steps, in s since the controller's start
@@ -514,4 +516,8 @@ def capture_health(session: HilSession, cap: Capture, isr_hz: float) -> dict:
             reason = f"a board reported: {session.errors[0]}"
     hil["valid"] = not reason
     hil["reason"] = reason
+    step_us = EMU_DT * 1e6
+    hil["warnings"] = [f"emulator step max {hil['step_max_us']:.2f} us is {100 * hil['step_max_us'] / step_us:.1f} % "
+                       f"of the {step_us:g} us step (warning above {100 * STEP_WARN_FRACTION:g} %)"
+                       ] if hil["step_max_us"] > STEP_WARN_FRACTION * step_us else []
     return hil
