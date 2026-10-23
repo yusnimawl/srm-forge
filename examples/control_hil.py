@@ -126,7 +126,7 @@ def run_one(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, 
     if plan.scenario is None:
         c = refused(res, h["reason"] or plan.reason)
     else:
-        c = compare(res, run(m, controller, plan.scenario, cache_dir=cache_dir), t0=plan.t0)
+        c = compare(res, run(m, controller, plan.scenario, cache_dir=cache_dir), m=m, t0=plan.t0)
     keep = ("valid", "reason", "clock_ratio", "clock_spread_ppm", "step_mean_us", "step_max_us", "overruns", "dropped",
             "isr_mean_us", "isr_max_us", "isr_overruns", "latency_us", "capture_clipped", "bad_frames", "errors")
     return {"controller": controller, "firmware_hash": f"{fw:08x}",

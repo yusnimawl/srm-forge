@@ -21,6 +21,7 @@ from srmweb.jobs import JobRunner
 from web_support import analytic_evaluation, store_search
 
 SCENARIO = {"speed_rpm": 1000.0, "duration": 0.02, "command_value": 1.0, "bus_voltage": 48.0}
+CAPTURE_STEPS = 4200      # 25 ms: its second half spans 5 strokes of the analytic 8/6 at 1000 rpm
 OPEN = {"controller": "hysteresis", "scenario": SCENARIO, "modes": {}}
 
 
@@ -169,7 +170,7 @@ def test_events_stream_live_stats(client):
 def test_capture_then_compare_passes(client):
     _open(client, _case(client))
     client.post("/api/hil/session/start")
-    r = client.post("/api/hil/session/capture", json={"n_steps": 2000})
+    r = client.post("/api/hil/session/capture", json={"n_steps": CAPTURE_STEPS})
     assert r.status_code == 201, r.text
     cap = r.json()
     assert cap["valid"], cap["reason"]
@@ -180,6 +181,7 @@ def test_capture_then_compare_passes(client):
     out = c.json()
     assert out["passed"], out
     assert out["clock_measured"] and out["clock_ratio"] == pytest.approx(1.0)
+    assert out["ripple_window_hil"] > 0 and out["ripple_window_sil"] > 0
     from web_support import unpack
     header, _, arrays = unpack(client.get(f"/api/hil/captures/{cap['capture_id']}?n_px=500").content)
     assert header["meta"]["compared"] and header["meta"]["hil"]["valid"]
@@ -187,7 +189,7 @@ def test_capture_then_compare_passes(client):
     assert arrays["t.sil.i.0"][0] >= arrays["t.i.0"][0] - 1e-9
 
 
-def _capture(client, n_steps=2000):
+def _capture(client, n_steps=CAPTURE_STEPS):
     r = client.post("/api/hil/session/capture", json={"n_steps": n_steps})
     assert r.status_code == 201, r.text
     return r.json()

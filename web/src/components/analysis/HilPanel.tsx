@@ -21,13 +21,15 @@ const num = (v: number | null | undefined, d: number, unit = "") => (v == null ?
 const signed = (v: number | null, d: number, unit: string) => (v == null ? "n/a" : `${v >= 0 ? "+" : "-"}${Math.abs(v).toFixed(d)} ${unit}`)
 const ppmText = (ppm: number | null) => (ppm == null ? "not measured" : signed(Math.round(ppm), 0, "ppm"))
 
-function Rows({ rows }: { rows: [string, string][] }) {
+/** Label, value and an optional secondary line under the value. */
+function Rows({ rows }: { rows: [string, string, string?][] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm @2xl:grid-cols-4">
-      {rows.map(([k, v]) => (
+      {rows.map(([k, v, sub]) => (
         <div key={k}>
           <dt className="text-muted-foreground">{k}</dt>
           <dd className="font-mono">{v}</dd>
+          {sub && <dd className="text-xs text-muted-foreground">{sub}</dd>}
         </div>
       ))}
     </dl>
@@ -206,7 +208,8 @@ function CaptureResult({ view, busy, onRetry }: { view: CaptureView; busy: boole
         <Rows rows={[
           ["Torque difference", signed(cmp.d_torque_pct, 2, "%")],
           ["RMS current difference", signed(cmp.d_irms_pct, 2, "%")],
-          ["Ripple difference", signed(cmp.d_ripple_pts, 2, "pts")],
+          ["Ripple difference (median over strokes)", signed(cmp.d_ripple_pts, 2, "pts"),
+            `whole window: HIL ${num(cmp.ripple_window_hil, 1, "%")} · SIL ${num(cmp.ripple_window_sil, 1, "%")}`],
           ["Controller clock", cmp.clock_ratio == null ? "not measured" : `${ppmText(ppmOff(cmp.clock_ratio))} off nominal (${cmp.clock_measured ? "measured" : "assumed"})`],
         ]} />
       )}

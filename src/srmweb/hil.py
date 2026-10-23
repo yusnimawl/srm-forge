@@ -235,10 +235,10 @@ class HilManager:
         if not h["valid"]:
             return refused(hil, f"HIL run not valid: {h['reason']}")
         sil_file = self.dir / f"{capture_id}.sil.npz"
+        m = motor_of(h["case_id"], hil.scenario.bus_voltage)
         if sil_file.is_file():
             sil = sil_run.load(sil_file)
-            return compare(hil, sil, t0=sil.hil["t0"])
-        m = motor_of(h["case_id"], hil.scenario.bus_voltage)
+            return compare(hil, sil, m=m, t0=sil.hil["t0"])
         plan = match_plan(hil, HilModes(**h["modes"]), m)
         if plan.scenario is None:
             return refused(hil, plan.reason)
@@ -248,7 +248,7 @@ class HilManager:
             return refused(hil, f"the matched SIL run failed: {exc}")
         sil = replace(sil, hil={"t0": plan.t0})
         sil_run.save(sil, sil_file)
-        return compare(hil, sil, t0=plan.t0)
+        return compare(hil, sil, m=m, t0=plan.t0)
 
     def poll(self) -> dict | None:
         """The session and the newest live statistics of both boards; None when no session is open."""

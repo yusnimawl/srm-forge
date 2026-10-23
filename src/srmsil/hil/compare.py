@@ -16,6 +16,7 @@ from srmsil.tables import MotorData
 TORQUE_TOL_PCT = 3.0
 IRMS_TOL_PCT = 3.0
 RIPPLE_TOL_PTS = 5.0
+MIN_STROKES = 3          # complete strokes each side needs for the ripple median
 SETTLE_S = 0.2           # s the matched SIL of a fixed-speed capture runs before the capture (and run_hil's settle)
 RPM = 2 * math.pi / 60
 
@@ -55,11 +56,13 @@ def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, cloc
 class Comparison:
     d_torque_pct: float      # HIL mean torque relative to the SIL's
     d_irms_pct: float        # HIL RMS phase current (rms over the phases) relative to the SIL's
-    d_ripple_pts: float      # HIL ripple % minus the SIL's
+    d_ripple_pts: float      # median ripple % over the complete strokes, HIL minus SIL (stroke_ripples)
     passed: bool
     clock_ratio: float | None
     clock_measured: bool
     reason: str = ""         # why it did not pass ("" when it passed)
+    ripple_window_hil: float = math.nan   # ripple % of the whole window, for information
+    ripple_window_sil: float = math.nan
 
 
 def _rel_pct(a: float, b: float) -> float:
@@ -77,6 +80,37 @@ def window_stats(r: SimResult, t_start: float, t_end: float) -> tuple[float, flo
     ripple = 100 * float(np.max(tq) - np.min(tq)) / abs(mean) if abs(mean) > 1e-12 else math.nan
     i = r.traces["i"][:, w].astype(np.float64)
     return mean, ripple, float(np.sqrt(np.mean(i**2)))
+
+
+def stroke_ripples(r: SimResult, w: np.ndarray, stroke: float) -> np.ndarray:
+    """Ripple % ((max - min) / |mean| x 100) of each complete stroke among the samples w of r. A stroke is one torque
+    period `stroke` of rotor angle, numbered floor(angle / stroke) on the unwrapped angle trace (phase A aligned at
+    0, so the HIL's wrapped angle and the SIL's split the same strokes); the first and last stroke in w are cut by
+    the window and left out. Strokes with a zero mean torque are skipped."""
+    theta = r.traces.get("theta")
+    if theta is None or not w.any():
+        return np.zeros(0)
+    k = np.floor(np.unwrap(np.asarray(theta, np.float64)[w]) / stroke).astype(np.int64)
+    tq = np.asarray(r.traces["torque"], np.float64)[w]
+    out = []
+    for j in np.unique(k)[1:-1]:
+        x = tq[k == j]
+        mean = float(np.mean(x))
+        if abs(mean) > 1e-12:
+            out.append(100 * float(np.max(x) - np.min(x)) / abs(mean))
+    return np.array(out)
+
+
+def _window_mask(r: SimResult, win: tuple[float, float] | None) -> np.ndarray:
+    """The samples of r in win (t_start <= t < t_end), or the second half of its traces (its summary's window)."""
+    t = r.traces.get("t")
+    if t is None:
+        return np.zeros(0, bool)
+    if win:
+        return (t >= win[0] - 1e-12) & (t < win[1] - 1e-12)
+    w = np.zeros(len(t), bool)
+    w[len(t) // 2:] = True
+    return w
 
 
 def covers(r: SimResult, t_start: float, t_end: float) -> bool:
@@ -105,7 +139,8 @@ def match_plan(hil: SimResult, modes: HilModes, m: MotorData) -> MatchPlan:
     `last_change_s`, the time since Start of the last accepted parameter or command change, None for none).
 
     - Fixed speed: the SIL starts SETTLE_S before the capture (at Start when the capture began earlier), at the rotor
-      angle the HIL had then, and runs to the end of the summary window; `compare(..., t0=plan.t0)` shifts the window.
+      angle the HIL had then, and runs to the end of the summary window; `compare(..., m=m, t0=plan.t0)` shifts the
+      window.
       A change after the SIL's start cannot be matched.
     - Dynamic: the speed depends on the whole run, so the SIL runs from Start; a change while running cannot be
       matched.
@@ -150,25 +185,31 @@ def refused(hil: SimResult, reason: str) -> Comparison:
     return Comparison(n, n, n, False, h.get("clock_ratio"), bool(h.get("clock_measured")), reason)
 
 
-def compare(hil: SimResult, sil: SimResult, *, t0: float = 0.0) -> Comparison:
-    """Differences of a HIL run from its matched SIL run, both over the HIL's window (`hil["window_s"]`, times since
-    the controller's start; the SIL's times are t0 earlier; the summaries when there is no window). It passes when the
-    HIL run is valid, its capture did not clip, the SIL covers the window, and the mean torque and RMS current are
-    within 3 % and the ripple within 5 points."""
+def compare(hil: SimResult, sil: SimResult, *, m: MotorData, t0: float = 0.0) -> Comparison:
+    """Differences of a HIL run from its matched SIL run on motor m, both over the HIL's window (`hil["window_s"]`,
+    times since the controller's start; the SIL's times are t0 earlier; the summaries and the traces' second halves
+    when there is no window). The ripple compared is the median over the complete strokes of each side
+    (stroke_ripples, m.stroke): a single stroke whose chop falls late, which the sensed-value age decides near a
+    threshold, does not set it; the whole-window ripples are kept as information. It passes when the HIL run is valid,
+    its capture did not clip, the SIL covers the window, the mean torque and RMS current are within 3 %, both sides
+    have at least MIN_STROKES complete strokes and the median ripples are within 5 points."""
     h = hil.hil or {}
-    win = h.get("window_s")
-    if win:
-        win = (win[0] - t0, win[1] - t0)
+    win_hil = h.get("window_s")
+    win = (win_hil[0] - t0, win_hil[1] - t0) if win_hil else None
     uncovered = bool(win) and not covers(sil, *win)
     reasons = ["SIL does not cover the HIL window"] if uncovered else []
     b = (math.nan,) * 3 if uncovered else window_stats(sil, *win) if win else _summary_stats(sil)
     a = _summary_stats(hil)
-    dt, di, dr = _rel_pct(a[0], b[0]), _rel_pct(a[2], b[2]), a[1] - b[1]
+    dt, di = _rel_pct(a[0], b[0]), _rel_pct(a[2], b[2])
+    rh = stroke_ripples(hil, _window_mask(hil, win_hil), m.stroke)
+    rs = np.zeros(0) if uncovered else stroke_ripples(sil, _window_mask(sil, win), m.stroke)
+    n = min(len(rh), len(rs))
+    dr = float(np.median(rh) - np.median(rs)) if n >= MIN_STROKES else math.nan
     if not h.get("valid"):
         reasons.append(f"HIL run not valid: {h.get('reason') or 'no hil block'}")
     if h.get("capture_clipped"):
         reasons.append(f"capture clipped ({100 * h['capture_clipped']:.1f} % of samples)")
-    if not all(math.isfinite(x) for x in (dt, di, dr)):
+    if not all(math.isfinite(x) for x in (dt, di)):
         if not uncovered:
             reasons.append("a difference is not finite")
     else:
@@ -176,6 +217,11 @@ def compare(hil: SimResult, sil: SimResult, *, t0: float = 0.0) -> Comparison:
             reasons.append(f"mean torque {dt:+.2f} % (limit {TORQUE_TOL_PCT:g} %)")
         if abs(di) > IRMS_TOL_PCT:
             reasons.append(f"RMS current {di:+.2f} % (limit {IRMS_TOL_PCT:g} %)")
-        if abs(dr) > RIPPLE_TOL_PTS:
+        if n < MIN_STROKES:
+            reasons.append(f"too few strokes for the ripple median ({n})")
+        elif not math.isfinite(dr):
+            reasons.append("a difference is not finite")
+        elif abs(dr) > RIPPLE_TOL_PTS:
             reasons.append(f"ripple {dr:+.2f} points (limit {RIPPLE_TOL_PTS:g})")
-    return Comparison(dt, di, dr, not reasons, h.get("clock_ratio"), bool(h.get("clock_measured")), "; ".join(reasons))
+    return Comparison(dt, di, dr, not reasons, h.get("clock_ratio"), bool(h.get("clock_measured")), "; ".join(reasons),
+                      a[1], b[1])

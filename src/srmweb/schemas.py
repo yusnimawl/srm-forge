@@ -374,8 +374,10 @@ class ComparisonOut(BaseModel):
     """`srmsil.hil.compare.Comparison`; a difference is None when it is not finite."""
     d_torque_pct: float | None
     d_irms_pct: float | None
-    d_ripple_pts: float | None
+    d_ripple_pts: float | None      # median ripple over the complete strokes, HIL minus SIL
     passed: bool
     clock_ratio: float | None
     clock_measured: bool
     reason: str
+    ripple_window_hil: float | None  # whole-window ripple %, for information
+    ripple_window_sil: float | None

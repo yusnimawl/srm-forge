@@ -334,6 +334,7 @@ describe("HilPanel", () => {
     routes["POST /api/hil/session/capture"] = () => json(201, { capture_id: "abc", valid: true, reason: "", clipped: 0 })
     routes["GET /api/hil/captures/abc/compare"] = () => json(200, {
       d_torque_pct: 1.25, d_irms_pct: -0.5, d_ripple_pts: 0.8, passed: true, clock_ratio: 1.00002, clock_measured: true, reason: "",
+      ripple_window_hil: 103.4, ripple_window_sil: 78.25,
     })
     routes["GET /api/hil/captures/abc?n_px=1500"] = () => Promise.resolve(new Response(traces()))
     await mount()
@@ -347,6 +348,8 @@ describe("HilPanel", () => {
     expect(text()).toContain("+1.25 %")
     expect(text()).toContain("-0.50 %")
     expect(text()).toContain("+0.80 pts")
+    expect(text()).toContain("Ripple difference (median over strokes)")
+    expect(text()).toContain("whole window: HIL 103.4 % · SIL 78.3 %")
     expect(document.querySelector('[data-testid="scopes"]')!.getAttribute("data-overlay")).toBe("sil.i.0")
   })
 

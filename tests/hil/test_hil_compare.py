@@ -17,6 +17,7 @@ from srmsil.scenario import Scenario
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.02, command_value=1.0)
 R = 1.0125
+M = analytic_motor()
 
 
 @pytest.fixture(scope="module")
@@ -37,10 +38,10 @@ def matched(cache, res, clock_ratio, scn=SCN, end_s=True):
     if end_s:
         plan = match_plan(replace(res, hil={**res.hil, "clock_ratio": clock_ratio}), HilModes(), analytic_motor())
         assert plan.scenario is not None, plan.reason
-        return compare(res, run(analytic_motor(), "hysteresis", plan.scenario, cache_dir=cache), t0=plan.t0)
+        return compare(res, run(analytic_motor(), "hysteresis", plan.scenario, cache_dir=cache), m=M, t0=plan.t0)
     ms = matched_scenario(scn, res.hil["latency_us"] * 1e-6, HilModes(), clock_ratio, m=analytic_motor(), end_s=None)
     return compare(replace(res, hil={**res.hil, "window_s": None}), run(analytic_motor(), "hysteresis", ms,
-                                                                        cache_dir=cache))
+                                                                        cache_dir=cache), m=M)
 
 
 @pytest.mark.parametrize("r", [1.0, R])
@@ -125,30 +126,79 @@ def test_matched_adc_equals_hil_config(tmp_path, modes):
         assert h["HIL_ADC_VOLT_OFFSET_COUNTS"] == 2 ** (cfg.adc_bits - 1)
 
 
-def result(torque, irms, ripple, valid=True, clipped=0.0):
-    s = SimSummary(mean_torque=torque, ripple_pct=ripple, i_rms=np.full(4, irms), copper_loss=0.0, power_in=0.0,
-                   power_mech=0.0, beyond_map_fraction=0.0, energy_error=0.0, roundtrip_error=0.0)
-    return SimResult({}, s, SCN, "hysteresis", "", "", hil={"valid": valid, "clock_ratio": 1.01,
+def stroke_traces(torque, irms, ripple, *, t_start=0.0, strokes=12, per_stroke=100, outlier=None):
+    """Traces over `strokes` strokes of M from t_start, 1 ms per stroke: each stroke's torque is a sine about
+    `torque` with a peak-to-peak of `ripple` % of it (`outlier` = (stroke, ripple) changes one stroke)."""
+    x = np.arange(strokes * per_stroke) / per_stroke            # in strokes
+    r = np.full(x.shape, float(ripple))
+    if outlier is not None:
+        r[np.floor(x) == outlier[0]] = outlier[1]
+    tq = torque * (1 + r / 200 * np.sin(2 * math.pi * x))
+    return {"t": t_start + x * 1e-3, "theta": x * M.stroke, "torque": tq,
+            "i": np.full((4, len(x)), irms, np.float32)}
+
+
+def result(torque, irms, ripple, valid=True, clipped=0.0, **kw):
+    """A run whose summary (its traces' second half, like the capture's) and traces agree."""
+    tr = stroke_traces(torque, irms, ripple, **kw)
+    w = slice(len(tr["t"]) // 2, None)
+    tq = tr["torque"][w]
+    whole = 100 * (tq.max() - tq.min()) / abs(tq.mean()) if math.isfinite(torque) else math.nan
+    s = SimSummary(mean_torque=float(np.mean(tq)), ripple_pct=whole, i_rms=np.full(4, irms), copper_loss=0.0,
+                   power_in=0.0, power_mech=0.0, beyond_map_fraction=0.0, energy_error=0.0, roundtrip_error=0.0)
+    return SimResult(tr, s, SCN, "hysteresis", "", "", hil={"valid": valid, "clock_ratio": 1.01,
                                                             "clock_measured": True, "capture_clipped": clipped})
 
 
 def test_compare_bounds():
     sil = result(2.0, 10.0, 40.0)
-    assert compare(result(2.0 * 1.029, 10.0, 40.0), sil).passed
-    assert not compare(result(2.0 * 1.031, 10.0, 40.0), sil).passed
-    assert compare(result(2.0, 10.0 * 0.971, 40.0), sil).passed
-    assert not compare(result(2.0, 10.0 * 0.969, 40.0), sil).passed
-    assert compare(result(2.0, 10.0, 44.9), sil).passed
-    assert not compare(result(2.0, 10.0, 45.1), sil).passed
-    c = compare(result(2.0 * 1.031, 10.0 * 0.98, 45.1), sil)
+    assert compare(result(2.0 * 1.029, 10.0, 40.0), sil, m=M).passed
+    assert not compare(result(2.0 * 1.031, 10.0, 40.0), sil, m=M).passed
+    assert compare(result(2.0, 10.0 * 0.971, 40.0), sil, m=M).passed
+    assert not compare(result(2.0, 10.0 * 0.969, 40.0), sil, m=M).passed
+    assert compare(result(2.0, 10.0, 44.9), sil, m=M).passed
+    assert not compare(result(2.0, 10.0, 45.1), sil, m=M).passed
+    c = compare(result(2.0 * 1.031, 10.0 * 0.98, 45.1), sil, m=M)
     assert c.d_torque_pct == pytest.approx(3.1) and c.d_irms_pct == pytest.approx(-2.0)
     assert c.d_ripple_pts == pytest.approx(5.1)
+    assert c.ripple_window_hil == pytest.approx(45.1) and c.ripple_window_sil == pytest.approx(40.0)
     assert c.clock_ratio == 1.01 and c.clock_measured
-    assert compare(result(2.0, 10.0, 40.0), sil).reason == ""
+    assert compare(result(2.0, 10.0, 40.0), sil, m=M).reason == ""
     assert "mean torque +3.10 %" in c.reason and "ripple +5.10 points" in c.reason
-    assert not compare(result(2.0, 10.0, 40.0, valid=False), sil).passed
-    assert not compare(replace(result(2.0, 10.0, 40.0), hil=None), sil).passed
-    assert not compare(result(math.nan, 10.0, 40.0), sil).passed
+    assert not compare(result(2.0, 10.0, 40.0, valid=False), sil, m=M).passed
+    assert not compare(replace(result(2.0, 10.0, 40.0), hil=None), sil, m=M).passed
+    assert not compare(result(math.nan, 10.0, 40.0), sil, m=M).passed
+
+
+def test_one_outlier_stroke_does_not_move_the_ripple_median():
+    """The ripple compared is the median over complete strokes; the whole-window ripple is kept as information."""
+    sil = result(2.0, 10.0, 40.0)
+    hil = result(2.0, 10.0, 40.0, outlier=(8, 100.0))
+    c = compare(hil, sil, m=M)
+    assert c.passed, c
+    assert c.d_ripple_pts == pytest.approx(0.0, abs=1e-9)
+    assert c.ripple_window_hil == pytest.approx(100.0) and c.ripple_window_sil == pytest.approx(40.0)
+    # the median follows the bulk of the strokes
+    assert compare(result(2.0, 10.0, 46.0, outlier=(8, 40.0)), sil, m=M).d_ripple_pts == pytest.approx(6.0)
+
+
+def test_strokes_follow_the_rotor_angle():
+    """Strokes are located from the angle traces: a wrapped HIL angle (as captured) splits the same strokes."""
+    sil = result(2.0, 10.0, 40.0)
+    hil = result(2.0, 10.0, 40.0, outlier=(9, 100.0), strokes=48)          # two turns: the angle wraps
+    hil.traces["theta"] = np.mod(hil.traces["theta"] + 0.3 * M.stroke, 2 * math.pi)
+    c = compare(hil, sil, m=M)
+    assert c.passed, c
+    assert c.d_ripple_pts == pytest.approx(0.0, abs=0.5)    # strokes split 0.3 stroke later: about the same shape
+
+
+def test_too_few_strokes_refused():
+    sil = result(2.0, 10.0, 40.0)
+    c = compare(result(2.0, 10.0, 40.0, strokes=8), sil, m=M)      # second half: strokes 4-7, two complete
+    assert not c.passed and c.reason == "too few strokes for the ripple median (2)"
+    assert math.isnan(c.d_ripple_pts)
+    assert c.d_torque_pct == pytest.approx(0.0, abs=1e-9)
+    assert compare(sil, result(2.0, 10.0, 40.0, strokes=8), m=M).reason == "too few strokes for the ripple median (2)"
 
 
 def test_hil_block_survives_save(tmp_path):
@@ -162,22 +212,21 @@ def test_hil_block_survives_save(tmp_path):
 
 
 def test_clipped_capture_fails_comparison():
-    c = compare(result(2.0, 10.0, 40.0, clipped=0.0123), result(2.0, 10.0, 40.0))
+    c = compare(result(2.0, 10.0, 40.0, clipped=0.0123), result(2.0, 10.0, 40.0), m=M)
     assert not c.passed and c.reason == "capture clipped (1.2 % of samples)"
     assert c.d_torque_pct == 0.0
 
 
 def test_compare_sil_short_of_window():
     """A SIL run that ends before (or has no samples in) the HIL window gives passed False, never an exception."""
-    t = np.arange(100) * 1e-4
-    sil = SimResult({"t": t, "torque": np.full(100, 2.0), "i": np.full((4, 100), 10.0, np.float32)},
-                    result(2.0, 10.0, 0.0).summary, SCN, "hysteresis", "", "")
-    hil = replace(result(2.0, 10.0, 0.0), hil={"valid": True, "window_s": (0.02, 0.03)})
-    c = compare(hil, sil)
+    sil = SimResult(stroke_traces(2.0, 10.0, 0.0, strokes=10, per_stroke=10), result(2.0, 10.0, 0.0).summary, SCN,
+                    "hysteresis", "", "")          # 0 to 10 ms
+    hil = replace(result(2.0, 10.0, 0.0, strokes=40), hil={"valid": True, "window_s": (0.02, 0.03)})
+    c = compare(hil, sil, m=M)
     assert not c.passed and c.reason == "SIL does not cover the HIL window"
     partial = replace(hil, hil={"valid": True, "window_s": (0.005, 0.02)})
-    assert compare(partial, sil).reason == "SIL does not cover the HIL window"
-    assert compare(replace(hil, hil={"valid": True, "window_s": (0.002, 0.008)}), sil).passed
+    assert compare(partial, sil, m=M).reason == "SIL does not cover the HIL window"
+    assert compare(replace(hil, hil={"valid": True, "window_s": (0.002, 0.008)}), sil, m=M).passed
 
 
 def test_matched_scenario_end_s_is_required():
@@ -225,9 +274,8 @@ def test_match_plan_refusals():
 
 
 def test_compare_shifts_the_window_by_t0():
-    t = np.arange(100) * 1e-4
-    sil = SimResult({"t": t, "torque": np.full(100, 2.0), "i": np.full((4, 100), 10.0, np.float32)},
-                    result(2.0, 10.0, 0.0).summary, SCN, "hysteresis", "", "")
-    hil = replace(result(2.0, 10.0, 0.0), hil={"valid": True, "window_s": (1.002, 1.008)})
-    assert compare(hil, sil, t0=1.0).passed
-    assert compare(hil, sil).reason == "SIL does not cover the HIL window"
+    sil = SimResult(stroke_traces(2.0, 10.0, 0.0, strokes=10, per_stroke=10), result(2.0, 10.0, 0.0).summary, SCN,
+                    "hysteresis", "", "")
+    hil = replace(result(2.0, 10.0, 0.0, t_start=1.0), hil={"valid": True, "window_s": (1.002, 1.008)})
+    assert compare(hil, sil, m=M, t0=1.0).passed
+    assert compare(hil, sil, m=M).reason == "SIL does not cover the HIL window"

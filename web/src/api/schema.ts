@@ -1164,6 +1164,10 @@ export interface components {
             passed: boolean;
             /** Reason */
             reason: string;
+            /** Ripple Window Hil */
+            ripple_window_hil: number | null;
+            /** Ripple Window Sil */
+            ripple_window_sil: number | null;
         };
         /** ControlIn */
         ControlIn: {

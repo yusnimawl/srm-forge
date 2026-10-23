@@ -1068,6 +1068,28 @@
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "ripple_window_hil": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ripple Window Hil"
+          },
+          "ripple_window_sil": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ripple Window Sil"
           }
         },
         "required": [
@@ -1077,7 +1099,9 @@
           "passed",
           "clock_ratio",
           "clock_measured",
-          "reason"
+          "reason",
+          "ripple_window_hil",
+          "ripple_window_sil"
         ],
         "title": "ComparisonOut",
         "type": "object"
