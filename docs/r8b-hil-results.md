@@ -857,6 +857,80 @@ Bench at 912 MHz (`examples/control_hil.py --case ... --torque 10`; Task 14 case
 - No run overran, so the 6 us step (Part 2 of Task 14b2) was not needed.
 - pwm_current's step max (4.85-4.96 us) leaves 0.04-0.15 us of the 5 us step. At 1008 MHz it was 4.31-4.64 us.
 
+### Step 1f: 6 us step (owner's fallback, 2026-10-23)
+
+pwm_current had almost no step headroom at 912 MHz and overran while streaming (Step 1e), so the emulator step is
+now 6 us. It is one constant, `HIL_EMU_STEP_NS` in `hil/common/hil_proto.h` (Python `srmsil.hil.proto.EMU_STEP_NS`
+and `EMU_DT`). The firmware derives everything from it:
+- the step cycles (5472 at 912 MHz);
+- the PIT period (144 ticks of 24 MHz);
+- the GPT ticks per step of the encoder schedule (144, checked at compile time);
+- the plant dt and the capture header dt;
+- the live-statistics window (8333 steps, about 50 ms).
+
+The PC emulator model, the session, the fake rig, the self-test example and the web capture length take `EMU_DT`.
+The host now refuses a capture whose header dt is not its own step, and it computes capture times from `EMU_DT`, not
+from the header's float32 dt. The 912 MHz clock, the overrun rule, the tolerances, HSE_VALUE and the 0.5 us PC SIL
+are unchanged.
+
+Emulator model against the 0.5 us SIL (`tests/hil/test_hil_emulator_model.py`, CI, limit 1 %):
+
+| Check | 5 us | 6 us |
+|---|---|---|
+| open_loop, mean torque | 0.030 % | 0.044 % |
+| open_loop, RMS current (4 phases) | 0.004 % | 0.011-0.015 % |
+| pwm_fixed, mean torque | 0.029 % | 0.050 % |
+| pwm_fixed, RMS current | 0.003 % | 0.013 % |
+| hard chop at 25 %, model against the SIL at the step instants | -0.001 % | -0.006 % |
+| hard chop, the SIL at the step instants against its full-rate RMS | -1.34 % | -0.17 % |
+
+Resolution limit: current pulses shorter than about two steps, now 12 us, are resolved only at the step instants.
+The hard-chop pulses here are 12.5 us, about 2.1 steps. At 5 us the 50 us carrier was exactly 10 steps, so the
+instants always fell at the same carrier phase, and the full-rate RMS read 1.3 % low. At 6 us the carrier is 8 1/3
+steps, the instants sweep the carrier phase, and the error is 0.17 %. A carrier period that is a whole number of
+steps (for example 16.67 kHz at 6 us) brings back the 1 to 2 % low reading.
+
+Emulator self-test (`examples/hil_emu_selftest.py`, Teensy alone, firmware 9745b118):
+- buffered 8000 samples against the PC model: -0.0026 %;
+- streamed: 35 000 contiguous samples matched the model (-0.0019 %), then the ring filled;
+- live windows at 20 Hz;
+- step max 3.74 us, 0 overruns.
+
+Bench at 912 MHz (`scratchpad/t14f/bench.py`: control_hil's `run_one` on the Task 14 case and operating point, ad7606
++ encoder). Both boards were flashed with the same build, and after every run HELLO read the running hash on both
+boards. It matched the build in 32 of 32 runs.
+
+| Controller | Runs | Valid | Passed | d_torque | d_irms | d_ripple | Step mean / max | Max / 6 us | Overruns | ISR mean / max | Latency |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| pwm_current | 10 | 10 | 10 | +0.20 to +0.57 % | -0.00 to +0.55 % | -1.28 to -0.29 pts | 2.91 / 4.86-5.04 us | 81.0-84.1 % | 0 | 5.26-5.30 / 5.90-5.91 us | 6.49-6.52 us |
+| tsf | 16 | 14 | 14 | -0.12 to +0.39 % | -0.15 to +0.23 % | -1.76 to +0.50 pts | 2.62 / 4.53-4.88 us | 75.5-81.3 % | 0 | 5.83-5.86 / 7.06 us | 6.36-6.40 us |
+| hysteresis | 6 | 6 | 5 | -0.31 to +0.28 % | -0.55 to +0.35 % | -0.10 to +24.89 pts | 2.66 / 4.19-4.31 us | 69.8-71.8 % | 0 | 4.52-4.55 / 5.20-5.21 us | 6.42-6.58 us |
+
+- Firmware hashes: pwm_current 9745b118, tsf 871f8907, hysteresis 46ce1e59.
+  - Four tsf runs used d0a833c4. It was built while emu.h had a comment-only edit, which was later reverted.
+  - The committed tsf build alone gave 12 runs, 10 valid, 10 passed.
+- Invalid runs: 2 tsf, both capture sequence gaps (the known USB loss).
+- The hysteresis run that failed had a ripple of +24.89 pts: the Step 1 bimodality.
+- Clock ratio 1.0104-1.0114.
+- The step max did not change in absolute terms (pwm_current 4.85-4.96 us at 5 us). The headroom grew from
+  0.04-0.15 us to 0.96-1.14 us.
+- pwm_current and the top of tsf are still above the 80 % step-time warning.
+- The latency rose by about 0.5 us (half a step more of averaging age); the matched SIL takes it from the measurement.
+
+Streamed captures, pwm_current on the case (`scratchpad/t14f/streamchk.py`, run_hil, session host, the Step 1e
+lengths in steps, 3 each):
+
+| Steps | Valid | Ring full (samples at the end) | Sequence gap | Overruns | Step max |
+|---|---|---|---|---|---|
+| 100 000 (0.6 s) | 0 | 2 (14 520, 17 376) | 1 | 0 | 5.09-5.13 us |
+| 400 000 (2.4 s) | 0 | 2 (84 016, 156 228) | 1 | 0 | 5.03-5.13 us |
+
+- Streaming no longer overruns: 0 of 6 runs, against 4 of 6 at 5 us.
+- It still fails, because the host does not keep up with 166.7 k samples/s. The ring filled after 14 520 to 156 228
+  samples, against 17 208 and 18 888 at 5 us.
+- Every streamed run counted 1 dropped sample or cut frame.
+- Captures within the 8192-sample ring (49 ms) are buffered and work.
+
 ### Step 2: speed step with the speed loop (dynamic, hysteresis)
 
 Dynamic mode from rest, speed command 1500 rpm, J 1e-3 kg m^2, no load or friction; speed loop `speed_kp` 0.2,
@@ -943,7 +1017,13 @@ Not run: no DACs.
   set 912 MHz (Step 1e): 310 STARTs had 0 refusals and 0 faults, including the stress modes. pwm_current (10 of 10),
   tsf (11 of 11 valid) and hysteresis (4 of 5 valid; the fifth fails the ripple bound by the bimodality) pass with
   0 overruns at the 5 us step. pwm_current's step max is 4.85-4.96 us.
-- Open: streamed captures (longer than the 8192-sample ring) do not work at 912 MHz. The host gets about 81 % of
-  the sample rate, and with pwm_current the extra load makes the step overrun. Buffered captures work (Step 1e).
+- The emulator step is 6 us, the owner's fallback (Step 1f). The 1 % emulator-model check still passes, with a
+  largest error of 0.050 %. At 912 MHz: pwm_current 10 of 10 valid, all passed; tsf 14 of 16 valid, all passed;
+  hysteresis 6 of 6 valid, 5 passed (one failed the ripple bound by the bimodality). No run overran.
+  - pwm_current's step max is 4.86-5.04 us, 84 % of the step, which is above the 80 % warning but has a margin
+    of about 1 us.
+- Open: streamed captures (longer than the 8192-sample ring, 49 ms at 6 us) do not work. At 6 us the step no
+  longer overruns while streaming (0 of 6). The host still falls behind 166.7 k samples/s, so the ring fills (4 of 6
+  runs) or a frame is lost (2 of 6). Buffered captures work (Steps 1e, 1f).
 - Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
   matched SIL scenario.
