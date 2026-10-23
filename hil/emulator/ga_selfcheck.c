@@ -7,8 +7,8 @@
 #define N_WINDOWS 4000
 #define TICKS 5040u              /* ticks per window, fixed (independent of the clock) */
 
-/* Fills the stack below the caller's frame with a pattern, so the averager called next from the same frame starts on
-   non-zero memory: a build that reads uninitialised stack then gives a different hash. */
+/* Writes a pattern over the stack below the caller's frame, so every window runs on the same non-zero stack contents
+   and the hash does not depend on what earlier code left there. noinline keeps the writes in a frame of their own. */
 #if defined(__GNUC__)
 __attribute__((noinline))
 #endif

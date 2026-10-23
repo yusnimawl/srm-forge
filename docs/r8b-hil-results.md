@@ -1,5 +1,11 @@
 # R8b control HIL results
 
+Current configuration (end of Task 14): Teensy at 912 MHz, 6 us emulator step, matched SIL with the sensed-value age
+jitter, ripple compared as the median over complete strokes, buffered captures of up to 8192 samples (49 ms). The
+Summary at the end is current. The sections before it are the record in the order the work was done; where one gives
+a 600, 816 or 1008 MHz clock, a 5 us step or the "kept out of line" averager as the state of the firmware, a later
+step supersedes it (Step 1d: the 1008 MHz failure; Step 1e: 912 MHz; Step 1f: 6 us).
+
 ## Bring-up
 
 Firmware project: PlatformIO 6.2.0, teensy 6.0.0, ststm32 20.0.0. Both environments compile in the modes ad7606+encoder and internal+ad2s1210 (internal+both also checked). Each firmware only answers HELLO with BUILD_INFO.
@@ -81,7 +87,8 @@ Target (max < 4 us, 0 overruns) still missed: one phase by 0.2 us (0.7 us while 
 overruns on the steps with a gate edge. A streamed capture at 200 kHz (7.2 MB/s) does not keep up with the CPU time
 left to the USB loop.
 
-Core clock (owner decision, 2026-10-21): 1008 MHz, chosen from the table below. `board_build.f_cpu` in
+Core clock (owner decision, 2026-10-21; superseded by Step 1e: the default is 912 MHz, 1008 MHz fails timing, see
+Step 1d): 1008 MHz, chosen from the table below. `board_build.f_cpu` in
 `hil/platformio.ini` sets it at boot; the iMXRT1062 needs a heatsink at this clock. Every cycle constant is derived
 from `F_CPU_ACTUAL`. The die temperature
 (`tempmonGetTemp`) is reported in the live statistics (`temp_c`), and a run stops (READY low, `HIL_ERROR`) above
@@ -449,7 +456,7 @@ the LIVE_CTRL arrival rate and TIM2 (`micros`) read through OpenOCD every 2 s, e
 | ad7606 + ad2s1210, scratch build counting SAMPLE | 45 s | SAMPLE | 20 223.07 Hz (6.3 Hz) | 1.011154 | 1.011047 | 1.011148 |
 | ad7606 + encoder (committed, last) | 40 s | CONVST | 20 222.14 Hz (8.6 Hz) | 1.011107 | 1.011105 | 1.011019 |
 
-- The run means agree with both cross-checks to within 0.01 % (+11 107 to +11 221 ppm; earlier +10 650 and
+- The run means agree with both cross-checks to within about 0.011 % (+11 107 to +11 221 ppm; earlier +10 650 and
   +14 000 ppm).
 - The window-to-window spread (6-9 Hz, about 400 ppm) is the Nucleo clock wandering, not measurement noise: consecutive
   windows correlate at 0.79 and 1 s means still spread by 4.5 Hz. A single window is good to about 0.04 %; a matched
@@ -543,6 +550,9 @@ run is invalid) and marks a capture being sent invalid. Both firmwares rebuilt a
   torque) is larger than the clock's effect on the mean.
 
 ## Acceptance
+
+Steps 0 to 1d were measured at 1008 MHz and a 5 us step and are history: Step 1e (912 MHz) and Step 1f (6 us) set the
+current configuration, and the re-run at the end of this section and the Summary give the current figures.
 
 2026-10-23, Teensy 4.1 at 1008 MHz (COM4) and Nucleo-H723ZG (COM6), boards wired, both flashed with the same modes
 before every run (the first Teensy upload after a flash of a different build failed about every second time; one
@@ -647,7 +657,8 @@ What changed (commit f33a685):
   the case tables (two phases chopping at random instants) gives the same hash (a9d0cb2e) as the earlier firmware.
   Inlined into the window function, the per-winding advance compiled by arm-none-eabi-gcc 15.2 at -O3 read
   uninitialised stack on the board (wrong voltages, a hash that changed between calls; the host build and -O2 were
-  correct); it is kept out of line, which is bit-identical.
+  correct); it is kept out of line, which is bit-identical. (Superseded by Step 1d and Step 1e: the miscompile finding
+  is withdrawn, the inlined code is correct at 912 MHz and `advance_all` is no longer forced out of line.)
 
 Bench, final firmware, 10 runs each (`examples/control_hil.py --case ... --torque 10 --controllers ...`):
 
@@ -806,8 +817,8 @@ The running firmware hash was checked after every upload.
 - The step interrupt starts the same kind of float burst every 5 us after the loop's light polling, so real runs at
   1008 MHz are exposed to the same failure. The Step 1c PIT faults (a one-bit wrong bus address) fit it.
 - Step 1b's finding that GCC 15.2 at -O3 miscompiles the inlined `advance_all` is withdrawn. The inlined code is
-  correct; it fails more often at 1008 MHz. `noinline` and its comment are left in the code until the owner decides
-  on the clock.
+  correct; it fails more often at 1008 MHz. `noinline` and its comment were left in the code until the owner decided
+  on the clock (superseded by Step 1e: 912 MHz, `noinline` dropped).
 
 ### Step 1e: 912 MHz default (owner decision, 2026-10-23)
 

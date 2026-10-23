@@ -22,7 +22,7 @@ goes through a PI loop on the speed estimate that produces the torque command.
 | `torque_limit` | N*m | SRM_T_MAX_NM |
 | `resolver_pole_pairs` | - | 1 |
 
-Every parameter can also be changed while the controller runs (`ctrl_param` returns 0 and the new value is used from the next ISR); `resolver_pole_pairs` is the exception and returns -2 after `ctrl_init`.
+Live changes (`ctrl_param` while the controller runs, in the SIL with a parameter step and on the HIL with Set parameter): `kp`, `ki`, `f_bw`, `theta_on`, `theta_off`, `speed_kp`, `speed_ki`, `speed_filter_hz` and `torque_limit` return 0 and the new value is used from the next ISR. `resolver_pole_pairs` returns -2 once `ctrl_init` has run (it sets the angle range), so set it before the run; a name the controller does not have returns -1. On the HIL the controller board's serial link also refuses a name over 23 bytes and a value that is not finite.
 
 ## Notes
 
