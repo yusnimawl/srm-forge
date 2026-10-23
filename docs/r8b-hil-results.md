@@ -809,6 +809,54 @@ The running firmware hash was checked after every upload.
   correct; it fails more often at 1008 MHz. `noinline` and its comment are left in the code until the owner decides
   on the clock.
 
+### Step 1e: 912 MHz default (owner decision, 2026-10-23)
+
+The Teensy now runs at 912 MHz (`hil/platformio.ini`, 1525 mV from the core's table). The 85 C guard is unchanged,
+and so are the 5 us step, the overrun rule and the tolerances. With the same commits, the CONVST interrupt moved one
+NVIC level below the gates (16; encoder 32, step 48), so a gate edge pending together with a CONVST edge is stamped
+first. The emulator also refuses `ad7606_t_conv_us` outside 1..1000 us; on the board, 0.999 and 1000.5 are refused,
+1 and 1000 accepted.
+
+`advance_all` is no longer forced out of line. Inlined, it is correct at 912 MHz (40 of 40 stress STARTs in Step 1d)
+and faster: 1060 against 1096 cycles per self-check window (the averager calls only, best of 5 checks of 4000 windows,
+-3.3 %).
+
+Soak at 912 MHz, each START after a fresh EMU_CONFIG and table upload, die at 63.2-64.6 C:
+
+| Firmware | STARTs | Refused | Faults |
+|---|---|---|---|
+| committed | 150 | 0 | 0 |
+| committed plus the Step 1d stress modes (40 each: plain, after a 2 ms spin, twice after the spin, after 2 ms of 8-wide float work) | 160 | 0 | 0 |
+
+Captures at 912 MHz:
+
+| Capture | Result |
+|---|---|
+| buffered, pwm_current on the case (8000 steps, session host) | 2 of 3 valid; the third had a sequence gap (the known USB loss); 0 overruns, step max 4.92-4.99 us |
+| streamed, pwm_current on the case, 100 000 and 400 000 steps (session host) | 0 of 6 valid: in 4 the step overran (max 5.01-5.09 us) and the run stopped; in 2 the ring filled after 17 208 and 18 888 samples |
+| buffered, self-test pattern (`examples/hil_emu_selftest.py`) | valid, -0.004 % against the PC model |
+| streamed, self-test pattern, one phase, raw-reading host (bytes first, parsed afterwards; scratch) | ring full after 42 128-42 156 samples in 3 of 3 (100 000 and 400 000 steps): about 161 k samples/s sustained, 81 % of the 200 k/s needed; 0 overruns |
+
+So streamed captures do not work at 912 MHz. At 1008 MHz the raw host kept up with the self-test pattern; at
+816 MHz it reached 77 % (Bench checks). Captures that fit the 8192-sample RAM ring are buffered and work. Longer
+captures are limited to about 40 000 steps (0.2 s) of a light load. With a controller, streaming adds enough CPU
+load that pwm_current overruns. A re-check of the 1008 MHz streaming rate with the same host was not possible: the
+self-check refused 2 of 2 STARTs there (hashes b89a73f9 and 31a2a3c0), as Step 1d predicts.
+
+Bench at 912 MHz (`examples/control_hil.py --case ... --torque 10`; Task 14 case and operating point; ad7606 + encoder):
+
+| Controller | Runs | Valid | Passed | d_torque | d_irms | d_ripple | Step mean / max | Overruns | ISR mean / max | Latency |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pwm_current | 10 | 10 | 10 | +0.08 to +0.52 % | +0.00 to +0.54 % | -1.28 to -0.48 pts | 2.85 / 4.85-4.96 us | 0 | 5.26-5.30 / 5.90-5.91 us | 6.04-6.05 us |
+| tsf | 12 | 11 | 11 | -0.37 to +0.30 % | -0.27 to +0.23 % | -2.00 to +0.35 pts | 2.55-2.57 / 4.34-4.55 us | 0 | 5.83-5.85 / 7.06 us | 5.86-5.89 us |
+| hysteresis | 8 | 5 | 4 | -0.87 to +0.47 % | -1.54 to -0.10 % | +0.81 to +25.49 pts | 2.61-2.63 / 4.03-4.12 us | 0 | 4.51-4.55 / 5.20-5.21 us | 6.00-6.14 us |
+
+- The invalid runs had capture sequence gaps (the known USB loss): 1 tsf, 3 hysteresis.
+- The hysteresis run that failed had a ripple of +25.49 pts: the Step 1 bimodality, within its +5.6 to +27.9 range.
+- Clock ratio 1.0105-1.0119.
+- No run overran, so the 6 us step (Part 2 of Task 14b2) was not needed.
+- pwm_current's step max (4.85-4.96 us) leaves 0.04-0.15 us of the 5 us step. At 1008 MHz it was 4.31-4.64 us.
+
 ### Step 2: speed step with the speed loop (dynamic, hysteresis)
 
 Dynamic mode from rest, speed command 1500 rpm, J 1e-3 kg m^2, no load or friction; speed loop `speed_kp` 0.2,
@@ -891,9 +939,11 @@ Not run: no DACs.
   step was not needed.
 - Not passed, owner decisions: the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
   its mean only (7 of 27 valid runs over the 5-point bound).
-- Owner decision: the self-check refusals and the bus faults are timing failures of the iMXRT1062 at 1008 MHz
-  (Step 1d). They do not occur at 912 or 816 MHz in a stress mode that fails at 1008 MHz, and they appear at 912 MHz
-  when the core voltage is lowered. The core clock (912 MHz had no failures in 120 STARTs, 40 of them with the inlined averager) or another board is for
-  the owner; the default stays 1008 MHz. The eDMA PIT faults of Step 1c are likely the same cause.
+- The self-check refusals and the bus faults were timing failures of the iMXRT1062 at 1008 MHz (Step 1d). The owner
+  set 912 MHz (Step 1e): 310 STARTs had 0 refusals and 0 faults, including the stress modes. pwm_current (10 of 10),
+  tsf (11 of 11 valid) and hysteresis (4 of 5 valid; the fifth fails the ripple bound by the bimodality) pass with
+  0 overruns at the 5 us step. pwm_current's step max is 4.85-4.96 us.
+- Open: streamed captures (longer than the 8192-sample ring) do not work at 912 MHz. The host gets about 81 % of
+  the sample rate, and with pwm_current the extra load makes the step overrun. Buffered captures work (Step 1e).
 - Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
   matched SIL scenario.
