@@ -30,12 +30,12 @@ typedef struct {
 
 void srm_gate_avg_init(srm_gate_avg_t *g, int64_t rise_ticks, int64_t fall_ticks, uint16_t initial);
 
-/* Consumes the sorted edges with t in [t0, t0 + dt) (dt ticks of c->dt / dt seconds, dt < 2^32) and writes, for each phase, the
-   winding voltage averaged over the window and the fractions of the window each switch is on. The flux starts at
-   psi0 and follows the asymmetric half-bridge voltage segment by segment (resistive drop neglected); freewheeling
-   and demagnetising conduct only while the running flux is positive, and the flux stops at zero. The voltage is
-   (end flux - psi0) / c->dt. Pending commands that mature after the window stay pending. on_upper and on_lower may
-   both be NULL: the fractions are then not computed. */
+/* Consumes the sorted edges with t in [t0, t0 + dt) (dt ticks of c->dt / dt seconds, dt < 2^32) and writes, for each
+   phase, the winding voltage averaged over the window and the fractions of the window each switch is on. The flux
+   starts at psi0 and follows the asymmetric half-bridge voltage segment by segment (resistive drop neglected);
+   freewheeling and demagnetising conduct only while the running flux is positive, and the flux stops at zero. The
+   voltage is (end flux - psi0) / c->dt. Pending commands that mature after the window stay pending. on_upper and
+   on_lower may both be NULL: the fractions are then not computed. */
 void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm_edge_t *edges, int n, uint64_t t0,
                          uint64_t dt, const srm_real_t *psi0, srm_real_t *v_out, float *on_upper, float *on_lower);
 

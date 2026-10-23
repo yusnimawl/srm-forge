@@ -1,6 +1,7 @@
 /* Open-loop model of the real-time emulator: the plant stepping at cfg->dt on the time-averaged winding voltages
    of a gate-edge list. Built with SRM_TABLE_FLOAT it uses the same table type as the Teensy. */
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "srm_gate_avg.h"
@@ -22,7 +23,9 @@ SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
         cfg->mode != 0 || n_edges < 0)
         return -1;
     const int64_t per_step = (int64_t)llround(cfg->dt / tick_s);
-    if (per_step < 1 || fabs((double)per_step * tick_s - cfg->dt) > 1.0e-6 * cfg->dt) return -1;
+    /* the averager takes windows of fewer than 2^32 ticks */
+    if (per_step < 1 || per_step > (int64_t)UINT32_MAX || fabs((double)per_step * tick_s - cfg->dt) > 1.0e-6 * cfg->dt)
+        return -1;
 
     srm_gate_avg_t g;
     srm_gate_avg_init(&g, (int64_t)llround((cfg->dead_time + cfg->turn_on_delay) / tick_s),

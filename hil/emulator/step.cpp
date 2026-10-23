@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <IntervalTimer.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "emu.h"
@@ -287,6 +288,13 @@ const char *emu_start(void)
     if (!cfg_ok) return "start refused: no config";
     const uint32_t size = cfg.n_theta * cfg.n_psi;
     if (got[0] != size || got[1] != size) return "start refused: tables incomplete";
+    const uint32_t ga_check = emu_ga_selfcheck();      // 4000 windows, a few ms
+    if (ga_check != EMU_GA_SELFCHECK_HASH) {
+        static char msg[96];
+        snprintf(msg, sizeof msg, "start refused: gate averager self-check hash %08lx, expected %08lx (miscompiled)",
+                 (unsigned long)ga_check, (unsigned long)EMU_GA_SELFCHECK_HASH);
+        return msg;
+    }
     double tmax = 0;
     for (uint32_t j = 0; j < size; j++) tmax = fmax(tmax, fabs(g_torque[j]));
     i_scale = 2.0f * cfg.i_max / 32767.0f;

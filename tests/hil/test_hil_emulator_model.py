@@ -5,7 +5,7 @@ import pytest
 from sil_fixtures import analytic_motor
 
 from srmsil.emumodel import edges_from_trace, run_model
-from srmsil.run import run
+from srmsil.run import SimError, run
 from srmsil.scenario import ConverterSettings, Scenario
 
 CTRL = Path(__file__).parents[1] / "sil" / "controllers"
@@ -58,6 +58,9 @@ def test_model_rejects_dynamic_and_odd_step(tmp_path):
         run_model(m, e, Scenario(mode="dynamic", duration=0.001), tick_s=0.5e-6, cache_dir=tmp_path)
     with pytest.raises(ValueError, match="whole number"):
         run_model(m, e, Scenario(duration=0.001), tick_s=0.5e-6, step=5.2e-6, cache_dir=tmp_path)
+    # a step of 2^32 ticks or more is refused by the C model (the gate averager's windows are shorter)
+    with pytest.raises(SimError, match="rejected the configuration"):
+        run_model(m, e, Scenario(duration=0.001), tick_s=5e-6 / 2**33, cache_dir=tmp_path)
 
 
 def test_edges_from_trace():

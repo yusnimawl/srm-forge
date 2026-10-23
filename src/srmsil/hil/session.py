@@ -70,9 +70,9 @@ class Capture:
     clipped: float = 0.0    # share of samples with a phase current or the speed at the capture's int16 limit
 
 
-def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
-    """HIL_EMU_CONFIG fields of a scenario on the emulator's table grid. The firmware does not model the SIL's ADC
-    errors or `sensors.delay`; those fields are sent as 0."""
+def emu_config(m: MotorData, scenario: Scenario, capture_steps: int, position: str) -> dict:
+    """HIL_EMU_CONFIG fields of a scenario on the emulator's table grid, for the build's position mode (HilModes.position).
+    The firmware does not model the SIL's ADC errors or `sensors.delay`; those fields are sent as 0."""
     tab = emu_tables(m)
     sc, se = scenario.converter, scenario.sensors
     c = dict.fromkeys(proto.EMU_CONFIG_FIELDS, 0)
@@ -88,19 +88,19 @@ def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
              encoder_cpr=se.encoder_cpr, capture_steps=capture_steps, seed=scenario.seed, n_phases=m.n_phases,
              n_rotor_poles=m.n_rotor_poles, mode=int(scenario.mode == "dynamic"), rdc_bits=se.resolver_bits,
              resolver_pole_pairs=se.resolver_pole_pairs, encoder_ecc_harmonic=se.encoder_ecc_harmonic,
-             resolver=int(se.resolver), omega_max=omega_max(m, scenario))
+             resolver=int(se.resolver), omega_max=omega_max(m, scenario, position))
     c.update(sensor_chain(m, scenario))
     return c
 
 
-def omega_max(m: MotorData, scenario: Scenario) -> float:
+def omega_max(m: MotorData, scenario: Scenario, position: str) -> float:
     """rad/s a dynamic run may reach, for the capture's speed range (the emulator takes the largest of this, twice
     the initial speed and 100 rad/s): twice the speed command (room for overshoot), or for a torque command the
     initial speed plus the map's peak torque accelerating the inertia over SETTLE_S plus the capture's duration, capped
-    at the fastest speed the position sensor follows (the encoder's edge-rate limit, else the resolver's tracking
-    rate), beyond which the run is not valid anyway. 0 for a fixed-speed run. MotorData carries no top speed; a
-    capture whose speed reaches the range counts as clipped (a live torque-commanded run kept going longer, or a speed
-    command raised while running)."""
+    at the fastest speed the build's position sensors follow (HilModes.position: the encoder's edge-rate limit, the
+    resolver's tracking rate per pole pair, the lower of the two for both), beyond which the run is not valid anyway.
+    0 for a fixed-speed run. MotorData carries no top speed; a capture whose speed reaches the range counts as clipped
+    (a live torque-commanded run kept going longer, or a speed command raised while running)."""
     if scenario.mode != "dynamic":
         return 0.0
     if scenario.command_mode == "speed":
@@ -108,9 +108,9 @@ def omega_max(m: MotorData, scenario: Scenario) -> float:
     t_peak = float(np.max(np.abs(m.torque)))
     w = abs(scenario.speed_rpm) * RPM + t_peak * (SETTLE_S + scenario.duration) / scenario.inertia
     se = scenario.sensors
-    if se.encoder_cpr > 0:
+    if position in ("encoder", "both") and se.encoder_cpr > 0:
         w = min(w, 2 * math.pi * ENCODER_EDGE_RATE_MAX / se.encoder_cpr)
-    elif se.resolver:
+    if position in ("ad2s1210", "both"):
         w = min(w, 2 * math.pi * resolver_rps_max(se.resolver_bits) / se.resolver_pole_pairs)
     return w
 
@@ -282,7 +282,7 @@ class HilSession:
         n = round(scenario.duration / EMU_DT)
         self.stop()
         self._reset_controller(info)
-        self._request(self.emu, Type.EMU_CONFIG, proto.pack_emu_config(emu_config(m, scenario, n)))
+        self._request(self.emu, Type.EMU_CONFIG, proto.pack_emu_config(emu_config(m, scenario, n, modes.position)))
         tab = emu_tables(m)
         n_err = len(self.errors)
         for which, arr in ((0, tab.current), (1, tab.torque)):

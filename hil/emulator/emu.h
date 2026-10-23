@@ -6,6 +6,7 @@
  * safety.cpp  RUN input (pin 7) and READY output (pin 8)
  * outputs.cpp the output stage of the build's modes, and the output pins on the combined GPIO interrupt
  * ad7606_slave.cpp, ad2s1210_slave.cpp, dac.cpp, encoder.cpp  the emulated sensor chips (one per mode)
+ * ga_selfcheck.c  self-check of the compiled gate averager, run by every START (portable C)
  *
  * Interrupt priorities (lower is more urgent): gates, then the encoder timer, then the step timer; USB stays at the
  * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 1008 MHz from platformio.ini; every cycle constant
@@ -17,6 +18,7 @@
 
 extern "C" {
 #include "edge_ring.h"
+#include "ga_selfcheck.h"
 #include "hil_proto.h"
 #include "srm_gate_avg.h"
 #include "srm_plant.h"
