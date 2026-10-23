@@ -1,4 +1,4 @@
-// 200 kHz step interrupt: the gate edges of each 5 us window are averaged into winding voltages and the shared plant
+// Step interrupt: the gate edges of each window of EMU_STEP_NS are averaged into winding voltages and the shared plant
 // takes one step; the order mirrors src/srmsil/c/emu/srm_emu.c, the PC model of this loop.
 #include <Arduino.h>
 #include <IntervalTimer.h>
@@ -308,7 +308,7 @@ const char *emu_start(void)
     inv_v = 1.0f / v_scale;
     inv_t = 1.0f / t_scale;
     inv_w = 1.0f / w_scale;
-    P = F_CPU_ACTUAL / EMU_STEP_HZ;
+    P = (uint32_t)((uint64_t)F_CPU_ACTUAL * EMU_STEP_NS / 1000000000u);
     const double f = (double)F_CPU_ACTUAL;
     srm_gate_avg_init(&ga, llround(((double)cfg.dead_time + (double)cfg.turn_on_delay) * f), llround((double)cfg.turn_off_delay * f), 0);
     srm_plant_init(&pl, &sim, &tab);
@@ -336,7 +336,7 @@ const char *emu_start(void)
     running = true;
     safety_ready(true);
     timer.priority(EMU_PRIO_STEP);
-    if (!timer.begin(step_isr, 1e6f / EMU_STEP_HZ)) {
+    if (!timer.begin(step_isr, (float)EMU_STEP_NS / 1000.0f)) {
         running = false;
         safety_ready(false);
         return "start refused: no timer";

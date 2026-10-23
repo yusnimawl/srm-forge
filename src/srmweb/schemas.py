@@ -360,7 +360,7 @@ class HilFlashResultOut(BaseModel):
 class HilCaptureIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    n_steps: int = Field(ge=100, le=200_000)    # emulator steps of 5 us
+    n_steps: int = Field(ge=100, le=200_000)    # emulator steps (srmsil.hil.proto.EMU_DT each)
 
 
 class HilCaptureOut(BaseModel):

@@ -14,6 +14,8 @@
 #define HIL_FRAME_MAX(n) ((n) + 5 + ((n) + 5) / 254 + 2)
 #define HIL_CAPTURE_SAMPLES_PER_PACKET 28
 #define HIL_TABLE_CHUNK_FLOATS 200
+/* The emulator step and the capture sample period, ns (srmsil.hil.proto.EMU_STEP_NS). */
+#define HIL_EMU_STEP_NS 6000u
 
 enum hil_type {
     HIL_HELLO = 1,

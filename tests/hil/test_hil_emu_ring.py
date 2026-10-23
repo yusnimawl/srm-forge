@@ -12,7 +12,7 @@ EMU = ROOT / "hil" / "emulator"
 PLANT = ROOT / "src" / "srmsil" / "c" / "plant"
 SHIM = Path(__file__).parent / "c" / "emu_ring_shim.c"
 CACHE = Path(tempfile.gettempdir()) / "srm_emu_ring_tests"
-P = 3000                 # cycles per 5 us step at 600 MHz
+P = 3000                 # cycles per window, a test value (the ring does not depend on the step)
 LATE = 1200              # 2 us
 
 

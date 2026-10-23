@@ -13,13 +13,12 @@ from srmsil.hil import HilError, proto
 from srmsil.hil.compare import RPM, SETTLE_S
 from srmsil.hil.config import (ENCODER_EDGE_RATE_MAX, HilModes, check_encoder_rate, check_isr_rate, mode_defines,
                                resolver_rps_max, sensor_chain)
-from srmsil.hil.proto import BuildInfo, LiveCtrl, LiveEmu, Type
+from srmsil.hil.proto import EMU_DT, BuildInfo, LiveCtrl, LiveEmu, Type
 from srmsil.hil.transport import Transport
 from srmsil.run import SimResult, SimSummary
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData, emu_tables
 
-EMU_DT = 5e-6                 # s, the emulator step and the capture sample period
 REPLY_TIMEOUT_S = 2.0
 CLOCK_SPREAD_WARN_PPM = 500.0
 RESET_TIMEOUT_S = 3.0        # s the controller may take to answer HELLO after a reset
@@ -126,7 +125,9 @@ def capture_traces(hdr: proto.CaptureHeader, s: np.ndarray) -> dict[str, np.ndar
     k = np.arange(q)[:, None]
     g = s["gates"].astype(np.uint16)[None, :]
     return {
-        "t": s["step"].astype(np.float64) * hdr.dt,       # since the controller's start: the plant steps only while RUN is high
+        # since the controller's start (the plant steps only while RUN is high); EMU_DT, which _capture_problem checks
+        # the header's float32 dt against, so the times are exact multiples of the step
+        "t": s["step"].astype(np.float64) * EMU_DT,
         "theta": s["theta"].astype(np.float64) * (2 * math.pi / 65536),
         "omega": s["omega"] * float(hdr.omega_scale),
         "torque": s["torque"] * float(hdr.t_scale),
@@ -405,6 +406,9 @@ def _capture_problem(n_steps, hdr, seqs, parts, end, bad, errors) -> str:
     complete but the emulator saw a fault while recording."""
     if hdr is None:
         return "no capture header received"
+    if abs(hdr.dt - EMU_DT) > 1e-6 * EMU_DT:
+        return (f"capture step {hdr.dt * 1e6:.3g} us, the host expects {EMU_DT * 1e6:.3g} us (emulator firmware of "
+                "another build)")
     expected = end[0] if end is not None else (max(seqs) + 1 if seqs else 0)
     missing = sorted(set(range(expected)) - set(seqs))
     if missing:

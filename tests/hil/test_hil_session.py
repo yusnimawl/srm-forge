@@ -1,5 +1,6 @@
 """HilSession against the fake rig, and the serial transport's framing without a serial port."""
 
+import dataclasses
 import math
 import sys
 import time
@@ -14,7 +15,7 @@ from srmsil.hil import HilError, proto
 from srmsil.hil.config import HilModes
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.proto import Type
-from srmsil.hil.session import HilSession, _capture_problem, clock_stats, emu_config, run_hil
+from srmsil.hil.session import EMU_DT, HilSession, _capture_problem, clock_stats, emu_config, run_hil
 from srmsil.scenario import Scenario, SensorSettings
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.004, command_value=1.0)
@@ -78,7 +79,7 @@ def test_capture_complete_is_valid(cache):
     assert cap.valid, cap.reason
     tr = cap.result.traces
     assert tr["i"].shape == (4, 800) and tr["gate_u"].shape == (4, 800)
-    assert tr["t"][1] - tr["t"][0] == pytest.approx(5e-6)
+    assert tr["t"][1] - tr["t"][0] == pytest.approx(EMU_DT)
     assert cap.clipped == 0.0
 
 
@@ -320,12 +321,18 @@ def test_run_hil_keeps_the_run_error_when_stop_fails(cache):
 
 
 def test_short_capture_invalid():
-    hdr = proto.CaptureHeader(5e-6, 1, 1, 1, 1, 1, 100, 4)
+    hdr = proto.CaptureHeader(EMU_DT, 1, 1, 1, 1, 1, 100, 4)
     parts = [np.zeros(28, proto.SAMPLE_DTYPE) for _ in range(3)]
     for k, p in enumerate(parts):
         p["step"] = 28 * k + np.arange(28)
     assert _capture_problem(84, hdr, [0, 1, 2], parts, (3, 1, 84), 0, []) == ""
     assert _capture_problem(100, hdr, [0, 1, 2], parts, (3, 1, 84), 0, []) == "short capture: 84 of 100 samples"
+    # the header's dt arrives as float32
+    f32 = proto.unpack_capture_hdr(proto.pack_capture_hdr(hdr))
+    assert _capture_problem(84, f32, [0, 1, 2], parts, (3, 1, 84), 0, []) == ""
+    old = dataclasses.replace(hdr, dt=5e-6)
+    assert _capture_problem(84, old, [0, 1, 2], parts, (3, 1, 84), 0, []) == (
+        "capture step 5 us, the host expects 6 us (emulator firmware of another build)")
 
 
 @pytest.mark.parametrize("field", [{"adc": {"offset_error": 1.0}}, {"adc": {"gain_error": 0.01}},

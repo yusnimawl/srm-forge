@@ -1,6 +1,6 @@
 /* Teensy 4.1 real-time SRM emulator: shared state and the interfaces between its parts.
  *
- * step.cpp    200 kHz step interrupt: gate edges -> averaged winding voltages -> plant step -> outputs, health
+ * step.cpp    step interrupt (every EMU_STEP_NS): gate edges -> averaged winding voltages -> plant step -> outputs, health
  * gates.cpp   gate inputs (pins 14..21, fast GPIO6) on the combined GPIO6-9 interrupt, cycle-counter stamps
  * link.cpp    USB framing, config and table upload, live statistics, capture ring and its transfer
  * safety.cpp  RUN input (pin 7) and READY output (pin 8)
@@ -27,21 +27,23 @@ extern "C" {
 
 #define EMU_MAX_THETA 180
 #define EMU_MAX_PSI 192
-#define EMU_STEP_HZ 200000
-#define EMU_DT 5e-6
+#define EMU_STEP_NS HIL_EMU_STEP_NS   /* the step, hil_proto.h; every step-derived constant below follows it */
+#define EMU_DT (EMU_STEP_NS / 1e9)     /* s */
 #define EMU_MAX_PHASES 4
 #define EMU_PRIO_GATES 0
 #define EMU_PRIO_CONVST 16
 #define EMU_PRIO_ENCODER 32
 #define EMU_PRIO_STEP 48
 #define EMU_OVERLOAD_STEPS 20          /* a step finishing this many steps late stops the loop */
-#define EMU_STATS_STEPS 10000          /* one live-statistics window: 50 ms, 20 Hz */
+#define EMU_STATS_STEPS (50000000u / EMU_STEP_NS)   /* one live-statistics window: about 50 ms, 20 Hz */
 #define EMU_SELFTEST_HZ 20000
 #define EMU_SELFTEST_OFFSET 1000       /* cycles from the start of the first pattern window to its first rise */
 #define EMU_TEMP_MAX_C 85.0f           /* die temperature that stops a run */
 #define EMU_CAPTURE_RING 8192          /* samples, the largest power of two whose ring fits in DMAMEM */
 #define EMU_GPT_HZ 24000000            /* output timers (GPT2): the peripheral clock, the 24 MHz oscillator as for the step timer's PIT */
-#define EMU_GPT_STEP 120               /* GPT ticks per step */
+#define EMU_GPT_STEP (EMU_GPT_HZ / 1000u * EMU_STEP_NS / 1000000u)   /* GPT ticks per step */
+static_assert(EMU_GPT_STEP * 1000000000ull == (unsigned long long)EMU_GPT_HZ * EMU_STEP_NS,
+              "the step must be a whole number of 24 MHz ticks (the step timer's PIT and GPT2)");
 
 /* Output modes of the build (hil_hello.h codes the same macros; no macro means ad7606 and encoder). */
 #ifdef HIL_CURRENT_SENSE_INTERNAL

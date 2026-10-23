@@ -338,7 +338,7 @@ describe("HilPanel", () => {
     routes["GET /api/hil/captures/abc?n_px=1500"] = () => Promise.resolve(new Response(traces()))
     await mount()
     await emitLive(live())
-    await setValue(document.getElementById("hil-capture-ms") as HTMLInputElement, "10")
+    await setValue(document.getElementById("hil-capture-ms") as HTMLInputElement, "12")
     await act(async () => { button("Capture").click() })
     await vi.waitFor(() => expect(document.querySelector('[data-testid="scopes"]')).not.toBeNull())
     expect(calls.find((c) => c.url === "/api/hil/session/capture")!.body).toEqual({ n_steps: 2000 })

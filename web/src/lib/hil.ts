@@ -48,10 +48,10 @@ export type HilFlashResult = components["schemas"]["HilFlashResultOut"]
 
 export const LOOPBACK_TEXT = "HIL needs the server on this computer (loopback)"
 
-/** Emulator steps are 5 us (`srmsil.hil.session.EMU_DT`); the capture route takes 100 to 200 000 of them. */
-export const EMU_STEPS_PER_MS = 200
-export const MIN_CAPTURE_MS = 100 / EMU_STEPS_PER_MS
-export const MAX_CAPTURE_MS = 200_000 / EMU_STEPS_PER_MS
+/** The emulator step in us (`srmsil.hil.proto.EMU_DT`); the capture route takes 100 to 200 000 steps. */
+export const EMU_STEP_US = 6
+export const MIN_CAPTURE_MS = (100 * EMU_STEP_US) / 1000
+export const MAX_CAPTURE_MS = (200_000 * EMU_STEP_US) / 1000
 
 /** The message of a failed HIL request: the loopback text for a 403, the server's text for a 409 or a 422. */
 export function hilErrorText(e: unknown): string {
@@ -94,7 +94,7 @@ export function livePpm(live: HilLive): number | null {
 
 /** Emulator steps for a capture of `ms` milliseconds, or null when the length is not accepted. */
 export function captureSteps(ms: number): number | null {
-  return Number.isFinite(ms) && ms >= MIN_CAPTURE_MS && ms <= MAX_CAPTURE_MS ? Math.round(ms * EMU_STEPS_PER_MS) : null
+  return Number.isFinite(ms) && ms >= MIN_CAPTURE_MS && ms <= MAX_CAPTURE_MS ? Math.round((ms * 1000) / EMU_STEP_US) : null
 }
 
 /** A capture's traces (`GET /api/hil/captures/{id}`): the HIL channels, and the matched SIL run's under `sil.` once compared. */

@@ -28,7 +28,7 @@ static void row_eval(const srm_sim_tables_t *tab, int row, double s, double *i, 
 
 #ifdef SRM_TABLE_FLOAT
 /* Float-table build (the real-time emulator and its PC model, srm_emu.c): the lookup runs in single precision, which
-   matches the float tables and fits the Cortex-M7's 5 us step. */
+   matches the float tables and fits the Cortex-M7's emulator step. */
 static void row_eval_f(const srm_sim_tables_t *tab, int row, float s, float *i, float *torque, float *w)
 {
     const int n = (int)tab->n_psi;

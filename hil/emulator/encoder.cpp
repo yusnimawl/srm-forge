@@ -15,7 +15,7 @@
 
 #ifdef EMU_ENCODER
 
-#define EDGES_PER_STEP 8         // cpr * rev/s <= 400 000 /s gives at most 2 per 5 us step
+#define EDGES_PER_STEP 8         // cpr * rev/s <= 400 000 /s gives at most floor(400 000 x dt) + 1 per step, 3 at 6 us
 #define QUEUE 32                  // power of two
 #define EDGE_RATE_MAX 400000.0
 #define NEAR 48                   // ticks, 2 us

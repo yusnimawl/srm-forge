@@ -37,7 +37,7 @@ from srmsil.scenario import Scenario
 from srmsil.tables import emu_tables
 
 F_CPU = float(sys.argv[2]) if len(sys.argv) > 2 else 912e6
-STEP = 5e-6
+STEP = proto.EMU_DT
 PERIOD = round(F_CPU / 20_000)                   # cycles: 20 kHz (emu.h EMU_SELFTEST_HZ), 50 % duty
 ON, OFFSET = PERIOD // 2, 1000                   # first rise 1000 cycles into step 0 (emu.h EMU_SELFTEST_OFFSET)
 STEP_TICKS = round(F_CPU * STEP)

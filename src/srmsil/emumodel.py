@@ -12,6 +12,7 @@ import numpy as np
 
 from srmsil import _abi
 from srmsil.build import compile_host
+from srmsil.hil.proto import EMU_DT
 from srmsil.run import SimError, SimSummary, make_config, summarise
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData, emu_tables
@@ -74,7 +75,7 @@ def _child_main(args: tuple, out: Path) -> None:
         out.write_bytes(pickle.dumps(("err", f"{type(e).__name__}: {e}")))
 
 
-def run_model(m: MotorData, edges: np.ndarray, scenario: Scenario, *, tick_s: float, step: float = 5e-6,
+def run_model(m: MotorData, edges: np.ndarray, scenario: Scenario, *, tick_s: float, step: float = EMU_DT,
               grid: tuple[int, int] = (180, 192), cache_dir: Path, timeout_s: float = 300.0,
               return_trace: bool = False):
     """Run the emulator model for `scenario` (fixed speed, open loop) on the gate edges (ticks of `tick_s`), stepping

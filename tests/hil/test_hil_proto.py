@@ -171,3 +171,19 @@ def test_command_modes_distinct_and_shared():
     assert c == {"EMU_SELFTEST": proto.CMD_EMU_SELFTEST, "EMU_SELFTEST_PHASES": proto.CMD_EMU_SELFTEST_PHASES,
                  "CTRL_RESET": proto.CMD_CTRL_RESET}
     assert len({0, 1, *c.values()}) == 2 + len(c)      # 0 torque and 1 speed are the controller's command modes
+
+
+def test_emulator_step_is_one_constant():
+    """The emulator step is HIL_EMU_STEP_NS in hil_proto.h; the firmware, the host and the PC emulator model take it
+    from there, and no other step literal is left in the emulator's step loop."""
+    from srmsil import emumodel
+    from srmsil.hil import session
+    ns = int(re.search(r"#define HIL_EMU_STEP_NS (\d+)u", (COMMON / "hil_proto.h").read_text())[1])
+    assert ns == proto.EMU_STEP_NS == 6000
+    assert proto.EMU_DT == 6e-6 and session.EMU_DT is proto.EMU_DT
+    assert emumodel.run_model.__kwdefaults__["step"] == proto.EMU_DT
+    emu = ROOT / "hil" / "emulator"
+    h = (emu / "emu.h").read_text()
+    assert "#define EMU_STEP_NS HIL_EMU_STEP_NS" in h and "EMU_STEP_HZ" not in h
+    for f in ("emu.h", "step.cpp", "encoder.cpp"):
+        assert not re.search(r"5e-6|200000\b|200 kHz|\b120\b", (emu / f).read_text()), f

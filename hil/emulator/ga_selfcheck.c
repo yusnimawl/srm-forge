@@ -44,7 +44,7 @@ uint32_t emu_ga_selfcheck(void)
     c.bus_voltage = 400.0;
     c.v_switch = 1.0;
     c.v_diode = 1.0;
-    c.dt = 5e-6;
+    c.dt = 5e-6;                 /* part of the fixed test vector with TICKS, not the emulator step */
     srm_gate_avg_t g;
     srm_gate_avg_init(&g, 605, 202, 0);
     uint32_t lcg = 12345u, h = 2166136261u;

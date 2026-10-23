@@ -15,6 +15,8 @@ PROTOCOL_VERSION = 1
 PAYLOAD_MAX = 1024
 SAMPLES_PER_PACKET = 28
 TABLE_CHUNK_FLOATS = 200
+EMU_STEP_NS = 6000            # HIL_EMU_STEP_NS: the emulator step and the capture sample period
+EMU_DT = EMU_STEP_NS / 1e9    # s
 
 
 class Type(IntEnum):

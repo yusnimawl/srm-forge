@@ -10,6 +10,7 @@ from sil_fixtures import analytic_motor
 from srmsil.hil.compare import SETTLE_S, compare, match_plan, matched_scenario
 from srmsil.hil.config import HilModes, write_hil_config
 from srmsil.hil.fake import FakeRig
+from srmsil.hil.proto import EMU_DT
 from srmsil.hil.session import HilSession, run_hil
 from srmsil.run import SimResult, SimSummary, make_config, run
 from srmsil.scenario import Scenario
@@ -54,10 +55,11 @@ def test_run_hil_on_fake_matches_sil(cache, r):
     for k in ("step_mean_us", "step_max_us", "edge_jitter_ns", "latency_us", "isr_mean_us", "isr_max_us"):
         assert math.isfinite(h[k]), k
     assert res.controller == "hysteresis"
-    assert res.traces["i"].shape == (4, 4000)
+    n = round(SCN.duration / EMU_DT)
+    assert res.traces["i"].shape == (4, n)
     t0, t1 = h["window_s"]
-    assert t0 > 0.2 and t1 - t0 == pytest.approx(0.01)
-    assert res.traces["t"][2000] == t0
+    assert t0 > 0.2 and t1 - t0 == pytest.approx((n - n // 2) * EMU_DT)
+    assert res.traces["t"][n // 2] == t0
     assert res.summary.mean_torque > 0.5
     c = matched(cache, res, h["clock_ratio"])
     assert c.passed, c
@@ -182,10 +184,10 @@ def test_matched_scenario_end_s_is_required():
 
 def captured(scn, t_start=1.0, n=2000, **hil):
     """A valid live capture of n emulator steps from t_start s after Start."""
-    t = t_start + np.arange(n) * 5e-6
+    t = t_start + np.arange(n) * EMU_DT
     tr = {"t": t, "torque": np.ones(n), "i": np.ones((4, n), np.float32)}
     h = {"valid": True, "latency_us": 8.0, "clock_ratio": 1.0, "clock_measured": True,
-         "window_s": (float(t[n // 2]), float(t[-1]) + 5e-6), **hil}
+         "window_s": (float(t[n // 2]), float(t[-1]) + EMU_DT), **hil}
     return SimResult(tr, result(1.0, 1.0, 0.0).summary, scn, "hysteresis", "", "", hil=h)
 
 

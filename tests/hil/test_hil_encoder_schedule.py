@@ -10,11 +10,12 @@ from sil_fixtures import run_in_child
 
 from srmsil.build import compile_host, zig_cc
 from srmsil.hil.config import check_encoder_rate
+from srmsil.hil.proto import EMU_DT
 
 EMU = Path(__file__).parents[2] / "hil" / "emulator"
 CACHE = Path(tempfile.gettempdir()) / "srm_hil_enc_tests"
 CPR = 1000
-DT = 5e-6
+DT = EMU_DT
 GRAY = [(0, 0), (1, 0), (1, 1), (0, 1)]        # (A, B) of count n mod 4: A leads while the count rises
 
 

@@ -8,10 +8,10 @@ describe("hil", () => {
   })
 
   it("converts a capture length to emulator steps within the server's limits", () => {
-    expect(captureSteps(10)).toBe(2000)
-    expect(captureSteps(0.5)).toBe(100)
-    expect(captureSteps(1000)).toBe(200000)
-    expect([0.4, 1001, NaN].map(captureSteps)).toEqual([null, null, null])
+    expect(captureSteps(12)).toBe(2000)
+    expect(captureSteps(0.6)).toBe(100)
+    expect(captureSteps(1200)).toBe(200000)
+    expect([0.5, 1201, NaN].map(captureSteps)).toEqual([null, null, null])
   })
 
   it("shows the loopback text for a 403, the server text for a 409 and the field paths of a 422", () => {
