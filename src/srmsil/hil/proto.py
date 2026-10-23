@@ -139,7 +139,7 @@ EMU_CONFIG_FLOATS = (
     "v_switch", "v_diode", "dead_time", "turn_on_delay", "turn_off_delay", "theta_step", "psi_step", "psi_max",
     "i_max", "adc_noise", "adc_offset_error", "adc_gain_error", "sensor_delay", "encoder_offset", "encoder_ecc_amp",
     "resolver_gain_mismatch", "resolver_phase_error", "ad7606_range_v", "ad7606_t_conv_us", "sense_v_per_a",
-    "volt_divider", "volt_rc_tau", "dac_v_mid", "dac_v_per_a")
+    "volt_divider", "volt_rc_tau", "dac_v_mid", "dac_v_per_a", "omega_max")
 EMU_CONFIG_U32 = ("n_theta", "n_psi", "encoder_cpr", "capture_steps", "seed")
 EMU_CONFIG_U8 = ("n_phases", "n_rotor_poles", "mode", "rdc_bits", "resolver_pole_pairs", "encoder_ecc_harmonic",
                  "resolver")

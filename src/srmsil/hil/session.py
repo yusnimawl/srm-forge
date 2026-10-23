@@ -65,7 +65,7 @@ class Capture:
     result: SimResult       # traces empty and summary NaN unless every sample arrived
     valid: bool
     reason: str             # "" when valid
-    clipped: float = 0.0    # share of samples with a phase current at the capture's int16 limit (2 x the table i_max)
+    clipped: float = 0.0    # share of samples with a phase current or the speed at the capture's int16 limit
 
 
 def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
@@ -86,9 +86,23 @@ def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
              encoder_cpr=se.encoder_cpr, capture_steps=capture_steps, seed=scenario.seed, n_phases=m.n_phases,
              n_rotor_poles=m.n_rotor_poles, mode=int(scenario.mode == "dynamic"), rdc_bits=se.resolver_bits,
              resolver_pole_pairs=se.resolver_pole_pairs, encoder_ecc_harmonic=se.encoder_ecc_harmonic,
-             resolver=int(se.resolver))
+             resolver=int(se.resolver), omega_max=omega_max(m, scenario))
     c.update(sensor_chain(m, scenario))
     return c
+
+
+def omega_max(m: MotorData, scenario: Scenario) -> float:
+    """rad/s a dynamic run may reach, for the capture's speed range (the emulator takes the largest of this, twice
+    the initial speed and 100 rad/s): twice the speed command (room for overshoot), or for a torque command the
+    initial speed plus the map's peak torque accelerating the inertia over SETTLE_S plus the capture's duration.
+    0 for a fixed-speed run. MotorData carries no top speed; a capture whose speed reaches the range counts as
+    clipped (a live torque-commanded run kept going longer, or a speed command raised while running)."""
+    if scenario.mode != "dynamic":
+        return 0.0
+    if scenario.command_mode == "speed":
+        return 2 * abs(scenario.command_value) * RPM
+    t_peak = float(np.max(np.abs(m.torque)))
+    return abs(scenario.speed_rpm) * RPM + t_peak * (SETTLE_S + scenario.duration) / scenario.inertia
 
 
 def _nan_summary(q: int) -> SimSummary:
@@ -347,7 +361,8 @@ class HilSession:
         samples = np.concatenate(parts)
         traces = capture_traces(hdr, samples)
         res = SimResult(traces, capture_summary(traces, self._m.resistance), self._scenario, "", "", "")
-        clipped = float(np.mean(np.any(np.abs(samples["i"][:, :q].astype(np.int32)) >= 32767, axis=1)))
+        clipped = float(np.mean(np.any(np.abs(samples["i"][:, :q].astype(np.int32)) >= 32767, axis=1)
+                                | (np.abs(samples["omega"].astype(np.int32)) >= 32767)))
         return Capture(res, not reason, reason, clipped)
 
     def close(self) -> None:

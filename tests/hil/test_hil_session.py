@@ -14,7 +14,7 @@ from srmsil.hil import HilError, proto
 from srmsil.hil.config import HilModes
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.proto import Type
-from srmsil.hil.session import HilSession, _capture_problem, clock_stats, run_hil
+from srmsil.hil.session import HilSession, _capture_problem, clock_stats, emu_config, run_hil
 from srmsil.scenario import Scenario
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.004, command_value=1.0)
@@ -151,6 +151,44 @@ def test_configure_refuses_bad_isr_and_fast_encoder(cache):
     s2.connect()
     s2.configure(m, Scenario(speed_rpm=6000.0, duration=0.004), rdc)   # no encoder output: no edge-rate limit
     assert emu2.requests.count(Type.EMU_CONFIG) == 1
+
+
+def test_capture_speed_range_covers_the_run(cache):
+    """A speed step from rest past 955 rpm (2 x 0 and the 100 rad/s floor) keeps its captured speed: the range comes
+    from the speed command, or for a torque command from the peak torque over the settle and capture time. A speed
+    beyond the range counts as clipped."""
+    m = analytic_motor()
+    rpm = 2 * math.pi / 60
+    step = Scenario(mode="dynamic", speed_rpm=0.0, inertia=1e-4, duration=0.02, command_mode="speed",
+                    command_value=1500.0)
+    torque = step.model_copy(update={"command_mode": "torque", "command_value": 1.0, "speed_rpm": 100.0})
+    assert emu_config(m, step, 4000)["omega_max"] == pytest.approx(2 * 1500.0 * rpm)
+    assert emu_config(m, torque, 4000)["omega_max"] == pytest.approx(
+        100.0 * rpm + float(np.max(np.abs(m.torque))) * (0.2 + 0.02) / 1e-4)
+    assert emu_config(m, SCN, 4000)["omega_max"] == 0.0
+    s, _, _ = session(cache)
+    s.connect()
+    s.configure(m, step, HilModes())
+    s.start()
+    try:
+        cap = s.capture(4000)
+    finally:
+        s.stop()
+    assert cap.valid, cap.reason
+    w = cap.result.traces["omega"]
+    assert cap.clipped == 0.0
+    assert 1200 * rpm < w.max() < 2 * 1500.0 * rpm      # past the old 100 rad/s range, not saturated
+    s, emu, _ = session(cache)
+    s.connect()
+    s.configure(m, step.model_copy(update={"command_value": 400.0}), HilModes())   # range 2 x 400 rpm = 83.8 rad/s
+    s.start()
+    try:
+        s.command("speed", 1500.0)                       # raised while running: beyond the range
+        cap = s.capture(4000)
+    finally:
+        s.stop()
+    assert cap.valid, cap.reason
+    assert cap.clipped > 0.0
 
 
 def test_clock_stats():

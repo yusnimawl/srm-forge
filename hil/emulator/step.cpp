@@ -231,6 +231,7 @@ const char *emu_configure(const hil_emu_config_t *c)
     if (!finite_nonneg(c->dead_time) || !finite_nonneg(c->turn_on_delay) || !finite_nonneg(c->turn_off_delay) ||
         !finite_nonneg(c->v_switch) || !finite_nonneg(c->v_diode))
         return "config refused: converter settings";
+    if (!finite_nonneg(c->omega_max)) return "config refused: omega_max";
     const char *err = outputs_configure(c);
     if (err) return err;
     cfg = *c;
@@ -293,7 +294,7 @@ const char *emu_start(void)
     psi_scale = 2.0f * cfg.psi_max / 32767.0f;
     v_scale = 1.25f * (cfg.bus_voltage + 2.0f * cfg.v_diode) / 32767.0f;
     t_scale = (float)(1.25 * (tmax > 0 ? tmax : 1.0) / 32767.0);
-    w_scale = fmaxf(2.0f * fabsf(cfg.speed), 100.0f) / 32767.0f;
+    w_scale = fmaxf(fmaxf(2.0f * fabsf(cfg.speed), cfg.omega_max), 100.0f) / 32767.0f;
     inv_i = 1.0f / i_scale;
     inv_psi = 1.0f / psi_scale;
     inv_v = 1.0f / v_scale;

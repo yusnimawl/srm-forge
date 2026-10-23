@@ -164,6 +164,8 @@ typedef struct {
     float volt_rc_tau;               /* s, filter on the sensed voltages */
     float dac_v_mid;                 /* V at DAC mid-scale */
     float dac_v_per_a;               /* V per A at the DAC output */
+    float omega_max;                 /* rad/s the run may reach (0 = none); the capture's omega range is the largest
+                                        of this, 2 |speed| and 100 rad/s */
     uint32_t n_theta, n_psi;         /* table grid */
     uint32_t encoder_cpr;            /* counts per revolution */
     uint32_t capture_steps;          /* steps recorded by a capture */

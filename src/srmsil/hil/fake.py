@@ -83,7 +83,7 @@ class _Rig:
         c, tr, q = self.cfg, res.traces, self.m.n_phases
         idx = (off + np.arange(n)) * k
         scales = (2 * c["i_max"] / 32767, 2 * c["psi_max"] / 32767, 1.25 * (c["bus_voltage"] + 2 * c["v_diode"]) / 32767,
-                  1.25 * (self.t_max or 1.0) / 32767, max(2 * abs(c["speed"]), 100.0) / 32767)
+                  1.25 * (self.t_max or 1.0) / 32767, max(2 * abs(c["speed"]), c["omega_max"], 100.0) / 32767)
         hdr = proto.CaptureHeader(EMU_DT, *scales, n, q)
 
         def i16(x, scale):
