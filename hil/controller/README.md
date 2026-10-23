@@ -5,7 +5,7 @@ the starting point for the motor controller board (spec D11, §14). Pins: `docs/
 
 | File | Contents |
 |---|---|
-| `srm_hal_stm32.[ch]` | `srm_hal_stm32_init` (fills `srm_hal_t` from the generated `hil_config.h`), sample trigger, `ctrl_isr` scheduling and timing, RUN/READY, `micros` (TIM2), `ctrl_slow` (TIM6, 1 kHz), start/stop, statistics |
+| `srm_hal_stm32.[ch]` | `srm_hal_stm32_init` (fills `srm_hal_t` from the generated `hil_config.h`), sample trigger, `ctrl_isr` scheduling and timing, RUN/READY, `micros` (TIM2), `ctrl_slow` (TIM6, 1 kHz, restarted at each start so its first call comes one period after RUN rises, as in the SIL), start/stop, statistics |
 | `pwm_ahb.c`, `pwm_compare.[ch]` | TIM1 (upper A-D, PE9/11/13/14) master, TIM8 (lower A-D, PC6-9) slave; `ahb_compare` is portable and tested on the host (`tests/hil/test_hil_pwm_compare.py`) |
 | `sense_ad7606.c` | `current_sense = ad7606`: CONVST PD15, BUSY PF3, SPI1 (PA5/PA6, CS PD14) by DMA |
 | `sense_internal.c` | `current_sense = internal`: ADC1 + ADC2 dual simultaneous on PA3/PB1/PC0/PA4 by DMA |

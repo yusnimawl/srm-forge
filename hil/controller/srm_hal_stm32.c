@@ -198,6 +198,9 @@ const char *drv_start(void)
     enc_start();
     ctrl_init(hal_);
     if (has_cmd) ctrl_command(cmd_mode ? SRM_CMD_SPEED : SRM_CMD_TORQUE, cmd_value);
+    /* ctrl_slow's first call one period after RUN rises (the plant's t = 0), as in the SIL */
+    TIM6->CNT = 0;
+    TIM6->SR = 0;
     run_pin(true);
     drv_delay_cycles(DRV_CPU_HZ / 50000u);     /* 20 us: the emulator sees RUN before the first trigger */
     __disable_irq();          /* READY checked and the outputs enabled with no READY interrupt in between */
