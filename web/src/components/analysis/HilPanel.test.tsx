@@ -334,6 +334,9 @@ describe("HilPanel", () => {
     await emitLive(live())
     await act(async () => { button("Capture").click() })
     expect(document.querySelector('[data-testid="capture-invalid"]')).not.toBeNull()
+    // the default length fills the emulator's buffered ring
+    expect((document.getElementById("hil-capture-ms") as HTMLInputElement).value).toBe("49.152")
+    expect(calls.find((c) => c.url === "/api/hil/session/capture")!.body).toEqual({ n_steps: 8192 })
     expect(text()).toContain("overruns 3, ISR overruns 0, dropped 0")
     expect(document.querySelector('[data-testid="verdict-pass"]')).toBeNull()
     expect(document.querySelector('[data-testid="verdict-fail"]')).toBeNull()

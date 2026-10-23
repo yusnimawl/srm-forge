@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { ApiError } from "@/api/client"
-import { captureSteps, hilErrorText, liveProblems, liveWarnings, paramStatusText, ppmOff, type HilLive } from "./hil"
+import { CAPTURE_RING, captureSteps, DEFAULT_CAPTURE_MS, hilErrorText, liveProblems, liveWarnings, paramStatusText, ppmOff, type HilLive } from "./hil"
 
 describe("hil", () => {
   it("names the ctrl_param statuses", () => {
@@ -12,6 +12,7 @@ describe("hil", () => {
     expect(captureSteps(0.6)).toBe(100)
     expect(captureSteps(1200)).toBe(200000)
     expect([0.5, 1201, NaN].map(captureSteps)).toEqual([null, null, null])
+    expect(captureSteps(DEFAULT_CAPTURE_MS)).toBe(CAPTURE_RING)          // the default capture fills the buffered ring
   })
 
   it("shows the loopback text for a 403, the server text for a 409 and the field paths of a 422", () => {

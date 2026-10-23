@@ -189,3 +189,23 @@ def test_emulator_step_is_one_constant():
         assert not re.search(r"5e-6|200000\b|200 kHz|\b120\b", (emu / f).read_text()), f
     web = (ROOT / "web" / "src" / "lib" / "hil.ts").read_text()
     assert int(re.search(r"export const EMU_STEP_US = (\d+)\n", web)[1]) * 1000 == ns
+
+
+def test_capture_ring_is_one_constant():
+    """The default capture is the emulator's buffered ring (EMU_CAPTURE_RING samples), in the host, the web and
+    examples/control_hil.py, so the summary window holds enough strokes for the ripple median."""
+    ring = int(re.search(r"#define EMU_CAPTURE_RING (\d+)", (ROOT / "hil" / "emulator" / "emu.h").read_text())[1])
+    assert proto.CAPTURE_RING == ring == 8192
+    web = (ROOT / "web" / "src" / "lib" / "hil.ts").read_text()
+    assert int(re.search(r"export const CAPTURE_RING = (\d+)\n", web)[1]) == ring
+
+
+def test_control_hil_example_compiles_and_defaults_to_the_ring():
+    import importlib.util
+    import py_compile
+    path = ROOT / "examples" / "control_hil.py"
+    py_compile.compile(str(path), doraise=True)
+    spec = importlib.util.spec_from_file_location("control_hil_example", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert round(mod.DEFAULT_DURATION / proto.EMU_DT) == proto.CAPTURE_RING

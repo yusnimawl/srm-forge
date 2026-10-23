@@ -16,7 +16,8 @@ PAYLOAD_MAX = 1024
 SAMPLES_PER_PACKET = 28
 TABLE_CHUNK_FLOATS = 200
 EMU_STEP_NS = 6000            # HIL_EMU_STEP_NS: the emulator step and the capture sample period
-EMU_DT = EMU_STEP_NS / 1e9    # s
+EMU_DT = EMU_STEP_NS / 1e9
+CAPTURE_RING = 8192           # samples the emulator buffers (EMU_CAPTURE_RING in hil/emulator/emu.h), 49 ms at EMU_DT    # s
 
 
 class Type(IntEnum):

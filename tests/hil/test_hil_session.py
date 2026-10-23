@@ -13,7 +13,7 @@ from sil_fixtures import analytic_motor
 
 from srmsil.hil import HilError, proto
 from srmsil.hil.config import HilModes
-from srmsil.hil.build import BuildResult
+from srmsil.hil.build import BuildResult, firmware_hash
 from srmsil.hil.fake import FAKE_HASH, FakeRig
 from srmsil.hil.proto import Type
 from srmsil.hil.session import EMU_DT, HilSession, _capture_problem, clock_stats, emu_config, run_hil
@@ -353,17 +353,41 @@ def test_configure_refuses_settings_the_hil_does_not_emulate(cache, field):
 def test_run_hil_checks_the_boards_run_the_expected_build(cache):
     """run_hil(expect=...) refuses, before configuring, a rig whose boards run another build than the one flashed."""
     m = analytic_motor()
-    s, emu, _ = session(cache)
-    res = run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", FAKE_HASH))
+    h = firmware_hash("hysteresis", m, SCN, HilModes())
+    s, emu, _ = session(cache, emulator_hash=h, controller_hash=h)
+    res = run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", h))
     assert res.hil["valid"], res.hil["reason"]
-    s, emu, _ = session(cache)
+    s, emu, _ = session(cache, emulator_hash=h, controller_hash=h)
     with pytest.raises(HilError, match="the controller board runs another build"):
         run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", 0x1234))
     assert Type.EMU_CONFIG not in emu.requests
-    s, emu, _ = session(cache, emulator_hash=0x1234)
+    s, emu, _ = session(cache, emulator_hash=0x1234, controller_hash=h)
     with pytest.raises(HilError, match="the emulator board runs another build"):
-        run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", FAKE_HASH))
+        run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", h))
     assert Type.EMU_CONFIG not in emu.requests
+
+
+def test_run_hil_refuses_controller_sources_changed_since_the_flash(cache, tmp_path):
+    """A custom controller folder edited after its Build & Flash: the boards run the flashed build, but the matched
+    SIL would compile the edited sources, so run_hil refuses before configuring."""
+    import shutil
+    folder = tmp_path / "ctrl"
+    shutil.copytree(Path(__file__).parents[1] / "sil" / "controllers" / "open_loop", folder)
+    m = analytic_motor()
+    h = firmware_hash(str(folder), m, SCN, HilModes())
+    assert firmware_hash(str(folder), m, SCN, HilModes()) == h
+    flashed = BuildResult(True, "", h)
+    src = next(folder.glob("*.c"))
+    src.write_text(src.read_text() + "\n/* edited after the flash */\n")
+    s, emu, _ = session(cache, emulator_hash=h, controller_hash=h)
+    with pytest.raises(HilError, match="the controller sources changed since the last Build & Flash"):
+        run_hil(s, m, str(folder), SCN, expect=flashed)
+    assert Type.EMU_CONFIG not in emu.requests
+    # a build setting of the scenario counts too: boards flashed for 25 kHz PWM, a run at 20 kHz
+    e = firmware_hash("hysteresis", m, SCN.model_copy(update={"pwm_hz": 25000.0}), HilModes())
+    with pytest.raises(HilError, match="sources changed"):
+        run_hil(session(cache, emulator_hash=e, controller_hash=e)[0], m, "hysteresis", SCN,
+                expect=BuildResult(True, "", e))
 
 
 def test_fake_rig_reports_the_chosen_hashes(cache):

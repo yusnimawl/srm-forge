@@ -80,6 +80,18 @@ def test_pio_missing_message(monkeypatch, tmp_path):
         build.pio_executable()
 
 
+def test_firmware_hash_is_the_build_hash(monkeypatch, tmp_path):
+    """firmware_hash (the session's check of the current sources) gives the hash build_and_flash builds with."""
+    monkeypatch.setattr(build, "pio_executable", lambda: Path("pio"))
+    monkeypatch.setattr(build.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, "SUCCESS", ""))
+    m, scn = analytic_motor(), Scenario()
+    for ctrl, modes in (("hysteresis", HilModes()), ("tsf", HilModes(position="ad2s1210"))):
+        r = build.build_and_flash(ctrl, m, scn, modes, cache_dir=tmp_path, upload=True)
+        assert r.firmware_hash == build.firmware_hash(ctrl, m, scn, modes)
+    assert build.firmware_hash("hysteresis", m, scn, HilModes()) != build.firmware_hash("tsf", m, scn, HilModes())
+
+
 @pytest.mark.skipif(not HAVE_PIO, reason="hil/.runtime is not set up (run hil/setup.bat)")
 @pytest.mark.parametrize("modes", [HilModes(), HilModes(current_sense="internal", position="ad2s1210")])
 def test_pio_compiles_both_envs(modes, tmp_path):

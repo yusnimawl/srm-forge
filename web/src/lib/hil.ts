@@ -52,6 +52,10 @@ export const LOOPBACK_TEXT = "HIL needs the server on this computer (loopback)"
 export const EMU_STEP_US = 6
 export const MIN_CAPTURE_MS = (100 * EMU_STEP_US) / 1000
 export const MAX_CAPTURE_MS = (200_000 * EMU_STEP_US) / 1000
+/** Samples the emulator buffers (`srmsil.hil.proto.CAPTURE_RING`). The default capture fills it, so the comparison
+ *  window (its second half) holds enough complete strokes for the ripple median. */
+export const CAPTURE_RING = 8192
+export const DEFAULT_CAPTURE_MS = (CAPTURE_RING * EMU_STEP_US) / 1000
 
 /** The message of a failed HIL request: the loopback text for a 403, the server's text for a 409 or a 422. */
 export function hilErrorText(e: unknown): string {

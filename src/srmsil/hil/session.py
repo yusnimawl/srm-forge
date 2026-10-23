@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 
 from srmsil.hil import HilError, proto
+from srmsil.hil.build import check_sources
 from srmsil.hil.compare import RPM, SETTLE_S
 from srmsil.hil.config import (ENCODER_EDGE_RATE_MAX, HilModes, check_encoder_rate, check_isr_rate, mode_defines,
                                resolver_rps_max, sensor_chain)
@@ -451,11 +452,13 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
             settle_s: float = SETTLE_S, expect: BuildResult | None = None) -> SimResult:
     """Configure, start, settle, capture `scenario.duration` of steps, stop. The result's traces and summary come
     from the capture (summary over its second half); `hil` is `capture_health` of the run. With `expect` (the build
-    that was flashed for this controller) the boards are asked for their build first and a mismatch raises HilError
-    before anything is configured, so the run is never compared against a controller the boards do not run."""
+    that was flashed for this controller) the boards are asked for their build first, and the build of the current
+    sources is hashed (build.check_sources): either mismatch raises HilError before anything is configured, so the
+    run is never compared against a controller the boards do not run."""
     info = session.connect() if expect is not None or session.info is None else session.info
     if expect is not None:
         check_build(info, expect.firmware_hash)
+        check_sources(controller, m, scenario, info.modes, expect.firmware_hash)
     session.configure(m, scenario, info.modes)
     n = round(scenario.duration / EMU_DT)
     session.start()

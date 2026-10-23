@@ -6,6 +6,7 @@ import hashlib
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -58,19 +59,42 @@ def _source_hash(ctrl_dirs: list[Path], gen_dir: Path, modes: HilModes) -> str:
     return h.hexdigest()
 
 
+def _stage(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, stage: Path) -> tuple[list[Path], str]:
+    """Write the case headers into `stage`; the controller's source folders and the digest of the whole build."""
+    cdir = controller_dir(controller)
+    ctrl_dirs = [cdir, _CTRL_DIR / "common"] if controller in REFERENCE else [cdir]
+    stage.mkdir(parents=True, exist_ok=True)
+    write_header(m, ctrl_tables(m), stage / "srm_motor_tables.h")
+    write_hil_config(modes, scenario, m, stage / "hil_config.h")
+    return ctrl_dirs, _source_hash(ctrl_dirs, stage, modes)
+
+
+def firmware_hash(controller: str, m: MotorData, scenario: Scenario, modes: HilModes) -> int:
+    """The firmware hash build_and_flash gives (controller, case, scenario, modes) from the sources as they are now:
+    the controller folder(s), the plant and HIL sources and the generated headers. Nothing is compiled."""
+    with tempfile.TemporaryDirectory(prefix="srm_hil_hash_") as tmp:
+        return int(_stage(controller, m, scenario, modes, Path(tmp))[1][:8], 16)
+
+
+def check_sources(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, flashed: int) -> None:
+    """Raise HilError when the build of (controller, case, scenario, modes) from the current sources is not the one
+    flashed (`flashed`, its firmware hash): the controller folder, the case's tables or the scenario's build settings
+    changed since the last Build & Flash."""
+    now = firmware_hash(controller, m, scenario, modes)
+    if now != flashed:
+        raise HilError(f"the controller sources changed since the last Build & Flash (the build is now {now:08x}, the "
+                       f"boards run {flashed:08x}: the controller folder, the case's tables or the scenario's build "
+                       "settings differ); build and flash again")
+
+
 def build_and_flash(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, *, cache_dir: Path,
                     upload: bool = True, log: list[str] | None = None) -> BuildResult:
     """Generate the case headers, compile both firmwares (and upload them when `upload`). A compile without upload
     of unchanged sources is served from a marker in the cache."""
     pio = pio_executable()
-    cdir = controller_dir(controller)
-    ctrl_dirs = [cdir, _CTRL_DIR / "common"] if controller in REFERENCE else [cdir]
     base = Path(cache_dir) / "sil" / "hil" / "build"
     stage = base / "stage"
-    stage.mkdir(parents=True, exist_ok=True)
-    write_header(m, ctrl_tables(m), stage / "srm_motor_tables.h")
-    write_hil_config(modes, scenario, m, stage / "hil_config.h")
-    digest = _source_hash(ctrl_dirs, stage, modes)
+    ctrl_dirs, digest = _stage(controller, m, scenario, modes, stage)
     gen = base / digest[:16]
     gen.mkdir(parents=True, exist_ok=True)
     for name in ("srm_motor_tables.h", "hil_config.h"):

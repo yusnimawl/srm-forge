@@ -7,7 +7,7 @@ overruns, dropped, ISR mean/max, latency).
 
     $env:PYTHONPATH="src;tests;tests/sil"; python examples\\control_hil.py [--case SETUP.srm-setup.json]
         [--cache-dir DIR] [--controllers hysteresis pwm_current tsf] [--modes ad7606,encoder] [--rpm 1000]
-        [--torque 1.0] [--bus V] [--duration 0.02] [--param NAME=VALUE ...] [--json PATH]
+        [--torque 1.0] [--bus V] [--duration S] [--param NAME=VALUE ...] [--json PATH]
 
 Without --case the analytic motor of tests/sil/sil_fixtures.py is used. With --case the setup file is evaluated
 (srmapp.case.evaluate_design; the map comes from --cache-dir when it is there, so point it at srmweb's cache) and the
@@ -37,6 +37,7 @@ except ImportError:
 from srmsil.hil import HilError
 from srmsil.hil.build import BuildResult, build_and_flash
 from srmsil.hil.compare import compare, match_plan, refused
+from srmsil.hil import proto
 from srmsil.hil.config import HilModes
 from srmsil.hil.session import HilSession, check_build, run_hil
 from srmsil.hil.transport import SerialTransport, discover
@@ -45,6 +46,8 @@ from srmsil.scenario import Scenario, SensorSettings
 from srmsil.tables import MotorData, motor_data
 
 CONTROLLERS = ("hysteresis", "pwm_current", "tsf")
+# the buffered ring: its second half holds enough complete strokes for the ripple median at typical speeds
+DEFAULT_DURATION = proto.CAPTURE_RING * proto.EMU_DT
 
 
 def load_motor(case: str | None, cache_dir: Path, bus: float | None) -> MotorData:
@@ -163,9 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--rpm", type=float, default=1000.0, help="fixed speed")
     p.add_argument("--torque", type=float, default=1.0, help="torque command, N m")
     p.add_argument("--bus", type=float, help="bus voltage, V (default: the case's)")
-    p.add_argument("--duration", type=float, default=0.02,
-                   help="capture length, s (the summary and the ripple median use its second half; at most 8192 "
-                        "emulator steps are buffered)")
+    p.add_argument("--duration", type=float, default=DEFAULT_DURATION,
+                   help="capture length, s (default: the buffered ring; the summary and the ripple median use its "
+                        "second half)")
     p.add_argument("--param", action="append", default=[], metavar="NAME=VALUE",
                    help="controller parameter for every controller (repeatable)")
     p.add_argument("--json", type=Path)

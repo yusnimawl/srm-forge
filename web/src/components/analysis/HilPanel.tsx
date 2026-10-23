@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { Scenario } from "@/lib/control"
 import {
-  captureSteps, hilCapture, hilCaptureTraces, hilClose, hilCommand, hilCompare, hilErrorText, hilFlash, hilFlashResult, hilOpen, hilParam,
+  captureSteps, DEFAULT_CAPTURE_MS, hilCapture, hilCaptureTraces, hilClose, hilCommand, hilCompare, hilErrorText, hilFlash, hilFlashResult, hilOpen, hilParam,
   hilStart, hilStop, liveProblems, livePpm, liveWarnings, MAX_CAPTURE_MS, MIN_CAPTURE_MS, paramStatusText, ppmOff, useHilEvents,
   type HilCaptureOut, type HilComparison, type HilFlashResult, type HilLive, type HilModes, type HilSession,
 } from "@/lib/hil"
@@ -250,7 +250,7 @@ export default function HilPanel({ caseId, controller, scenario, params, custom,
   const { live, ended, lost } = useHilEvents(epoch)
   // The controller's dropped-frame counter runs since boot; the last value seen while stopped is the run's baseline.
   const [txBase, setTxBase] = useState(0)
-  const [captureMs, setCaptureMs] = useState("20")
+  const [captureMs, setCaptureMs] = useState(String(DEFAULT_CAPTURE_MS))
   const [capture, setCapture] = useState<CaptureView | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -17,6 +17,7 @@ from fastapi import HTTPException
 
 from srmsil import run as sil_run
 from srmsil.hil import HilError
+from srmsil.hil.build import check_sources
 from srmsil.hil.compare import compare, match_plan, refused
 from srmsil.hil.config import HilModes
 from srmsil.hil.session import HilSession, LiveStats, capture_health, check_build
@@ -93,7 +94,8 @@ class HilManager:
         return self._session
 
     def open(self, case_id: str, body: HilOpenIn, motor: MotorData) -> HilSessionOut:
-        """Connect to both boards, check that they run the case's newest Build & Flash of the controller, and configure
+        """Connect to both boards, check that they run the case's newest Build & Flash of the controller and that the
+        controller's sources, the case's tables and the scenario's build settings still give that build, and configure
         them for the case's motor and the scenario. HilError (no rig, mode mismatch, another build on a board, a
         setting the HIL does not emulate) and the scenario rules give 409 with the error's text."""
         check_loopback(self.settings)
@@ -108,7 +110,9 @@ class HilManager:
                 raise HTTPException(409, str(exc)) from exc
             try:
                 info = session.connect()
-                check_build(info, self._flashed(case_id, body.controller))
+                flashed = self._flashed(case_id, body.controller)
+                check_build(info, flashed)
+                check_sources(body.controller, motor, body.scenario, body.modes, flashed)
                 session.configure(motor, body.scenario, body.modes)
             except (HilError, ValueError) as exc:
                 session.close()

@@ -4,6 +4,7 @@ the flash job and its exclusion with the session, and the cache."""
 import json
 import threading
 import time
+from pathlib import Path
 
 import pytest
 pytest.importorskip("fastapi")
@@ -13,7 +14,11 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sil_fixtures import analytic_motor
 
-from srmsil.hil.fake import FAKE_HASH, FakeRig
+from srmsil.hil.build import firmware_hash
+from srmsil.hil.config import HilModes
+from srmsil.hil.fake import FakeRig
+from srmsil.scenario import Scenario
+from srmsil.tables import motor_data_from_json
 from srmweb.api import create_app
 from srmweb.config import Settings
 from srmweb.hil import HilManager
@@ -36,8 +41,11 @@ def rig(tmp_path):
 
 
 def _client(tmp_path, rig, host="127.0.0.1", token=None):
-    return TestClient(create_app(_settings(tmp_path, host, token), runner_factory=lambda store, st: JobRunner(store, st),
-                                 hil_transports=lambda: FakeRig(analytic_motor(), **rig)))
+    """The app on the fake rig; `client.rig` is the keyword dict of the next FakeRig it opens."""
+    c = TestClient(create_app(_settings(tmp_path, host, token), runner_factory=lambda store, st: JobRunner(store, st),
+                              hil_transports=lambda: FakeRig(analytic_motor(), **rig)))
+    c.rig = rig
+    return c
 
 
 @pytest.fixture
@@ -46,13 +54,24 @@ def client(tmp_path, rig):
         yield c
 
 
-def _flashed(client, cid, controller="hysteresis", firmware_hash=FAKE_HASH):
-    """A finished Build & Flash job of the case and controller, as run_hil_flash_job stores it."""
+def _build(client, cid, controller="hysteresis"):
+    """The firmware hash of the case's build of `controller` for SCENARIO, from the sources as they are now."""
+    motor = motor_data_from_json(client.app.state.store.case_result(cid, "evaluate"), SCENARIO["bus_voltage"])
+    return firmware_hash(controller, motor, Scenario(**SCENARIO), HilModes())
+
+
+def _flashed(client, cid, controller="hysteresis", firmware_hash=None):
+    """A finished Build & Flash job of the case and controller, as run_hil_flash_job stores it (by default of the
+    current sources); the fake rig's boards then run that build."""
+    h = _build(client, cid, controller) if firmware_hash is None else firmware_hash
     store = client.app.state.store
     job_id = store.create_job("hil_flash", {"case_id": cid})
-    store.put_result(job_id, {"case_id": cid, "controller": controller, "modes": {}, "firmware_hash": firmware_hash,
+    store.put_result(job_id, {"case_id": cid, "controller": controller, "modes": {}, "firmware_hash": h,
                               "log": ""}, kind="hil_flash")
     store.set_status(job_id, "done")
+    if firmware_hash is None:
+        client.rig.update(emulator_hash=h, controller_hash=h)
+    return h
 
 
 def _case(client, flashed=True):
@@ -102,7 +121,7 @@ def test_every_route_refused_off_loopback(tmp_path, rig):
 
 def test_manager_refuses_off_loopback(tmp_path):
     m = HilManager(_settings(tmp_path, "0.0.0.0", "t"), lambda: FakeRig(analytic_motor()), lambda: False,
-                   lambda case_id, controller: FAKE_HASH)
+                   lambda case_id, controller: 0)
     for call in (m.close, m.start, m.stop, lambda: m.param("band", 1.0), lambda: m.capture(100),
                  lambda: m.compare("0" * 32, lambda *a: analytic_motor())):
         with pytest.raises(HTTPException) as e:
@@ -115,9 +134,10 @@ def test_open_close_and_second_open(client):
     r = _open(client, cid)
     assert r.status_code == 201, r.text
     s = r.json()
+    h = _build(client, cid)
     assert s["case_id"] == cid and s["controller"] == "hysteresis" and not s["running"]
     assert s["modes"] == {"current_sense": "ad7606", "position": "encoder", "dac": "mcp4922x2"}
-    assert s["emulator_hash"] == s["controller_hash"] == 0x5EED0001
+    assert s["emulator_hash"] == s["controller_hash"] == h
     again = _open(client, cid)
     assert again.status_code == 409 and "open" in again.json()["detail"]
     assert client.delete("/api/hil/session").status_code == 204
@@ -430,6 +450,7 @@ def test_open_refuses_boards_without_this_flash(client, rig):
     assert r.status_code == 409 and r.json()["detail"].startswith(f"the controller board {BUILD}")
     _flashed(client, cid, controller="tsf")                      # another controller's build
     assert BUILD in _open(client, cid).json()["detail"]
+    rig.update(emulator_hash=_build(client, cid), controller_hash=_build(client, cid))
     _flashed(client, cid, firmware_hash=0x1234)                  # this controller, but not what the boards run
     r = _open(client, cid)
     assert r.status_code == 409 and "controller board" in r.json()["detail"]
@@ -441,4 +462,23 @@ def test_open_refuses_boards_without_this_flash(client, rig):
     rig["emulator_hash"] = 0x1234
     r = _open(client, cid)
     assert r.status_code == 409 and r.json()["detail"].startswith(f"the emulator board {BUILD}")
+    assert not client.app.state.hil.is_open()
+
+
+def test_open_refuses_controller_sources_changed_since_the_flash(client, tmp_path):
+    """A custom controller folder edited after its Build & Flash: the boards still run the flashed build, so the
+    session (whose matched SIL compiles the folder as it is now) is refused."""
+    import shutil
+    folder = tmp_path / "ctrl"
+    shutil.copytree(Path(__file__).parents[1] / "sil" / "controllers" / "open_loop", folder)
+    cid = _case(client, flashed=False)
+    _flashed(client, cid, controller=str(folder))
+    body = {**OPEN, "controller": str(folder)}
+    assert _open(client, cid, body).status_code == 201
+    client.delete("/api/hil/session")
+    src = next(folder.glob("*.c"))
+    src.write_text(src.read_text() + "\n/* edited after the flash */\n")
+    r = _open(client, cid, body)
+    assert r.status_code == 409
+    assert r.json()["detail"].startswith("the controller sources changed since the last Build & Flash")
     assert not client.app.state.hil.is_open()
