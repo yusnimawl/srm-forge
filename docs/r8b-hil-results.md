@@ -755,6 +755,60 @@ of 40, committed 1 of 60. Once the board took a bus fault inside `advance_all` (
 address 0x20068000, the top of the stack) at START instead. The averager source is unchanged by this step; the
 refusal is the self-check working, and a refused start was repeated. Open for the owner (see Summary).
 
+### Step 1d: root cause of the self-check refusals (2026-10-23)
+
+The gate averager self-check refuses START because the Teensy computes wrongly at 1008 MHz, not because of the code.
+The default clock is unchanged; the clock is an owner decision.
+
+Method: a scratch build (not committed) compared every self-check window with a host table of per-window hashes and
+reported the first differing window, its inputs, the state before it, FPSCR, FPCCR, SP and the cycles per window. A
+mode counter in `emu_start` ran the check in one of four ways, in turn: (0) as committed; (1) after a 2 ms spin on
+the cycle counter; (2) as (1), then a second check straight after the first; (3) after 2 ms of 8-wide float
+multiply-adds. A scratch CrashReport relay reported faults. Each START came after a fresh EMU_CONFIG and table upload.
+The running firmware hash was checked after every upload.
+
+| Build, clock, core voltage | STARTs | Self-check wrong | Board faults |
+|---|---|---|---|
+| per-window build, 1008 MHz, 1575 mV | 30 | 18 (window 0 in 17, window 2 in 1) | 1 START lost (no relay) |
+| same, interrupts masked during the check | 120 | 14 (window 0 in 9, window 2 in 5) | 3 STARTs lost (no relay) |
+| mode build, 1008 MHz, 1575 mV (3 soaks) | 200 | mode 0: 4 of 50, mode 1: 21 of 50, mode 2: 24 of 50 (its second check: 0 of 50) | mode 3: 50 of 50 (30 relayed) |
+| mode build, 1008 MHz, lazy FP stacking off | 80 | modes 0-2: 16 of 58 | mode 3: 22 of 22 |
+| mode build, 960 MHz, 1550 mV | 80 | 0 of 60 | mode 3: 20 of 20 |
+| mode build, 912 MHz, 1525 mV | 80 | 0 | 0 |
+| mode build, 816 MHz, 1425 mV | 80 | 0 | 0 |
+| mode build with advance_all inlined, 1008 MHz | 40 | 30 of 30 | 10 of 10 |
+| mode build with advance_all inlined, 912 MHz | 40 | 0 | 0 |
+| mode build, 1008 MHz, voltage lowered to 1525 mV | 40 | - | 40 of 40 |
+| mode build, 912 MHz, voltage lowered to 1425 mV | 40 | 14 of 14 (all 8ea70d6e, window 0) | 26 of 26 |
+| mode build, 912 MHz, voltage lowered to 1375 mV | 40 | - | 40 of 40 |
+| committed source, 1008 MHz | 100 | 0 | 0 |
+
+- Every wrong result is in the first windows of a check (window 0, rarely 2), with the same few values each time
+  (8ea70d6e: only phase 3's voltage of window 0 wrong; 64fb7149: window 0's pending changes matured early).
+  The cycle counts of a failing window are identical from run to run, so no interrupt hit it.
+- Every fault is a PRECISERR at the same instruction, the first load of `src` in `advance_all`, with BFAR
+  0x20070000 (past the end of DTCM). This is the fault Step 1c saw once at START. At 1375 mV other faulting addresses
+  appear as well.
+- Ruled out: interrupts during the check (masked: still wrong); lazy FP stacking (FPCCR.LSPEN off: no change); FP
+  register or uninitialised-stack contents left by earlier code (mode 0 and mode 1 leave the same registers and differ,
+  8 % against 42 %, and the stack scrub runs before each window either way); caches (code in ITCM, data and stack in
+  DTCM); a miscompile (the inlined averager, refused 30 of 30 at 1008 MHz, is correct at 912 MHz in 40 of 40, and the
+  host build is correct).
+- What triggers it is the start of heavy work after lighter work. A check straight after another check is always
+  right. A check after 2 ms of light spinning is often wrong. A check after 2 ms of full-throughput float work faults
+  every time.
+- Dose-response: at a fixed clock, lowering the core voltage turns every START into the same failure. At 912 MHz, a
+  clock that is otherwise clean, the identical wrong hash 8ea70d6e and the identical fault (0x416, 0x20070000)
+  appear when the voltage is lowered to 1425 mV. So these signatures are timing failures of the silicon. The Teensy
+  core already runs the DCDC at its maximum, 1575 mV, at 1008 MHz; the part is rated 600 MHz.
+- The committed build passed 100 of 100 STARTs at 1008 MHz in this session (it refused 15 of 43 in Step 1c). The rate
+  depends on the code layout and the preceding load, so a passing soak does not show margin.
+- The step interrupt starts the same kind of float burst every 5 us after the loop's light polling, so real runs at
+  1008 MHz are exposed to the same failure. The Step 1c PIT faults (a one-bit wrong bus address) fit it.
+- Step 1b's finding that GCC 15.2 at -O3 miscompiles the inlined `advance_all` is withdrawn. The inlined code is
+  correct; it fails more often at 1008 MHz. `noinline` and its comment are left in the code until the owner decides
+  on the clock.
+
 ### Step 2: speed step with the speed loop (dynamic, hysteresis)
 
 Dynamic mode from rest, speed command 1500 rpm, J 1e-3 kg m^2, no load or friction; speed loop `speed_kp` 0.2,
@@ -837,9 +891,9 @@ Not run: no DACs.
   step was not needed.
 - Not passed, owner decisions: the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
   its mean only (7 of 27 valid runs over the 5-point bound).
-- Open, for the owner: the gate averager self-check refused 15 of 43 STARTs during the Step 1c bench (hash 8ea70d6e),
-  with HEAD's firmware as often (13 of 30 in an A/B); one START took a bus fault inside the averager instead; and any
-  eDMA use makes the PIT read fault. All three point at the board at 1008 MHz (IP bus 252 MHz) rather than at the
-  code, but it is not proven.
+- Owner decision: the self-check refusals and the bus faults are timing failures of the iMXRT1062 at 1008 MHz
+  (Step 1d). They do not occur at 912 or 816 MHz in a stress mode that fails at 1008 MHz, and they appear at 912 MHz
+  when the core voltage is lowered. The core clock (912 MHz had no failures in 120 STARTs, 40 of them with the inlined averager) or another board is for
+  the owner; the default stays 1008 MHz. The eDMA PIT faults of Step 1c are likely the same cause.
 - Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
   matched SIL scenario.
