@@ -1001,29 +1001,83 @@ The ripple failures are the Step 1 bimodality. Health: step 2.39-2.44 / 4.10-4.1
 
 Not run: no DACs.
 
+### Re-run: sensed-value age jitter and the ripple median (2026-10-24)
+
+Owner decision (2026-10-23): the matched SIL models the spread of the sensed-value age, and the ripple is compared as
+a median over strokes.
+- The HIL latches the emulator's output at an age uniform in [D, D + dt], dt = `EMU_DT` (6 us); the measured latency
+  is its mean. The matched SIL now draws each ISR sample's age from that range: `sensors.delay` = latency - dt/2,
+  `sensors.delay_jitter` = dt (`SensorSettings.delay_jitter`, drawn from the run's seeded sensor RNG; 0 is
+  bit-identical to before).
+- `d_ripple_pts` is the median per-stroke ripple of the HIL minus the SIL's. A stroke is one torque period
+  (2 pi / (q N_r), 15 deg here) of rotor angle from the angle traces; only complete strokes in the window count; fewer
+  than 3 on either side fails. The whole-window ripples are kept as information. The 5-point bound, the 3 % torque and
+  current bounds and the overrun rule are unchanged.
+- A session refuses boards that do not run the flashed build of the controller (`run_hil(expect=...)`, srmweb
+  `HilManager.open`); every run below checked it before the capture and read the hashes again after it.
+- An emulator step max above 80 % of the step is reported as a warning (owner decision), not a failure.
+
+Rig: Teensy 4.1 at 912 MHz (COM4), 6 us step, Nucleo-H723ZG (COM6), both boards flashed with the same build per
+controller and mode. Case and operating point as in Step 1 (8/6 at 60 turns, fixed 1000 rpm, 10 N m command, 400 V,
+20 kHz, default parameters). Captures are buffered, 8000 steps (48 ms, `--duration 0.048`), so the summary window (its
+second half, 24 ms) holds 8 to 9 complete strokes. Tool: `examples/control_hil.py`'s `run_one` in a loop
+(`scratchpad/t14c/bench.py`).
+
+| Controller (mode) | Runs | Valid | Passed | Mean torque | RMS current | d_torque | d_irms | d_ripple (median) | Whole-window ripple HIL / SIL | Whole-window difference |
+|---|---|---|---|---|---|---|---|---|---|---|
+| hysteresis (encoder) | 26 | 25 | 25 | 13.67-13.89 N m | 14.90-15.22 A | -0.75 to +0.47 % | -0.67 to +0.46 % | -4.03 to +3.28 pts | 78.2-103.8 / 78.1-105.6 % | -23.48 to +25.39 pts (6 of 25 over 5) |
+| pwm_current (encoder) | 12 | 11 | 11 | 9.57-9.68 N m | 10.93-11.05 A | +0.03 to +0.38 % | -0.08 to +0.34 % | -1.24 to -0.31 pts | 50.3-51.0 / 51.2-52.0 % | -1.41 to -0.52 pts |
+| tsf (encoder) | 12 | 11 | 11 | 10.25-10.44 N m | 11.42-11.67 A | +0.21 to +0.55 % | +0.04 to +0.26 % | -0.74 to +0.59 pts | 69.0-71.0 / 69.1-71.2 % | -1.02 to +0.66 pts |
+| hysteresis (ad2s1210) | 8 | 8 | 8 | 13.67-13.82 N m | 14.96-15.22 A | -0.58 to +0.43 % | -1.01 to +0.80 % | -1.82 to +2.88 pts | 78.4-104.3 / 78.1-84.5 % | -3.30 to +24.85 pts (3 of 8 over 5) |
+
+Health (valid runs):
+
+| Controller (mode) | Firmware | Step mean / max | Step-time warnings | Overruns, dropped, ISR overruns | ISR mean / max | Latency | Clock ratio |
+|---|---|---|---|---|---|---|---|
+| hysteresis (encoder) | 2ac78f20 | 2.64-2.68 / 4.18-4.32 us | 0 | 0, 0, 0 | 4.53-4.56 / 5.19-5.22 us | 6.43-6.65 us | 1.01055-1.01160 |
+| pwm_current (encoder) | 43ff36ea | 2.90-2.93 / 5.03-5.14 us (84-86 %) | 11 of 11 | 0, 0, 0 | 5.29-5.31 / 5.90-5.91 us | 6.48-6.54 us | 1.01031-1.01125 |
+| tsf (encoder) | 088451dd | 2.60-2.64 / 4.55-4.89 us | 1 of 11 | 0, 0, 0 | 5.83-5.86 / 7.06 us | 6.38-6.41 us | 1.01015-1.01112 |
+| hysteresis (ad2s1210) | bb5a6725 | 2.59 / 3.87 us | 0 | 0, 0, 0 | 6.13-6.19 / 7.80-7.86 us | 6.39-6.50 us | 1.01059-1.01148 |
+
+- The running hashes matched the flashed build before and after every run (58 of 58).
+- Invalid: 3 runs (one per encoder-mode controller), each a capture sequence gap of 1-2 packets with 1-2 bad frames
+  on the host (the known USB loss); 1 more hysteresis run before the series (the smoke run) had one too.
+- The hysteresis bimodality is still there in both the HIL and, now, the matched SIL: whole-window ripples of about
+  78 % or about 104 % on either side. With the age jitter the SIL reaches the high branch (SIL whole-window up to
+  105.6 %), so the high windows no longer belong to the HIL alone; which side shows a late chop in a given window is
+  random, and the whole-window difference is -23 to +25 points. The median over 8-9 strokes is not moved by such a
+  stroke: -4.03 to +3.28 points, inside the 5-point bound in all 33 valid hysteresis runs.
+- pwm_current's step max is 84-86 % of the step in every run: a warning, not a failure (owner decision).
+
 ### Summary
 
-- Passed: hysteresis at a fixed speed on mean torque and RMS current (27 of 27 valid runs); the speed step against the
-  matched SIL (after the ctrl_slow fix); the live theta_on change and captures through srmweb (after the reset fix);
-  the AD2S1210 angle chain with and without resolver errors.
-- After Step 1b (cheaper gate averaging): tsf passes in 10 of 10 runs with 0 overruns (step max 4.55-4.75 us, above
-  the 4.5 us goal); pwm_current still overruns at the start of every run.
-- After Step 1c (AD7606 BUSY in hardware, the frame loaded by a lean CONVST interrupt; the eDMA is not usable at
-  1008 MHz): pwm_current and tsf run at the 5 us step with 0 overruns, 11 of 11 and 12 of 12 valid runs passed; the 6 us
-  step was not needed.
-- Not passed, owner decisions: the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
-  its mean only (7 of 27 valid runs over the 5-point bound).
-- The self-check refusals and the bus faults were timing failures of the iMXRT1062 at 1008 MHz (Step 1d). The owner
-  set 912 MHz (Step 1e): 310 STARTs had 0 refusals and 0 faults, including the stress modes. pwm_current (10 of 10),
-  tsf (11 of 11 valid) and hysteresis (4 of 5 valid; the fifth fails the ripple bound by the bimodality) pass with
-  0 overruns at the 5 us step. pwm_current's step max is 4.85-4.96 us.
-- The emulator step is 6 us, the owner's fallback (Step 1f). The 1 % emulator-model check still passes, with a
-  largest error of 0.050 %. At 912 MHz: pwm_current 10 of 10 valid, all passed; tsf 14 of 16 valid, all passed;
-  hysteresis 6 of 6 valid, 5 passed (one failed the ripple bound by the bimodality). No run overran.
-  - pwm_current's step max is 4.86-5.04 us, 84 % of the step, which is above the 80 % warning but has a margin
-    of about 1 us.
-- Open: streamed captures (longer than the 8192-sample ring, 49 ms at 6 us) do not work. At 6 us the step no
-  longer overruns while streaming (0 of 6). The host still falls behind 166.7 k samples/s, so the ring fills (4 of 6
-  runs) or a frame is lost (2 of 6). Buffered captures work (Steps 1e, 1f).
-- Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
-  matched SIL scenario.
+Current configuration (2026-10-24): Teensy at 912 MHz, 6 us emulator step, matched SIL with the sensed-value age
+jitter, ripple compared as the median over complete strokes (re-run above).
+
+Passed:
+- Step 1 at a fixed speed, ad7606 + encoder: hysteresis 25 of 25 valid runs, pwm_current 11 of 11, tsf 11 of 11, on
+  mean torque, RMS current and the median ripple; 0 overruns.
+- Step 4, ad7606 + ad2s1210, hysteresis: 8 of 8 valid runs passed; the AD2S1210 angle chain with and without resolver
+  errors agrees with the SIL within one ISR period (Step 4 table).
+- Step 2: the speed step against the matched SIL (after the ctrl_slow fix).
+- Step 3: the live theta_on change and captures through srmweb (after the reset fix).
+- A session refuses boards that run another build than the flashed one (58 of 58 re-run runs checked).
+
+Did not pass, or not run:
+- Earlier comparisons, superseded by the re-run but kept as recorded:
+  - Step 1 at 1008 MHz and 5 us: pwm_current (5 runs) and tsf (6 runs) stopped on an emulator overrun in every run.
+  - Step 1 hysteresis (whole-window ripple, matched SIL at the mean age): 7 of 27 valid runs over the 5-point
+    ripple bound (+5.6 to +27.9 points).
+  - Step 4 (same metric): 3 of 6 ripple comparisons failed (resolver errors none: 1 of 3, up to +24.15 points; gain
+    and phase errors: 2 of 3, up to +26.43 points).
+  - Step 1e (912 MHz, 5 us): 1 of 5 valid hysteresis runs over the ripple bound; Step 1f (6 us): 1 of 6 (+24.89
+    points).
+- Step 2: the window comparison is NaN in every run (no current in the summary window after the overshoot); the step
+  response is the comparison. 2 of 13 dynamic runs gave "no matched SIL scenario" (open, not reproduced).
+- Step 5 (internal current sensing): not run, no DACs.
+- Streamed captures longer than the 8192-sample ring (49 ms at 6 us) do not work: the host falls behind 166.7 k
+  samples/s, so the ring fills or a frame is lost (Step 1f). Buffered captures work.
+- Capture packet loss: 3 of 58 re-run captures invalid by a sequence gap (6 of 33 in Step 1; it comes in bursts; its
+  side is still open).
+- Warnings, not failures: pwm_current's step max is 84-86 % of the 6 us step in every run, above the 80 % warning
+  line; tsf reached it in 1 of 11 runs.
