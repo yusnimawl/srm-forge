@@ -290,8 +290,9 @@ const char *emu_start(void)
     if (got[0] != size || got[1] != size) return "start refused: tables incomplete";
     const uint32_t ga_check = emu_ga_selfcheck();      // 4000 windows, a few ms
     if (ga_check != EMU_GA_SELFCHECK_HASH) {
-        static char msg[96];
-        snprintf(msg, sizeof msg, "start refused: gate averager self-check hash %08lx, expected %08lx (miscompiled)",
+        static char msg[128];
+        snprintf(msg, sizeof msg, "start refused: gate averager self-check hash %08lx, expected %08lx "
+                 "(miscompiled or a processor fault)",
                  (unsigned long)ga_check, (unsigned long)EMU_GA_SELFCHECK_HASH);
         return msg;
     }

@@ -5,7 +5,7 @@
 #include "srm_gate_avg.h"
 
 #define N_WINDOWS 4000
-#define TICKS 5040u              /* one 5 us step at 1008 MHz */
+#define TICKS 5040u              /* ticks per window, fixed (independent of the clock) */
 
 /* Fills the stack below the caller's frame with a pattern, so the averager called next from the same frame starts on
    non-zero memory: a build that reads uninitialised stack then gives a different hash. */

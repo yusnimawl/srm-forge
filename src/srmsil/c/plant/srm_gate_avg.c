@@ -98,13 +98,7 @@ static inline void advance(const srm_gate_avg_t *g, int k, const segment_t *s, i
 }
 
 /* Advances every winding from the fluxes src over the n segments into dst (src may be dst); any is the OR of their
-   gate words. A winding off in every segment and at zero flux stays as it is. Kept out of line: inlined into
-   srm_gate_avg_window, arm-none-eabi-gcc 15.2 at -O3 compiles code that reads uninitialised stack and gives wrong
-   voltages on the Teensy; the self-check the emulator runs at every START (hil/emulator/ga_selfcheck.c) refuses
-   such a build. */
-#if defined(__GNUC__)
-__attribute__((noinline))
-#endif
+   gate words. A winding off in every segment and at zero flux stays as it is. */
 static void advance_all(const srm_gate_avg_t *g, const srm_sim_config_t *c, const segment_t *s, int n, uint16_t any,
                         const srm_real_t *src, srm_real_t *dst, float *on_upper, float *on_lower)
 {

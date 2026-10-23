@@ -13,9 +13,10 @@
 // falls ad7606_t_conv_us later (triggered count up to COMP1 on the IP bus clock, then re-armed); an edge during BUSY
 // restarts it (CSCTRL.TCI). The same edge sets the timer's input edge flag, whose interrupt (convst_isr) loads the
 // latest codes into the transmit FIFO as one 128-bit frame (V1 first, MSB first) and stamps the trigger.
-// The frame is loaded by the CPU because the eDMA cannot be used here: with any eDMA activity, even one RAM-to-RAM
-// copy per CONVST, the step interrupt's PIT read takes a bus fault within minutes at 1008 MHz (IP bus 252 MHz), and
-// so do CPU reads of the eDMA registers (bench, docs/r8b-hil-results.md, Step 1c).
+// The frame is loaded by the CPU. An eDMA version worked on the wire, but at 1008 MHz (IP bus 252 MHz) any eDMA
+// activity, even one RAM-to-RAM copy per CONVST, made the step interrupt's PIT read take a bus fault within minutes,
+// and so did CPU reads of the eDMA registers (docs/r8b-hil-results.md, Step 1c). That clock fails timing (Step 1d);
+// the eDMA was not tried again at 912 MHz.
 #include <Arduino.h>
 #include <math.h>
 

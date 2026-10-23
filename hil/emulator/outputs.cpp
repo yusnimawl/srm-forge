@@ -44,7 +44,7 @@ void outputs_trigger_reset(void)
 #endif
 }
 
-// last - first is exact in 32 bits while the window is shorter than the cycle-counter wrap (4.26 s at 1008 MHz).
+// last - first is exact in 32 bits while the window is shorter than the cycle-counter wrap (4.71 s at 912 MHz).
 float outputs_trigger_hz(void)
 {
     const uint8_t s = trig_sel;
