@@ -544,4 +544,150 @@ run is invalid) and marks a capture being sent invalid. Both firmwares rebuilt a
 
 ## Acceptance
 
-Pending.
+2026-10-23, Teensy 4.1 at 1008 MHz (COM4) and Nucleo-H723ZG (COM6), boards wired, both flashed with the same modes
+before every run (the first Teensy upload after a flash of a different build failed about every second time; one
+retry always worked). Case: the 8/6 reference machine (`srmapp.references`, with the requirements of the owner's 8/6
+reference case: 10 kW, 32 N m, 3000 / 9000 rpm, 400 V) evaluated through srmweb at the `screening` preset. The
+search's own winding for these requirements is 1 turn on 2 paths (0.5 equivalent turns: L_u 0.26 uH, I_max 6.5 kA,
+0.02 mOhm), which no 20 kHz controller can chop (about 7.7 kA per 5 us at 400 V). So the HIL case is an edit of it
+with a fixed winding of 60 turns on 1 path (the reference machine's own turns per pole): map I_max 54.3 A, R 0.307
+Ohm, L_u 3.7 mH, L_a 34 mH, peak torque 28.6 N m (case `072f2112-8862-4ca1-81e0-327f4b240194`, "8/6 reference, 60
+turns (HIL acceptance)"; the map is the cached screening map of the reference case). Operating point: fixed 1000 rpm,
+torque command 10 N m, bus 400 V (the case's), 20 kHz PWM and ISR, default reference-controller parameters, 4096 CPR
+encoder. Peak currents 19-34 A, inside the map (54.3 A), the AD7606 range (84.8 A) and the capture range (108.6 A);
+no capture clipped. Tolerances unchanged (3 % torque, 3 % RMS current, 5 points ripple).
+
+Runs: `examples/control_hil.py --case <setup file> --cache-dir <srmweb cache> --torque 10 [--modes ...]` (capture
+4000 steps after 0.2 s, summary over its second half, matched SIL from 0.2 s before the capture).
+
+### Step 0: capture speed range
+
+The emulator's captured speed range was max(2 |initial speed|, 100 rad/s), so a speed step from rest saturated the
+capture at 955 rpm. EMU_CONFIG now carries `omega_max` (`session.omega_max`): twice a dynamic run's speed command, or
+for a torque command the initial speed plus the map's peak torque over the settle and capture time. The emulator takes
+the largest of it, 2 |speed| and 100 rad/s. A captured speed at the range counts as clipped (`Capture.clipped`), so
+the comparison refuses it. Test: `tests/hil/test_hil_session.py::test_capture_speed_range_covers_the_run` (fails with
+`omega_max` 0). The clip count also showed that `test_window_matches_a_changing_run` had been passing on a speed
+saturated at 100 rad/s in every sample. On the bench (Step 2) the 1500 rpm step is captured at 0.092 rpm per count
+with no clipped sample.
+
+### Step 1: reference controllers at a fixed speed (ad7606 + encoder)
+
+| Controller | Runs (valid) | Mean torque | RMS current | Ripple | d_torque | d_irms | d_ripple | Passed |
+|---|---|---|---|---|---|---|---|---|
+| hysteresis | 33 (27) | 13.57-13.90 N m | 14.75-15.21 A | 76.3-106.2 % | -1.64 to +0.79 % | -1.95 to +1.59 % | -2.23 to +27.92 pts | 20 of 27 |
+| pwm_current | 5 (0) | - | - | - | - | - | - | **no**: emulator overrun |
+| tsf | 6 (0) | - | - | - | - | - | - | **no**: emulator overrun |
+
+Health (hysteresis, every run): emulator step mean 2.40-2.42 us, max 4.18-4.39 us, 0 overruns, 0 dropped; ISR mean
+4.49-4.55 us, max 4.94-5.28 us, 0 ISR overruns; latency 6.15-6.31 us; clock ratio 1.01064-1.01208 (window spread
+113-498 ppm); trigger to `ctrl_isr` 16.9 us; die temperature 65-67 C. Six of the 33 runs had a capture sequence gap
+(1-2 packets, 1-2 bad frames on the host, `dropped` 0) and were marked invalid: 5 of them in the first 8 runs (within
+about 15 minutes), then none in 45 debugging captures (20 in one session, 15 fresh sessions, 10 with a SIL run
+between) and 1 in the remaining 25 runs. The loss comes in bursts; its side is still open.
+
+**pwm_current and tsf: the emulator's 5 us step overruns.** Every run stopped with one overrun, 1.3 ms (pwm_current)
+to 0.55 s (tsf) after the start: READY falls, the controller stops ("READY low"), and the capture ends without
+CAPTURE_END. Before it the step maximum was 4.80-4.85 us (tsf); the overrun step took 5.03-5.43 us. A scratch build
+(not in the tree) recorded the first overrun step: 5084-5294 of the 5040 cycles per step at 1008 MHz, gate averaging
+1742-2546, plant 1397-1668, two gate edges in the window and two phases with flux; the rest (output stage, encoder and
+GPIO interrupts preempting the step) 950-1900. Hysteresis switches only at the ISR instants and stays below 4.4 us.
+pwm_current with `theta_off` 90 (one phase at a time) ran 2 of 4 runs without an overrun (step max 4.76-4.78 us; both
+passed: -0.88 / +0.16 % torque, +0.07 / +0.10 % current, -0.84 / +0.92 pts ripple) and overran at the start in the
+other two. In ad7606 + ad2s1210 (no encoder interrupt) both controllers overran as well (step max 5.07-5.43 us). Two
+overlapping PWM phases need more than the 5 us step on this board: an owner decision (cheaper gate averaging per edge,
+a longer step, or another step budget); not tuned away.
+
+**hysteresis ripple: 7 of 27 valid runs fail the ripple bound (+5.6 to +27.9 points); torque and current pass in all
+27.** In those windows the HIL ripple is 102-106 % (otherwise 76-80 %). One chop late in a stroke (after an earlier
+chop that the SIL extends by one ISR period and the HIL does not) lands where the phase is saturated near alignment,
+the current climbs from 16 to 32 A in 95 us while the next phase is already high, and the torque peaks at 22 N m
+against 18.8. The emulator's torque and currents agree with the tables at those samples (within 0.03 N m). The
+matched SIL does not produce such windows at the mean sensed-value age (6.2 us: 0 of 74 consecutive 10 ms windows
+above 83 %; 28 variants of start angle, noise and seed: 77-80 %), but it does at the low end of the HIL's age range D
+to D + dt: at 3.7 us 22 of 29 windows are at about 102 %, at 5.0-8.7 us none. The HIL samples each value at an age
+uniform in that range, so a borderline chop decision can go either way, while the matched SIL models the mean age
+only. The max-minus-min ripple of a 10 ms window is therefore bimodal at this operating point and the 5-point bound
+fails on a share of valid runs: a limit of the matched SIL's age model (and of the ripple metric), for the owner; not
+tuned away.
+
+### Step 2: speed step with the speed loop (dynamic, hysteresis)
+
+Dynamic mode from rest, speed command 1500 rpm, J 1e-3 kg m^2, no load or friction; speed loop `speed_kp` 0.2,
+`speed_ki` 2.5, `speed_filter_hz` 200 (faster than the defaults so the step fits a buffered capture: a streamed
+capture on the wired rig ends at about 10 600 samples with a full ring). Capture 8000 steps (40 ms) from 0.3-0.6 ms
+after Start; the matched SIL runs from Start (`match_plan`, dynamic).
+
+| Firmware | Runs | 10 % reached (HIL / SIL) | Rise 10-90 % (HIL / SIL) | Overshoot (HIL / SIL) | Speed at 40 ms (HIL / SIL) | Speed difference max / rms |
+|---|---|---|---|---|---|---|
+| before the ctrl_slow fix | 3 | 2.48-2.67 / 3.06 ms | 4.59 / 4.58-4.59 ms | 6.8-6.9 / 6.6-6.7 % | 1602-1603 / 1599-1600 rpm | 131-193 / 39-58 rpm |
+| after | 8 | 3.04-3.08 / 3.06 ms | 4.57-4.60 / 4.58-4.59 ms | 6.6-7.5 / 6.5-7.0 % | 1599-1612 / 1598-1606 rpm | 3.4-16.0 / 2.3-12.7 rpm |
+
+The hysteresis drive only motors and nothing loads the rotor, so the overshoot is also the final error (6.6-7.5 % HIL,
+6.5-7.0 % SIL). The window comparison is NaN in every run (neither side draws current in the summary window, after
+the overshoot), so the step response is the comparison here. Health: step mean 1.70-1.72 us, max 4.26-4.66 us, 0
+overruns; ISR 4.07-4.09 / 4.53-4.57 us; latency 6.5-7.0 us; clock ratio 1.0112-1.0120; no clipped sample.
+
+Found and fixed: the HIL led the SIL by 0.4-0.6 ms because TIM6 (`ctrl_slow`, 1 kHz) ran free since boot, so the first
+`ctrl_slow` after a start came at a random 0-1 ms, while the SIL calls it first one period after the start. TIM6 is
+now restarted when RUN rises (`hil/controller/srm_hal_stm32.c`; bench evidence above, no host test reaches the
+timer). In 2 of the 13 runs (the first two after that flash) `match_plan` gave "no matched SIL scenario" with a
+pydantic finite-number error; it did not recur in 9 more runs and the field was not recorded (open).
+
+### Step 3: live theta_on change and captures through srmweb
+
+Loopback srmweb from the worktree (scratch DB and cache), routes only: Build & Flash job (`hil_flash`; the first
+attempt failed on the Teensy upload, the resume passed), `POST /api/hil/session`, start, live numbers from
+`/api/hil/session/events`, capture of 4000 steps, compare, `POST /api/hil/session/param` `theta_on` 20 (electrical
+degrees), live numbers, capture, compare, stop. Hysteresis, 1000 rpm, 10 N m.
+
+| | Live torque (24 windows) | Live RMS current per phase | Live ripple (last window) | Capture | d_torque | d_irms | d_ripple | Passed |
+|---|---|---|---|---|---|---|---|---|
+| defaults | 13.71 N m | 14.97 A | 105.3 % | `f6a0633508644827b373de6e46f6905e` | +0.81 % | +0.51 % | -1.18 pts | yes |
+| theta_on 20 (live) | 13.28 N m | 13.61 A | 86.3 % | `8470573eb0454ea9a5f49997ad43fdad` | -1.42 % | -1.23 % | +1.79 pts | yes |
+
+Live health: step max 4.15 / 4.31 us, 0 overruns; ISR mean 4.52 / 4.47 us, max 5.20 us, 0 ISR overruns; trigger to
+`ctrl_isr` 16.95 us. A first pass of the same flow (before the reset fix below) gave +2.04 and -9.40 points ripple (the
+second with the SIL at the high-ripple branch of Step 1).
+
+Found and fixed: the reference controllers keep `ctrl_param` values in statics, so `theta_on` 20 from that session
+stayed on the board, and the next `examples/control_hil.py` runs (which set no parameter) read -2.4 to -4.1 % torque
+and -9.0 to -9.9 % RMS current against a matched SIL at the defaults. `HilSession.configure` now resets the controller
+board first (`HIL_COMMAND` mode `HIL_CMD_CTRL_RESET`: stop, acknowledge, `NVIC_SystemReset` once the acknowledgement
+has left the UART; the host waits for HELLO with the same build, 0.6 s on the bench). Test:
+`tests/hil/test_hil_session.py::test_configure_resets_parameters_of_an_earlier_session`. Bench: 13.72 N m at the
+defaults, 13.30 N m with `theta_on` 20, 13.73 N m after the next configure.
+
+### Step 4: ad2s1210 (ad7606 + ad2s1210, hysteresis)
+
+Resolver angle (12 bits, 1 pole pair, `encoder_cpr` 0), 1000 rpm, 10 N m, 3 runs per setting, 40 ms captures. Each
+turn-on (both switches off for at least 200 us before it) at the true rotor angle of the capture is compared with the
+matched SIL's turn-on in the same stroke (the SIL models the same resolver errors), and the shift of each turn-on
+between the two settings with the tracked-angle error of atan2(sin x, (1 + g) cos(x + phi)) at that angle:
+
+| Resolver errors | Turn-ons | HIL - SIL turn-on angle: mean / std / max | d_torque | d_irms | d_ripple | Passed |
+|---|---|---|---|---|---|---|
+| none | 48 | 0.07 / 2.28 / 4.52 mrad | -0.50 to +0.10 % | -0.66 to +0.15 % | -0.01 to +24.15 pts | 2 of 3 |
+| gain mismatch 1 %, phase error 0.01 rad | 48 | 0.04 / 1.50 / 3.61 mrad | -0.53 to +0.06 % | -1.26 to -0.04 % | +2.70 to +26.43 pts | 1 of 3 |
+
+The turn-ons agree with the SIL within one ISR period of rotation (5.2 mrad at 1000 rpm). With the errors set they
+shift by -11.5 to +2.1 mrad against the model's -11.9 to +1.8 mrad (44 locations, residual 0.30 +- 1.61 mrad,
+correlation 0.947): the angle error follows the set gain and phase errors (-1.3 to +7.9 counts of 4096, as expected).
+The ripple failures are the Step 1 bimodality. Health: step 2.39-2.44 / 4.10-4.16 us, 0 overruns; ISR 6.10-6.18 /
+6.78-6.88 us; latency 6.24-6.37 us. Hysteresis at the Step 1 settings in this mode: 2 runs, one valid (-0.33 % torque,
+-0.32 % current, -0.58 pts ripple, passed), one capture gap.
+
+### Step 5: internal current sensing
+
+Not run: no DACs.
+
+### Summary
+
+- Passed: hysteresis at a fixed speed on mean torque and RMS current (27 of 27 valid runs); the speed step against the
+  matched SIL (after the ctrl_slow fix); the live theta_on change and captures through srmweb (after the reset fix);
+  the AD2S1210 angle chain with and without resolver errors.
+- Not passed, owner decisions: pwm_current and tsf overrun the emulator's 5 us step with two overlapping PWM phases;
+  the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
+  its mean only (7 of 27 valid runs over the 5-point bound).
+- Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
+  matched SIL scenario.
