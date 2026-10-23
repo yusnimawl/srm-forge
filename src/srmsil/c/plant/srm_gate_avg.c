@@ -62,21 +62,65 @@ static inline srm_real_t ahb(const srm_gate_avg_t *g, int u, int l, int conducti
     return conducting ? g->v_demag : SRM_REAL(0.0);
 }
 
-/* Advances the running fluxes psi over span ticks at the held effective gates. The winding conducts the freewheel
-   and demagnetising paths only while its flux is positive, and the flux stops at zero. */
-static void accumulate(const srm_gate_avg_t *g, const srm_sim_config_t *c, srm_real_t span, srm_real_t *psi,
-                       float *on_upper, float *on_lower)
+/* A segment of a window: its length in ticks, that length in seconds and the effective gates held over it. */
+typedef struct {
+    srm_real_t span, tau;
+    uint16_t eff;
+} segment_t;
+
+#define SEG_CHUNK 16      /* segments advanced together; a window with more is advanced chunk by chunk */
+
+/* Advances one winding's running flux *psi over the segments in order. The winding conducts the freewheel and
+   demagnetising paths only while its flux is positive, and the flux stops at zero. With on set, the ticks each
+   switch is on are added to *on_u and *on_l. */
+static inline void advance(const srm_gate_avg_t *g, int k, const segment_t *s, int n, srm_real_t *psi, float *on_u,
+                           float *on_l, const int on)
 {
-    const srm_real_t tau = span * g->tick_s;
-    for (int k = 0; k < c->n_phases; k++) {
-        int u = (g->eff >> k) & 1, l = (g->eff >> (8 + k)) & 1;
-        if (!u && !l && !(psi[k] > SRM_REAL(0.0))) continue;      /* idle winding: no voltage, no flux change */
-        srm_real_t v = ahb(g, u, l, psi[k] > SRM_REAL(0.0));
-        if (v >= SRM_REAL(0.0) || psi[k] > -v * tau) psi[k] += v * tau;
-        else psi[k] = SRM_REAL(0.0);
-        on_upper[k] += (float)((srm_real_t)u * span);
-        on_lower[k] += (float)((srm_real_t)l * span);
+    srm_real_t p = *psi;
+    float ou = on ? *on_u : 0.0f, ol = on ? *on_l : 0.0f;
+    for (int i = 0; i < n; i++) {
+        int u = (s[i].eff >> k) & 1, l = (s[i].eff >> (8 + k)) & 1;
+        if (!u && !l && !(p > SRM_REAL(0.0))) continue;      /* idle winding: no voltage, no flux change */
+        srm_real_t v = ahb(g, u, l, p > SRM_REAL(0.0));
+        const srm_real_t tau = s[i].tau;
+        if (v >= SRM_REAL(0.0) || p > -v * tau) p += v * tau;
+        else p = SRM_REAL(0.0);
+        if (on) {
+            ou += (float)((srm_real_t)u * s[i].span);
+            ol += (float)((srm_real_t)l * s[i].span);
+        }
     }
+    *psi = p;
+    if (on) {
+        *on_u = ou;
+        *on_l = ol;
+    }
+}
+
+/* Advances every winding from the fluxes src over the n segments into dst (src may be dst); any is the OR of their
+   gate words. A winding off in every segment and at zero flux stays as it is. Not inlined: the Teensy build
+   (arm-none-eabi-gcc 15.2, -O3) inlined into srm_gate_avg_window reads uninitialised stack and gives wrong voltages
+   (board check against the earlier averager); out of line it is bit-identical. */
+#if defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static void advance_all(const srm_gate_avg_t *g, const srm_sim_config_t *c, const segment_t *s, int n, uint16_t any,
+                        const srm_real_t *src, srm_real_t *dst, float *on_upper, float *on_lower)
+{
+    for (int k = 0; k < c->n_phases; k++) {
+        srm_real_t p = src[k];
+        if (any & (0x0101u << k) || p > SRM_REAL(0.0)) {
+            if (on_upper) advance(g, k, s, n, &p, &on_upper[k], &on_lower[k], 1);
+            else advance(g, k, s, n, &p, NULL, NULL, 0);
+        }
+        dst[k] = p;
+    }
+}
+
+/* Ticks from t0 to t: 0 for t at or before t0, w for t w or more ticks after t0. */
+static inline uint32_t rel_ticks(uint64_t t, uint64_t t0, uint32_t w)
+{
+    return t <= t0 ? 0u : t - t0 >= w ? w : (uint32_t)(t - t0);
 }
 
 /* A tick count in the real type; a 32-bit conversion is one instruction on the Cortex-M7, a 64-bit one a library
@@ -86,8 +130,6 @@ static srm_real_t span_ticks(uint64_t n) { return n <= UINT32_MAX ? (srm_real_t)
 void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm_edge_t *edges, int n, uint64_t t0,
                          uint64_t dt, const srm_real_t *psi0, srm_real_t *v_out, float *on_upper, float *on_lower)
 {
-    const uint64_t t1 = t0 + dt;
-    uint64_t now = t0;
     int e = 0;
     if (g->cache_ticks != dt || g->cache_dt != c->dt || g->cache_cfg != (const void *)c) {
         g->cache_ticks = dt;
@@ -102,8 +144,8 @@ void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm
     }
 #ifndef SRM_GATE_AVG_NO_FAST_PATH     /* defined only by the test that compares both paths */
     if (n == 0 && !g->pending_valid) {
-        /* No edge and no pending change: one segment over the whole window. The same arithmetic as accumulate and
-           the closing loop below, fused. */
+        /* No edge and no pending change: one segment over the whole window. The same arithmetic as advance and the
+           closing loops below, fused. */
         const srm_real_t span = span_ticks(dt), tau = span * g->tick_s, inv = g->inv_ticks;
         for (int k = 0; k < c->n_phases; k++) {
             int u = (g->eff >> k) & 1, l = (g->eff >> (8 + k)) & 1;
@@ -117,37 +159,109 @@ void srm_gate_avg_window(srm_gate_avg_t *g, const srm_sim_config_t *c, const srm
                 ol += (float)((srm_real_t)l * span);
             }
             v_out[k] = (psi - psi0[k]) / g->dt_r;
-            on_upper[k] = (float)((srm_real_t)ou * inv);
-            on_lower[k] = (float)((srm_real_t)ol * inv);
+            if (on_upper) {
+                on_upper[k] = (float)((srm_real_t)ou * inv);
+                on_lower[k] = (float)((srm_real_t)ol * inv);
+            }
         }
         return;
     }
 #endif
-    srm_real_t psi[SRM_SIM_MAX_PHASES];
-    for (int k = 0; k < c->n_phases; k++) {
-        psi[k] = psi0[k];
-        on_upper[k] = on_lower[k] = 0.0f;
-    }
-
+    /* Events at or before t0 (late edges, changes due before the window) take effect at t0, in time order. */
     for (;;) {
         uint64_t te = e < n ? edges[e].t : UINT64_MAX;
         uint64_t tp = next_pending(g);
-        uint64_t ts = te < tp ? te : tp;      /* an edge at the same tick as a maturing change comes first */
-        if (ts >= t1) break;
-        if (ts < now) ts = now;
-        if (ts > now) accumulate(g, c, span_ticks(ts - now), psi, on_upper, on_lower);
-        now = ts;
+        if ((te < tp ? te : tp) > t0) break;
         if (te <= tp) {
-            while (e < n && edges[e].t <= ts) command(g, edges[e++].gates, ts);
+            while (e < n && edges[e].t <= t0) command(g, edges[e++].gates, t0);
         }
-        mature(g, ts);
+        mature(g, t0);
     }
-    if (t1 > now) accumulate(g, c, span_ticks(t1 - now), psi, on_upper, on_lower);
 
-    const srm_real_t inv = g->inv_ticks;
-    for (int k = 0; k < c->n_phases; k++) {
-        v_out[k] = (psi[k] - psi0[k]) / g->dt_r;
-        on_upper[k] = (float)((srm_real_t)on_upper[k] * inv);
-        on_lower[k] = (float)((srm_real_t)on_lower[k] * inv);
+    /* The rest of the window in ticks after t0 (dt < 2^32): every remaining event is after t0, and an event at or
+       after t1 reads as w. The window's segments between edges and maturing changes are collected, then each winding
+       is advanced over them: the same per-winding sequence of operations as advancing every winding segment by
+       segment. */
+    const uint32_t w = (uint32_t)dt;
+    uint16_t cmd = g->cmd, eff = g->eff, pv = g->pending_valid;
+    uint32_t pr[16];          /* ticks after t0 at which each pending change matures */
+    uint32_t tp = w;
+    for (unsigned m = pv; m; m &= m - 1u) {
+        int s = __builtin_ctz(m);
+        pr[s] = rel_ticks(g->pending_t[s], t0, w);
+        if (pr[s] < tp) tp = pr[s];
+    }
+    srm_real_t psi[SRM_SIM_MAX_PHASES];
+    const srm_real_t *src = psi0;
+    if (on_upper) {
+        for (int k = 0; k < c->n_phases; k++) on_upper[k] = on_lower[k] = 0.0f;
+    }
+    segment_t seg[SEG_CHUNK];
+    int ns = 0;
+    uint16_t any = 0;
+    uint32_t now = 0;
+    for (;;) {
+        uint32_t te = e < n ? rel_ticks(edges[e].t, t0, w) : w;
+        uint32_t ts = te < tp ? te : tp;      /* an edge at the same tick as a maturing change comes first */
+        if (ts > now) {
+            if (ns == SEG_CHUNK) {
+                advance_all(g, c, seg, ns, any, src, psi, on_upper, on_lower);
+                src = psi;
+                ns = 0;
+                any = 0;
+            }
+            seg[ns].span = (srm_real_t)(ts - now);
+            seg[ns].tau = seg[ns].span * g->tick_s;
+            seg[ns].eff = eff;
+            any |= eff;
+            ns++;
+            now = ts;
+        }
+        if (ts >= w) break;
+        if (te <= tp) {
+            /* new command words: a switch commanded to its effective level drops any pending change, otherwise
+               the delay restarts from this tick */
+            for (; e < n && rel_ticks(edges[e].t, t0, w) <= now; e++) {
+                const uint16_t word = edges[e].gates;
+                unsigned changed = (uint16_t)(word ^ cmd);
+                cmd = word;
+                for (; changed; changed &= changed - 1u) {
+                    int s = __builtin_ctz(changed);
+                    uint16_t bit = (uint16_t)(1u << s);
+                    if (((word ^ eff) & bit) == 0) {
+                        pv &= (uint16_t)~bit;
+                    } else {
+                        int64_t d = (word & bit) ? g->rise_ticks : g->fall_ticks;
+                        g->pending_t[s] = t0 + now + (uint64_t)d;
+                        pr[s] = rel_ticks(g->pending_t[s], t0, w);
+                        pv |= bit;
+                    }
+                }
+            }
+        }
+        tp = w;
+        for (unsigned m = pv; m; m &= m - 1u) {
+            int s = __builtin_ctz(m);
+            uint16_t bit = (uint16_t)(1u << s);
+            if (pr[s] <= now) {
+                eff = (uint16_t)((eff & ~bit) | (cmd & bit));
+                pv &= (uint16_t)~bit;
+            } else if (pr[s] < tp) {
+                tp = pr[s];
+            }
+        }
+    }
+    g->cmd = cmd;
+    g->eff = eff;
+    g->pending_valid = pv;
+    advance_all(g, c, seg, ns, any, src, psi, on_upper, on_lower);
+
+    for (int k = 0; k < c->n_phases; k++) v_out[k] = (psi[k] - psi0[k]) / g->dt_r;
+    if (on_upper) {
+        const srm_real_t inv = g->inv_ticks;
+        for (int k = 0; k < c->n_phases; k++) {
+            on_upper[k] = (float)((srm_real_t)on_upper[k] * inv);
+            on_lower[k] = (float)((srm_real_t)on_lower[k] * inv);
+        }
     }
 }

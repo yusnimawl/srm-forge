@@ -137,9 +137,8 @@ static void step_isr()
         last_word = e[j].gates;
     }
     srm_real_t v[SRM_SIM_MAX_PHASES];
-    float on_u[SRM_SIM_MAX_PHASES], on_l[SRM_SIM_MAX_PHASES];
     uint32_t c_ga = ARM_DWT_CYCCNT;
-    srm_gate_avg_window(&ga, &sim, e, ne, t0, P, pl.psi, v, on_u, on_l);
+    srm_gate_avg_window(&ga, &sim, e, ne, t0, P, pl.psi, v, NULL, NULL);
     c_ga = ARM_DWT_CYCCNT - c_ga;
     if (c_ga > prof_ga) prof_ga = c_ga;
     prof_ga_sum += c_ga;

@@ -116,9 +116,10 @@ void outputs_begin(void)
 #endif
 }
 
-void outputs_pins_isr(uint32_t t)
+// Each GPIO register read costs tens of cycles on this path, so a port without enabled pins is not read.
+void outputs_pins_isr(uint32_t t, uint32_t isr6)
 {
-    const uint32_t f6 = GPIO6_ISR & bits6, f7 = GPIO7_ISR & bits7, f9 = GPIO9_ISR & bits9;
+    const uint32_t f6 = isr6 & bits6, f7 = bits7 ? GPIO7_ISR & bits7 : 0, f9 = bits9 ? GPIO9_ISR & bits9 : 0;
     if (f6) GPIO6_ISR = f6;
     if (f7) GPIO7_ISR = f7;
     if (f9) GPIO9_ISR = f9;

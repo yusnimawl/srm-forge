@@ -45,6 +45,32 @@ EXPORT int gate_avg_windows(int q, double bus, double vs, double vd, int64_t ris
     return 0;
 }
 
+/* Windows at given starts t0s[w] over the edges [firsts[w], firsts[w + 1]) (edges before a window's start are late
+   edges); without_fractions passes NULL for them. Ticks are 0.5 us. */
+EXPORT int gate_avg_windows_at(int q, double bus, double vs, double vd, int64_t rise, int64_t fall, uint16_t initial,
+                               int n_edges, const uint64_t *edge_t, const uint16_t *edge_g, int n_windows,
+                               const uint64_t *t0s, const int *firsts, uint64_t dt, const double *psi0,
+                               double *v_out, float *on_u, float *on_l, int without_fractions)
+{
+    srm_sim_config_t c;
+    srm_gate_avg_t g;
+    static srm_edge_t edges[8192];
+    if (n_edges > 8192) return -1;
+    for (int i = 0; i < n_edges; i++) {
+        edges[i].t = edge_t[i];
+        edges[i].gates = edge_g[i];
+    }
+    make_cfg(&c, q, bus, vs, vd);
+    c.dt = (double)dt * 0.5e-6;
+    srm_gate_avg_init(&g, rise, fall, initial);
+    for (int w = 0; w < n_windows; w++) {
+        const size_t o = (size_t)w * q;
+        srm_gate_avg_window(&g, &c, edges + firsts[w], firsts[w + 1] - firsts[w], t0s[w], dt, psi0 + o, v_out + o,
+                            without_fractions ? NULL : on_u + o, without_fractions ? NULL : on_l + o);
+    }
+    return 0;
+}
+
 /* Both switches off from a flux of psi0 with the plant stepping on the averaged voltage; out = {min psi, min
    current, final psi, final current}. The table is linear, i = psi / L. */
 EXPORT void gate_avg_plant_off(double psi0, double inductance, int n_steps, double *out)

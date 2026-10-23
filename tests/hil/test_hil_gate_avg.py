@@ -1,4 +1,5 @@
 import ctypes as C
+import math
 import tempfile
 from pathlib import Path
 
@@ -177,3 +178,116 @@ def test_fast_path_identical_to_general_walk(seed):
     slow = run_in_child(_windows, _lib_general(), *args)
     for a, b in zip(fast, slow):
         assert a.tobytes() == b.tobytes()
+
+
+def _windows_at(lib, q, bus, vs, vd, rise, fall, initial, edges, t0s, firsts, dt, psi0, without_fractions):
+    dll = C.CDLL(str(lib))
+    dll.gate_avg_windows_at.restype = C.c_int
+    dll.gate_avg_windows_at.argtypes = [C.c_int, C.c_double, C.c_double, C.c_double, C.c_int64, C.c_int64,
+                                        C.c_uint16, C.c_int, C.c_void_p, C.c_void_p, C.c_int, C.c_void_p, C.c_void_p,
+                                        C.c_uint64, C.c_void_p, C.c_void_p, C.c_void_p, C.c_void_p, C.c_int]
+    et = np.array([e[0] for e in edges] or [0], np.uint64)
+    eg = np.array([e[1] for e in edges] or [0], np.uint16)
+    t0a = np.array(t0s, np.uint64)
+    fa = np.array(firsts, np.int32)
+    p0 = np.ascontiguousarray(psi0, np.float64)
+    nw = len(t0s)
+    v = np.zeros((nw, q))
+    ou = np.zeros((nw, q), np.float32)
+    ol = np.zeros((nw, q), np.float32)
+    rc = dll.gate_avg_windows_at(q, bus, vs, vd, rise, fall, initial, len(edges), et.ctypes.data, eg.ctypes.data,
+                                 nw, t0a.ctypes.data, fa.ctypes.data, dt, p0.ctypes.data, v.ctypes.data,
+                                 ou.ctypes.data, ol.ctypes.data, int(without_fractions))
+    assert rc == 0
+    return v, ou, ol
+
+
+def _reference(q, bus, vs, vd, rise, fall, initial, edges, t0s, firsts, dt, psi0):
+    """The averager as one walk over every edge and maturing change in time order, every winding advanced at every
+    segment; events before a window's start take effect at its start (all edges up to it first when an edge is the
+    earliest)."""
+    tick = 0.5e-6
+    v_on, v_free, v_demag = bus - 2 * vs, -(vs + vd), -(bus + 2 * vd)
+    cmd = eff = initial
+    pend = {}
+    vs_out, ou_out, ol_out = [], [], []
+    for w, t0 in enumerate(t0s):
+        ed = edges[firsts[w]:firsts[w + 1]]
+        t1, now, e = t0 + dt, t0, 0
+        psi = list(psi0[w])
+        ou, ol = [0.0] * q, [0.0] * q
+
+        def accumulate(span):
+            tau = span * tick
+            for k in range(q):
+                u, lo = (eff >> k) & 1, (eff >> (8 + k)) & 1
+                if not u and not lo and not psi[k] > 0:
+                    continue
+                v = v_on if u and lo else (v_free if psi[k] > 0 else 0.0) if u or lo else (v_demag if psi[k] > 0 else 0.0)
+                psi[k] = psi[k] + v * tau if v >= 0 or psi[k] > -v * tau else 0.0
+                ou[k] += u * span
+                ol[k] += lo * span
+
+        while True:
+            te = ed[e][0] if e < len(ed) else math.inf
+            tp = min(pend.values(), default=math.inf)
+            ts = min(te, tp)
+            if ts >= t1:
+                break
+            ts = max(ts, now)
+            if ts > now:
+                accumulate(ts - now)
+            now = ts
+            if te <= tp:
+                while e < len(ed) and ed[e][0] <= ts:
+                    word = ed[e][1]
+                    for s in range(16):
+                        bit = 1 << s
+                        if not (word ^ cmd) & bit:
+                            continue
+                        if not (word ^ eff) & bit:
+                            pend.pop(s, None)
+                        else:
+                            pend[s] = ts + (rise if word & bit else fall)
+                    cmd = word
+                    e += 1
+            for s, t in list(pend.items()):
+                if t <= ts:
+                    eff = (eff & ~(1 << s)) | (cmd & (1 << s))
+                    del pend[s]
+        if t1 > now:
+            accumulate(t1 - now)
+        vs_out.append([(psi[k] - psi0[w][k]) / (dt * tick) for k in range(q)])
+        ou_out.append([x / dt for x in ou])
+        ol_out.append([x / dt for x in ol])
+    return np.array(vs_out), np.array(ou_out, np.float32), np.array(ol_out, np.float32)
+
+
+@pytest.mark.parametrize("seed", [4, 5, 6, 7])
+def test_matches_reference_walk(seed):
+    """The averager equals a plain event walk (rounding of the order of 1e-12), with late edges, gaps between windows,
+    long delays, windows of more than 16 segments, and with the fractions left out."""
+    rng = np.random.default_rng(seed)
+    q, dt, n_w = 4, (10, 16, 40, 40)[seed - 4], 150
+    gap, lag = int(rng.integers(0, 2)) * int(rng.integers(1, dt)), int(rng.integers(0, dt))
+    t0s = [w * (dt + gap) for w in range(n_w)]
+    span_end = t0s[-1] + dt
+    n_e = int(rng.integers(n_w, n_w * (dt // 2)))
+    t = np.sort(rng.choice(span_end, min(n_e, span_end), replace=False))
+    t = t[t < span_end]
+    words = rng.integers(0, 16, len(t)) | (rng.integers(0, 16, len(t)) << 8)
+    edges = [(int(a), int(b)) for a, b in zip(t, words)]
+    # window w takes the edges before its end less lag: those after are late edges of the next window
+    firsts = [0]
+    for w in range(n_w):
+        lim = t0s[w] + dt - (lag if w < n_w - 1 else 0)
+        firsts.append(int(np.searchsorted(t, lim)))
+    psi0 = np.where(rng.random((n_w, q)) < 0.3, 0.0, rng.random((n_w, q)) * 1e-4)
+    rise, fall = int(rng.integers(0, 3 * dt)), int(rng.integers(0, 3 * dt))
+    args = (q, 48.0, 1.0, 0.8, rise, fall, 0x0103, edges, t0s, firsts, dt, psi0)
+    v, ou, ol = run_in_child(_windows_at, _lib(), *args, False)
+    rv, rou, rol = _reference(*args)
+    assert np.array_equal(ou, rou) and np.array_equal(ol, rol)
+    assert np.max(np.abs(v - rv)) <= 1e-9 * 48.0
+    v2, _, _ = run_in_child(_windows_at, _lib(), *args, True)
+    assert v2.tobytes() == v.tobytes()

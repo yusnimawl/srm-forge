@@ -44,8 +44,7 @@ SRM_SIM_API int srm_emu_run(const srm_sim_config_t *cfg, const srm_sim_tables_t 
         while (e < n_edges && edges[e].t < t0 + (uint64_t)per_step) e++;
         srm_real_t v[SRM_SIM_MAX_PHASES];
         double pin = 0.0, cu = 0.0;
-        float on_u[SRM_SIM_MAX_PHASES], on_l[SRM_SIM_MAX_PHASES];
-        srm_gate_avg_window(&g, cfg, edges + first, (int)(e - first), t0, (uint64_t)per_step, pl.psi, v, on_u, on_l);
+        srm_gate_avg_window(&g, cfg, edges + first, (int)(e - first), t0, (uint64_t)per_step, pl.psi, v, NULL, NULL);
         double cur[SRM_SIM_MAX_PHASES];
         for (int k = 0; k < q; k++) cur[k] = (double)pl.cur[k];
         if (i_trace) memcpy(i_trace + (size_t)n * (size_t)q, cur, (size_t)q * sizeof(double));

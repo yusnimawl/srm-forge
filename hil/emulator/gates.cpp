@@ -11,13 +11,14 @@ static const uint32_t GATE_BITS = (1u << 16) | (1u << 17) | (1u << 18) | (1u << 
 static void gate_isr()
 {
     const uint32_t t = ARM_DWT_CYCCNT;
-    const uint32_t flags = GPIO6_ISR & GATE_BITS;
+    const uint32_t isr6 = GPIO6_ISR;
+    const uint32_t flags = isr6 & GATE_BITS;
     if (flags) {
         GPIO6_ISR = flags;                   // clear first, so a change while reading raises the interrupt again
         const uint32_t psr = GPIO6_PSR;
         if (!g_selftest) emu_edge_push(&g_edges, t, emu_gate_word(psr));
     }
-    outputs_pins_isr(t);
+    outputs_pins_isr(t, isr6);
     asm volatile("dsb");
 }
 
