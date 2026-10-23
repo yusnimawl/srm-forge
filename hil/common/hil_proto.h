@@ -66,6 +66,9 @@ typedef struct {
 #define HIL_CMD_EMU_SELFTEST 2
 /* Emulator command: the phases of that pattern (value = bit mask 1..15, default 1 = phase A), set before it starts. */
 #define HIL_CMD_EMU_SELFTEST_PHASES 3
+/* Controller command: stop and reset the board once the acknowledgement is sent, so the controller's parameters and
+ * command are the build's defaults again (value ignored, finite). The board answers HELLO again after its boot. */
+#define HIL_CMD_CTRL_RESET 2
 
 typedef struct {
     uint32_t step;

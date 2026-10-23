@@ -132,6 +132,32 @@ def test_set_param_refused_status(cache):
         s.stop()
 
 
+def test_configure_resets_parameters_of_an_earlier_session(cache):
+    """A parameter set live in one session must not leak into the next one: its matched SIL uses the build's
+    defaults plus the new scenario's parameters, so configure resets the controller board first."""
+    s, emu, ctrl = session(cache)
+    m = analytic_motor()
+    s.connect()
+    s.configure(m, SCN, HilModes())
+    s.start()
+    try:
+        assert s.set_param("theta_on", 20.0) == 0
+    finally:
+        s.stop()
+    assert ctrl._rig.params == {"theta_on": 20.0}
+    s2 = HilSession(emu, ctrl)
+    s2.connect()
+    ctrl.requests.clear()
+    s2.configure(m, SCN.model_copy(update={"params": {"theta_off": 140.0}}), HilModes())
+    assert ctrl._rig.params == {"theta_off": 140.0}
+    assert ctrl.requests.index(Type.COMMAND) < ctrl.requests.index(Type.PARAM_SET)   # the reset comes first
+    s2.start()
+    try:
+        assert s2.set_param("resolver_pole_pairs", 2.0) == -2     # fixed again once started after the reset
+    finally:
+        s2.stop()
+
+
 def test_configure_refuses_bad_isr_and_fast_encoder(cache):
     s, emu, _ = session(cache)
     s.connect()

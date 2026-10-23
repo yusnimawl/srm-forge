@@ -120,6 +120,7 @@ PARAM_REPLY = struct.Struct("<24sb")
 COMMAND = struct.Struct("<Bf")
 CMD_EMU_SELFTEST = 2       # emulator command: software gate pattern, 20 kHz, duty = value (0 = off)
 CMD_EMU_SELFTEST_PHASES = 3   # emulator command: phases of the pattern, value = bit mask (default 1, phase A)
+CMD_CTRL_RESET = 2         # controller command: stop and reset the board (parameters and command back to the build's)
 CAPTURE_REQ = struct.Struct("<I")       # n_steps; 0 = the config's capture_steps
 CAPTURE_END = struct.Struct("<BI")
 LIVE_EMU = struct.Struct("<I9f2I4f")

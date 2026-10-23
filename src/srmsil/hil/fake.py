@@ -185,6 +185,10 @@ class _Rig:
             return [(Type.PARAM_REPLY, seq, proto.pack_param_reply(name, status))]
         if t == Type.COMMAND:
             mode, value = proto.unpack_command(p)
+            if mode == proto.CMD_CTRL_RESET and math.isfinite(value):   # the board reboots: build defaults again
+                self.ctrl_on = self.started = False
+                self.params, self.cmd = {}, (0, 0.0)
+                return ack()
             if mode > 1 or not math.isfinite(value):
                 return ack("command refused: mode must be 0 (torque) or 1 (speed) with a finite value")
             self.cmd = (mode, value)

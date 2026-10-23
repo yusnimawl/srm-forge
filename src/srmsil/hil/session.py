@@ -21,6 +21,7 @@ from srmsil.tables import MotorData, emu_tables
 EMU_DT = 5e-6                 # s, the emulator step and the capture sample period
 REPLY_TIMEOUT_S = 2.0
 CLOCK_SPREAD_WARN_PPM = 500.0
+RESET_TIMEOUT_S = 3.0        # s the controller may take to answer HELLO after a reset
 
 CS_CODES = {"ad7606": 0, "internal": 1}
 POS_CODES = {"encoder": 0, "ad2s1210": 1, "both": 2}
@@ -247,7 +248,8 @@ class HilSession:
         return self.info
 
     def configure(self, m: MotorData, scenario: Scenario, modes: HilModes) -> None:
-        """Check the scenario against the HIL's rules, stop both boards, upload the emulator config and tables, set
+        """Check the scenario against the HIL's rules, stop both boards, reset the controller board (parameters set in an
+        earlier session go back to the build's defaults), upload the emulator config and tables, set
         the controller parameters and command. Rule checks raise ValueError, and modes or settings the HIL does not
         emulate raise HilError, before anything is sent."""
         info = self._connected()
@@ -270,6 +272,7 @@ class HilSession:
                            "and the ADC are those of the rig)")
         n = round(scenario.duration / EMU_DT)
         self.stop()
+        self._reset_controller(info)
         self._request(self.emu, Type.EMU_CONFIG, proto.pack_emu_config(emu_config(m, scenario, n)))
         tab = emu_tables(m)
         n_err = len(self.errors)
@@ -286,6 +289,21 @@ class HilSession:
                 raise HilError(f"controller refused parameter {name!r} (status {status})")
         self.command(scenario.command_mode, scenario.command_value)
         self._m, self._scenario = m, scenario
+
+    def _reset_controller(self, info: RigInfo) -> None:
+        """Reset the controller board, so parameters set in an earlier session (which the matched SIL would not know)
+        are back at the build's defaults, and wait until it answers HELLO with the same build."""
+        self._request(self.ctrl, Type.COMMAND, proto.pack_command(proto.CMD_CTRL_RESET, 0.0))
+        deadline = time.monotonic() + RESET_TIMEOUT_S
+        while True:
+            try:
+                b = proto.unpack_build_info(self._request(self.ctrl, Type.HELLO, reply=Type.BUILD_INFO, timeout=0.2))
+                break
+            except HilError:
+                if time.monotonic() > deadline:
+                    raise HilError("controller: no reply to HELLO after the reset") from None
+        if b.firmware_hash != info.controller_hash:
+            raise HilError(f"controller: build {b.firmware_hash:08x} after the reset, {info.controller_hash:08x} before")
 
     def start(self) -> None:
         """Start the emulator (READY high), then the controller (RUN high)."""

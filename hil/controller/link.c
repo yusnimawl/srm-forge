@@ -2,7 +2,8 @@
  * directions by DMA (RX: DMA1 stream 3, circular; TX: DMA1 stream 4), polled from the main loop.
  *
  * Requests: HELLO -> BUILD_INFO; PARAM_SET -> ctrl_param -> PARAM_REPLY with its status; COMMAND (mode 0 torque N*m,
- * 1 speed rad/s) -> ctrl_command; START, STOP. COMMAND, START and STOP are acknowledged with an empty frame of the same
+ * 1 speed rad/s) -> ctrl_command, mode HIL_CMD_CTRL_RESET -> stop and reset the board once the acknowledgement is
+ * sent; START, STOP. COMMAND, START and STOP are acknowledged with an empty frame of the same
  * type and sequence number; a refused request gets HIL_ERROR with a text and the request's sequence number. LIVE_CTRL
  * goes out every 50 ms, and HIL_ERROR with the reason when a run stops by itself. */
 #include <math.h>
@@ -26,6 +27,7 @@ static uint32_t acc_n;
 static bool acc_over;
 static uint8_t frame[HIL_FRAME_MAX(HIL_PAYLOAD_MAX)];
 static uint16_t seq_out;
+static bool reset_pending;
 
 static void send(uint8_t type, uint16_t seq, const void *p, size_t n)
 {
@@ -90,6 +92,12 @@ static void dispatch(uint8_t type, uint16_t seq, const uint8_t *p, long len)
     case HIL_COMMAND: {
         hil_command_t c;
         memcpy(&c, p, sizeof c);
+        if (c.mode == HIL_CMD_CTRL_RESET && isfinite(c.value)) {
+            drv_stop();
+            reply(type, seq, NULL);
+            reset_pending = true;
+            break;
+        }
         if (c.mode > 1 || !isfinite(c.value)) {
             reply(type, seq, "command refused: mode must be 0 (torque) or 1 (speed) with a finite value");
             break;
@@ -182,4 +190,7 @@ void link_poll(void)
         send(HIL_LIVE_CTRL, seq_out++, &l, sizeof l);
     }
     tx_pump();
+    /* a requested reset waits until the acknowledgement (and anything queued before it) has left the UART */
+    if (reset_pending && txq_n == 0 && !(DMA1_Stream4->CR & DMA_SxCR_EN) && (USART3->ISR & USART_ISR_TC))
+        NVIC_SystemReset();
 }
