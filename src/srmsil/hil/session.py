@@ -11,7 +11,8 @@ import numpy as np
 
 from srmsil.hil import HilError, proto
 from srmsil.hil.compare import RPM, SETTLE_S
-from srmsil.hil.config import HilModes, check_encoder_rate, check_isr_rate, mode_defines, sensor_chain
+from srmsil.hil.config import (ENCODER_EDGE_RATE_MAX, HilModes, check_encoder_rate, check_isr_rate, mode_defines,
+                               resolver_rps_max, sensor_chain)
 from srmsil.hil.proto import BuildInfo, LiveCtrl, LiveEmu, Type
 from srmsil.hil.transport import Transport
 from srmsil.run import SimResult, SimSummary
@@ -95,15 +96,23 @@ def emu_config(m: MotorData, scenario: Scenario, capture_steps: int) -> dict:
 def omega_max(m: MotorData, scenario: Scenario) -> float:
     """rad/s a dynamic run may reach, for the capture's speed range (the emulator takes the largest of this, twice
     the initial speed and 100 rad/s): twice the speed command (room for overshoot), or for a torque command the
-    initial speed plus the map's peak torque accelerating the inertia over SETTLE_S plus the capture's duration.
-    0 for a fixed-speed run. MotorData carries no top speed; a capture whose speed reaches the range counts as
-    clipped (a live torque-commanded run kept going longer, or a speed command raised while running)."""
+    initial speed plus the map's peak torque accelerating the inertia over SETTLE_S plus the capture's duration, capped
+    at the fastest speed the position sensor follows (the encoder's edge-rate limit, else the resolver's tracking
+    rate), beyond which the run is not valid anyway. 0 for a fixed-speed run. MotorData carries no top speed; a
+    capture whose speed reaches the range counts as clipped (a live torque-commanded run kept going longer, or a speed
+    command raised while running)."""
     if scenario.mode != "dynamic":
         return 0.0
     if scenario.command_mode == "speed":
         return 2 * abs(scenario.command_value) * RPM
     t_peak = float(np.max(np.abs(m.torque)))
-    return abs(scenario.speed_rpm) * RPM + t_peak * (SETTLE_S + scenario.duration) / scenario.inertia
+    w = abs(scenario.speed_rpm) * RPM + t_peak * (SETTLE_S + scenario.duration) / scenario.inertia
+    se = scenario.sensors
+    if se.encoder_cpr > 0:
+        w = min(w, 2 * math.pi * ENCODER_EDGE_RATE_MAX / se.encoder_cpr)
+    elif se.resolver:
+        w = min(w, 2 * math.pi * resolver_rps_max(se.resolver_bits) / se.resolver_pole_pairs)
+    return w
 
 
 def _nan_summary(q: int) -> SimSummary:

@@ -15,6 +15,12 @@ ENCODER_EDGE_RATE_MAX = 400_000.0
 """Edges per second the emulator's encoder output may schedule: cpr * rev/s, one A or B edge per count."""
 
 
+def resolver_rps_max(bits: int) -> float:
+    """Electrical rev/s the emulated AD2S1210 tracks at a resolution (the datasheet's values for an 8.192 MHz clock, as
+    hil/emulator/ad2s1210_slave.cpp)."""
+    return 2500.0 if bits <= 10 else 1000.0 if bits <= 12 else 500.0 if bits <= 14 else 125.0
+
+
 def check_encoder_rate(cpr: int, rpm: float) -> None:
     """Raise ValueError when cpr * rev/s exceeds ENCODER_EDGE_RATE_MAX."""
     rate = cpr * abs(rpm) / 60.0

@@ -2,6 +2,7 @@ import ctypes as C
 import dataclasses
 import json
 import math
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -161,3 +162,12 @@ def test_frame_buffer_bounds_and_hostile_input():
     assert exact[249][1] == 257 and exact[1024][1] == 1035
     assert too_big == 0
     assert n_crafted == 1035 and rc == -3
+
+
+def test_command_modes_distinct_and_shared():
+    """HIL_COMMAND modes are distinct across both boards (a reset sent to the wrong port is refused, not taken for a
+    self-test), and the Python constants equal the header's."""
+    c = {m[0]: int(m[1]) for m in re.findall(r"#define HIL_CMD_(\w+) (\d+)", (COMMON / "hil_proto.h").read_text())}
+    assert c == {"EMU_SELFTEST": proto.CMD_EMU_SELFTEST, "EMU_SELFTEST_PHASES": proto.CMD_EMU_SELFTEST_PHASES,
+                 "CTRL_RESET": proto.CMD_CTRL_RESET}
+    assert len({0, 1, *c.values()}) == 2 + len(c)      # 0 torque and 1 speed are the controller's command modes

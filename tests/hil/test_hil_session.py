@@ -15,7 +15,7 @@ from srmsil.hil.config import HilModes
 from srmsil.hil.fake import FakeRig
 from srmsil.hil.proto import Type
 from srmsil.hil.session import HilSession, _capture_problem, clock_stats, emu_config, run_hil
-from srmsil.scenario import Scenario
+from srmsil.scenario import Scenario, SensorSettings
 
 SCN = Scenario(speed_rpm=1000.0, duration=0.004, command_value=1.0)
 
@@ -189,8 +189,15 @@ def test_capture_speed_range_covers_the_run(cache):
                     command_value=1500.0)
     torque = step.model_copy(update={"command_mode": "torque", "command_value": 1.0, "speed_rpm": 100.0})
     assert emu_config(m, step, 4000)["omega_max"] == pytest.approx(2 * 1500.0 * rpm)
-    assert emu_config(m, torque, 4000)["omega_max"] == pytest.approx(
-        100.0 * rpm + float(np.max(np.abs(m.torque))) * (0.2 + 0.02) / 1e-4)
+    physics = 100.0 * rpm + float(np.max(np.abs(m.torque))) * (0.2 + 0.02) / 1e-4
+    # a torque command is capped at the position sensor's speed limit: 400 000 edges/s of a 4096-count encoder, or
+    # the resolver's tracking rate (1000 rev/s at 12 bits) per pole pair; without either, the physics bound
+    assert emu_config(m, torque, 4000)["omega_max"] == pytest.approx(2 * math.pi * 400_000 / 4096)
+    rdc = torque.model_copy(update={"sensors": SensorSettings(encoder_cpr=0, resolver=True, resolver_pole_pairs=2)})
+    assert emu_config(m, rdc, 4000)["omega_max"] == pytest.approx(2 * math.pi * 1000 / 2)
+    none = torque.model_copy(update={"sensors": SensorSettings(encoder_cpr=0)})
+    assert emu_config(m, none, 4000)["omega_max"] == pytest.approx(physics)
+    assert physics > 2 * math.pi * 1000 / 2
     assert emu_config(m, SCN, 4000)["omega_max"] == 0.0
     s, _, _ = session(cache)
     s.connect()

@@ -39,7 +39,7 @@ the starting point for the motor controller board (spec D11, §14). Pins: `docs/
   `HIL_ERROR` with the reason, live state bit `READY_STOP`.
 - `ctrl_param` (from `HIL_PARAM_SET`, replied with its status 0 / -1 / -2) and `ctrl_command` run in the main loop with
   the `ctrl_isr` priority masked.
-- `HIL_COMMAND` mode `HIL_CMD_CTRL_RESET` (2): stop, acknowledge, and reset the board once the acknowledgement has
+- `HIL_COMMAND` mode `HIL_CMD_CTRL_RESET` (4): stop, acknowledge, and reset the board once the acknowledgement has
   left the UART, so the controller's parameters and command are the build's defaults again. `HilSession.configure`
   sends it before the parameters of a new session.
 
