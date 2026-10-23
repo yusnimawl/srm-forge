@@ -8,8 +8,9 @@
  * ad7606_slave.cpp, ad2s1210_slave.cpp, dac.cpp, encoder.cpp  the emulated sensor chips (one per mode)
  * ga_selfcheck.c  self-check of the compiled gate averager, run by every START (portable C)
  *
- * Interrupt priorities (lower is more urgent): gates and CONVST, then the encoder timer, then the step timer; USB
- * stays at the core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 912 MHz from platformio.ini; every
+ * Interrupt priorities (lower is more urgent; the NVIC has 16 levels, steps of 16): gates, then CONVST (so a gate
+ * edge pending with a CONVST edge is stamped first), then the encoder timer, then the step timer; USB stays at the
+ * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 912 MHz from platformio.ini; every
  * cycle constant is derived from it), extended to 64 bits by the step interrupt. */
 #ifndef EMU_H
 #define EMU_H
@@ -30,8 +31,9 @@ extern "C" {
 #define EMU_DT 5e-6
 #define EMU_MAX_PHASES 4
 #define EMU_PRIO_GATES 0
-#define EMU_PRIO_ENCODER 16
-#define EMU_PRIO_STEP 32
+#define EMU_PRIO_CONVST 16
+#define EMU_PRIO_ENCODER 32
+#define EMU_PRIO_STEP 48
 #define EMU_OVERLOAD_STEPS 20          /* a step finishing this many steps late stops the loop */
 #define EMU_STATS_STEPS 10000          /* one live-statistics window: 50 ms, 20 Hz */
 #define EMU_SELFTEST_HZ 20000
@@ -111,7 +113,7 @@ void emu_outputs_update(const srm_plant_t *p, const srm_real_t *v);
 void emu_outputs_zero(void);
 void outputs_pins_isr(uint32_t t, uint32_t isr6);  /* combined GPIO interrupt entered at cycle t, GPIO6_ISR read there: input pins */
 void outputs_trigger_reset(void);                 /* with the GPIO interrupt disabled */
-void outputs_trigger_stamp(uint32_t t);           /* a sample trigger at cycle t, from its interrupt (priority 0) */
+void outputs_trigger_stamp(uint32_t t);           /* a sample trigger at cycle t, from its interrupt (CONVST or SAMPLE) */
 float outputs_trigger_hz(void);                   /* step interrupt: triggers per s since the last call */
 
 /* The chips, one file each, compiled in their modes only. */

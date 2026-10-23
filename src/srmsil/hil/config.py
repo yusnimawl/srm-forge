@@ -65,7 +65,8 @@ def mode_defines(modes: HilModes) -> list[str]:
 AD7606_RANGE_V = 10.0
 """V, the AD7606 input range (+-)."""
 AD7606_T_CONV_US = 4.15
-"""us, the AD7606 conversion time (datasheet maximum without oversampling)."""
+"""us, the AD7606 conversion time (datasheet maximum without oversampling). The emulator accepts 1..1000 us, so the
+CONVST interrupt has loaded the frame before BUSY falls."""
 SENSE_TOP_V = 8.0
 """V at the AD7606 inputs for 1.25 x the top map current, and for 1.25 x the bus voltage."""
 DAC_V_MID = 0.2

@@ -81,8 +81,8 @@ void ad7606_begin(void)
     LPSPI4_CR = LPSPI_CR_MEN;
     LPSPI4_TCR = TCR_FRAME;
 
-    // BUSY: QTIMER4 timer 1 (the core's PWM setup configured it at boot; every register is set here). The output is
-    // the inverted OFLAG: forced to 1 (pin low), cleared by the CONVST edge (pin high), set again at compare.
+    // BUSY: QTIMER4 timer 1 (the core's pwm_init only enables the QTIMER4 clock; every register is set here). The
+    // output is the inverted OFLAG: forced to 1 (pin low), cleared by the CONVST edge (pin high), set again at compare.
     CCM_CCGR6 |= CCM_CCGR6_QTIMER4(CCM_CCGR_ON);
     TMR4_CTRL1 = 0;
     TMR4_SCTRL1 = TMR_SCTRL_OPS | TMR_SCTRL_VAL;
@@ -100,7 +100,7 @@ void ad7606_begin(void)
     CORE_PIN6_PADCONFIG = IOMUXC_PAD_DSE(7);
     CORE_PIN6_CONFIG = 1;               // ALT1 QTIMER4_TIMER1
     attachInterruptVector(IRQ_QTIMER4, convst_isr);
-    NVIC_SET_PRIORITY(IRQ_QTIMER4, EMU_PRIO_GATES);
+    NVIC_SET_PRIORITY(IRQ_QTIMER4, EMU_PRIO_CONVST);
     NVIC_ENABLE_IRQ(IRQ_QTIMER4);
 
     // XBAR1: pin 5 to the timer.
@@ -115,8 +115,8 @@ void ad7606_begin(void)
 const char *ad7606_configure(const hil_emu_config_t *c)
 {
     if (c->ad7606_range_v != 5.0f && c->ad7606_range_v != 10.0f) return "config refused: ad7606_range_v must be 5 or 10";
-    if (!(c->ad7606_t_conv_us >= 0.0f && c->ad7606_t_conv_us <= 1000.0f))
-        return "config refused: ad7606_t_conv_us must be 0..1000";
+    if (!(c->ad7606_t_conv_us >= (float)BUSY_MIN_US && c->ad7606_t_conv_us <= 1000.0f))
+        return "config refused: ad7606_t_conv_us must be 1..1000";
     if (!isfinite(c->sense_v_per_a) || !isfinite(c->volt_divider) || !(c->volt_rc_tau >= 0.0f) ||
         !isfinite(c->volt_rc_tau))
         return "config refused: sense_v_per_a, volt_divider or volt_rc_tau";
@@ -125,9 +125,9 @@ const char *ad7606_configure(const hil_emu_config_t *c)
     k_v = c->volt_divider * lsb;
     alpha = c->volt_rc_tau > 0.0f ? (float)(1.0 - exp(-EMU_DT / (double)c->volt_rc_tau)) : 1.0f;
     q = c->n_phases;
-    // BUSY width in IP bus clocks, prescaled by 2^p into the 16-bit compare. At least BUSY_MIN_US, so the CONVST
-    // interrupt has loaded the frame before BUSY falls and the controller reads it.
-    const double t_conv = fmax((double)c->ad7606_t_conv_us, BUSY_MIN_US);
+    // BUSY width in IP bus clocks, prescaled by 2^p into the 16-bit compare. At least BUSY_MIN_US (checked above),
+    // so the CONVST interrupt has loaded the frame before BUSY falls and the controller reads it.
+    const double t_conv = (double)c->ad7606_t_conv_us;
     uint32_t ticks = (uint32_t)lround(t_conv * 1e-6 * F_BUS_ACTUAL), p = 0;
     while ((ticks + (1u << p >> 1)) >> p > 0x10000u) p++;
     ticks = (ticks + (1u << p >> 1)) >> p;
