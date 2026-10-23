@@ -1,6 +1,7 @@
 // Output stage: dispatches to the chips of the build's modes (emu.h EMU_*), and handles their input pins on the
-// combined GPIO6-9 interrupt (priority 0, owned by gates.cpp): CONVST (pin 5, GPIO9), SAMPLE (pin 9, GPIO7), A0/A1
-// (pins 22/23, GPIO6) and, in DAC builds, the RUN falling edge (pin 7, GPIO7), which releases the shared SPI wires.
+// combined GPIO6-9 interrupt (priority 0, owned by gates.cpp): SAMPLE (pin 9, GPIO7), A0/A1 (pins 22/23, GPIO6) and,
+// in DAC builds, the RUN falling edge (pin 7, GPIO7), which releases the shared SPI wires. CONVST (pin 5) goes through
+// XBAR1 to a timer instead (ad7606_slave.cpp).
 #include <Arduino.h>
 
 #include <math.h>
@@ -8,23 +9,23 @@
 #include "emu.h"
 
 #define PIN_RUN 7
-#define PIN_CONVST 5
 #define PIN_SAMPLE 9
 #define PIN_RDC_A0 22
 #define PIN_RDC_A1 23
 
 #define SIN_TAB 1024
 
-// The controller's sample triggers, one per controller ISR: CONVST in AD7606 builds, else SAMPLE in AD2S1210 builds,
-// else none. The pins interrupt stamps them into trig[trig_sel]; outputs_trigger_hz (step interrupt, less urgent, so
-// it never preempts a stamp) switches trig_sel and then reads the other buffer, which no stamp writes any more.
+// The controller's sample triggers, one per controller ISR: CONVST in AD7606 builds (the CONVST interrupt,
+// ad7606_slave.cpp), else SAMPLE in AD2S1210 builds (the pins interrupt), else none. Each is stamped into
+// trig[trig_sel]; outputs_trigger_hz (step interrupt, less urgent, so it never preempts a stamp) switches trig_sel and
+// then reads the other buffer, which no stamp writes any more.
 struct Trig {
     uint32_t n, first, last;      // count, first and last cycle stamp
 };
 static volatile Trig trig[2];
 static volatile uint8_t trig_sel;
 
-static inline void trig_stamp(uint32_t t)
+void outputs_trigger_stamp(uint32_t t)
 {
     volatile Trig &b = trig[trig_sel];
     if (b.n++ == 0) b.first = t;
@@ -33,8 +34,14 @@ static inline void trig_stamp(uint32_t t)
 
 void outputs_trigger_reset(void)
 {
+#ifdef EMU_AD7606
+    NVIC_DISABLE_IRQ(IRQ_QTIMER4);
+#endif
     trig[0].n = trig[1].n = 0;
     trig_sel = 0;
+#ifdef EMU_AD7606
+    NVIC_ENABLE_IRQ(IRQ_QTIMER4);
+#endif
 }
 
 // last - first is exact in 32 bits while the window is shorter than the cycle-counter wrap (4.26 s at 1008 MHz).
@@ -48,7 +55,7 @@ float outputs_trigger_hz(void)
     return n >= 2 && span ? (float)((double)(n - 1) * (double)F_CPU_ACTUAL / (double)span) : NAN;
 }
 
-static uint32_t bits6, bits7, bits9;     // the enabled pins of each port
+static uint32_t bits6, bits7;            // the enabled pins of each port
 static float sin_tab[SIN_TAB + 1];       // sin over one turn
 static double off_turns, ecc_turns;      // encoder offset and eccentricity amplitude, in turns
 static double ecc_harm;
@@ -70,8 +77,8 @@ static double measured_turns(double theta)
     return m;
 }
 
-#define EDGE_RISING 2u        // GPIO ICR field values; EDGE_BOTH uses EDGE_SEL instead
-#define EDGE_FALLING 3u
+#if defined(EMU_DAC) || defined(EMU_RDC)
+#define EDGE_FALLING 3u       // GPIO ICR field value; EDGE_BOTH uses EDGE_SEL instead
 #define EDGE_BOTH 4u
 
 // The GPIO block latches the selected edge in hardware, so a pulse shorter than the interrupt latency still counts;
@@ -93,13 +100,13 @@ static void pin_irq(uint8_t pin, IMXRT_GPIO_t &g, uint32_t bit, uint32_t edge, u
     g.IMR |= mask;
     bits |= mask;
 }
+#endif
 
 void outputs_begin(void)
 {
     for (int j = 0; j <= SIN_TAB; j++) sin_tab[j] = (float)sin(2.0 * M_PI * j / SIN_TAB);
 #ifdef EMU_AD7606
     ad7606_begin();
-    pin_irq(PIN_CONVST, IMXRT_GPIO9, CORE_PIN5_BIT, EDGE_RISING, bits9);
 #endif
 #ifdef EMU_DAC
     dac_begin();
@@ -119,23 +126,16 @@ void outputs_begin(void)
 // Each GPIO register read costs tens of cycles on this path, so a port without enabled pins is not read.
 void outputs_pins_isr(uint32_t t, uint32_t isr6)
 {
-    const uint32_t f6 = isr6 & bits6, f7 = bits7 ? GPIO7_ISR & bits7 : 0, f9 = bits9 ? GPIO9_ISR & bits9 : 0;
+    const uint32_t f6 = isr6 & bits6, f7 = bits7 ? GPIO7_ISR & bits7 : 0;
     if (f6) GPIO6_ISR = f6;
     if (f7) GPIO7_ISR = f7;
-    if (f9) GPIO9_ISR = f9;
 #ifdef EMU_DAC
     if (f7 & CORE_PIN7_BITMASK) dac_run_low();
-#endif
-#ifdef EMU_AD7606
-    if (f9 & CORE_PIN5_BITMASK) {
-        trig_stamp(t);
-        ad7606_convst();
-    }
 #endif
 #ifdef EMU_RDC
     if (f7 & CORE_PIN9_BITMASK) {
 #ifndef EMU_AD7606
-        trig_stamp(t);
+        outputs_trigger_stamp(t);
 #endif
         rdc_sample();
     }

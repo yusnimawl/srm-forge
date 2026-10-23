@@ -663,6 +663,98 @@ result-neutral gains are small (the plant step is latency-bound float arithmetic
 register access), so 0 overruns and 4.5 us need an owner decision (a longer emulator step, another step budget, or
 moving the BUSY and CONVST handling into hardware).
 
+### Step 1c: AD7606 CONVST and BUSY in hardware (2026-10-23)
+
+Owner decision of 2026-10-23: move the CONVST/BUSY handling of the emulated AD7606 into hardware, and fall back to a
+6 us emulator step only if that is not enough. dt 5 us, 1008 MHz, the overrun rule, the tolerances and HSE_VALUE are
+unchanged; no pin was re-assigned.
+
+What is in hardware now (`hil/emulator/ad7606_slave.cpp`):
+- Pin 5 (GPIO_EMC_08) is XBAR1_INOUT17 (ALT3, `IOMUXC_XBAR1_IN17_SELECT_INPUT` 0). XBAR1 routes it to output 99,
+  the input of QTIMER4 timer 1 (`IOMUXC_GPR_GPR6` QTIMER4_TRM1_INPUT_SEL).
+- Pin 6 (GPIO_B0_10) is QTIMER4_TIMER1 (ALT1). The timer runs in triggered count mode (CM 6) on the IP bus clock
+  (252 MHz, prescaled only for t_conv above 260 us), with OUTMODE 5 and inverted output: BUSY rises at the CONVST
+  edge and falls when the count reaches COMP1 = round(t_conv x f) - 1, then the timer re-arms. An edge during BUSY
+  restarts it (CSCTRL.TCI), as the old interrupt did. ONCE is not usable (the timer then fires once only), and
+  without TCI an edge during BUSY stops the count, so BUSY stays high until the next edge (both seen in a board
+  self-test that makes edges by switching XBAR1's select between the logic-low and logic-high inputs). t_conv is
+  floored at 1 us, so the frame is always in the FIFO before BUSY falls.
+- No BUSY interrupt (GPT1 is no longer used) and no CONVST work in the gate interrupt: GPIO9 is not read any more.
+
+What is left on the CPU, and why: the frame load. The same edge sets the timer's input edge flag; its interrupt
+(QTIMER4, priority 0 as the gates) clears the flag, writes CR.RTF, SR, TCR and the four TDR words from the latest
+step's buffer, and stamps the trigger for `trigger_hz` with the cycle counter (as before). A DMA version was built and
+worked on the wire: XBAR1 DMA request 0 to an eDMA scatter/gather chain (CR+SR, TCR, the four codes from the buffer
+whose address the step writes into the third descriptor), the frame in the FIFO 0.43-0.46 us after the edge, plus
+stamps of GPT1's count. It is not used because the Teensy took bus faults with any eDMA in use:
+
+| Build (all else as committed) | tsf runs that started | Ended by a fault reboot |
+|---|---|---|
+| eDMA frame chain plus a stamp channel (the CPU reads its CITER once per 50 ms) | 18 | 3 |
+| the same, stamp channel not enabled | 3 | 3 |
+| eDMA frame chain with the stamps written to memory (no eDMA register reads) | 3 | 2 |
+| no eDMA transfer, CPU reads of an eDMA TCD once per 50 ms | 2 | 2 |
+| eDMA doing only one RAM-to-RAM copy per CONVST | 4 | 2 |
+| no eDMA at all (hardware BUSY, frame not loaded) | 4 | 0 |
+| HEAD (Step 1b firmware) | 8 | 0 |
+| committed (hardware BUSY, CONVST interrupt) | 25 | 0 |
+
+Every fault the Teensy's crash report caught (a scratch relay of `CrashReport` over HIL_ERROR) was the same: PRECISERR
+in `pit_isr` reading PIT channel 0 TFLG, BFAR 0x4008418C; the instruction reads 0x4008410C, one address bit apart.
+A faulted board reboots (the core's fault handler) and is gone from USB for a few seconds.
+pwm_current never faulted with the eDMA in 16 runs (10 of them a 10-run bench: all valid and passed, 0 overruns, step
+max 4.23-4.46 us); tsf did. The eDMA's registers and the PIT are both behind the AIPS-1 bridge, and the IP bus runs
+at 252 MHz (1008 / 4), above the part's 150 MHz rating; that is the likely cause, not proven.
+
+Wire checks (scratch builds `-DDBG14B2`, not in the tree: the emulator sends a pattern frame, V1 = a 16-bit counter
+of published steps and V2-V8 a hash of it; the Nucleo checks every frame and times BUSY on both edges with EXTI3 and
+its cycle counter, nominal 400 MHz, which runs 1.1 % fast; `open_loop`, 20 s each):
+
+| Firmware | Frames checked / bad | Steps between frames | CONVST to BUSY falling: min / mean / max | trigger_hz windows finite, mean |
+|---|---|---|---|---|
+| HEAD | 404 710 / 0 | 9-11 | 5060 / 5120 / 5480 ns | 398 of 398, 20 229.5 Hz |
+| committed | 405 365 / 0 | 9-11 | 4360 / 4385 / 4500 ns | 399 of 399, 20 220.6 Hz |
+
+- Codes: bit-exact, no torn frame, and each frame carries the latest step's values (9.9 steps per CONVST on average).
+- BUSY: CONVST to BUSY falling is t_conv (4.15 us; the timer gives 1046 / 252 MHz = 4.151 us) plus the Nucleo's EXTI
+  latency, with 140 ns of spread instead of 420 ns. Before, BUSY rose after the interrupt had loaded the FIFO and
+  fell in a second interrupt, so it ended 0.7 us later and the controller's sample time (trigger to `ctrl_isr`) was
+  17.7-17.8 us; now it is 17.0-17.1 us. The width seen on the Nucleo is 3.94-4.16 us (rising edges are stamped late
+  while the trigger interrupt is still running, so the falling edge is the reliable measure).
+- trigger_hz: the same method as before ((n - 1) / (t_last - t_first) of the cycle stamps per 50 ms window).
+
+Profile (scratch build, not in the tree, as in Step 1b; 3 runs each, cycles at 1008 MHz, 5040 per step):
+
+| Firmware | pwm_current worst step (interrupts in it) | tsf worst step (interrupts) | Interrupt mean: gates / CONVST / BUSY / encoder |
+|---|---|---|---|
+| HEAD | 5136-5254, overrun in every run (1392-1527 in 4-5) | 4383-4448 (752-765 in 1) | 266-355 incl. CONVST / - / 265-301 / 134-156 |
+| committed | 4318-4464, no overrun (398-573 in 3) | 3812-4180 (129-171 in 1) | 91-94 / 139 / - / 151-152 |
+
+Bench, committed firmware (`examples/control_hil.py --case ... --torque 10 --controllers ...`):
+
+| Controller | Attempts | Refused at START (self-check) | Ran | Valid | Passed | d_torque | d_irms | d_ripple | Step mean / max | Overruns |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pwm_current | 22 | 10 | 12 | 11 | 11 | -0.03 to +0.28 % | -0.04 to +0.48 % | -1.33 to -0.32 pts | 2.57-2.58 / 4.31-4.64 us | 0 |
+| tsf | 16 | 4 | 12 | 12 | 12 | -0.25 to +0.25 % | -0.27 to +0.22 % | -2.14 to +0.11 pts | 2.32-2.33 / 3.97-4.16 us | 0 |
+| hysteresis | 3 | 1 | 2 | 2 | 2 | -0.03 to +0.45 % | -0.74 to +0.34 % | -1.00 to +1.87 pts | 2.38 / 3.65-3.68 us | 0 |
+| hysteresis, ad7606 + ad2s1210 | 2 | 0 | 2 | 2 | 2 | -1.25 to +0.31 % | -1.40 to -0.21 % | 0.00 to +3.50 pts | 2.31-2.33 / 3.53 us | 0 |
+
+The one invalid pwm_current run had a capture sequence gap (the known USB loss). Clock ratio 1.0102-1.0115 (from
+trigger_hz), ISR max 5.90 us (pwm_current) and 7.08 us (tsf), latency 5.55-5.69 us. The step max of pwm_current
+(4.31-4.64 us) is above Step 1b's 4.5 us goal in some runs but below the 5 us step in all; the overrun rule is
+unchanged. Before the final firmware, 10 tsf runs of the same design with the scratch crash relay: 9 valid and
+passed, 0 overruns, step max 3.98-4.22 us.
+
+Part 2 (the 6 us step) was not needed: pwm_current runs with 0 overruns at 5 us.
+
+START refusals by the gate averager self-check: during this bench the self-check at START refused with hash
+8ea70d6e (the hash the inlined averager gives, see Step 1b) in a share of the starts, with this firmware and with
+HEAD alike. A/B the same hour, each START after a fresh EMU_CONFIG and table upload (`starts.py`, scratch): HEAD 13 of
+30 refused (and one start lost to a reboot), the committed firmware 5 of 30. With one configure and 60 starts: HEAD 1
+of 40, committed 1 of 60. Once the board took a bus fault inside `advance_all` (the first load of its source array,
+address 0x20068000, the top of the stack) at START instead. The averager source is unchanged by this step; the
+refusal is the self-check working, and a refused start was repeated. Open for the owner (see Summary).
+
 ### Step 2: speed step with the speed loop (dynamic, hysteresis)
 
 Dynamic mode from rest, speed command 1500 rpm, J 1e-3 kg m^2, no load or friction; speed loop `speed_kp` 0.2,
@@ -740,9 +832,14 @@ Not run: no DACs.
   the AD2S1210 angle chain with and without resolver errors.
 - After Step 1b (cheaper gate averaging): tsf passes in 10 of 10 runs with 0 overruns (step max 4.55-4.75 us, above
   the 4.5 us goal); pwm_current still overruns at the start of every run.
-- Not passed, owner decisions: pwm_current overruns the emulator's 5 us step with two overlapping PWM phases (tsf
-  did before Step 1b);
-  the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
+- After Step 1c (AD7606 BUSY in hardware, the frame loaded by a lean CONVST interrupt; the eDMA is not usable at
+  1008 MHz): pwm_current and tsf run at the 5 us step with 0 overruns, 11 of 11 and 12 of 12 valid runs passed; the 6 us
+  step was not needed.
+- Not passed, owner decisions: the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
   its mean only (7 of 27 valid runs over the 5-point bound).
+- Open, for the owner: the gate averager self-check refused 15 of 43 STARTs during the Step 1c bench (hash 8ea70d6e),
+  with HEAD's firmware as often (13 of 30 in an A/B); one START took a bus fault inside the averager instead; and any
+  eDMA use makes the PIT read fault. All three point at the board at 1008 MHz (IP bus 252 MHz) rather than at the
+  code, but it is not proven.
 - Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
   matched SIL scenario.

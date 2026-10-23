@@ -8,9 +8,9 @@
  * ad7606_slave.cpp, ad2s1210_slave.cpp, dac.cpp, encoder.cpp  the emulated sensor chips (one per mode)
  * ga_selfcheck.c  self-check of the compiled gate averager, run by every START (portable C)
  *
- * Interrupt priorities (lower is more urgent): gates, then the encoder timer, then the step timer; USB stays at the
- * core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 1008 MHz from platformio.ini; every cycle constant
- * is derived from it), extended to 64 bits by the step interrupt. */
+ * Interrupt priorities (lower is more urgent): gates and CONVST, then the encoder timer, then the step timer; USB
+ * stays at the core's default 128. Time is the ARM cycle counter (F_CPU_ACTUAL, 1008 MHz from platformio.ini; every
+ * cycle constant is derived from it), extended to 64 bits by the step interrupt. */
 #ifndef EMU_H
 #define EMU_H
 
@@ -38,7 +38,7 @@ extern "C" {
 #define EMU_SELFTEST_OFFSET 1000       /* cycles from the start of the first pattern window to its first rise */
 #define EMU_TEMP_MAX_C 85.0f           /* die temperature that stops a run */
 #define EMU_CAPTURE_RING 8192          /* samples, the largest power of two whose ring fits in DMAMEM */
-#define EMU_GPT_HZ 24000000            /* output timers (GPT1, GPT2): the peripheral clock, the 24 MHz oscillator as for the step timer's PIT */
+#define EMU_GPT_HZ 24000000            /* output timers (GPT2): the peripheral clock, the 24 MHz oscillator as for the step timer's PIT */
 #define EMU_GPT_STEP 120               /* GPT ticks per step */
 
 /* Output modes of the build (hil_hello.h codes the same macros; no macro means ad7606 and encoder). */
@@ -111,6 +111,7 @@ void emu_outputs_update(const srm_plant_t *p, const srm_real_t *v);
 void emu_outputs_zero(void);
 void outputs_pins_isr(uint32_t t, uint32_t isr6);  /* combined GPIO interrupt entered at cycle t, GPIO6_ISR read there: input pins */
 void outputs_trigger_reset(void);                 /* with the GPIO interrupt disabled */
+void outputs_trigger_stamp(uint32_t t);           /* a sample trigger at cycle t, from its interrupt (priority 0) */
 float outputs_trigger_hz(void);                   /* step interrupt: triggers per s since the last call */
 
 /* The chips, one file each, compiled in their modes only. */
@@ -119,7 +120,6 @@ const char *ad7606_configure(const hil_emu_config_t *c);
 void ad7606_start(void);
 void ad7606_update(const srm_plant_t *p, const srm_real_t *v);
 void ad7606_zero(void);
-void ad7606_convst(void);                         /* CONVST rising edge */
 void rdc_begin(void);
 const char *rdc_configure(const hil_emu_config_t *c);
 void rdc_start(double turns, float omega);       /* turns: measured mechanical angle (outputs.cpp) */
