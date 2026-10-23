@@ -13,7 +13,8 @@ from sil_fixtures import analytic_motor
 
 from srmsil.hil import HilError, proto
 from srmsil.hil.config import HilModes
-from srmsil.hil.fake import FakeRig
+from srmsil.hil.build import BuildResult
+from srmsil.hil.fake import FAKE_HASH, FakeRig
 from srmsil.hil.proto import Type
 from srmsil.hil.session import EMU_DT, HilSession, _capture_problem, clock_stats, emu_config, run_hil
 from srmsil.scenario import Scenario, SensorSettings
@@ -347,3 +348,25 @@ def test_configure_refuses_settings_the_hil_does_not_emulate(cache, field):
     with pytest.raises(HilError, match=f"does not emulate {group}.{name}"):
         s.configure(analytic_motor(), scn, HilModes())
     assert Type.EMU_CONFIG not in emu.requests
+
+
+def test_run_hil_checks_the_boards_run_the_expected_build(cache):
+    """run_hil(expect=...) refuses, before configuring, a rig whose boards run another build than the one flashed."""
+    m = analytic_motor()
+    s, emu, _ = session(cache)
+    res = run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", FAKE_HASH))
+    assert res.hil["valid"], res.hil["reason"]
+    s, emu, _ = session(cache)
+    with pytest.raises(HilError, match="the controller board runs another build"):
+        run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", 0x1234))
+    assert Type.EMU_CONFIG not in emu.requests
+    s, emu, _ = session(cache, emulator_hash=0x1234)
+    with pytest.raises(HilError, match="the emulator board runs another build"):
+        run_hil(s, m, "hysteresis", SCN, expect=BuildResult(True, "", FAKE_HASH))
+    assert Type.EMU_CONFIG not in emu.requests
+
+
+def test_fake_rig_reports_the_chosen_hashes(cache):
+    s, _, _ = session(cache, emulator_hash=0x11, controller_hash=0x22)
+    info = s.connect()
+    assert (info.emulator_hash, info.controller_hash) == (0x11, 0x22)

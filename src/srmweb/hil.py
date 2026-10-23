@@ -19,7 +19,7 @@ from srmsil import run as sil_run
 from srmsil.hil import HilError
 from srmsil.hil.compare import compare, match_plan, refused
 from srmsil.hil.config import HilModes
-from srmsil.hil.session import HilSession, LiveStats, capture_health
+from srmsil.hil.session import HilSession, LiveStats, capture_health, check_build
 from srmsil.hil.transport import SerialTransport, Transport, discover
 from srmsil.tables import MotorData
 from srmweb.config import Settings, is_loopback
@@ -55,11 +55,13 @@ def check_loopback(settings: Settings) -> None:
 class HilManager:
     """The app's one HIL session. `flash_active()` is true while a `hil_flash` job is queued or running; `gate` is held
     while a flash job is submitted and while a session opens, so the two never overlap (flashing re-enumerates the
-    ports)."""
+    ports). `flashed(case_id, controller)` is the firmware hash of the newest finished Build & Flash of that case and
+    controller (None when there is none); a session opens only when both boards run it."""
 
     def __init__(self, settings: Settings, transports: Callable[[], tuple[Transport, Transport]],
-                 flash_active: Callable[[], bool]):
+                 flash_active: Callable[[], bool], flashed: Callable[[str, str], int | None]):
         self.settings, self._transports, self._flash_active = settings, transports, flash_active
+        self._flashed = flashed
         self.gate = threading.Lock()
         self._lock = threading.Lock()
         self._session: HilSession | None = None
@@ -91,8 +93,9 @@ class HilManager:
         return self._session
 
     def open(self, case_id: str, body: HilOpenIn, motor: MotorData) -> HilSessionOut:
-        """Connect to both boards and configure them for the case's motor and the scenario. HilError (no rig, mode
-        mismatch, a setting the HIL does not emulate) and the scenario rules give 409 with the error's text."""
+        """Connect to both boards, check that they run the case's newest Build & Flash of the controller, and configure
+        them for the case's motor and the scenario. HilError (no rig, mode mismatch, another build on a board, a
+        setting the HIL does not emulate) and the scenario rules give 409 with the error's text."""
         check_loopback(self.settings)
         with self.gate, self._lock:
             if self._session is not None:
@@ -105,6 +108,7 @@ class HilManager:
                 raise HTTPException(409, str(exc)) from exc
             try:
                 info = session.connect()
+                check_build(info, self._flashed(case_id, body.controller))
                 session.configure(motor, body.scenario, body.modes)
             except (HilError, ValueError) as exc:
                 session.close()

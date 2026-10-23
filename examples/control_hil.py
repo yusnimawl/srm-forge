@@ -35,10 +35,10 @@ except ImportError:
     sys.path.append(str(ROOT / "hil" / ".runtime" / "Lib" / "site-packages"))
 
 from srmsil.hil import HilError
-from srmsil.hil.build import build_and_flash
+from srmsil.hil.build import BuildResult, build_and_flash
 from srmsil.hil.compare import compare, match_plan, refused
 from srmsil.hil.config import HilModes
-from srmsil.hil.session import HilSession, run_hil
+from srmsil.hil.session import HilSession, check_build, run_hil
 from srmsil.hil.transport import SerialTransport, discover
 from srmsil.run import run
 from srmsil.scenario import Scenario, SensorSettings
@@ -52,12 +52,16 @@ def load_motor(case: str | None, cache_dir: Path, bus: float | None) -> MotorDat
         from sil_fixtures import analytic_motor
         m = analytic_motor()
         return m if bus is None else replace(m, bus_voltage=bus)
-    from srmapp.case import evaluate_design
+    import srmapp
+    from srmapp.case import evaluate_design, map_key
     from srmweb.setup import SetupFile, case_inputs_from_setup
     text = Path(case).read_text()
     inputs = case_inputs_from_setup(SetupFile.model_validate_json(text))
-    # the winding choice is not cached with the map, so the evaluated motor is kept per setup file
-    saved = Path(cache_dir) / "control_hil" / f"motor_{hashlib.sha256(text.encode()).hexdigest()[:16]}.npz"
+    # the winding choice is not cached with the map, so the evaluated motor is kept per setup file, srmapp version
+    # (the winding choice) and map provenance (the map's design, grids, solver and srmcore version)
+    key = hashlib.sha256("
+".join((text, srmapp.__version__, map_key(inputs))).encode()).hexdigest()[:16]
+    saved = Path(cache_dir) / "control_hil" / f"motor_{key}.npz"
     if saved.is_file():
         z = np.load(saved)
         m = MotorData(z["angles"], z["currents"], z["psi"], z["torque"], float(z["resistance"]), int(z["n_phases"]),
@@ -90,7 +94,7 @@ def open_session() -> HilSession:
         raise
 
 
-def flash(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, cache_dir: Path) -> int:
+def flash(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, cache_dir: Path) -> BuildResult:
     """Flash both boards with the build of (controller, case, scenario, modes) unless both already run it. The first
     Teensy upload after a reboot often fails, so a failed upload is tried once more."""
     b = build_and_flash(controller, m, scenario, modes, cache_dir=cache_dir, upload=False)
@@ -98,27 +102,25 @@ def flash(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, ca
         raise HilError("build failed:\n" + b.log[-3000:])
     s = open_session()
     try:
-        info = s.connect()
-        if info.emulator_hash == info.controller_hash == b.firmware_hash:
-            return b.firmware_hash
+        check_build(s.connect(), b.firmware_hash)
+        return b
     except HilError:
-        pass                                   # an older protocol or a board that does not answer: flash it
+        pass                                   # another build, an older protocol or a board that does not answer
     finally:
         s.close()
     for attempt in (1, 2):
         b = build_and_flash(controller, m, scenario, modes, cache_dir=cache_dir, upload=True)
         if b.ok:
-            return b.firmware_hash
+            return b
         print(f"upload attempt {attempt} failed")
     raise HilError("upload failed:\n" + b.log[-3000:])
 
 
 def run_one(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, cache_dir: Path) -> dict:
-    fw = flash(controller, m, scenario, modes, cache_dir)
+    build = flash(controller, m, scenario, modes, cache_dir)
     s = open_session()
     try:
-        s.connect()
-        res = run_hil(s, m, controller, scenario)
+        res = run_hil(s, m, controller, scenario, expect=build)
     finally:
         s.close()
     h = res.hil
@@ -129,7 +131,7 @@ def run_one(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, 
         c = compare(res, run(m, controller, plan.scenario, cache_dir=cache_dir), m=m, t0=plan.t0)
     keep = ("valid", "reason", "clock_ratio", "clock_spread_ppm", "step_mean_us", "step_max_us", "overruns", "dropped",
             "isr_mean_us", "isr_max_us", "isr_overruns", "latency_us", "capture_clipped", "bad_frames", "errors")
-    return {"controller": controller, "firmware_hash": f"{fw:08x}",
+    return {"controller": controller, "firmware_hash": f"{build.firmware_hash:08x}",
             "hil": {"mean_torque": res.summary.mean_torque, "i_rms": float(np.sqrt(np.mean(res.summary.i_rms ** 2))),
                     "ripple_pct": res.summary.ripple_pct},
             "comparison": asdict(c), **{k: h.get(k) for k in keep}}

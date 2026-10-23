@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sil_fixtures import analytic_motor
 
-from srmsil.hil.fake import FakeRig
+from srmsil.hil.fake import FAKE_HASH, FakeRig
 from srmweb.api import create_app
 from srmweb.config import Settings
 from srmweb.hil import HilManager
@@ -46,9 +46,22 @@ def client(tmp_path, rig):
         yield c
 
 
-def _case(client):
+def _flashed(client, cid, controller="hysteresis", firmware_hash=FAKE_HASH):
+    """A finished Build & Flash job of the case and controller, as run_hil_flash_job stores it."""
+    store = client.app.state.store
+    job_id = store.create_job("hil_flash", {"case_id": cid})
+    store.put_result(job_id, {"case_id": cid, "controller": controller, "modes": {}, "firmware_hash": firmware_hash,
+                              "log": ""}, kind="hil_flash")
+    store.set_status(job_id, "done")
+
+
+def _case(client, flashed=True):
+    """An evaluated case; with `flashed` the boards of the fake rig run its hysteresis build."""
     job_id = store_search(client, analytic_evaluation("c1"))
-    return client.post("/api/cases", json={"origin": "candidate", "job_id": job_id, "candidate_id": "c1"}).json()["id"]
+    cid = client.post("/api/cases", json={"origin": "candidate", "job_id": job_id, "candidate_id": "c1"}).json()["id"]
+    if flashed:
+        _flashed(client, cid)
+    return cid
 
 
 def _open(client, cid, body=OPEN):
@@ -88,7 +101,8 @@ def test_every_route_refused_off_loopback(tmp_path, rig):
 
 
 def test_manager_refuses_off_loopback(tmp_path):
-    m = HilManager(_settings(tmp_path, "0.0.0.0", "t"), lambda: FakeRig(analytic_motor()), lambda: False)
+    m = HilManager(_settings(tmp_path, "0.0.0.0", "t"), lambda: FakeRig(analytic_motor()), lambda: False,
+                   lambda case_id, controller: FAKE_HASH)
     for call in (m.close, m.start, m.stop, lambda: m.param("band", 1.0), lambda: m.capture(100),
                  lambda: m.compare("0" * 32, lambda *a: analytic_motor())):
         with pytest.raises(HTTPException) as e:
@@ -404,3 +418,27 @@ def test_flash_job_refused_off_loopback(tmp_path):
         "controller": "hysteresis", "scenario": {}, "modes": {}})
     with pytest.raises(ValueError, match=HIL_REFUSED):
         run_hil_flash_job(req, None, JobContext(_settings(tmp_path, "0.0.0.0", "t"), None))
+
+
+BUILD = "runs another build"
+
+
+def test_open_refuses_boards_without_this_flash(client, rig):
+    """The session opens only when both boards run the newest Build & Flash of the case and controller."""
+    cid = _case(client, flashed=False)
+    r = _open(client, cid)
+    assert r.status_code == 409 and r.json()["detail"].startswith(f"the controller board {BUILD}")
+    _flashed(client, cid, controller="tsf")                      # another controller's build
+    assert BUILD in _open(client, cid).json()["detail"]
+    _flashed(client, cid, firmware_hash=0x1234)                  # this controller, but not what the boards run
+    r = _open(client, cid)
+    assert r.status_code == 409 and "controller board" in r.json()["detail"]
+    _flashed(client, cid)
+    assert _open(client, cid).status_code == 201
+    client.delete("/api/hil/session")
+    other = _case(client, flashed=False)                         # flashed for another case only
+    assert BUILD in _open(client, other).json()["detail"]
+    rig["emulator_hash"] = 0x1234
+    r = _open(client, cid)
+    assert r.status_code == 409 and r.json()["detail"].startswith(f"the emulator board {BUILD}")
+    assert not client.app.state.hil.is_open()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -18,6 +18,9 @@ from srmsil.hil.transport import Transport
 from srmsil.run import SimResult, SimSummary
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData, emu_tables
+
+if TYPE_CHECKING:
+    from srmsil.hil.build import BuildResult
 
 REPLY_TIMEOUT_S = 2.0
 CLOCK_SPREAD_WARN_PPM = 500.0
@@ -433,11 +436,25 @@ def _capture_problem(n_steps, hdr, seqs, parts, end, bad, errors) -> str:
     return ""
 
 
+def check_build(info: RigInfo, expected: int | None) -> None:
+    """Raise HilError unless both boards run the firmware hash `expected` (the build of the controller the run is
+    compared against); None means there is no such build."""
+    for board, h in (("controller", info.controller_hash), ("emulator", info.emulator_hash)):
+        if expected is None or h != expected:
+            want = "no build of this controller is known" if expected is None else f"expected {expected:08x}"
+            raise HilError(f"the {board} board runs another build ({h:08x}, {want}); build and flash both boards "
+                           "with this controller")
+
+
 def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenario, *,
-            settle_s: float = SETTLE_S) -> SimResult:
+            settle_s: float = SETTLE_S, expect: BuildResult | None = None) -> SimResult:
     """Configure, start, settle, capture `scenario.duration` of steps, stop. The result's traces and summary come
-    from the capture (summary over its second half); `hil` is `capture_health` of the run."""
-    info = session.info or session.connect()
+    from the capture (summary over its second half); `hil` is `capture_health` of the run. With `expect` (the build
+    that was flashed for this controller) the boards are asked for their build first and a mismatch raises HilError
+    before anything is configured, so the run is never compared against a controller the boards do not run."""
+    info = session.connect() if expect is not None or session.info is None else session.info
+    if expect is not None:
+        check_build(info, expect.firmware_hash)
     session.configure(m, scenario, info.modes)
     n = round(scenario.duration / EMU_DT)
     session.start()

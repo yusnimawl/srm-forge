@@ -28,8 +28,9 @@ SIL_DT = 0.5e-6
 
 
 class _Rig:
-    def __init__(self, motor, modes, drop_after, mode_mismatch, clock_ratio, controller, cache_dir):
+    def __init__(self, motor, modes, drop_after, mode_mismatch, clock_ratio, controller, cache_dir, hashes):
         self.m, self.modes, self.drop_after, self.clock_ratio = motor, modes, drop_after, clock_ratio
+        self.hashes = hashes
         self.controller, self.cache_dir = controller, Path(cache_dir)
         cs, pos, dac = build_codes(modes)
         self.codes = {1: (cs, pos, dac), 2: (1 if mode_mismatch else cs, pos, 1 if mode_mismatch else dac)}
@@ -43,7 +44,8 @@ class _Rig:
         self.ctrl_t0 = 0.0         # monotonic time of the controller's start: emulator step 0
 
     def build_info(self, board: int) -> bytes:
-        return proto.pack_build_info(proto.BuildInfo(proto.PROTOCOL_VERSION, board, *self.codes[board], FAKE_HASH))
+        return proto.pack_build_info(proto.BuildInfo(proto.PROTOCOL_VERSION, board, *self.codes[board],
+                                                     self.hashes[board - 1]))
 
     def step_now(self) -> int:
         return round((time.monotonic() - self.ctrl_t0) / EMU_DT) if self.started else 0
@@ -250,12 +252,14 @@ class FakeTransport:
 
 def FakeRig(motor: MotorData, *, modes: HilModes = HilModes(), drop_after: int | None = None,  # noqa: N802
             mode_mismatch: bool = False, clock_ratio: float = 1.0, controller: str = "hysteresis",
-            cache_dir: Path | None = None) -> tuple[FakeTransport, FakeTransport]:
+            cache_dir: Path | None = None, emulator_hash: int = FAKE_HASH,
+            controller_hash: int = FAKE_HASH) -> tuple[FakeTransport, FakeTransport]:
     """(emulator, controller) transports of a fake rig built for `modes` running `controller` (a reference name or
     a folder, as srmsil.run.run takes). `drop_after` leaves out the capture packet with that sequence number;
     `mode_mismatch` makes the controller report internal current sensing; the controller's clock runs at
-    `clock_ratio` times nominal (its trigger rate and its SIL run)."""
+    `clock_ratio` times nominal (its trigger rate and its SIL run); the boards report the firmware hashes
+    `emulator_hash` and `controller_hash`."""
     rig = _Rig(motor, modes, drop_after, mode_mismatch, clock_ratio, controller,
-               cache_dir or Path(tempfile.gettempdir()) / "srmsil_fake_rig")
+               cache_dir or Path(tempfile.gettempdir()) / "srmsil_fake_rig", (emulator_hash, controller_hash))
     return FakeTransport(rig, 1), FakeTransport(rig, 2)
 

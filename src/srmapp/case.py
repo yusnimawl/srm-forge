@@ -115,13 +115,17 @@ def validate_case(inputs: CaseInputs, *, solver: str = "ngsolve", workers: int |
     return em_validate(design, result, solver=solver, workers=workers)
 
 
-def map_cache_hit(inputs: CaseInputs, cache_dir, *, solver: str = "ngsolve") -> bool:
-    """Whether `evaluate_design` finds its map in `cache_dir`. Mirrors the grids and provenance that
+def map_key(inputs: CaseInputs, *, solver: str = "ngsolve") -> str:
+    """The provenance hash of the map `evaluate_design` builds. Mirrors the grids and provenance that
     `srmcore.maps.api.build_map` computes for a default grid and phase A."""
     design, i_map, _ = map_request(inputs)
     aligned = aligned_angle(design.machine, "A")
     n_angles, n_currents = GRID_SIZES[design.mesh.preset]
     divisions = resolve_mesh_settings(design.machine, design.mesh).band_divisions
     angles = angle_grid(design.machine, divisions, n_angles, aligned=aligned)
-    prov = provenance(design, angles, current_grid(i_map, n_currents), "A", make_solver(solver))
-    return Path(cache_dir, f"map_{provenance_hash(prov)}.h5").exists()
+    return provenance_hash(provenance(design, angles, current_grid(i_map, n_currents), "A", make_solver(solver)))
+
+
+def map_cache_hit(inputs: CaseInputs, cache_dir, *, solver: str = "ngsolve") -> bool:
+    """Whether `evaluate_design` finds its map in `cache_dir`."""
+    return Path(cache_dir, f"map_{map_key(inputs, solver=solver)}.h5").exists()

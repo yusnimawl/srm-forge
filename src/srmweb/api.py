@@ -146,7 +146,16 @@ def create_app(settings: Settings,
     def flash_active() -> bool:
         return any(j["kind"] == "hil_flash" and j["status"] in ACTIVE for j in store.list_jobs())
 
-    hil = HilManager(settings, hil_transports or serial_transports, flash_active)
+    def flashed_hash(case_id: str, controller: str) -> int | None:
+        """The firmware hash of the newest finished Build & Flash job of the case and controller."""
+        for j in store.list_jobs():
+            if j["kind"] == "hil_flash" and j["status"] == "done":
+                r = store.get_result(j["id"]) or {}
+                if r.get("case_id") == case_id and r.get("controller") == controller and "firmware_hash" in r:
+                    return r["firmware_hash"]
+        return None
+
+    hil = HilManager(settings, hil_transports or serial_transports, flash_active, flashed_hash)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
