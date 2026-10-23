@@ -7,7 +7,7 @@ overruns, dropped, ISR mean/max, latency).
 
     $env:PYTHONPATH="src;tests;tests/sil"; python examples\\control_hil.py [--case SETUP.srm-setup.json]
         [--cache-dir DIR] [--controllers hysteresis pwm_current tsf] [--modes ad7606,encoder] [--rpm 1000]
-        [--torque 1.0] [--bus V] [--param NAME=VALUE ...] [--json PATH]
+        [--torque 1.0] [--bus V] [--duration 0.02] [--param NAME=VALUE ...] [--json PATH]
 
 Without --case the analytic motor of tests/sil/sil_fixtures.py is used. With --case the setup file is evaluated
 (srmapp.case.evaluate_design; the map comes from --cache-dir when it is there, so point it at srmweb's cache) and the
@@ -59,8 +59,7 @@ def load_motor(case: str | None, cache_dir: Path, bus: float | None) -> MotorDat
     inputs = case_inputs_from_setup(SetupFile.model_validate_json(text))
     # the winding choice is not cached with the map, so the evaluated motor is kept per setup file, srmapp version
     # (the winding choice) and map provenance (the map's design, grids, solver and srmcore version)
-    key = hashlib.sha256("
-".join((text, srmapp.__version__, map_key(inputs))).encode()).hexdigest()[:16]
+    key = hashlib.sha256("\n".join((text, srmapp.__version__, map_key(inputs))).encode()).hexdigest()[:16]
     saved = Path(cache_dir) / "control_hil" / f"motor_{key}.npz"
     if saved.is_file():
         z = np.load(saved)
@@ -164,6 +163,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--rpm", type=float, default=1000.0, help="fixed speed")
     p.add_argument("--torque", type=float, default=1.0, help="torque command, N m")
     p.add_argument("--bus", type=float, help="bus voltage, V (default: the case's)")
+    p.add_argument("--duration", type=float, default=0.02,
+                   help="capture length, s (the summary and the ripple median use its second half; at most 8192 "
+                        "emulator steps are buffered)")
     p.add_argument("--param", action="append", default=[], metavar="NAME=VALUE",
                    help="controller parameter for every controller (repeatable)")
     p.add_argument("--json", type=Path)
@@ -173,7 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     # the reference controllers take the encoder when encoder_cpr > 0, else the resolver
     sensors = SensorSettings(encoder_cpr=0 if a.modes.position == "ad2s1210" else 4096,
                              resolver=a.modes.position != "encoder")
-    scenario = Scenario(speed_rpm=a.rpm, command_value=a.torque, bus_voltage=a.bus, params=params, sensors=sensors)
+    scenario = Scenario(speed_rpm=a.rpm, command_value=a.torque, bus_voltage=a.bus, params=params, sensors=sensors,
+                        duration=a.duration)
     print(f"modes {a.modes.env_string}, {a.rpm:g} rpm, {a.torque:g} N m, bus {a.bus or m.bus_voltage:g} V, "
           f"map i_max {m.currents[-1]:.2f} A, params {params or 'defaults'}")
     rows = []
