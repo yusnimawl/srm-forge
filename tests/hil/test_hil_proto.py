@@ -187,3 +187,5 @@ def test_emulator_step_is_one_constant():
     assert "#define EMU_STEP_NS HIL_EMU_STEP_NS" in h and "EMU_STEP_HZ" not in h
     for f in ("emu.h", "step.cpp", "encoder.cpp"):
         assert not re.search(r"5e-6|200000\b|200 kHz|\b120\b", (emu / f).read_text()), f
+    web = (ROOT / "web" / "src" / "lib" / "hil.ts").read_text()
+    assert int(re.search(r"export const EMU_STEP_US = (\d+)\n", web)[1]) * 1000 == ns
