@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_STEPS = 50_000_000
-MAX_DELAY_STEPS = 2048   # size of the sensor delay ring in c/plant/srm_sensors.h
+MAX_DELAY_STEPS = 2048   # size of the sensor delay and jitter rings in c/plant/srm_sensors.h
 MAX_PARAM_NAME = 23
 
 
@@ -35,6 +35,9 @@ class SensorSettings(_Model):
     resolver_gain_mismatch: float = 0.0      # cos amplitude = 1 + mismatch, sin = 1
     resolver_phase_error: float = 0.0        # rad, added to the cos argument
     delay: float = Field(0.0, ge=0, le=1e-3)  # s, transport delay of the sensed currents and voltages
+    # s: each controller sample sees the sensed values delay + u * delay_jitter old, u ~ U(0, 1) per ISR sample
+    # from the run's seeded RNG
+    delay_jitter: float = Field(0.0, ge=0, le=1e-4)
 
 
 class AdcSettings(_Model):
@@ -123,4 +126,8 @@ class Scenario(_Model):
         if steps > MAX_DELAY_STEPS:
             raise ValueError(f"sensor delay {self.sensors.delay} s is {steps} steps of {self.dt} s, over the limit of "
                              f"{MAX_DELAY_STEPS}; raise dt or shorten the delay")
+        span = math.floor((self.sensors.delay + self.sensors.delay_jitter) / self.dt + 0.5) - steps   # srm_sensors.c
+        if self.sensors.delay_jitter > 0 and span + 1 > MAX_DELAY_STEPS:
+            raise ValueError(f"sensor delay jitter {self.sensors.delay_jitter} s spans {span} steps of {self.dt} s, over "
+                             f"the limit of {MAX_DELAY_STEPS - 1}; raise dt or shorten the jitter")
         return self

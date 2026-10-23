@@ -121,7 +121,8 @@ def make_config(m: MotorData, scenario: Scenario, cps, n_param_steps: int, strid
         encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
         resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits, sensor_delay=se.delay,
         volt_full_scale=ad.volt_full_scale or 0.0, volt_rc_tau=ad.volt_rc_tau, param_steps=cps,
-        n_param_steps=n_param_steps, controller_clock=scenario.controller_clock)
+        n_param_steps=n_param_steps, controller_clock=scenario.controller_clock,
+        sensor_delay_jitter=se.delay_jitter)
     return cfg
 
 

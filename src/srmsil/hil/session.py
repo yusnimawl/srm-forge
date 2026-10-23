@@ -71,7 +71,8 @@ class Capture:
 
 def emu_config(m: MotorData, scenario: Scenario, capture_steps: int, position: str) -> dict:
     """HIL_EMU_CONFIG fields of a scenario on the emulator's table grid, for the build's position mode (HilModes.position).
-    The firmware does not model the SIL's ADC errors or `sensors.delay`; those fields are sent as 0."""
+    The firmware does not model the SIL's ADC errors, `sensors.delay` or `sensors.delay_jitter`; those fields are sent
+    as 0."""
     tab = emu_tables(m)
     sc, se = scenario.converter, scenario.sensors
     c = dict.fromkeys(proto.EMU_CONFIG_FIELDS, 0)
@@ -276,10 +277,11 @@ class HilSession:
         ad, se = scenario.adc, scenario.sensors
         unsupported = [name for name, v in (("adc.offset_error", ad.offset_error), ("adc.gain_error", ad.gain_error),
                                             ("adc.noise", ad.noise), ("adc.rc_tau", ad.rc_tau),
-                                            ("sensors.delay", se.delay)) if v != 0]
+                                            ("sensors.delay", se.delay),
+                                            ("sensors.delay_jitter", se.delay_jitter)) if v != 0]
         if unsupported:
-            raise HilError(f"the HIL does not emulate {', '.join(unsupported)}; set them to 0 (the sensed-value delay "
-                           "and the ADC are those of the rig)")
+            raise HilError(f"the HIL does not emulate {', '.join(unsupported)}; set them to 0 (the sensed-value delay, "
+                           "its jitter and the ADC are those of the rig)")
         n = round(scenario.duration / EMU_DT)
         self.stop()
         self._reset_controller(info)

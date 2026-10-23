@@ -336,7 +336,8 @@ def test_short_capture_invalid():
 
 
 @pytest.mark.parametrize("field", [{"adc": {"offset_error": 1.0}}, {"adc": {"gain_error": 0.01}},
-                                   {"adc": {"noise": 0.5}}, {"adc": {"rc_tau": 1e-6}}, {"sensors": {"delay": 1e-6}}])
+                                   {"adc": {"noise": 0.5}}, {"adc": {"rc_tau": 1e-6}}, {"sensors": {"delay": 1e-6}},
+                                   {"sensors": {"delay_jitter": 1e-6}}])
 def test_configure_refuses_settings_the_hil_does_not_emulate(cache, field):
     s, emu, _ = session(cache)
     s.connect()

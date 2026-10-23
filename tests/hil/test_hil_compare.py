@@ -90,12 +90,15 @@ def test_window_matches_a_changing_run(cache):
 def test_matched_scenario():
     m = analytic_motor()
     scn = matched_scenario(SCN, 8e-6, HilModes(), 1.011, m=m, end_s=0.25)
-    assert scn.sensors.delay == 8e-6
+    # the measured latency is the mean age D + dt/2 of a latch uniform in [D, D + dt]
+    assert scn.sensors.delay == pytest.approx(8e-6 - EMU_DT / 2)
+    assert scn.sensors.delay_jitter == EMU_DT
     assert scn.controller_clock == 1.011
     assert scn.compute_delay == pytest.approx(1 / (20000.0 * 1.011))
     assert scn.duration == 0.25
     one = matched_scenario(SCN, 0.0, HilModes(current_sense="internal"), m=m, end_s=None)
     assert one.sensors.delay == 0.0 and one.controller_clock == 1.0 and one.compute_delay == pytest.approx(5e-5)
+    assert one.sensors.delay_jitter == EMU_DT                       # the delay is clamped at 0
     assert one.command_value == SCN.command_value and one.duration == SCN.duration
 
 

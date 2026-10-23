@@ -1204,6 +1204,7 @@ export interface components {
              *       "seed": 0,
              *       "sensors": {
              *         "delay": 0,
+             *         "delay_jitter": 0,
              *         "encoder_cpr": 4096,
              *         "encoder_ecc_amp": 0,
              *         "encoder_ecc_harmonic": 1,
@@ -1573,6 +1574,7 @@ export interface components {
              *       "seed": 0,
              *       "sensors": {
              *         "delay": 0,
+             *         "delay_jitter": 0,
              *         "encoder_cpr": 4096,
              *         "encoder_ecc_amp": 0,
              *         "encoder_ecc_harmonic": 1,
@@ -1674,6 +1676,7 @@ export interface components {
              *       "seed": 0,
              *       "sensors": {
              *         "delay": 0,
+             *         "delay_jitter": 0,
              *         "encoder_cpr": 4096,
              *         "encoder_ecc_amp": 0,
              *         "encoder_ecc_harmonic": 1,
@@ -2434,6 +2437,7 @@ export interface components {
             /**
              * @default {
              *       "delay": 0,
+             *       "delay_jitter": 0,
              *       "encoder_cpr": 4096,
              *       "encoder_ecc_amp": 0,
              *       "encoder_ecc_harmonic": 1,
@@ -2553,6 +2557,11 @@ export interface components {
              * @default 0
              */
             delay: number;
+            /**
+             * Delay Jitter
+             * @default 0
+             */
+            delay_jitter: number;
             /**
              * Encoder Cpr
              * @default 4096

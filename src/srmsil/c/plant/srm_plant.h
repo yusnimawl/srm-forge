@@ -28,8 +28,8 @@ typedef struct {
     char name[24];
 } srm_param_step_t;
 
-/* The structs are mirrored by ctypes: 8-byte members first, then 4-byte members; the config's controller_clock
-   comes last, after the padding C and ctypes both insert. */
+/* The structs are mirrored by ctypes: 8-byte members first, then 4-byte members; the config's controller_clock and
+   sensor_delay_jitter come last, after the padding C and ctypes both insert. */
 typedef struct {
     double resistance, bus_voltage, dt, speed, theta0;
     double inertia, friction, load, load_step, load_step_time;
@@ -54,6 +54,8 @@ typedef struct {
     int32_t n_param_steps;
     double controller_clock;    /* controller clock / its nominal rate: the ISR, ctrl_slow, PWM carrier and micros()
                                    run this much faster in true time; the HAL's pwm_hz and isr_hz stay nominal */
+    double sensor_delay_jitter; /* s: each ISR sample sees the sensed values sensor_delay + u * jitter old,
+                                   u ~ U(0, 1) from the sensor RNG; 0 = none */
 } srm_sim_config_t;
 
 typedef struct {

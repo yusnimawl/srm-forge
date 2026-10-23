@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from srmsil.hil.config import HilModes, hil_adc
+from srmsil.hil.proto import EMU_DT
 from srmsil.run import TRACE_CAP, SimResult
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData
@@ -28,10 +29,12 @@ def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, cloc
       compares are preloaded and load at the next underflow, one ISR period of the controller's clock later, so
       compute_delay = 1 / (isr_hz * r) in true time (r the measured clock ratio, 1 when None).
     - Sensed-value age. The emulator's output after step k holds the plant state at the end of the step (t_k) and
-      appears D after it; a trigger at a random instant latches it at an age uniform in [D, D + dt], mean D + dt/2.
-      The measured `latency_us` is the time from the last gate edge of a step's window to the end of that step's output
-      stage, (t_k - t_edge) + D; with gate edges asynchronous to the emulator steps, t_k - t_edge averages dt/2, so the
-      mean latency is already D + dt/2 and sensors.delay = latency_s.
+      appears D after it; a trigger at a random instant latches it at an age uniform in [D, D + dt] (dt = EMU_DT),
+      mean D + dt/2. The measured `latency_us` is the time from the last gate edge of a step's window to the end of
+      that step's output stage, (t_k - t_edge) + D; with gate edges asynchronous to the emulator steps, t_k - t_edge
+      averages dt/2, so the mean latency is already D + dt/2. The SIL draws each sample's age from the same range:
+      sensors.delay = latency_s - dt/2 (D, at least 0) and sensors.delay_jitter = dt. A chop decision near its
+      threshold depends on where in that range the sample falls, which the mean age alone does not reproduce.
     - ADC. The controller's HAL constants and code range of the HIL sensing chain (`config.hil_adc`).
     - Duration. `end_s` (the end of the HIL capture since the controller's start, `hil["window_s"][1]`), so the SIL
       covers the HIL's window from the same start; None keeps the scenario's duration (a scenario that already runs
@@ -40,7 +43,8 @@ def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, cloc
     r = 1.0 if clock_ratio is None else clock_ratio
     d["controller_clock"] = r
     d["compute_delay"] = 1.0 / (scenario.resolved_isr_hz * r)
-    d["sensors"]["delay"] = latency_s
+    d["sensors"]["delay"] = max(0.0, latency_s - EMU_DT / 2)
+    d["sensors"]["delay_jitter"] = EMU_DT
     d["adc"] = hil_adc(modes, scenario, m).model_dump()
     if end_s is not None:
         d["duration"] = end_s

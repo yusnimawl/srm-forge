@@ -1125,6 +1125,7 @@
               "seed": 0,
               "sensors": {
                 "delay": 0.0,
+                "delay_jitter": 0.0,
                 "encoder_cpr": 4096,
                 "encoder_ecc_amp": 0.0,
                 "encoder_ecc_harmonic": 1,
@@ -2208,6 +2209,7 @@
               "seed": 0,
               "sensors": {
                 "delay": 0.0,
+                "delay_jitter": 0.0,
                 "encoder_cpr": 4096,
                 "encoder_ecc_amp": 0.0,
                 "encoder_ecc_harmonic": 1,
@@ -2352,6 +2354,7 @@
               "seed": 0,
               "sensors": {
                 "delay": 0.0,
+                "delay_jitter": 0.0,
                 "encoder_cpr": 4096,
                 "encoder_ecc_amp": 0.0,
                 "encoder_ecc_harmonic": 1,
@@ -4565,6 +4568,7 @@
             "$ref": "#/components/schemas/SensorSettings",
             "default": {
               "delay": 0.0,
+              "delay_jitter": 0.0,
               "encoder_cpr": 4096,
               "encoder_ecc_amp": 0.0,
               "encoder_ecc_harmonic": 1,
@@ -4811,6 +4815,13 @@
             "maximum": 0.001,
             "minimum": 0.0,
             "title": "Delay",
+            "type": "number"
+          },
+          "delay_jitter": {
+            "default": 0.0,
+            "maximum": 0.0001,
+            "minimum": 0.0,
+            "title": "Delay Jitter",
             "type": "number"
           },
           "encoder_cpr": {

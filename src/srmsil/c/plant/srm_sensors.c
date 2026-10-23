@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 
 #include "srm_sensors.h"
 
@@ -77,6 +78,12 @@ int64_t srm_sensor_delay_steps(const srm_sim_config_t *c)
     return (int64_t)floor(c->sensor_delay / c->dt + 0.5);
 }
 
+int64_t srm_sensor_jitter_steps(const srm_sim_config_t *c)
+{
+    if (!(c->sensor_delay_jitter > 0.0)) return 0;
+    return (int64_t)floor((c->sensor_delay + c->sensor_delay_jitter) / c->dt + 0.5) - srm_sensor_delay_steps(c);
+}
+
 void srm_adc_init(srm_adc_t *a, const srm_sim_config_t *c, const double *current)
 {
     a->alpha = c->adc_rc_tau > 0.0 ? 1.0 - exp(-c->dt / c->adc_rc_tau) : 1.0;
@@ -91,6 +98,13 @@ void srm_adc_init(srm_adc_t *a, const srm_sim_config_t *c, const double *current
         for (int k = 0; k < c->n_phases; k++) {
             a->ring[s][k] = (float)current[k];
             a->ring[s][SRM_SIM_MAX_PHASES + k] = 0.0f;
+        }
+    a->hist_len = c->sensor_delay_jitter > 0.0 ? srm_sensor_jitter_steps(c) + 1 : 0;
+    a->hpos = 0;
+    for (int64_t s = 0; s < a->hist_len; s++)
+        for (int k = 0; k < c->n_phases; k++) {
+            a->hist[s][k] = current[k];
+            a->hist[s][SRM_SIM_MAX_PHASES + k] = 0.0;
         }
     srm_rng_seed(&a->rng, c->seed);
 }
@@ -112,12 +126,32 @@ void srm_adc_filter(srm_adc_t *a, const srm_sim_config_t *c, const double *curre
         a->v_filtered[k] += a->v_alpha * (delayed(a, SRM_SIM_MAX_PHASES + k, volts[k]) - a->v_filtered[k]);
     }
     if (a->delay_steps > 0 && ++a->pos == a->delay_steps) a->pos = 0;
+    if (a->hist_len > 0) {
+        for (int k = 0; k < c->n_phases; k++) {
+            a->hist[a->hpos][k] = a->filtered[k];
+            a->hist[a->hpos][SRM_SIM_MAX_PHASES + k] = a->v_filtered[k];
+        }
+        if (++a->hpos == a->hist_len) a->hpos = 0;
+    }
+}
+
+/* The extra age e = round((sensor_delay + u * jitter) / dt) - delay steps, u uniform in [0, 1): the values of e
+   steps before the newest entry. */
+void srm_adc_sample(srm_adc_t *a, const srm_sim_config_t *c)
+{
+    if (a->hist_len == 0) return;
+    double u = (double)(next_u64(&a->rng) >> 11) * U53;
+    int64_t e = (int64_t)floor((c->sensor_delay + u * c->sensor_delay_jitter) / c->dt + 0.5) - a->delay_steps;
+    if (e < 0) e = 0;
+    if (e > a->hist_len - 1) e = a->hist_len - 1;
+    int64_t at = (a->hpos - 1 - e + 2 * a->hist_len) % a->hist_len;
+    memcpy(a->held, a->hist[at], sizeof a->held);
 }
 
 int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase)
 {
     double x = (double)c->adc_offset_counts + c->adc_offset_error +
-               a->filtered[phase] * (1.0 + c->adc_gain_error) / c->adc_amps_per_count;
+               (a->hist_len ? a->held[phase] : a->filtered[phase]) * (1.0 + c->adc_gain_error) / c->adc_amps_per_count;
     if (c->adc_noise > 0.0) x += c->adc_noise * srm_rng_gauss(&a->rng);
     double top = (double)((1 << c->adc_bits) - 1);
     x = floor(x + 0.5);
@@ -127,6 +161,7 @@ int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase)
 int srm_adc_convert_volt(const srm_adc_t *a, const srm_sim_config_t *c, int phase)
 {
     double top = (double)((1 << c->adc_bits) - 1);
-    double x = floor((double)(1 << (c->adc_bits - 1)) + a->v_filtered[phase] / (2.0 * c->volt_full_scale) * top + 0.5);
+    double v = a->hist_len ? a->held[SRM_SIM_MAX_PHASES + phase] : a->v_filtered[phase];
+    double x = floor((double)(1 << (c->adc_bits - 1)) + v / (2.0 * c->volt_full_scale) * top + 0.5);
     return (int)(x < 0.0 ? 0.0 : (x > top ? top : x));
 }

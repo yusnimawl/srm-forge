@@ -69,6 +69,7 @@ export function defaultScenario(busVoltage?: number | null, peakTorque?: number 
     sensors: {
       encoder_cpr: 4096, encoder_offset: 0, encoder_ecc_amp: 0, encoder_ecc_harmonic: 1, resolver: false,
       resolver_pole_pairs: 1, resolver_bits: 12, resolver_gain_mismatch: 0, resolver_phase_error: 0, delay: 0,
+      delay_jitter: 0,
     },
     adc: {
       bits: 12, full_scale: null, offset_counts: 0, offset_error: 0, gain_error: 0, noise: 0, rc_tau: 0,

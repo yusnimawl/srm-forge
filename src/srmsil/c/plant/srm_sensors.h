@@ -13,7 +13,7 @@ typedef struct {
     double spare;
 } srm_rng_t;
 
-/* Longest sensor transport delay in simulation steps. */
+/* Longest sensor transport delay in simulation steps, and the most entries of the jitter history. */
 #define SRM_DELAY_MAX 2048
 
 typedef struct {
@@ -21,6 +21,11 @@ typedef struct {
     double filtered[SRM_SIM_MAX_PHASES], v_filtered[SRM_SIM_MAX_PHASES];
     int64_t delay_steps, pos;
     float ring[SRM_DELAY_MAX][2 * SRM_SIM_MAX_PHASES];   /* delayed currents, then voltages */
+    /* With a delay jitter: the filtered values of the last hist_len steps (currents, then voltages; 0 entries
+       without a jitter) and the ones the conversions of this sample read. */
+    int64_t hist_len, hpos;
+    double hist[SRM_DELAY_MAX][2 * SRM_SIM_MAX_PHASES];
+    double held[2 * SRM_SIM_MAX_PHASES];
     srm_rng_t rng;
 } srm_adc_t;
 
@@ -31,6 +36,10 @@ void srm_resolver(const srm_sim_config_t *c, double theta, int16_t *s, int16_t *
 void srm_adc_init(srm_adc_t *a, const srm_sim_config_t *c, const double *current);
 /* Steps of sensor delay, round(sensor_delay / dt). */
 int64_t srm_sensor_delay_steps(const srm_sim_config_t *c);
+/* Most extra steps of age the jitter adds, round((sensor_delay + jitter) / dt) - delay steps; 0 without a jitter. */
+int64_t srm_sensor_jitter_steps(const srm_sim_config_t *c);
+/* Draw this ISR sample's extra age (with a jitter) and pick the filtered values the conversions read. */
+void srm_adc_sample(srm_adc_t *a, const srm_sim_config_t *c);
 /* Push the phase currents and winding voltages of this step through the delay and the filters. */
 void srm_adc_filter(srm_adc_t *a, const srm_sim_config_t *c, const double *current, const double *volts);
 int srm_adc_convert(srm_adc_t *a, const srm_sim_config_t *c, int phase);

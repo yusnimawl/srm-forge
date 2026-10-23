@@ -110,6 +110,7 @@ static double adc_amps(int counts)
 
 static void latch_adc(void)
 {
+    srm_adc_sample(&S.adc, S.cfg);
     for (int k = 0; k < S.cfg->n_phases; k++) {
         S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
         if (S.cfg->volt_full_scale > 0.0) S.adc_vcounts[k] = srm_adc_convert_volt(&S.adc, S.cfg, k);
@@ -147,7 +148,8 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
         !(cfg->volt_rc_tau >= 0.0) || srm_sensor_delay_steps(cfg) > SRM_DELAY_MAX || cfg->n_param_steps < 0 ||
         (cfg->n_param_steps > 0 && !cfg->param_steps) ||
         cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1 ||
-        !(cfg->controller_clock > 0.0))
+        !(cfg->controller_clock > 0.0) || !(cfg->sensor_delay_jitter >= 0.0) ||
+        srm_sensor_jitter_steps(cfg) + 1 > SRM_DELAY_MAX)
         return -1;
     memset(&S, 0, sizeof S);
     S.cfg = cfg;

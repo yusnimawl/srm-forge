@@ -7,7 +7,7 @@
 #include "srm_plant.h"
 #include "srm_sensors.h"
 
-#define SRM_SIM_ABI 4
+#define SRM_SIM_ABI 5
 
 #if defined(_WIN32) && defined(SRM_SIM_BUILD)
 #define SRM_SIM_API __declspec(dllexport)
