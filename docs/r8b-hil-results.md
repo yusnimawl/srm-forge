@@ -569,7 +569,9 @@ the largest of it, 2 |speed| and 100 rad/s. A captured speed at the range counts
 the comparison refuses it. Test: `tests/hil/test_hil_session.py::test_capture_speed_range_covers_the_run` (fails with
 `omega_max` 0). The clip count also showed that `test_window_matches_a_changing_run` had been passing on a speed
 saturated at 100 rad/s in every sample. On the bench (Step 2) the 1500 rpm step is captured at 0.092 rpm per count
-with no clipped sample.
+with no clipped sample. A dynamic torque command's range is capped at the position sensor's speed limit (the
+encoder's 400 000 edges/s, else the resolver's tracking rate per pole pair), so a small inertia (J 1e-4 gave about
+20 rpm per count) keeps a usable resolution (4096 counts: 613.6 rad/s full scale).
 
 ### Step 1: reference controllers at a fixed speed (ad7606 + encoder)
 
@@ -610,6 +612,56 @@ uniform in that range, so a borderline chop decision can go either way, while th
 only. The max-minus-min ripple of a 10 ms window is therefore bimodal at this operating point and the 5-point bound
 fails on a share of valid runs: a limit of the matched SIL's age model (and of the ripple metric), for the owner; not
 tuned away.
+
+### Step 1b: emulator step time with two PWM phases (2026-10-23)
+
+Goal: pwm_current and tsf at the Step 1 operating point with 0 overruns and step max <= 4.5 us (90 % of dt), by
+result-neutral speedups only (dt 5 us, 1008 MHz and the overrun rule unchanged).
+
+Profile (scratch build, not in the tree: cycle marks per stage of the step interrupt, the cycles of every preempting
+interrupt including its closing `dsb`, the averager's cycles net of interrupts by edges in the window; 1008 cycles =
+1 us, 5040 per step). Worst step of a run and stage mean over the run:
+
+| | Worst step (cycles) | take / averager / capture+stats / plant / outputs | interrupts in it | Averager per window, 1 / 2 edges (mean / max) | Stage means: averager / plant / outputs |
+|---|---|---|---|---|---|
+| pwm_current, before | 5428 (overrun) | 190 / 2855 / 164 / 1587 / 616 | 1364 in 5 | 1141 / 1406, 1617 / 1844 | 643 / 1389 / 432 |
+| tsf, before | 5283 (overrun) | 190 / 2582 / 163 / 1408 / 924 | 1021 in 2 | -, 1529 / 1865 | 487 / 1295 / 431 |
+| pwm_current, after | 5106 (overrun) | 1093 / 1382 / 170 / 1523 / 922 | 1259 in 4 | 879 / 1112, 1184 / 1373 | 542 / 1435 / 440 |
+| tsf, after | 4565 | 278 / 1272 / 170 / 2197 / 632 | 748 in 1 | 813 / 1117, 1122 / 1321 | 433 / 1298 / 432 |
+
+Interrupt cost (mean, cycles): gate edges and CONVST 259-357, encoder compare 134-154, AD7606 BUSY timer 263-291; a
+worst step carries 750-1460 cycles of them. On the board with interrupts off (minimum of 64 calls), the averager
+takes 278 -> 251 cycles with no edge, 1104 -> 814 with one edge, 1822 -> 1281 with two; the plant step with two
+conducting phases 1225-1260 (one table lookup 114).
+
+What changed (commit f33a685):
+- `srm_gate_avg_window` collects the window's segments between edges and maturing changes (32-bit ticks after the
+  window start, events up to the start handled first as before), then advances each winding over them; the per-winding
+  sequence of float operations is the one of the earlier walk, so the voltages are bit-identical. The switch-on
+  fractions are optional (NULL): the emulator and its PC model `srm_emu.c` never used them.
+- The gate interrupt reads GPIO6_ISR once (the output pins of the same port reuse it) and does not read GPIO7/GPIO9
+  when no pin of that port is enabled.
+- Result-neutrality checks: host, old against new on random streams (late edges, gaps between windows, delays up to
+  3 windows, windows of more than 16 segments), double and float builds: bit-identical voltages and fractions; new
+  test `test_matches_reference_walk` against a plain event walk. Board: a 20000-window run of averager and plant on
+  the case tables (two phases chopping at random instants) gives the same hash (a9d0cb2e) as the earlier firmware.
+  Inlined into the window function, the per-winding advance compiled by arm-none-eabi-gcc 15.2 at -O3 read
+  uninitialised stack on the board (wrong voltages, a hash that changed between calls; the host build and -O2 were
+  correct); it is kept out of line, which is bit-identical.
+
+Bench, final firmware, 10 runs each (`examples/control_hil.py --case ... --torque 10 --controllers ...`):
+
+| Controller | Runs (valid) | d_torque | d_irms | d_ripple | Passed | Step mean / max | Overruns |
+|---|---|---|---|---|---|---|---|
+| tsf | 10 (10) | -0.09 to +0.30 % | -0.00 to +0.24 % | -1.44 to +0.82 pts | 10 of 10 | 2.35-2.37 / 4.55-4.75 us | 0 |
+| pwm_current | 10 (0) | - | - | - | no | 0.52-0.56 / 5.03-5.20 us | 1 per run, in the first ms |
+
+tsf now runs and passes (Task 14: every run overran), but its step max is 4.55-4.75 us, above the 4.5 us goal.
+pwm_current still overruns at the start of every run, where two phases chop with edges in the same window: the worst
+step is about 2600-2800 cycles of averager and plant, about 1100-1300 of the rest, and 1250-1450 of interrupts. Further
+result-neutral gains are small (the plant step is latency-bound float arithmetic; the interrupt cost is peripheral
+register access), so 0 overruns and 4.5 us need an owner decision (a longer emulator step, another step budget, or
+moving the BUSY and CONVST handling into hardware).
 
 ### Step 2: speed step with the speed loop (dynamic, hysteresis)
 
@@ -686,7 +738,10 @@ Not run: no DACs.
 - Passed: hysteresis at a fixed speed on mean torque and RMS current (27 of 27 valid runs); the speed step against the
   matched SIL (after the ctrl_slow fix); the live theta_on change and captures through srmweb (after the reset fix);
   the AD2S1210 angle chain with and without resolver errors.
-- Not passed, owner decisions: pwm_current and tsf overrun the emulator's 5 us step with two overlapping PWM phases;
+- After Step 1b (cheaper gate averaging): tsf passes in 10 of 10 runs with 0 overruns (step max 4.55-4.75 us, above
+  the 4.5 us goal); pwm_current still overruns at the start of every run.
+- Not passed, owner decisions: pwm_current overruns the emulator's 5 us step with two overlapping PWM phases (tsf
+  did before Step 1b);
   the hysteresis ripple at this operating point is bimodal in the sensed-value age, which the matched SIL models by
   its mean only (7 of 27 valid runs over the 5-point bound).
 - Open: capture packet loss in bursts (6 of 33 Step 1 hysteresis runs, 5 of them in one burst); 2 of 13 dynamic runs without a
