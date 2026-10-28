@@ -42,6 +42,7 @@ from srmcore.model.design import Design, MeshSettings, RadialSRMParams, RegionMa
 from srmcore.model.errors import InputError
 from srmcore.topology.dxf_io import import_dxf, write_dxf
 from srmsil import build as sil_build, run as sil_run, tables as sil_tables
+from srmsil.hil import HilError
 from srmsil.hil.config import check_isr_rate
 from srmsil.hil.transport import Transport
 from srmweb.auth import Sessions, auth_router, require_auth
@@ -49,7 +50,7 @@ from srmweb.cases import check_case, estimate as estimate_case, losses_estimate,
 from srmweb.config import Settings, is_loopback
 from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
-from srmweb.hil import POLL_S as HIL_POLL_S, HilManager, check_loopback, serial_transports
+from srmweb.hil import POLL_S as HIL_POLL_S, HilManager, check_loopback, serial_transports, sil_t0
 from srmweb.jobs import CUSTOM_REFUSED, KINDS, JobRunner, QueueFull, lane_of
 from srmweb.quick import LaneTimeout
 from srmweb.results import (BWaveformOut, CaseOut, DxfImportOut, CaseSummaryOut, FindingOut, LossesOut,
@@ -920,14 +921,18 @@ def create_app(settings: Settings,
     @hil_router.get("/hil/session/events")
     async def hil_events(request: Request):
         """Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when
-        they change; `event: end` once the session is closed."""
+        they change; `event: end` once the session is closed, `event: link_lost` (data `{error}`) when a board link fails."""
         if not hil.is_open():
             raise HTTPException(409, "no HIL session is open")
 
         async def stream():
             seen, last_send = None, time.monotonic()
             while not await request.is_disconnected():
-                event = await asyncio.to_thread(hil.poll)
+                try:
+                    event = await asyncio.to_thread(hil.poll)
+                except HilError as exc:
+                    yield f"event: link_lost\ndata: {json.dumps({'error': str(exc)})}\n\n"
+                    return
                 if event is None:
                     yield "event: end\ndata: {}\n\n"
                     return
@@ -970,10 +975,11 @@ def create_app(settings: Settings,
         res = sil_run.load(path)
         arrays = traces_arrays(res, n_px)
         sil_file = path.with_name(f"{capture_id}.sil.npz")
-        compared = sil_file.is_file()
+        sil = sil_run.load(sil_file) if sil_file.is_file() else None
+        t0 = sil_t0(sil) if sil is not None else None
+        compared = t0 is not None                  # a SIL file without its start time counts as not compared
         if compared and res.traces:
-            sil = sil_run.load(sil_file)
-            sil = replace(sil, traces={**sil.traces, "t": sil.traces["t"] + sil.hil["t0"]})   # the capture's time base
+            sil = replace(sil, traces={**sil.traces, "t": sil.traces["t"] + t0})   # the capture's time base
             t = res.traces["t"]
             arrays |= traces_arrays(sil, n_px, "sil.", (float(t[0]), float(t[-1])))
         meta = {"summary": res.summary, "scenario": res.scenario.model_dump(mode="json"), "controller": res.controller,

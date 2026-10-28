@@ -48,14 +48,15 @@ export type HilFlashResult = components["schemas"]["HilFlashResultOut"]
 
 export const LOOPBACK_TEXT = "HIL needs the server on this computer (loopback)"
 
-/** The emulator step in us (`srmsil.hil.proto.EMU_DT`); the capture route takes 100 to 200 000 steps. */
+/** The emulator step in us (`srmsil.hil.proto.EMU_DT`); the capture route takes 100 to `CAPTURE_RING` steps. */
 export const EMU_STEP_US = 6
 export const MIN_CAPTURE_MS = (100 * EMU_STEP_US) / 1000
-export const MAX_CAPTURE_MS = (200_000 * EMU_STEP_US) / 1000
 /** Samples the emulator buffers (`srmsil.hil.proto.CAPTURE_RING`). The default capture fills it, so the comparison
  *  window (its second half) holds enough complete strokes for the ripple median. */
 export const CAPTURE_RING = 8192
 export const DEFAULT_CAPTURE_MS = (CAPTURE_RING * EMU_STEP_US) / 1000
+/** Longer captures are not supported: the emulator buffers one ring and does not stream. */
+export const MAX_CAPTURE_MS = DEFAULT_CAPTURE_MS
 
 /** The message of a failed HIL request: the loopback text for a 403, the server's text for a 409 or a 422. */
 export function hilErrorText(e: unknown): string {
@@ -145,11 +146,13 @@ export async function hilCaptureTraces(id: string, nPx = 1500) {
 
 /** The live event stream of the open session. A new `epoch` reconnects (the stream of a closed session ends, and a
  *  stream opened with no session fails once). `live` is the newest event, `ended` is true after the server closed the
- *  session, and `lost` is true when the connection broke after events had arrived (the session may still be open). */
-export function useHilEvents(epoch: number): { live: HilLive | null; ended: boolean; lost: boolean } {
+ *  session, `lost` is true when the connection broke after events had arrived (the session may still be open), and
+ *  `linkError` is the server's reason when a board link failed (`event: link_lost`). */
+export function useHilEvents(epoch: number): { live: HilLive | null; ended: boolean; lost: boolean; linkError: string | null } {
   const [live, setLive] = useState<HilLive | null>(null)
   const [ended, setEnded] = useState(false)
   const [lost, setLost] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
   useEffect(() => {
     const es = new EventSource("/api/hil/session/events")
     let seen = false
@@ -158,6 +161,14 @@ export function useHilEvents(epoch: number): { live: HilLive | null; ended: bool
       setLive(JSON.parse((e as MessageEvent).data) as HilLive)
       setEnded(false)
       setLost(false)
+      setLinkError(null)
+    })
+    // A board link failed: the server ends the stream with the reason; the live numbers are stale.
+    es.addEventListener("link_lost", (e) => {
+      setLive(null)
+      setLost(true)
+      setLinkError(String((JSON.parse((e as MessageEvent).data) as { error?: string }).error ?? "unknown error"))
+      es.close()
     })
     es.addEventListener("end", () => {
       setLive(null)
@@ -172,5 +183,5 @@ export function useHilEvents(epoch: number): { live: HilLive | null; ended: bool
     }
     return () => es.close()
   }, [epoch])
-  return { live, ended, lost }
+  return { live, ended, lost, linkError }
 }

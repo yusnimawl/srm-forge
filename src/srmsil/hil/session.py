@@ -366,8 +366,9 @@ class HilSession:
         the capture valid; otherwise the traces are left empty (a gap is never filled)."""
         if self._m is None or self._scenario is None:
             raise HilError("not configured")
-        if n_steps < 1:
-            raise ValueError("n_steps must be at least 1")
+        if not 1 <= n_steps <= proto.CAPTURE_RING:
+            raise ValueError(f"n_steps must be 1 to {proto.CAPTURE_RING} (the emulator buffers {proto.CAPTURE_RING * EMU_DT * 1e3:.1f} ms; "
+                             "streaming longer captures is not supported)")
         q = self._m.n_phases
         bad0, errors0 = self.emu.bad_frames, len(self.errors)
         seq = self.emu.send(Type.CAPTURE_REQ, proto.CAPTURE_REQ.pack(n_steps))
@@ -461,6 +462,9 @@ def run_hil(session: HilSession, m: MotorData, controller: str, scenario: Scenar
         check_sources(controller, m, scenario, info.modes, expect.firmware_hash)
     session.configure(m, scenario, info.modes)
     n = round(scenario.duration / EMU_DT)
+    if n > proto.CAPTURE_RING:
+        raise ValueError(f"duration {scenario.duration:g} s is longer than the {proto.CAPTURE_RING * EMU_DT * 1e3:.1f} ms "
+                         "the emulator buffers; streaming longer captures is not supported")
     session.start()
     try:
         session.wait(settle_s)

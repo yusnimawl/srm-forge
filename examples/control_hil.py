@@ -173,6 +173,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="controller parameter for every controller (repeatable)")
     p.add_argument("--json", type=Path)
     a = p.parse_args(argv)
+    if round(a.duration / proto.EMU_DT) > proto.CAPTURE_RING:
+        p.error(f"--duration is at most {DEFAULT_DURATION:.6f} s (the emulator buffers {proto.CAPTURE_RING} samples; "
+                "streaming longer captures is not supported)")
     m = load_motor(a.case, a.cache_dir, a.bus)
     params = {k: float(v) for k, v in (kv.split("=", 1) for kv in a.param)}
     # the reference controllers take the encoder when encoder_cpr > 0, else the resolver

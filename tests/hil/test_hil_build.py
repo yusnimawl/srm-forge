@@ -113,3 +113,10 @@ def test_script_mode_validation():
     for bad in ("ad7606,resolver", "foo,encoder", "internal,encoder,dac9", "ad7606", "a,b,c,d", "ad7606,encoder,x"):
         with pytest.raises(ValueError):
             mode_macros(bad)
+
+
+def test_check_sources_names_the_mode_difference_first():
+    flashed = HilModes(current_sense="ad7606", position="encoder")
+    asked = HilModes(current_sense="ad7606", position="ad2s1210")
+    with pytest.raises(HilError, match=r"requested modes .*ad2s1210.* differ from .* flashed with .*encoder"):
+        build.check_sources("hysteresis", analytic_motor(), Scenario(), asked, 0, flashed)

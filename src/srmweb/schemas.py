@@ -12,6 +12,7 @@ from srmapp.references import REFERENCES
 from srmapp.requirements import Requirements
 from srmcore.materials.library import available_materials, load_material
 from srmsil.hil.config import HilModes
+from srmsil.hil.proto import CAPTURE_RING
 from srmsil.scenario import Scenario
 
 
@@ -360,7 +361,7 @@ class HilFlashResultOut(BaseModel):
 class HilCaptureIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    n_steps: int = Field(ge=100, le=200_000)    # emulator steps (srmsil.hil.proto.EMU_DT each)
+    n_steps: int = Field(ge=100, le=CAPTURE_RING)    # emulator steps (srmsil.hil.proto.EMU_DT each), at most the buffered ring
 
 
 class HilCaptureOut(BaseModel):

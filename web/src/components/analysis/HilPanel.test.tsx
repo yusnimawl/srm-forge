@@ -219,6 +219,18 @@ describe("HilPanel", () => {
     expect(text()).not.toContain("The live connection closed")
   })
 
+  it("shows the board link failure and clears the live numbers", async () => {
+    await mount()
+    await emitLive(live())
+    expect(button("Stop").disabled).toBe(false)
+    await act(async () => { stream().emit("link_lost", { error: "serial port closed" }) })
+    expect(text()).toContain("Board link lost: serial port closed")
+    expect(text()).not.toContain("The live connection closed")
+    expect(text()).toContain("No session open")
+    expect(button("Start").disabled).toBe(true)
+    expect(stream().closed).toBe(true)
+  })
+
   it("sends a parameter on blur and shows refused (not live) for status -2", async () => {
     routes["POST /api/hil/session/param"] = () => json(200, { status: -2, message: "not changeable while running" })
     await mount()

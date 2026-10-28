@@ -508,7 +508,7 @@ export interface paths {
         /**
          * Hil Events
          * @description Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when
-         *     they change; `event: end` once the session is closed.
+         *     they change; `event: end` once the session is closed, `event: link_lost` (data `{error}`) when a board link fails.
          */
         get: operations["hil_events_api_hil_session_events_get"];
         put?: never;

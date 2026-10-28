@@ -53,6 +53,12 @@ def check_loopback(settings: Settings) -> None:
         raise HTTPException(403, HIL_REFUSED)
 
 
+def sil_t0(sil) -> float | None:
+    """The start time a matched SIL file was saved with, None for a file without it (it is then run again)."""
+    t0 = (sil.hil or {}).get("t0")
+    return None if t0 is None else float(t0)
+
+
 class HilManager:
     """The app's one HIL session. `flash_active()` is true while a `hil_flash` job is queued or running; `gate` is held
     while a flash job is submitted and while a session opens, so the two never overlap (flashing re-enumerates the
@@ -112,7 +118,7 @@ class HilManager:
                 info = session.connect()
                 flashed = self._flashed(case_id, body.controller)
                 check_build(info, flashed)
-                check_sources(body.controller, motor, body.scenario, body.modes, flashed)
+                check_sources(body.controller, motor, body.scenario, body.modes, flashed, info.modes)
                 session.configure(motor, body.scenario, body.modes)
             except (HilError, ValueError) as exc:
                 session.close()
@@ -246,7 +252,8 @@ class HilManager:
         m = motor_of(h["case_id"], hil.scenario.bus_voltage)
         if sil_file.is_file():
             sil = sil_run.load(sil_file)
-            return compare(hil, sil, m=m, t0=sil.hil["t0"])
+            if (t0 := sil_t0(sil)) is not None:
+                return compare(hil, sil, m=m, t0=t0)
         plan = match_plan(hil, HilModes(**h["modes"]), m)
         if plan.scenario is None:
             return refused(hil, plan.reason)

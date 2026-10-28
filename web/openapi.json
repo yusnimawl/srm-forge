@@ -2119,7 +2119,7 @@
         "additionalProperties": false,
         "properties": {
           "n_steps": {
-            "maximum": 200000.0,
+            "maximum": 8192.0,
             "minimum": 100.0,
             "title": "N Steps",
             "type": "integer"
@@ -6846,7 +6846,7 @@
     },
     "/api/hil/session/events": {
       "get": {
-        "description": "Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when\nthey change; `event: end` once the session is closed.",
+        "description": "Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when\nthey change; `event: end` once the session is closed, `event: link_lost` (data `{error}`) when a board link fails.",
         "operationId": "hil_events_api_hil_session_events_get",
         "responses": {
           "200": {

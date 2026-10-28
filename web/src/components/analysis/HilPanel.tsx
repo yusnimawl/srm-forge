@@ -247,7 +247,7 @@ export default function HilPanel({ caseId, controller, scenario, params, custom,
   const [session, setSession] = useState<HilSession | null>(null)
   // A first stream attaches to a session that is already open (after a reload); opening one or reconnecting restarts it.
   const [epoch, setEpoch] = useState(0)
-  const { live, ended, lost } = useHilEvents(epoch)
+  const { live, ended, lost, linkError } = useHilEvents(epoch)
   // The controller's dropped-frame counter runs since boot; the last value seen while stopped is the run's baseline.
   const [txBase, setTxBase] = useState(0)
   const [captureMs, setCaptureMs] = useState(String(DEFAULT_CAPTURE_MS))
@@ -340,7 +340,7 @@ export default function HilPanel({ caseId, controller, scenario, params, custom,
         </p>
         {lost && (
           <div className="flex flex-wrap items-center gap-3" role="alert">
-            <p className="text-sm text-destructive">The live connection closed. The session may still be open on the server.</p>
+            <p className="text-sm text-destructive">{linkError ? `Board link lost: ${linkError}` : "The live connection closed. The session may still be open on the server."}</p>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setEpoch((e) => e + 1)}>Reconnect</Button>
           </div>
         )}

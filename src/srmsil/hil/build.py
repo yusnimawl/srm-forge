@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from srmsil.hil import HilError
-from srmsil.hil.config import HilModes, write_hil_config
+from srmsil.hil.config import HilModes, mode_defines, write_hil_config
 from srmsil.run import REFERENCE, _CTRL_DIR, controller_dir
 from srmsil.scenario import Scenario
 from srmsil.tables import MotorData, ctrl_tables, write_header
@@ -76,10 +76,15 @@ def firmware_hash(controller: str, m: MotorData, scenario: Scenario, modes: HilM
         return int(_stage(controller, m, scenario, modes, Path(tmp))[1][:8], 16)
 
 
-def check_sources(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, flashed: int) -> None:
+def check_sources(controller: str, m: MotorData, scenario: Scenario, modes: HilModes, flashed: int,
+                  boards: HilModes | None = None) -> None:
     """Raise HilError when the build of (controller, case, scenario, modes) from the current sources is not the one
     flashed (`flashed`, its firmware hash): the controller folder, the case's tables or the scenario's build settings
-    changed since the last Build & Flash."""
+    changed since the last Build & Flash. With `boards` (the modes the boards report) a requested `modes` that
+    differs is named first, since the hash would differ for that reason alone."""
+    if boards is not None and mode_defines(boards) != mode_defines(modes):
+        raise HilError(f"the requested modes {modes.env_string} differ from the modes the boards were flashed with "
+                       f"({boards.env_string}); choose the flashed modes or build and flash again")
     now = firmware_hash(controller, m, scenario, modes)
     if now != flashed:
         raise HilError(f"the controller sources changed since the last Build & Flash (the build is now {now:08x}, the "

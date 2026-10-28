@@ -411,3 +411,11 @@ def test_step_time_over_80_percent_is_a_warning_not_a_failure(cache):
         assert h["valid"] and h["reason"] == ""
         assert bool(h["warnings"]) == warned
     assert h["warnings"] == ["emulator step max 4.81 us is 80.2 % of the 6 us step (warning above 80 %)"]
+
+
+def test_capture_longer_than_the_ring_refused(cache):
+    s, _, _ = session(cache)
+    s.connect()
+    s.configure(analytic_motor(), SCN, HilModes())
+    with pytest.raises(ValueError, match="streaming longer captures is not supported"):
+        s.capture(proto.CAPTURE_RING + 1)

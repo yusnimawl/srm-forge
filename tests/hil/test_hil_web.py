@@ -4,6 +4,7 @@ the flash job and its exclusion with the session, and the cache."""
 import json
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -14,9 +15,12 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sil_fixtures import analytic_motor
 
+from srmsil import run as sil_run
+from srmsil.hil import HilError
 from srmsil.hil.build import firmware_hash
 from srmsil.hil.config import HilModes
 from srmsil.hil.fake import FakeRig
+from srmsil.hil.proto import CAPTURE_RING
 from srmsil.scenario import Scenario
 from srmsil.tables import motor_data_from_json
 from srmweb.api import create_app
@@ -482,3 +486,45 @@ def test_open_refuses_controller_sources_changed_since_the_flash(client, tmp_pat
     assert r.status_code == 409
     assert r.json()["detail"].startswith("the controller sources changed since the last Build & Flash")
     assert not client.app.state.hil.is_open()
+
+
+def test_events_stream_reports_a_lost_board_link(client, monkeypatch):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+
+    def lost():
+        raise HilError("serial port closed")
+
+    monkeypatch.setattr(client.app.state.hil._session, "live", lost)
+    got = []
+    with client.stream("GET", "/api/hil/session/events") as r:
+        name = None
+        for line in r.iter_lines():
+            if line.startswith("event: "):
+                name = line[7:]
+            elif line.startswith("data: "):
+                got.append((name, json.loads(line[6:])))
+    assert got == [("link_lost", {"error": "serial port closed"})]
+
+
+def test_capture_longer_than_the_ring_is_422(client):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    r = client.post("/api/hil/session/capture", json={"n_steps": CAPTURE_RING + 1})
+    assert r.status_code == 422
+    assert client.post("/api/hil/session/capture", json={"n_steps": CAPTURE_RING}).status_code == 201
+
+
+def test_sil_file_without_start_time_is_rerun_not_500(client):
+    _open(client, _case(client))
+    client.post("/api/hil/session/start")
+    cap = _capture(client)
+    path = client.app.state.hil.capture_file(cap["capture_id"])
+    assert _compare(client, cap)["passed"]
+    sil_file = path.with_name(f"{cap['capture_id']}.sil.npz")
+    sil = sil_run.load(sil_file)
+    sil_run.save(replace(sil, hil=None), sil_file)               # a file from before the HIL block existed
+    assert _compare(client, cap)["passed"]                         # run again and saved with its start time
+    assert sil_run.load(sil_file).hil["t0"] >= 0
+    sil_run.save(replace(sil_run.load(sil_file), hil={}), sil_file)
+    assert client.get(f"/api/hil/captures/{cap['capture_id']}?n_px=500").status_code == 200
