@@ -93,7 +93,7 @@ class LossResult:
     cut_process: str = "unspecified"
 
 
-def range_notes(sides: list[_Side]) -> list[str]:
+def range_notes(sides: list["_Side"]) -> list[str]:
     """One note per cause of leaving the fit range that is present on any side."""
     notes = []
     if any(s.high_b_share > 0 for s in sides):
