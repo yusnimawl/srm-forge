@@ -1,10 +1,14 @@
 # R8b control HIL results
 
 Current configuration (end of Task 14): Teensy at 912 MHz, 6 us emulator step, matched SIL with the sensed-value age
-jitter, ripple compared as the median over complete strokes, buffered captures of up to 8192 samples (49 ms). The
+jitter (`sensors.delay_jitter`), ripple compared as the median over complete strokes, buffered captures of up to 8192 samples (49 ms). The
 Summary at the end is current. The sections before it are the record in the order the work was done; where one gives
 a 600, 816 or 1008 MHz clock, a 5 us step or the "kept out of line" averager as the state of the firmware, a later
 step supersedes it (Step 1d: the 1008 MHz failure; Step 1e: 912 MHz; Step 1f: 6 us).
+
+Any edit under `hil/` (comments and READMEs included) changes the firmware hash, because the hash covers every file
+there. Reflash both boards before the next session: `check_sources` refuses a session whose sources differ from the
+flashed build.
 
 ## Bring-up
 

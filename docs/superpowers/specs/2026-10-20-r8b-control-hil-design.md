@@ -190,7 +190,7 @@ srmsil, srmweb and `web/` take the next minor version at merge, after R3c; the n
 
 ## 15. Bench items to confirm before relying on them
 
-From the wiring check (`docs/r8b-hil-wiring.md` §5): LPSPI4 SDO tri-state when CS is high (OUTCFG) on the i.MX RT1062; the board's MB1364 revision and default solder bridges; the Teensy GND pads; the pin-13 LED load on SCK at the chosen SPI clock; the Teensy LPSPI slave's maximum reliable clock. The first implementation task on hardware checks these and records the results. The wired-bench results are in `docs/r8b-hil-results.md`: the AD7606 SPI is reliable to 25 MHz (default 12.5 MHz, replacing the 10–15 MHz target of §5.5) and the AD2S1210 SPI3 to 50 MHz (default 12.5 MHz).
+From the wiring check (`docs/r8b-hil-wiring.md` §5): LPSPI4 SDO tri-state when CS is high (OUTCFG) on the i.MX RT1062; the board's MB1364 revision and default solder bridges; the Teensy GND pads; the pin-13 LED load on SCK at the chosen SPI clock; the Teensy LPSPI slave's maximum reliable clock. The first implementation task on hardware checks these and records the results. Of these, the OUTCFG tri-state, the MB1364 revision and solder bridges, the Teensy GND pads and the pin-13 LED load were not separately recorded; the bench acceptance ran on this wiring. The wired-bench results are in `docs/r8b-hil-results.md`: the AD7606 SPI is reliable to 25 MHz (default 12.5 MHz, replacing the 10–15 MHz target of §5.5) and the AD2S1210 SPI3 to 50 MHz (default 12.5 MHz).
 
 ## 16. Decisions made during implementation
 
