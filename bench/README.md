@@ -159,6 +159,7 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | Machine | CPU | Cores | RAM (GB) | OS | Tier | Single solve (s) | Workers | Screening map (min) | Full map (min) | Search of 24 (h) | RAM per worker (GB) | Throttle (%) | Correct | Index single/all |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [lattepanda-sigma-i5](#machine-lattepanda-sigma-i5) | 13th Gen Intel(R) Core(TM) i5-1340P | 12C/16T | 33 | Linux (glibc 2.43) | standard | 1.8 | 16 | 1.7 | ~15 | ~6.1 | 0.47 | +2.2 | ✓ | 195/234 |
+| [thinkpad-x1-yoga-i5-linux](#machine-thinkpad-x1-yoga-i5-linux) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 16 | Linux (glibc 2.43) | standard | 2.0 | 8 | 3.4 | ~31 | ~13 | 0.47 | -1.5 | ✓ | 169/117 |
 | [i7-13620h-laptop](#machine-i7-13620h-laptop) | 13th Gen Intel(R) Core(TM) i7-13620H | 10C/16T | 17 | Windows 11 | standard | 3.4 | 10 | 4.1 | ~36 | ~14 | 0.29 | +0.8 | ✓ | 100/100 |
 | [thinkpad-x1-yoga-i5](#machine-thinkpad-x1-yoga-i5) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 17 | Windows 11 | standard | 3.1 | 8 | 4.4 | ~60 | ~24 | 0.30 | +8.7 | ✓ | 112/65 |
 
@@ -215,6 +216,56 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | 8 | 120.6 | 3.75 | 47 |
 | 12 | 137.7 | 4.27 | 36 |
 | 16 | 146.7 | 4.55 | 28 |
+
+</details>
+
+<details id="machine-thinkpad-x1-yoga-i5-linux">
+<summary><b>thinkpad-x1-yoga-i5-linux</b> – 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, standard, 2026-10-29</summary>
+
+- Machine: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz; 4 cores, 8 threads; 15.9 GB RAM; Linux (glibc 2.43) (#38-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 09:10:14 UTC 2026, x86_64); Python 3.12.14
+- Versions: engine commit 1e1c1df, gmsh 4.15.2, matplotlib 3.11.2, ngsolve 6.2.2608, numpy 2.5.4, psutil 7.2.2, scipy 1.18.1, srmcore 0.7.0; srmbench 1.0; lock 6ff044847626
+- Run: 2026-10-29T05:06:52+07:00 to 2026-10-29T05:18:17+07:00, tier standard, status complete
+- Result file: [2026-10-29T0506-standard.json](results/thinkpad-x1-yoga-i5-linux/2026-10-29T0506-standard.json)
+
+**Mesh (8/6)**
+
+| Preset | Seconds | Nodes | Grid points |
+|---|---|---|---|
+| screening | 4.81 | 42 914 | 360 |
+| full | 7.15 | 81 968 | 1008 |
+
+**Single solve (8/6)**
+
+| Preset | Median (s) | Samples (s) |
+|---|---|---|
+| screening | 2.031 | 2.014, 2.025, 2.052, 2.109, 2.031 |
+| full | 4.604 | 4.587, 4.607, 4.604 |
+
+**Correctness points:** pass; mesh differs: 42914 nodes vs 42935
+
+**Batches**
+
+| Workers | Points | Seconds | Solves per minute | Peak RAM per worker (GB) |
+|---|---|---|---|---|
+| 1 | 8 | 17.26 | 27.8 | – |
+| 2 | 16 | 21.96 | 43.7 | 0.46 |
+| 4 | 32 | 29.87 | 64.3 | 0.47 |
+| 8 | 64 | 52.52 | 73.1 | 0.46 |
+
+**Recommended workers:** 8 (uncapped choice 8, RAM cap 8)
+
+**Screening map 8/6:** 204.6 s, 360 points, 8 workers, correctness pass; key numbers: aligned_angle 0, i_max 20, la 0.0328289, la_lu 9.16354, lu 0.00358256, peak_torque 12.4246, psi_max 0.320169, unaligned_angle 0.523599
+
+**Sustained load:** 5 min at 8 workers, throttle -1.5 %; trace (time: solves per minute): 52 s: 73.3; 105 s: 73.0; 157 s: 73.3; 210 s: 72.9; 262 s: 73.3; 316 s: 72.2
+
+**Scaling**
+
+| Workers | Solves per minute | Speed-up over 1 worker(s) | Efficiency (%) |
+|---|---|---|---|
+| 1 | 27.8 | 1.00 | 100 |
+| 2 | 43.7 | 1.57 | 79 |
+| 4 | 64.3 | 2.31 | 58 |
+| 8 | 73.1 | 2.63 | 33 |
 
 </details>
 
