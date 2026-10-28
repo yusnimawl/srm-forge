@@ -12,6 +12,8 @@ from srmsil.build import compile_host, zig_cc
 from srmsil.hil.config import check_encoder_rate
 from srmsil.hil.proto import EMU_DT
 
+GPT_STEP = round(24e6 * EMU_DT)   # GPT2 ticks per emulator step (EMU_GPT_STEP)
+
 EMU = Path(__file__).parents[2] / "hil" / "emulator"
 CACHE = Path(tempfile.gettempdir()) / "srm_hil_enc_tests"
 CPR = 1000
@@ -124,8 +126,9 @@ def _decisions(lib):
     d.enc_compare_missed.argtypes = [C.c_uint32, C.c_uint32, C.c_uint32]
     w = 2**32
     due = [d.enc_edge_due(t % w, n % w) for t, n in ((100, 99), (100, 100), (100, 101), (w - 10, 5), (5, w - 10))]
-    missed = [d.enc_compare_missed(due % w, now % w, 120)
-              for due, now in ((1000, 1120), (1000, 1121), (w - 50, 100), (w - 50, 40), (1000, 900))]
+    s = GPT_STEP
+    missed = [d.enc_compare_missed(due % w, now % w, s)
+              for due, now in ((1000, 1000 + s), (1000, 1001 + s), (w - 50, s - 20), (w - 50, 40), (1000, 900))]
     d.enc_next_action.argtypes = [C.c_uint32] * 3
     action = [d.enc_next_action(t % w, last % w, 48) for t, last in ((100, 100), (90, 100), (148, 100), (149, 100),
                                                                      (20, w - 30), (17, w - 30), (w - 40, 10))]
