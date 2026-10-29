@@ -97,7 +97,7 @@ def build_and_flash(controller: str, m: MotorData, scenario: Scenario, modes: Hi
     """Generate the case headers, compile both firmwares (and upload them when `upload`). A compile without upload
     of unchanged sources is served from a marker in the cache."""
     pio = pio_executable()
-    base = Path(cache_dir) / "sil" / "hil" / "build"
+    base = Path(cache_dir).resolve() / "sil" / "hil" / "build"  # pio runs in hil/, so relative paths would miss
     stage = base / "stage"
     ctrl_dirs, digest = _stage(controller, m, scenario, modes, stage)
     gen = base / digest[:16]

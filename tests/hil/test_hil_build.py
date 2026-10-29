@@ -120,3 +120,15 @@ def test_check_sources_names_the_mode_difference_first():
     asked = HilModes(current_sense="ad7606", position="ad2s1210")
     with pytest.raises(HilError, match=r"requested modes .*ad2s1210.* differ from .* flashed with .*encoder"):
         build.check_sources("hysteresis", analytic_motor(), Scenario(), asked, 0, flashed)
+
+
+def test_gen_dir_is_absolute_for_relative_cache(monkeypatch, tmp_path):
+    """pio runs in hil/, so a relative cache_dir (srmweb's default "cache") must reach it as an absolute path."""
+    seen = {}
+    monkeypatch.setattr(build, "pio_executable", lambda: Path("pio"))
+    monkeypatch.setattr(build.subprocess, "run",
+                        lambda cmd, **kw: seen.update(kw["env"]) or subprocess.CompletedProcess(cmd, 0, "SUCCESS", ""))
+    monkeypatch.chdir(tmp_path)
+    build.build_and_flash("hysteresis", analytic_motor(), Scenario(), HilModes(), cache_dir=Path("cache"), upload=True)
+    gen = Path(seen["SRM_HIL_GEN_DIR"])
+    assert gen.is_absolute() and (gen / "srm_motor_tables.h").is_file()
