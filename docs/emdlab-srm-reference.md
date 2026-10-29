@@ -333,6 +333,11 @@ cd docs/emdlab-data && "/c/Program Files/MATLAB/R2026b/bin/matlab.exe" -batch "b
   thread) and prints nodes, stage times, Newton iterations, ψ and T.
 * `profile_emdlab.m`: MATLAB profiler, line times of `solve()` at ~40k nodes.
 * `sweep86.m`: the shipped 30-position static-torque example with a timer, plots removed.
+* `export_emdlab_8_6.m`: writes the validation fixture `tests/validation/fixtures/emdlab_8_6/`.
+  It holds Maxwell's static torque curve, EMDLAB's sweep (ψ, W, W′, Arkkio/MST/co-energy torque),
+  the M530-50A B-H table and a −15° mesh-convergence table. Its README maps the machine to
+  `RadialSRMParams` and lists the assumptions to settle. EMDLAB Arkkio vs Maxwell: mean 1.4 %,
+  worst 3.8 % of peak torque.
 
 EMDLAB's own `emdlab paper.pdf` was not read here (no PDF renderer on that machine). Its content
 came from the `emdlab` Claude skill built from the paper.
