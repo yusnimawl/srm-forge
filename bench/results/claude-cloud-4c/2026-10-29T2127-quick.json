@@ -1,0 +1,135 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-29T21:29:08+00:00",
+ "label": "claude-cloud-4c",
+ "lock_hash": "6ff044847626",
+ "machine": {
+  "arch": "x86_64",
+  "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "glibc": "2.39",
+  "logical_cpus": 4,
+  "os": "Linux",
+  "os_version": "#1 SMP PREEMPT_DYNAMIC @0",
+  "physical_cores": 4,
+  "python": "3.12.14",
+  "ram_gb": 16.9
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-29T21:27:39+00:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": 0.462004224,
+    "per_min": 62.82316413959555,
+    "points": 32,
+    "seconds": 30.561975448000112,
+    "workers": 4
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [
+     "mesh differs: 42914 nodes vs 42935"
+    ],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3201688847409647,
+     "torque": -0.0013533310794579564
+    },
+    {
+     "angle": 0.2617993877991494,
+     "current": 20.0,
+     "psi": 0.1949695373875574,
+     "torque": -12.430250438802426
+    },
+    {
+     "angle": 0.5235987755982988,
+     "current": 20.0,
+     "psi": 0.0722318025857135,
+     "torque": 0.000220166000961253
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 81968,
+    "points": 1008,
+    "seconds": 8.501279679999925
+   },
+   "screening": {
+    "nodes": 42914,
+    "points": 360,
+    "seconds": 5.784120192000046
+   }
+  },
+  "recommended": {
+   "ram_cap": 4,
+   "uncapped": 4,
+   "workers": 4
+  },
+  "single_solve": {
+   "full": {
+    "median": 6.768782592999969,
+    "samples": [
+     7.253398586999992,
+     6.4388793959999475,
+     6.768782592999969
+    ]
+   },
+   "screening": {
+    "median": 2.8908311329998924,
+    "samples": [
+     3.1208865820001392,
+     2.9107957510000233,
+     2.6755374329998176,
+     2.8908311329998924,
+     2.64640978500006
+    ]
+   }
+  }
+ },
+ "summary": {
+  "best_throughput_per_min": 62.82316413959555,
+  "best_workers": 4,
+  "correctness": {
+   "details": [
+    "correctness_points: mesh differs: 42914 nodes vs 42935"
+   ],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 2262.635739264113
+  },
+  "peak_ram_worker_gb": 0.462004224,
+  "projection_error_pct": null,
+  "recommended_workers": 4,
+  "screening_map_s": {
+   "measured": false,
+   "value": 349.60634398200125
+  },
+  "search_h": 15.084238261760753,
+  "single_solve_full_s": 6.768782592999969,
+  "single_solve_s": 2.8908311329998924,
+  "srmweb_workers": 4,
+  "throttle_pct": null,
+  "throughput_per_min": 62.82316413959555
+ },
+ "tier": "quick",
+ "versions": {
+  "git_commit": "35cdccb",
+  "gmsh": "4.15.2",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2608",
+  "numpy": "2.5.4",
+  "psutil": "7.2.2",
+  "scipy": "1.18.1",
+  "srmcore": "0.7.0"
+ },
+ "warnings": []
+}
