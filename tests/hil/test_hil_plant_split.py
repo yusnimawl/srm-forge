@@ -37,6 +37,7 @@ def measure(cache_dir) -> dict:
     return out
 
 
+# The golden comes from one OS; libm differs in the last bits across platforms.
 def test_plant_split_matches_golden(tmp_path):
     got = measure(tmp_path)
     if os.environ.get("HIL_REGEN") == "1":
@@ -44,7 +45,7 @@ def test_plant_split_matches_golden(tmp_path):
     want = json.loads(GOLDEN.read_text())
     for name, vals in want.items():
         for key, v in vals.items():
-            assert got[name][key] == pytest.approx(v, rel=1e-12, abs=1e-300), (name, key)
+            assert got[name][key] == pytest.approx(v, rel=1e-9, abs=1e-300), (name, key)
 
 
 # The float build is the emulator's single-precision plant: no implicit promotion to double.
