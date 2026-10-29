@@ -1,0 +1,222 @@
+{
+ "bench_version": "1.0",
+ "finished": "2026-10-29T05:18:17+07:00",
+ "label": "thinkpad-x1-yoga-i5-linux",
+ "lock_hash": "6ff044847626",
+ "machine": {
+  "arch": "x86_64",
+  "cpu_model": "11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz",
+  "glibc": "2.43",
+  "logical_cpus": 8,
+  "os": "Linux",
+  "os_version": "#38-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 09:10:14 UTC 2026",
+  "physical_cores": 4,
+  "python": "3.12.14",
+  "ram_gb": 15.9
+ },
+ "schema": "srmbench-result",
+ "started": "2026-10-29T05:06:52+07:00",
+ "status": "complete",
+ "steps": {
+  "batches": [
+   {
+    "peak_ram_gb": null,
+    "per_min": 27.813288561343317,
+    "points": 8,
+    "seconds": 17.257937655999967,
+    "workers": 1
+   },
+   {
+    "peak_ram_gb": 0.462340096,
+    "per_min": 43.71100458355416,
+    "points": 16,
+    "seconds": 21.96243278199995,
+    "workers": 2
+   },
+   {
+    "peak_ram_gb": 0.46514176,
+    "per_min": 64.27992920758851,
+    "points": 32,
+    "seconds": 29.86935461300004,
+    "workers": 4
+   },
+   {
+    "peak_ram_gb": 0.462864384,
+    "per_min": 73.10876272792657,
+    "points": 64,
+    "seconds": 52.52448347799998,
+    "workers": 8
+   }
+  ],
+  "correctness_points": {
+   "correctness": {
+    "details": [
+     "mesh differs: 42914 nodes vs 42935"
+    ],
+    "status": "pass"
+   },
+   "points": [
+    {
+     "angle": 0.0,
+     "current": 20.0,
+     "psi": 0.3201688847409647,
+     "torque": -0.0013533310794579564
+    },
+    {
+     "angle": 0.2617993877991494,
+     "current": 20.0,
+     "psi": 0.1949695373875574,
+     "torque": -12.430250438802426
+    },
+    {
+     "angle": 0.5235987755982988,
+     "current": 20.0,
+     "psi": 0.0722318025857135,
+     "torque": 0.000220166000961253
+    }
+   ]
+  },
+  "mesh": {
+   "full": {
+    "nodes": 81968,
+    "points": 1008,
+    "seconds": 7.147674969999912
+   },
+   "screening": {
+    "nodes": 42914,
+    "points": 360,
+    "seconds": 4.812545398999987
+   }
+  },
+  "recommended": {
+   "ram_cap": 8,
+   "uncapped": 8,
+   "workers": 8
+  },
+  "screening_map": {
+   "correctness": {
+    "details": [],
+    "status": "pass"
+   },
+   "key_numbers": {
+    "aligned_angle": 0.0,
+    "i_max": 20.0,
+    "la": 0.03282892170772961,
+    "la_lu": 9.16354044782396,
+    "lu": 0.003582558716759459,
+    "peak_torque": 12.424649219856521,
+    "psi_max": 0.3201688847409647,
+    "unaligned_angle": 0.5235987755982988
+   },
+   "points": 360,
+   "seconds": 204.62422399700006,
+   "statuses": {
+    "arkkio_vs_nodal": "pass",
+    "coenergy_torque": "pass",
+    "dpsi_di_positive": "pass",
+    "energy_identity": "pass",
+    "iron_b_peak": "pass",
+    "la_analytic": "pass",
+    "la_lu": "pass",
+    "loop_energy": "pass",
+    "lu_air_slot": "pass",
+    "psi_bound": "pass",
+    "psi_decreasing": "pass",
+    "sign_pattern": "pass",
+    "zero_mean_torque": "pass",
+    "zero_torque_aligned_unaligned": "pass"
+   },
+   "workers": 8
+  },
+  "single_solve": {
+   "full": {
+    "median": 4.604066027000044,
+    "samples": [
+     4.587429875999987,
+     4.606761117000019,
+     4.604066027000044
+    ]
+   },
+   "screening": {
+    "median": 2.031308486999933,
+    "samples": [
+     2.014188044999969,
+     2.024721394999915,
+     2.052428716999998,
+     2.1090108360000386,
+     2.031308486999933
+    ]
+   }
+  },
+  "sustained": {
+   "batches": [
+    {
+     "per_min": 73.26087114609948,
+     "t": 52.42206923099991
+    },
+    {
+     "per_min": 73.04639595981213,
+     "t": 104.99766633699994
+    },
+    {
+     "per_min": 73.3375931905963,
+     "t": 157.36495205699987
+    },
+    {
+     "per_min": 72.88187041750577,
+     "t": 210.05949855000006
+    },
+    {
+     "per_min": 73.27033566968859,
+     "t": 262.47477260799985
+    },
+    {
+     "per_min": 72.19240625814602,
+     "t": 315.6727832
+    }
+   ],
+   "minutes": 5,
+   "throttle_pct": -1.4584386879903266,
+   "workers": 8
+  }
+ },
+ "summary": {
+  "best_throughput_per_min": 73.10876272792657,
+  "best_workers": 8,
+  "correctness": {
+   "details": [
+    "correctness_points: mesh differs: 42914 nodes vs 42935"
+   ],
+   "status": "pass"
+  },
+  "full_map_s": {
+   "measured": false,
+   "value": 1882.1767591058488
+  },
+  "peak_ram_worker_gb": 0.46514176,
+  "projection_error_pct": null,
+  "recommended_workers": 8,
+  "screening_map_s": {
+   "measured": true,
+   "value": 204.62422399700006
+  },
+  "search_h": 12.547845060705658,
+  "single_solve_full_s": 4.604066027000044,
+  "single_solve_s": 2.031308486999933,
+  "srmweb_workers": 8,
+  "throttle_pct": -1.4584386879903266,
+  "throughput_per_min": 73.10876272792657
+ },
+ "tier": "standard",
+ "versions": {
+  "git_commit": "1e1c1df",
+  "gmsh": "4.15.2",
+  "matplotlib": "3.11.2",
+  "ngsolve": "6.2.2608",
+  "numpy": "2.5.4",
+  "psutil": "7.2.2",
+  "scipy": "1.18.1",
+  "srmcore": "0.7.0"
+ },
+ "warnings": []
+}
