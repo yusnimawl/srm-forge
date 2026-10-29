@@ -20,7 +20,7 @@ The project needs Python 3.12 or newer. CI runs the fast suite on Linux 3.12 for
 
 ```powershell
 .venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev,ngsolve,web]"
+python -m pip install -e ".[dev,ngsolve,web,hil]"
 python -m pytest -m "not slow"                       # fast suite (what CI runs)
 python -m pytest                                     # include slow property/quality tests
 python -m pytest tests/mesh/test_band.py::test_name  # single test
