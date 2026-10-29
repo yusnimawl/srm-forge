@@ -24,6 +24,7 @@ ADC_HEADROOM = 1.25
 
 _C_DIR = Path(__file__).parent / "c"
 _SIM_DIR = _C_DIR / "sim"
+_PLANT_DIR = _C_DIR / "plant"
 _CTRL_DIR = _C_DIR / "controllers"
 REFERENCE = {"hysteresis", "pwm_current", "tsf"}
 
@@ -59,6 +60,7 @@ class SimResult:
     controller: str
     source_hash: str
     compile_log: str
+    hil: dict | None = None     # HIL runs: health numbers, validity and the measured clock (srmsil.hil.session.run_hil)
 
 
 def controller_dir(controller: str) -> Path:
@@ -73,26 +75,31 @@ def sim_library(controller_dir: Path, header_dir: Path, cache_dir: Path, common_
                 log: list[str] | None = None) -> Path:
     """Compile the simulator core and the controller folder (plus `common_dir`, if given) into a cached library."""
     folders = [Path(controller_dir), *([Path(common_dir)] if common_dir else [])]
-    sources = [*sorted(_SIM_DIR.glob("*.c")), *(s for f in folders for s in controller_sources(f))]
-    return compile_host(sources, [_C_DIR, _SIM_DIR, Path(header_dir), *folders], Path(cache_dir) / "sil" / "build", log)
+    sources = [*sorted(_PLANT_DIR.glob("*.c")), *sorted(_SIM_DIR.glob("*.c")), *(s for f in folders for s in controller_sources(f))]
+    return compile_host(sources, [_C_DIR, _PLANT_DIR, _SIM_DIR, Path(header_dir), *folders], Path(cache_dir) / "sil" / "build", log)
 
 
 def _ptr(a: np.ndarray, ctype):
     return a.ctypes.data_as(C.POINTER(ctype))
 
 
-def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
-    """Load the library and run it. Call only in a child process: the library holds controller code and C state."""
-    lib = C.CDLL(str(Path(lib_path).resolve()))
-    _abi.bind(lib)
-    for name, value in scenario.params.items():
-        if lib.srm_sim_param(name.encode(), value) != 0:
-            raise ValueError(f"controller rejected parameter {name!r}")
-    tab = sim_tables(m)
+def summarise(csum: _abi.Summary, n_phases: int, n_steps: int, roundtrip_error: float) -> SimSummary:
+    """SimSummary of a finished run over its window (the second half of the steps)."""
+    ws = max(csum.window_steps, 1)
+    mean_t = csum.torque_sum / ws
+    ripple = 100 * (csum.torque_max - csum.torque_min) / abs(mean_t) if abs(mean_t) > 1e-12 else math.nan
+    e_in = csum.energy_in
+    err = abs(e_in - csum.energy_mech - csum.energy_copper - (csum.w_field_end - csum.w_field_start)) / max(abs(e_in), 1e-12)
+    return SimSummary(
+        mean_torque=mean_t, ripple_pct=ripple, i_rms=np.sqrt(np.array(csum.i2_sum[:n_phases]) / ws),
+        copper_loss=csum.copper_sum / ws, power_in=csum.power_in_sum / ws, power_mech=csum.power_mech_sum / ws,
+        beyond_map_fraction=csum.beyond_map_steps / n_steps, energy_error=err, roundtrip_error=roundtrip_error)
+
+
+def make_config(m: MotorData, scenario: Scenario, cps, n_param_steps: int, stride: int) -> _abi.Config:
+    """The simulator Config of a scenario; `cps` is the ctypes ParamStep array."""
     q = m.n_phases
     n_steps = scenario.n_steps
-    stride = math.ceil(n_steps / TRACE_CAP)
-    n = math.ceil(n_steps / stride)
     rpm = 2 * math.pi / 60
     cv = scenario.command_value * (rpm if scenario.command_mode == "speed" else 1.0)
     sc, se, ad = scenario.converter, scenario.sensors, scenario.adc
@@ -112,13 +119,36 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         mode=int(scenario.mode == "dynamic"), command_mode=int(scenario.command_mode == "speed"),
         encoder_cpr=se.encoder_cpr, adc_bits=ad.bits, adc_offset_counts=ad.offset_counts, seed=scenario.seed,
         encoder_ecc_harmonic=se.encoder_ecc_harmonic, resolver=int(se.resolver),
-        resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits)
+        resolver_pole_pairs=se.resolver_pole_pairs, resolver_bits=se.resolver_bits, sensor_delay=se.delay,
+        volt_full_scale=ad.volt_full_scale or 0.0, volt_rc_tau=ad.volt_rc_tau, param_steps=cps,
+        n_param_steps=n_param_steps, controller_clock=scenario.controller_clock,
+        sensor_delay_jitter=se.delay_jitter)
+    return cfg
+
+
+def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
+    """Load the library and run it. Call only in a child process: the library holds controller code and C state."""
+    lib = C.CDLL(str(Path(lib_path).resolve()))
+    _abi.bind(lib)
+    cps = (_abi.ParamStep * max(len(scenario.param_steps), 1))()
+    steps = sorted(scenario.param_steps, key=lambda s: s.time)   # stable: steps at one time keep list order
+    for c, s in zip(cps, steps):
+        c.t, c.value, c.name = s.time, s.value, s.name.encode()
+    for name, value in scenario.params.items():
+        if lib.srm_sim_param(name.encode(), value) != 0:
+            raise ValueError(f"controller rejected parameter {name!r}")
+    tab = sim_tables(m)
+    q = m.n_phases
+    n_steps = scenario.n_steps
+    stride = math.ceil(n_steps / TRACE_CAP)
+    n = math.ceil(n_steps / stride)
+    cfg = make_config(m, scenario, cps, len(steps), stride)
     cur, trq, wf = (np.ascontiguousarray(a, dtype=np.float64) for a in (tab.current, tab.torque, tab.w_field))
     ctab = _abi.Tables(theta_step=tab.theta_step, psi_step=tab.psi_step, psi_max=tab.psi_max, i_max=tab.i_max,
                        n_theta=cur.shape[0], n_psi=cur.shape[1], current=_ptr(cur, C.c_double),
                        torque=_ptr(trq, C.c_double), w_field=_ptr(wf, C.c_double))
     scalars = {k: np.zeros(n) for k in ("t", "theta", "omega", "torque", "encoder", "resolver_sin", "resolver_cos")}
-    phased = {k: np.zeros((q, n), np.float32) for k in ("i", "psi", "v", "adc_i")}
+    phased = {k: np.zeros((q, n), np.float32) for k in ("i", "psi", "v", "adc_i", "adc_v")}
     gates = {k: np.zeros((q, n), np.uint8) for k in ("gate_u", "gate_l")}
     ctrace = _abi.Trace(n_samples=n)
     for k, a in scalars.items():
@@ -129,6 +159,8 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
         setattr(ctrace, k, _ptr(a, C.c_uint8))
     csum = _abi.Summary()
     rc = lib.srm_sim_run(C.byref(cfg), C.byref(ctab), C.byref(ctrace), C.byref(csum))
+    if rc == -3:
+        raise ValueError(f"controller refused live parameter {steps[csum.refused - 1].name} (code {csum.refused_code})")
     if rc == -2:
         raise RuntimeError("the controller queued more gate commands than the simulator can delay; "
                            "shorten compute_delay or issue fewer commands")
@@ -137,15 +169,7 @@ def _run_loaded(lib_path: Path, m: MotorData, scenario: Scenario) -> SimResult:
     got = ctrace.n_samples
     traces = {k: a[:got] for k, a in scalars.items()}
     traces.update({k: a[:, :got] for k, a in {**phased, **gates}.items()})
-    ws = max(csum.window_steps, 1)
-    mean_t = csum.torque_sum / ws
-    ripple = 100 * (csum.torque_max - csum.torque_min) / abs(mean_t) if abs(mean_t) > 1e-12 else math.nan
-    e_in = csum.energy_in
-    err = abs(e_in - csum.energy_mech - csum.energy_copper - (csum.w_field_end - csum.w_field_start)) / max(abs(e_in), 1e-12)
-    summary = SimSummary(
-        mean_torque=mean_t, ripple_pct=ripple, i_rms=np.sqrt(np.array(csum.i2_sum[:q]) / ws),
-        copper_loss=csum.copper_sum / ws, power_in=csum.power_in_sum / ws, power_mech=csum.power_mech_sum / ws,
-        beyond_map_fraction=csum.beyond_map_steps / n_steps, energy_error=err, roundtrip_error=tab.roundtrip_error)
+    summary = summarise(csum, q, n_steps, tab.roundtrip_error)
     return SimResult(traces, summary, scenario, "", "", "")
 
 
@@ -215,7 +239,9 @@ def save(result: SimResult, path: Path) -> None:
     meta = {"scenario": result.scenario.model_dump(mode="json"), "controller": result.controller,
             "source_hash": result.source_hash, "compile_log": result.compile_log,
             "summary": {k: (None if isinstance(v, float) and not math.isfinite(v) else v)
-                        for k, v in vars(s).items() if k != "i_rms"}}
+                        for k, v in vars(s).items() if k != "i_rms"},
+            "hil": None if result.hil is None else {k: (None if isinstance(v, float) and not math.isfinite(v) else v)
+                                                    for k, v in result.hil.items()}}
     path.with_suffix(".json").write_text(json.dumps(meta, allow_nan=False))
     tmp.replace(path)
 
@@ -228,7 +254,7 @@ def load(path: Path) -> SimResult:
         summary = SimSummary(i_rms=z["i_rms"],
                               **{k: math.nan if v is None else v for k, v in meta["summary"].items()})
     return SimResult(traces, summary, Scenario.model_validate(meta["scenario"]), meta["controller"],
-                     meta["source_hash"], meta["compile_log"])
+                     meta["source_hash"], meta["compile_log"], meta.get("hil"))
 
 
 def decimate(t: np.ndarray, y: np.ndarray, n_px: int) -> tuple[np.ndarray, np.ndarray]:

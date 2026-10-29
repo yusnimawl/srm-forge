@@ -6,7 +6,6 @@
 
 #define QUEUE_SIZE 65536
 #define SLOW_PERIOD_S 1.0e-3
-#define TWO_PI 6.283185307179586476925286766559
 
 typedef struct {
     int64_t step;
@@ -20,10 +19,9 @@ typedef struct {
     srm_conv_t conv;
     int64_t n, delay_steps;
     int in_isr, overflow;
-    double theta, omega;
-    double psi[SRM_SIM_MAX_PHASES], cur[SRM_SIM_MAX_PHASES], trq[SRM_SIM_MAX_PHASES], wf[SRM_SIM_MAX_PHASES];
+    srm_plant_t pl;
     srm_adc_t adc;
-    int adc_counts[SRM_SIM_MAX_PHASES];
+    int adc_counts[SRM_SIM_MAX_PHASES], adc_vcounts[SRM_SIM_MAX_PHASES];
     gate_event_t queue[QUEUE_SIZE];
     int64_t q_head, q_tail;
 } sim_t;
@@ -75,24 +73,27 @@ static void hal_set_pwm(uint8_t phase, float duty, srm_chop_t mode)
 
 static uint16_t hal_adc_read(uint8_t channel)
 {
-    return channel < S.cfg->n_phases ? (uint16_t)S.adc_counts[channel] : 0;
+    const int q = S.cfg->n_phases;
+    if (channel < q) return (uint16_t)S.adc_counts[channel];
+    if (channel < 2 * q && S.cfg->volt_full_scale > 0.0) return (uint16_t)S.adc_vcounts[channel - q];
+    return 0;
 }
 
 static uint32_t hal_encoder_count(void)
 {
-    return srm_encoder_count(S.cfg, S.theta);
+    return srm_encoder_count(S.cfg, S.pl.theta);
 }
 
 static void hal_resolver_sincos(int16_t *s, int16_t *c)
 {
     *s = 0;
     *c = 0;
-    if (S.cfg->resolver) srm_resolver(S.cfg, S.theta, s, c);
+    if (S.cfg->resolver) srm_resolver(S.cfg, S.pl.theta, s, c);
 }
 
 static uint32_t hal_micros(void)
 {
-    return (uint32_t)(int64_t)llround((double)S.n * S.cfg->dt * 1.0e6);
+    return (uint32_t)(int64_t)llround((double)S.n * S.cfg->dt * 1.0e6 * S.cfg->controller_clock);
 }
 
 static float hal_vbus_volts(void)
@@ -109,28 +110,17 @@ static double adc_amps(int counts)
 
 static void latch_adc(void)
 {
-    for (int k = 0; k < S.cfg->n_phases; k++) S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
-}
-
-static double eps(void)
-{
-    return TWO_PI / ((double)S.cfg->n_phases * (double)S.cfg->n_rotor_poles);
-}
-
-/* i, T and W of every phase at rotor angle theta and fluxes psi; returns the total torque. */
-static double eval_all(double theta, const double *psi, double *i, double *t, double *w)
-{
-    double sum = 0.0;
+    srm_adc_sample(&S.adc, S.cfg);
     for (int k = 0; k < S.cfg->n_phases; k++) {
-        srm_motor_eval(S.tab, theta - (double)k * eps(), psi[k], &i[k], &t[k], &w[k]);
-        sum += t[k];
+        S.adc_counts[k] = srm_adc_convert(&S.adc, S.cfg, k);
+        if (S.cfg->volt_full_scale > 0.0) S.adc_vcounts[k] = srm_adc_convert_volt(&S.adc, S.cfg, k);
     }
-    return sum;
 }
 
-static double load_torque(double t)
+static double adc_volts(int counts)
 {
-    return S.cfg->load + (t >= S.cfg->load_step_time ? S.cfg->load_step : 0.0);
+    return (double)(counts - (1 << (S.cfg->adc_bits - 1))) * 2.0 * S.cfg->volt_full_scale /
+           (double)((1 << S.cfg->adc_bits) - 1);
 }
 
 int srm_sim_abi(void) { return SRM_SIM_ABI; }
@@ -154,26 +144,27 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
 {
     const int q = cfg->n_phases;
     if (q < 1 || q > SRM_SIM_MAX_PHASES || cfg->n_steps < 1 || !(cfg->dt > 0.0) || cfg->trace_stride < 1 ||
-        cfg->adc_bits < 1 || cfg->adc_bits > 16 ||
-        cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1)
+        cfg->adc_bits < 1 || cfg->adc_bits > 16 || !(cfg->sensor_delay >= 0.0) || !(cfg->volt_full_scale >= 0.0) ||
+        !(cfg->volt_rc_tau >= 0.0) || srm_sensor_delay_steps(cfg) > SRM_DELAY_MAX || cfg->n_param_steps < 0 ||
+        (cfg->n_param_steps > 0 && !cfg->param_steps) ||
+        cfg->resolver_bits < 2 || cfg->resolver_bits > 16 || cfg->resolver_pole_pairs < 1 ||
+        !(cfg->controller_clock > 0.0) || !(cfg->sensor_delay_jitter >= 0.0) ||
+        srm_sensor_jitter_steps(cfg) + 1 > SRM_DELAY_MAX)
         return -1;
     memset(&S, 0, sizeof S);
     S.cfg = cfg;
     S.tab = tab;
     S.delay_steps = step_of(cfg->compute_delay, cfg->dt);
-    S.theta = cfg->theta0;
-    S.omega = cfg->speed;
     srm_conv_init(&S.conv, cfg);
     memset(sum, 0, sizeof *sum);
     sum->torque_min = INFINITY;
     sum->torque_max = -INFINITY;
 
     const double dt = cfg->dt, R = cfg->resistance;
-    const int dynamic = cfg->mode == 1;
-    double ttot = eval_all(S.theta, S.psi, S.cur, S.trq, S.wf);
-    for (int k = 0; k < q; k++) sum->w_field_start += S.wf[k];
+    srm_plant_init(&S.pl, cfg, tab);
+    for (int k = 0; k < q; k++) sum->w_field_start += S.pl.wf[k];
 
-    srm_adc_init(&S.adc, cfg, S.cur);
+    srm_adc_init(&S.adc, cfg, S.pl.cur);
 
     srm_hal_t hal = {0};
     hal.n_phases = (uint8_t)q;
@@ -183,6 +174,10 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     hal.adc_amps_per_count = (float)cfg->adc_amps_per_count;
     hal.adc_offset_counts = cfg->adc_offset_counts;
     hal.encoder_cpr = cfg->encoder_cpr;
+    if (cfg->volt_full_scale > 0.0) {
+        hal.adc_volts_per_count = (float)(2.0 * cfg->volt_full_scale / (double)((1 << cfg->adc_bits) - 1));
+        hal.adc_volt_offset_counts = 1 << (cfg->adc_bits - 1);
+    }
     hal.set_switches = hal_set_switches;
     hal.set_pwm = hal_set_pwm;
     hal.adc_read = hal_adc_read;
@@ -195,25 +190,40 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
     ctrl_init(&hal);
     ctrl_command(cfg->command_mode == 1 ? SRM_CMD_SPEED : SRM_CMD_TORQUE, (float)cfg->command_value);
 
+    /* ISR and ctrl_slow instants in true time, on the controller's clock */
+    const double isr_hz = cfg->isr_hz * cfg->controller_clock, slow_period = SLOW_PERIOD_S / cfg->controller_clock;
     int64_t isr_k = 0, slow_k = 1;
-    int64_t next_isr = step_of(0.5 / cfg->isr_hz, dt), next_slow = step_of(SLOW_PERIOD_S, dt);
+    int64_t next_isr = step_of(0.5 / isr_hz, dt), next_slow = step_of(slow_period, dt);
     const int64_t window_start = cfg->n_steps / 2;
-    double adc_hold[SRM_SIM_MAX_PHASES] = {0};
+    double adc_hold[SRM_SIM_MAX_PHASES] = {0}, adc_vhold[SRM_SIM_MAX_PHASES] = {0};
+    int32_t next_step = 0;
     int64_t n_out = 0;
 
     for (int64_t n = 0; n < cfg->n_steps; n++) {
         const double t = (double)n * dt;
         S.n = n;
         while (n >= next_isr) {
+            while (next_step < cfg->n_param_steps && cfg->param_steps[next_step].t <= t + 1.0e-9 * dt) {
+                char name[sizeof cfg->param_steps[0].name];
+                memcpy(name, cfg->param_steps[next_step].name, sizeof name);
+                name[sizeof name - 1] = '\0';
+                int rc = ctrl_param(name, cfg->param_steps[next_step].value);
+                next_step++;
+                if (rc != 0) {
+                    sum->refused = next_step;
+                    sum->refused_code = rc;
+                    return -3;
+                }
+            }
             latch_adc();
             S.in_isr = 1;
             ctrl_isr();
             S.in_isr = 0;
-            next_isr = step_of(((double)(++isr_k) + 0.5) / cfg->isr_hz, dt);
+            next_isr = step_of(((double)(++isr_k) + 0.5) / isr_hz, dt);
         }
         while (n >= next_slow) {
             ctrl_slow();
-            next_slow = step_of((double)(++slow_k) * SLOW_PERIOD_S, dt);
+            next_slow = step_of((double)(++slow_k) * slow_period, dt);
         }
         while (S.q_head < S.q_tail && S.queue[S.q_head % QUEUE_SIZE].step <= n) apply_event(&S.queue[S.q_head++ % QUEUE_SIZE]);
         if (S.overflow) return -2;
@@ -222,21 +232,22 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
         double v[SRM_SIM_MAX_PHASES], pin = 0.0, cu = 0.0;
         int beyond = 0;
         for (int k = 0; k < q; k++) {
-            v[k] = srm_conv_voltage(&S.conv, k, S.cur[k]);
-            pin += v[k] * S.cur[k];
-            cu += R * S.cur[k] * S.cur[k];
-            if (S.cur[k] > tab->i_max || S.psi[k] > tab->psi_max) beyond = 1;
+            v[k] = srm_conv_voltage(&S.conv, k, S.pl.cur[k]);
+            pin += v[k] * S.pl.cur[k];
+            cu += R * S.pl.cur[k] * S.pl.cur[k];
+            if (S.pl.cur[k] > tab->i_max || S.pl.psi[k] > tab->psi_max) beyond = 1;
             adc_hold[k] = adc_amps(S.adc_counts[k]);
+            if (cfg->volt_full_scale > 0.0) adc_vhold[k] = adc_volts(S.adc_vcounts[k]);
         }
         sum->beyond_map_steps += beyond;
-        const double pmech = ttot * S.omega;
+        const double pmech = S.pl.ttot * S.pl.omega;
 
         if (n % cfg->trace_stride == 0) {
             int64_t o = n / cfg->trace_stride;
             trace->t[o] = t;
-            trace->theta[o] = S.theta;
-            trace->omega[o] = S.omega;
-            trace->torque[o] = ttot;
+            trace->theta[o] = S.pl.theta;
+            trace->omega[o] = S.pl.omega;
+            trace->torque[o] = S.pl.ttot;
             trace->encoder[o] = (double)hal_encoder_count();
             int16_t rs, rc;
             hal_resolver_sincos(&rs, &rc);
@@ -244,10 +255,11 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
             trace->resolver_cos[o] = rc;
             for (int k = 0; k < q; k++) {
                 int64_t at = (int64_t)k * trace->n_samples + o;
-                trace->i[at] = (float)S.cur[k];
-                trace->psi[at] = (float)S.psi[k];
+                trace->i[at] = (float)S.pl.cur[k];
+                trace->psi[at] = (float)S.pl.psi[k];
                 trace->v[at] = (float)v[k];
                 trace->adc_i[at] = (float)adc_hold[k];
+                trace->adc_v[at] = (float)adc_vhold[k];
                 trace->gate_u[at] = (uint8_t)S.conv.ph[k].u_eff;
                 trace->gate_l[at] = (uint8_t)S.conv.ph[k].l_eff;
             }
@@ -255,48 +267,26 @@ int srm_sim_run(const srm_sim_config_t *cfg, const srm_sim_tables_t *tab, srm_si
         }
         if (n >= window_start) {
             sum->window_steps++;
-            sum->torque_sum += ttot;
-            if (ttot < sum->torque_min) sum->torque_min = ttot;
-            if (ttot > sum->torque_max) sum->torque_max = ttot;
+            sum->torque_sum += S.pl.ttot;
+            if (S.pl.ttot < sum->torque_min) sum->torque_min = S.pl.ttot;
+            if (S.pl.ttot > sum->torque_max) sum->torque_max = S.pl.ttot;
             sum->copper_sum += cu;
             sum->power_in_sum += pin;
             sum->power_mech_sum += pmech;
-            for (int k = 0; k < q; k++) sum->i2_sum[k] += S.cur[k] * S.cur[k];
+            for (int k = 0; k < q; k++) sum->i2_sum[k] += S.pl.cur[k] * S.pl.cur[k];
         }
 
-        /* Heun step with the converter voltage held over the step */
-        const double load0 = load_torque(t), load1 = load_torque(t + dt);
-        double k1[SRM_SIM_MAX_PHASES], psi_p[SRM_SIM_MAX_PHASES], i_p[SRM_SIM_MAX_PHASES], t_p[SRM_SIM_MAX_PHASES],
-            w_p[SRM_SIM_MAX_PHASES];
-        const double a1 = dynamic ? (ttot - cfg->friction * S.omega - load0) / cfg->inertia : 0.0;
-        for (int k = 0; k < q; k++) {
-            k1[k] = v[k] - R * S.cur[k];
-            psi_p[k] = S.psi[k] + dt * k1[k];
-        }
-        const double omega_p = S.omega + dt * a1;
-        const double tt_p = eval_all(S.theta + dt * S.omega, psi_p, i_p, t_p, w_p);
-        const double a2 = dynamic ? (tt_p - cfg->friction * omega_p - load1) / cfg->inertia : 0.0;
-        for (int k = 0; k < q; k++) {
-            double psi = S.psi[k] + 0.5 * dt * (k1[k] + (v[k] - R * i_p[k]));
-            S.psi[k] = psi > 0.0 ? psi : 0.0;
-        }
-        const double theta_new = dynamic ? S.theta + 0.5 * dt * (S.omega + omega_p)
-                                         : cfg->theta0 + cfg->speed * (double)(n + 1) * dt;
-        const double omega_new = S.omega + 0.5 * dt * (a1 + a2);
         double i_old[SRM_SIM_MAX_PHASES];
-        memcpy(i_old, S.cur, sizeof i_old);
-        const double ttot_new = eval_all(theta_new, S.psi, S.cur, S.trq, S.wf);
+        memcpy(i_old, S.pl.cur, sizeof i_old);
+        srm_plant_step(&S.pl, cfg, tab, v, t, n);
         for (int k = 0; k < q; k++) {
-            sum->energy_in += dt * v[k] * 0.5 * (i_old[k] + S.cur[k]);
-            sum->energy_copper += dt * R * 0.5 * (i_old[k] * i_old[k] + S.cur[k] * S.cur[k]);
+            sum->energy_in += dt * v[k] * 0.5 * (i_old[k] + S.pl.cur[k]);
+            sum->energy_copper += dt * R * 0.5 * (i_old[k] * i_old[k] + S.pl.cur[k] * S.pl.cur[k]);
         }
-        sum->energy_mech += dt * 0.5 * (pmech + ttot_new * omega_new);
-        S.theta = theta_new;
-        S.omega = omega_new;
-        ttot = ttot_new;
-        srm_adc_filter(&S.adc, cfg, S.cur);
+        sum->energy_mech += dt * 0.5 * (pmech + S.pl.ttot * S.pl.omega);
+        srm_adc_filter(&S.adc, cfg, S.pl.cur, v);
     }
-    for (int k = 0; k < q; k++) sum->w_field_end += S.wf[k];
+    for (int k = 0; k < q; k++) sum->w_field_end += S.pl.wf[k];
     trace->n_samples = n_out;
     return 0;
 }

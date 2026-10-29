@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_STEPS = 50_000_000
+MAX_DELAY_STEPS = 2048   # size of the sensor delay and jitter rings in c/plant/srm_sensors.h
+MAX_PARAM_NAME = 23
 
 
 class _Model(BaseModel):
@@ -31,6 +34,10 @@ class SensorSettings(_Model):
     resolver_bits: int = Field(12, ge=2, le=16)
     resolver_gain_mismatch: float = 0.0      # cos amplitude = 1 + mismatch, sin = 1
     resolver_phase_error: float = 0.0        # rad, added to the cos argument
+    delay: float = Field(0.0, ge=0, le=1e-3)  # s, transport delay of the sensed currents and voltages
+    # s: each controller sample sees the sensed values delay + u * delay_jitter old, u ~ U(0, 1) per ISR sample
+    # from the run's seeded RNG
+    delay_jitter: float = Field(0.0, ge=0, le=1e-4)
 
 
 class AdcSettings(_Model):
@@ -41,12 +48,29 @@ class AdcSettings(_Model):
     gain_error: float = 0.0                  # relative
     noise: float = Field(0.0, ge=0)          # counts, Gaussian sigma
     rc_tau: float = Field(0.0, ge=0)         # s, first-order filter on the sensed current, 0 = none
+    volt_full_scale: float | None = Field(None, gt=0)   # V at the top code of the bipolar phase-voltage channels, None = none
+    volt_rc_tau: float = Field(10e-6, ge=0)  # s, first-order filter on the sensed voltages
 
     @model_validator(mode="after")
     def _check_offset(self):
         if self.offset_counts > 2**self.bits - 1:
             raise ValueError(f"offset_counts {self.offset_counts} exceeds the top code {2**self.bits - 1}")
         return self
+
+
+class ParamStep(_Model):
+    """A controller parameter changed during the run, just before the first ISR at or after `time`."""
+
+    time: float = Field(ge=0)                # s
+    name: str = Field(min_length=1, max_length=MAX_PARAM_NAME)
+    value: float
+
+    @field_validator("name")
+    @classmethod
+    def _ascii(cls, v: str) -> str:
+        if not v.isascii():
+            raise ValueError("parameter names are ASCII")
+        return v
 
 
 class Scenario(_Model):
@@ -66,11 +90,16 @@ class Scenario(_Model):
     pwm_hz: float = Field(20000.0, gt=0)
     isr_hz: float | None = Field(None, gt=0)        # None = pwm_hz
     compute_delay: float | None = Field(None, ge=0)  # s, None = one ISR period
+    # The controller's clock frequency / its nominal frequency (1 = exact): its ISR, ctrl_slow, PWM carrier and
+    # micros() run this much faster in true time. The HAL constants pwm_hz and isr_hz stay nominal, and
+    # compute_delay, sensors.delay, the plant and the sensors stay in true time.
+    controller_clock: float = Field(1.0, ge=0.9, le=1.1)
     seed: int = Field(0, ge=0, lt=2**32)
     params: dict[str, float] = {}
     converter: ConverterSettings = ConverterSettings()
     sensors: SensorSettings = SensorSettings()
     adc: AdcSettings = AdcSettings()
+    param_steps: list[ParamStep] = []
 
     @property
     def n_steps(self) -> int:
@@ -91,6 +120,14 @@ class Scenario(_Model):
             raise ValueError(f"duration {self.duration} s is shorter than one step of {self.dt} s")
         if n > MAX_STEPS:
             raise ValueError(f"{n} steps (duration / dt) exceed the limit of {MAX_STEPS}; shorten the run or raise dt")
-        if self.pwm_hz * self.dt > 1 or self.resolved_isr_hz * self.dt > 1:
-            raise ValueError("pwm_hz and isr_hz must not exceed 1 / dt")
+        if max(self.pwm_hz, self.resolved_isr_hz) * self.controller_clock * self.dt > 1:   # true-time rates
+            raise ValueError("pwm_hz and isr_hz (times controller_clock) must not exceed 1 / dt")
+        steps = math.floor(self.sensors.delay / self.dt + 0.5)   # the rule of srm_sensor_delay_steps
+        if steps > MAX_DELAY_STEPS:
+            raise ValueError(f"sensor delay {self.sensors.delay} s is {steps} steps of {self.dt} s, over the limit of "
+                             f"{MAX_DELAY_STEPS}; raise dt or shorten the delay")
+        span = math.floor((self.sensors.delay + self.sensors.delay_jitter) / self.dt + 0.5) - steps   # srm_sensors.c
+        if self.sensors.delay_jitter > 0 and span + 1 > MAX_DELAY_STEPS:
+            raise ValueError(f"sensor delay jitter {self.sensors.delay_jitter} s spans {span} steps of {self.dt} s, over "
+                             f"the limit of {MAX_DELAY_STEPS - 1}; raise dt or shorten the jitter")
         return self

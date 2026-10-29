@@ -6,21 +6,31 @@
 #include "srm_ref.h"
 
 static const srm_hal_t *hal;
-static float kp = 0.0f;     /* V/A; 0 = derived from f_bw */
-static float ki = 0.0f;     /* V/(A*s); 0 = derived from f_bw */
+static float kp_set = 0.0f;   /* V/A; 0 = derived from f_bw */
+static float ki_set = 0.0f;   /* V/(A*s); 0 = derived from f_bw */
+static float kp, ki;          /* gains in use */
 static float f_bw = 0.0f;   /* Hz; 0 = pwm_hz / 20 */
 static float integ[SRM_N_PHASES];   /* V */
 static float dt;
 
 static const srm_ref_param_t own[] = {
-    {"kp", &kp},
-    {"ki", &ki},
+    {"kp", &kp_set},
+    {"ki", &ki_set},
     {"f_bw", &f_bw},
 };
 
+static void set_gains(void)
+{
+    kp = kp_set;
+    ki = ki_set;
+    srm_ref_pi_gains(hal, f_bw, &kp, &ki);
+}
+
 int ctrl_param(const char *name, float value)
 {
-    return srm_ref_param(own, (int)(sizeof own / sizeof own[0]), name, value);
+    int rc = srm_ref_param(own, (int)(sizeof own / sizeof own[0]), name, value);
+    if (rc == 0 && hal) set_gains();
+    return rc;
 }
 
 void ctrl_init(const srm_hal_t *h)
@@ -28,7 +38,7 @@ void ctrl_init(const srm_hal_t *h)
     hal = h;
     srm_ref_init(h);
     dt = srm_ref_ok() ? 1.0f / h->isr_hz : 0.0f;
-    srm_ref_pi_gains(h, f_bw, &kp, &ki);
+    set_gains();
     for (int k = 0; k < SRM_N_PHASES; k++) integ[k] = 0.0f;
 }
 

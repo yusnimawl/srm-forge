@@ -13,7 +13,7 @@ jobs:
         os: ${{ fromJSON(startsWith(github.ref, 'refs/tags/v') && '["windows-latest", "ubuntu-latest"]' || '["ubuntu-latest"]') }}
         python-version: ${{ fromJSON(startsWith(github.ref, 'refs/tags/v') && '["3.12", "3.14"]' || '["3.12"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

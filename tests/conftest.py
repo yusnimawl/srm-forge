@@ -22,3 +22,10 @@ def srm_24_16() -> RadialSRMParams:
 @pytest.fixture(params=["8/6", "12/8", "24/16"])
 def reference_design(request) -> RadialSRMParams:
     return REFERENCES[request.param]()
+
+
+def pytest_collection_modifyitems(config, items):
+    # The HIL tests compile firmware and run long simulations; they stay out of the fast suite.
+    for item in items:
+        if "/tests/hil/" in item.path.as_posix():
+            item.add_marker(pytest.mark.slow)

@@ -4,11 +4,12 @@
 
 void srm_conv_init(srm_conv_t *c, const srm_sim_config_t *cfg)
 {
+    c->cfg = cfg;
     c->n_phases = cfg->n_phases;
     c->bus = cfg->bus_voltage;
     c->v_switch = cfg->v_switch;
     c->v_diode = cfg->v_diode;
-    c->pwm_hz = cfg->pwm_hz;
+    c->pwm_hz = cfg->pwm_hz * cfg->controller_clock;    /* the carrier runs on the controller's clock */
     c->rise_steps = (int64_t)llround((cfg->dead_time + cfg->turn_on_delay) / cfg->dt);
     c->fall_steps = (int64_t)llround(cfg->turn_off_delay / cfg->dt);
     for (int k = 0; k < SRM_SIM_MAX_PHASES; k++) {
@@ -67,7 +68,5 @@ void srm_conv_step(srm_conv_t *c, double t)
 double srm_conv_voltage(const srm_conv_t *c, int phase, double current)
 {
     const srm_phase_gates_t *g = &c->ph[phase];
-    if (g->u_eff && g->l_eff) return c->bus - 2.0 * c->v_switch;
-    if (g->u_eff || g->l_eff) return current > 0.0 ? -(c->v_switch + c->v_diode) : 0.0;
-    return current > 0.0 ? -(c->bus + 2.0 * c->v_diode) : 0.0;
+    return srm_ahb_voltage(c->cfg, g->u_eff, g->l_eff, current);
 }

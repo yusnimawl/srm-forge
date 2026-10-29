@@ -53,10 +53,10 @@ def _incs(include_dirs: list[Path]) -> list[str]:
     return [f"-I{d}" for d in include_dirs]
 
 
-def _cache_key(sources: list[Path], include_dirs: list[Path]) -> str:
+def _cache_key(sources: list[Path], include_dirs: list[Path], flags: list[str]) -> str:
     h = hashlib.sha256()
     h.update(_zig_version().encode())
-    h.update(" ".join(HOST_FLAGS).encode())
+    h.update(" ".join(flags).encode())
     for s in sources:
         h.update(Path(s).read_bytes())
     for d in include_dirs:
@@ -65,19 +65,22 @@ def _cache_key(sources: list[Path], include_dirs: list[Path]) -> str:
     return h.hexdigest()
 
 
-def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path, log: list[str] | None = None) -> Path:
-    """Compile (or find in the cache) the host library. `log`, if given, receives the compiler output of a fresh build."""
+def compile_host(sources: list[Path], include_dirs: list[Path], out_dir: Path, log: list[str] | None = None,
+                 defines: tuple[str, ...] = ()) -> Path:
+    """Compile (or find in the cache) the host library. `log`, if given, receives the compiler output of a fresh build;
+    `defines` are extra `-D` macros."""
+    flags = [*HOST_FLAGS, *(f"-D{d}" for d in defines)]
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = ".dll" if os.name == "nt" else ".so"
-    lib = out_dir / f"srmsil_{_cache_key(sources, include_dirs)[:32]}{suffix}"
+    lib = out_dir / f"srmsil_{_cache_key(sources, include_dirs, flags)[:32]}{suffix}"
     if lib.exists():
         return lib
     fd, tmp = tempfile.mkstemp(suffix=suffix, dir=out_dir)
     os.close(fd)
     try:
         r = subprocess.run(
-            [*zig_cc(), *HOST_FLAGS, *_incs(include_dirs), "-o", tmp, *map(str, sources)],
+            [*zig_cc(), *flags, *_incs(include_dirs), "-o", tmp, *map(str, sources)],
             capture_output=True, text=True,
         )
         if r.returncode != 0:

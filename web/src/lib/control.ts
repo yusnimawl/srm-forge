@@ -63,12 +63,18 @@ export function defaultScenario(busVoltage?: number | null, peakTorque?: number 
     compute_delay: null,
     seed: 0,
     params: {},
+    param_steps: [],
+    controller_clock: 1,
     converter: { v_switch: 1, v_diode: 1, dead_time: 0.5e-6, turn_on_delay: 0.1e-6, turn_off_delay: 0.2e-6 },
     sensors: {
       encoder_cpr: 4096, encoder_offset: 0, encoder_ecc_amp: 0, encoder_ecc_harmonic: 1, resolver: false,
-      resolver_pole_pairs: 1, resolver_bits: 12, resolver_gain_mismatch: 0, resolver_phase_error: 0,
+      resolver_pole_pairs: 1, resolver_bits: 12, resolver_gain_mismatch: 0, resolver_phase_error: 0, delay: 0,
+      delay_jitter: 0,
     },
-    adc: { bits: 12, full_scale: null, offset_counts: 0, offset_error: 0, gain_error: 0, noise: 0, rc_tau: 0 },
+    adc: {
+      bits: 12, full_scale: null, offset_counts: 0, offset_error: 0, gain_error: 0, noise: 0, rc_tau: 0,
+      volt_full_scale: null, volt_rc_tau: 1e-5,
+    },
   }
 }
 

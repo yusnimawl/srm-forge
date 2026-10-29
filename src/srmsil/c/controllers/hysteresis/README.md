@@ -21,6 +21,8 @@ the rise during one ISR period plus the compute delay.
 | `torque_limit` | N*m | SRM_T_MAX_NM |
 | `resolver_pole_pairs` | - | 1 |
 
+Live changes (`ctrl_param` while the controller runs, in the SIL with a parameter step and on the HIL with Set parameter): `band`, `soft`, `theta_on`, `theta_off`, `speed_kp`, `speed_ki`, `speed_filter_hz` and `torque_limit` return 0 and the new value is used from the next ISR. `resolver_pole_pairs` returns -2 once `ctrl_init` has run (it sets the angle range), so set it before the run; a name the controller does not have returns -1. On the HIL the controller board's serial link also refuses a name over 23 bytes and a value that is not finite.
+
 ## Notes
 
 - The window may wrap through 0/360 degrees: `theta_on` = -15 starts conduction 15 degrees before the unaligned

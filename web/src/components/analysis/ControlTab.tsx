@@ -6,6 +6,7 @@ import type { Case } from "@/api/types"
 import { useControllers, useControlScopes, useRunControl, useTargetCheck } from "@/api/control"
 import { useJobActions } from "@/api/useJobActions"
 import { useJobEvents } from "@/api/useJobEvents"
+import HilPanel from "./HilPanel"
 import { JobStepper } from "@/components/run/JobStepper"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -136,6 +137,7 @@ export default function ControlTab({ caseId, busVoltage, peakTorque, baseSpeedRp
   const [busy, setBusy] = useState(false)
   const [custom, setCustom] = useState<{ name: string; value: string }[]>([])
   const [headerError, setHeaderError] = useState<string | null>(null)
+  const [mode, setMode] = useState<"sil" | "hil">("sil")
 
   const info = controllers.data?.find((c) => c.name === choice)
   const controller = choice === CUSTOM ? folder.trim() : choice
@@ -181,6 +183,13 @@ export default function ControlTab({ caseId, busVoltage, peakTorque, baseSpeedRp
 
   return (
     <div className="@container space-y-4 pt-2">
+      <div role="group" aria-label="Run on" className="flex gap-2">
+        {(["sil", "hil"] as const).map((m) => (
+          <Button key={m} type="button" variant={mode === m ? "default" : "outline"} className="min-h-11" aria-pressed={mode === m} onClick={() => setMode(m)}>
+            {m.toUpperCase()}
+          </Button>
+        ))}
+      </div>
       <section className="space-y-3" aria-label="Controller">
         <div className="grid gap-3 @2xl:grid-cols-2">
           <div className="space-y-1.5">
@@ -280,33 +289,40 @@ export default function ControlTab({ caseId, busVoltage, peakTorque, baseSpeedRp
             </label>
           </div>
         </details>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" className="min-h-11" disabled={invalid || running || !controller}
-            onClick={() => run.mutate({ controller, scenario: { ...sc, bus_voltage: bus ?? null, params: sent } }, { onSuccess: (r) => setJobId(r.job_id) })}>
-            {run.isPending ? "Starting..." : "Run"}
-          </Button>
-          <Button type="button" variant="outline" className="min-h-11" disabled={!controller || check.isPending} onClick={() => check.mutate(controller)}>
-            {check.isPending ? "Checking..." : "Check for target"}
-          </Button>
-          <Button type="button" variant="outline" className="min-h-11" onClick={downloadHeader}>Download srm_motor_tables.h</Button>
-          {last && last.id !== jobId && (
-            <Button type="button" variant="outline" className="min-h-11" onClick={() => setJobId(last.id)}>Load the last run</Button>
-          )}
-        </div>
-        {headerError && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{headerError}</p>}
-        {run.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(run.error)}</p>}
-        {check.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(check.error)}</p>}
-        {check.data && (
-          <div className="space-y-1" role="status">
-            <p className={`text-sm font-medium ${check.data.ok ? "" : "text-destructive"}`}>
-              {check.data.ok ? `Target check passed (${check.data.compiler})` : `Target check failed (${check.data.compiler})`}
-            </p>
-            {check.data.log && <pre className="max-h-60 overflow-auto rounded-[10px] border border-border p-3 font-mono text-xs whitespace-pre-wrap">{check.data.log}</pre>}
-          </div>
+        {mode === "sil" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" className="min-h-11" disabled={invalid || running || !controller}
+                onClick={() => run.mutate({ controller, scenario: { ...sc, bus_voltage: bus ?? null, params: sent } }, { onSuccess: (r) => setJobId(r.job_id) })}>
+                {run.isPending ? "Starting..." : "Run"}
+              </Button>
+              <Button type="button" variant="outline" className="min-h-11" disabled={!controller || check.isPending} onClick={() => check.mutate(controller)}>
+                {check.isPending ? "Checking..." : "Check for target"}
+              </Button>
+              <Button type="button" variant="outline" className="min-h-11" onClick={downloadHeader}>Download srm_motor_tables.h</Button>
+              {last && last.id !== jobId && (
+                <Button type="button" variant="outline" className="min-h-11" onClick={() => setJobId(last.id)}>Load the last run</Button>
+              )}
+            </div>
+            {headerError && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{headerError}</p>}
+            {run.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(run.error)}</p>}
+            {check.error && <p role="alert" className="rounded-[10px] border border-destructive p-3 text-sm text-destructive">{errorMessage(check.error)}</p>}
+            {check.data && (
+              <div className="space-y-1" role="status">
+                <p className={`text-sm font-medium ${check.data.ok ? "" : "text-destructive"}`}>
+                  {check.data.ok ? `Target check passed (${check.data.compiler})` : `Target check failed (${check.data.compiler})`}
+                </p>
+                {check.data.log && <pre className="max-h-60 overflow-auto rounded-[10px] border border-border p-3 font-mono text-xs whitespace-pre-wrap">{check.data.log}</pre>}
+              </div>
+            )}
+          </>
+        ) : (
+          <HilPanel caseId={caseId} controller={controller} scenario={{ ...sc, bus_voltage: bus ?? null, params: sent }} params={info?.params ?? []} custom={choice === CUSTOM} invalid={invalid}
+            activeFlashId={(caseQ.data?.jobs ?? []).find((j) => j.kind === "hil_flash" && j.active)?.id} />
         )}
       </section>
 
-      {jobId && (
+      {mode === "sil" && jobId && (
         <section className="border-t border-border pt-4" aria-label="Run">
           <RunView key={jobId} caseId={caseId} jobId={jobId} onBusy={setBusy} />
         </section>

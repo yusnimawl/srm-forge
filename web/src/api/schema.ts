@@ -195,6 +195,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/hil/flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Flash */
+        post: operations["hil_flash_api_cases__case_id__hil_flash_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/losses": {
         parameters: {
             query?: never;
@@ -391,6 +408,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hil/captures/{capture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hil Capture Traces
+         * @description The capture's traces decimated to n_px buckets (`t.<trace>`, `y.<trace>`), and once compared the matched
+         *     SIL run's over the capture's time span (`t.sil.<trace>`, `y.sil.<trace>`).
+         */
+        get: operations["hil_capture_traces_api_hil_captures__capture_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/captures/{capture_id}/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hil Compare */
+        get: operations["hil_compare_api_hil_captures__capture_id__compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Open */
+        post: operations["hil_open_api_hil_session_post"];
+        /** Hil Close */
+        delete: operations["hil_close_api_hil_session_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Capture */
+        post: operations["hil_capture_api_hil_session_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Command */
+        post: operations["hil_command_api_hil_session_command_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hil Events
+         * @description Live statistics of both boards (`event: live`, data `{session, emu, ctrl}`), polled at 20 Hz and sent when
+         *     they change; `event: end` once the session is closed, `event: link_lost` (data `{error}`) when a board link fails.
+         */
+        get: operations["hil_events_api_hil_session_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/param": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Param */
+        post: operations["hil_param_api_hil_session_param_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Start */
+        post: operations["hil_start_api_hil_session_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hil/session/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hil Stop */
+        post: operations["hil_stop_api_hil_session_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs": {
         parameters: {
             query?: never;
@@ -487,6 +666,26 @@ export interface paths {
         };
         /** Job Frames */
         get: operations["job_frames_api_jobs__job_id__frames_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/hil-flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hil Flash Result
+         * @description The build log and firmware hash of a finished Build & Flash job.
+         */
+        get: operations["hil_flash_result_api_jobs__job_id__hil_flash_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -704,6 +903,13 @@ export interface components {
              * @default 0
              */
             rc_tau: number;
+            /** Volt Full Scale */
+            volt_full_scale?: number | null;
+            /**
+             * Volt Rc Tau
+             * @default 0.00001
+             */
+            volt_rc_tau: number;
         };
         /** AnimateIn */
         AnimateIn: {
@@ -939,6 +1145,30 @@ export interface components {
             /** Unit */
             unit: string;
         };
+        /**
+         * ComparisonOut
+         * @description `srmsil.hil.compare.Comparison`; a difference is None when it is not finite.
+         */
+        ComparisonOut: {
+            /** Clock Measured */
+            clock_measured: boolean;
+            /** Clock Ratio */
+            clock_ratio: number | null;
+            /** D Irms Pct */
+            d_irms_pct: number | null;
+            /** D Ripple Pts */
+            d_ripple_pts: number | null;
+            /** D Torque Pct */
+            d_torque_pct: number | null;
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason: string;
+            /** Ripple Window Hil */
+            ripple_window_hil: number | null;
+            /** Ripple Window Sil */
+            ripple_window_sil: number | null;
+        };
         /** ControlIn */
         ControlIn: {
             /** Controller */
@@ -951,10 +1181,12 @@ export interface components {
              *         "noise": 0,
              *         "offset_counts": 0,
              *         "offset_error": 0,
-             *         "rc_tau": 0
+             *         "rc_tau": 0,
+             *         "volt_rc_tau": 0.00001
              *       },
              *       "command_mode": "torque",
              *       "command_value": 0,
+             *       "controller_clock": 1,
              *       "converter": {
              *         "dead_time": 5e-7,
              *         "turn_off_delay": 2e-7,
@@ -970,10 +1202,13 @@ export interface components {
              *       "load_step": 0,
              *       "load_step_time": 0,
              *       "mode": "fixed",
+             *       "param_steps": [],
              *       "params": {},
              *       "pwm_hz": 20000,
              *       "seed": 0,
              *       "sensors": {
+             *         "delay": 0,
+             *         "delay_jitter": 0,
              *         "encoder_cpr": 4096,
              *         "encoder_ecc_amp": 0,
              *         "encoder_ecc_harmonic": 1,
@@ -1269,6 +1504,227 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HilCaptureIn */
+        HilCaptureIn: {
+            /** N Steps */
+            n_steps: number;
+        };
+        /** HilCaptureOut */
+        HilCaptureOut: {
+            /** Capture Id */
+            capture_id: string;
+            /** Clipped */
+            clipped: number;
+            /** Reason */
+            reason: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /** HilCommandIn */
+        HilCommandIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "torque" | "speed";
+            /** Value */
+            value: number;
+        };
+        /** HilFlashIn */
+        HilFlashIn: {
+            /** Controller */
+            controller: string;
+            /**
+             * @default {
+             *       "current_sense": "ad7606",
+             *       "dac": "mcp4922x2",
+             *       "position": "encoder"
+             *     }
+             */
+            modes: components["schemas"]["HilModes"];
+            /**
+             * @default {
+             *       "adc": {
+             *         "bits": 12,
+             *         "gain_error": 0,
+             *         "noise": 0,
+             *         "offset_counts": 0,
+             *         "offset_error": 0,
+             *         "rc_tau": 0,
+             *         "volt_rc_tau": 0.00001
+             *       },
+             *       "command_mode": "torque",
+             *       "command_value": 0,
+             *       "controller_clock": 1,
+             *       "converter": {
+             *         "dead_time": 5e-7,
+             *         "turn_off_delay": 2e-7,
+             *         "turn_on_delay": 1e-7,
+             *         "v_diode": 1,
+             *         "v_switch": 1
+             *       },
+             *       "dt": 5e-7,
+             *       "duration": 0.02,
+             *       "friction": 0,
+             *       "inertia": 0.001,
+             *       "load": 0,
+             *       "load_step": 0,
+             *       "load_step_time": 0,
+             *       "mode": "fixed",
+             *       "param_steps": [],
+             *       "params": {},
+             *       "pwm_hz": 20000,
+             *       "seed": 0,
+             *       "sensors": {
+             *         "delay": 0,
+             *         "delay_jitter": 0,
+             *         "encoder_cpr": 4096,
+             *         "encoder_ecc_amp": 0,
+             *         "encoder_ecc_harmonic": 1,
+             *         "encoder_offset": 0,
+             *         "resolver": false,
+             *         "resolver_bits": 12,
+             *         "resolver_gain_mismatch": 0,
+             *         "resolver_phase_error": 0,
+             *         "resolver_pole_pairs": 1
+             *       },
+             *       "speed_rpm": 1000,
+             *       "theta0": 0
+             *     }
+             */
+            scenario: components["schemas"]["Scenario"];
+        };
+        /**
+         * HilFlashResultOut
+         * @description The result of a finished `hil_flash` job: the end of the PlatformIO log of the upload.
+         */
+        HilFlashResultOut: {
+            /** Case Id */
+            case_id: string;
+            /** Controller */
+            controller: string;
+            /** Firmware Hash */
+            firmware_hash: number;
+            /** Log */
+            log: string;
+            modes: components["schemas"]["HilModes"];
+        };
+        /** HilModes */
+        HilModes: {
+            /**
+             * Current Sense
+             * @default ad7606
+             * @enum {string}
+             */
+            current_sense: "ad7606" | "internal";
+            /**
+             * Dac
+             * @default mcp4922x2
+             * @enum {string}
+             */
+            dac: "mcp4922x2" | "mcp4921x4";
+            /**
+             * Position
+             * @default encoder
+             * @enum {string}
+             */
+            position: "encoder" | "ad2s1210" | "both";
+        };
+        /** HilOpenIn */
+        HilOpenIn: {
+            /** Case Id */
+            case_id: string;
+            /** Controller */
+            controller: string;
+            /**
+             * @default {
+             *       "current_sense": "ad7606",
+             *       "dac": "mcp4922x2",
+             *       "position": "encoder"
+             *     }
+             */
+            modes: components["schemas"]["HilModes"];
+            /**
+             * @default {
+             *       "adc": {
+             *         "bits": 12,
+             *         "gain_error": 0,
+             *         "noise": 0,
+             *         "offset_counts": 0,
+             *         "offset_error": 0,
+             *         "rc_tau": 0,
+             *         "volt_rc_tau": 0.00001
+             *       },
+             *       "command_mode": "torque",
+             *       "command_value": 0,
+             *       "controller_clock": 1,
+             *       "converter": {
+             *         "dead_time": 5e-7,
+             *         "turn_off_delay": 2e-7,
+             *         "turn_on_delay": 1e-7,
+             *         "v_diode": 1,
+             *         "v_switch": 1
+             *       },
+             *       "dt": 5e-7,
+             *       "duration": 0.02,
+             *       "friction": 0,
+             *       "inertia": 0.001,
+             *       "load": 0,
+             *       "load_step": 0,
+             *       "load_step_time": 0,
+             *       "mode": "fixed",
+             *       "param_steps": [],
+             *       "params": {},
+             *       "pwm_hz": 20000,
+             *       "seed": 0,
+             *       "sensors": {
+             *         "delay": 0,
+             *         "delay_jitter": 0,
+             *         "encoder_cpr": 4096,
+             *         "encoder_ecc_amp": 0,
+             *         "encoder_ecc_harmonic": 1,
+             *         "encoder_offset": 0,
+             *         "resolver": false,
+             *         "resolver_bits": 12,
+             *         "resolver_gain_mismatch": 0,
+             *         "resolver_phase_error": 0,
+             *         "resolver_pole_pairs": 1
+             *       },
+             *       "speed_rpm": 1000,
+             *       "theta0": 0
+             *     }
+             */
+            scenario: components["schemas"]["Scenario"];
+        };
+        /** HilParamIn */
+        HilParamIn: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: number;
+        };
+        /** HilParamOut */
+        HilParamOut: {
+            /** Message */
+            message?: string | null;
+            /** Status */
+            status: number;
+        };
+        /** HilSessionOut */
+        HilSessionOut: {
+            /** Case Id */
+            case_id: string;
+            /** Controller */
+            controller: string;
+            /** Controller Hash */
+            controller_hash: number;
+            /** Emulator Hash */
+            emulator_hash: number;
+            modes: components["schemas"]["HilModes"];
+            /** Running */
+            running: boolean;
+            scenario: components["schemas"]["Scenario"];
         };
         /** ImportCase */
         ImportCase: {
@@ -1626,6 +2082,18 @@ export interface components {
             /** Torque Nm */
             torque_nm: number | null;
         };
+        /**
+         * ParamStep
+         * @description A controller parameter changed during the run, just before the first ISR at or after `time`.
+         */
+        ParamStep: {
+            /** Name */
+            name: string;
+            /** Time */
+            time: number;
+            /** Value */
+            value: number;
+        };
         /** RadialSRMParams */
         RadialSRMParams: {
             /** Air Gap */
@@ -1870,7 +2338,8 @@ export interface components {
              *       "noise": 0,
              *       "offset_counts": 0,
              *       "offset_error": 0,
-             *       "rc_tau": 0
+             *       "rc_tau": 0,
+             *       "volt_rc_tau": 0.00001
              *     }
              */
             adc: components["schemas"]["AdcSettings"];
@@ -1889,6 +2358,11 @@ export interface components {
             command_value: number;
             /** Compute Delay */
             compute_delay?: number | null;
+            /**
+             * Controller Clock
+             * @default 1
+             */
+            controller_clock: number;
             /**
              * @default {
              *       "dead_time": 5e-7,
@@ -1943,6 +2417,11 @@ export interface components {
              */
             mode: "fixed" | "dynamic";
             /**
+             * Param Steps
+             * @default []
+             */
+            param_steps: components["schemas"]["ParamStep"][];
+            /**
              * Params
              * @default {}
              */
@@ -1961,6 +2440,8 @@ export interface components {
             seed: number;
             /**
              * @default {
+             *       "delay": 0,
+             *       "delay_jitter": 0,
              *       "encoder_cpr": 4096,
              *       "encoder_ecc_amp": 0,
              *       "encoder_ecc_harmonic": 1,
@@ -2075,6 +2556,16 @@ export interface components {
         };
         /** SensorSettings */
         SensorSettings: {
+            /**
+             * Delay
+             * @default 0
+             */
+            delay: number;
+            /**
+             * Delay Jitter
+             * @default 0
+             */
+            delay_jitter: number;
             /**
              * Encoder Cpr
              * @default 4096
@@ -2751,6 +3242,41 @@ export interface operations {
             };
         };
     };
+    hil_flash_api_cases__case_id__hil_flash_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HilFlashIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_losses_api_cases__case_id__losses_get: {
         parameters: {
             query?: never;
@@ -3116,6 +3642,280 @@ export interface operations {
             };
         };
     };
+    hil_capture_traces_api_hil_captures__capture_id__get: {
+        parameters: {
+            query?: {
+                n_px?: number;
+            };
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_compare_api_hil_captures__capture_id__compare_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparisonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_open_api_hil_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HilOpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_close_api_hil_session_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    hil_capture_api_hil_session_capture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HilCaptureIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilCaptureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_command_api_hil_session_command_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HilCommandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_events_api_hil_session_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    hil_param_api_hil_session_param_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HilParamIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilParamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_start_api_hil_session_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilSessionOut"];
+                };
+            };
+        };
+    };
+    hil_stop_api_hil_session_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilSessionOut"];
+                };
+            };
+        };
+    };
     list_jobs_api_jobs_get: {
         parameters: {
             query?: never;
@@ -3342,6 +4142,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hil_flash_result_api_jobs__job_id__hil_flash_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HilFlashResultOut"];
                 };
             };
             /** @description Validation Error */

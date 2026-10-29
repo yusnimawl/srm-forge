@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -110,6 +110,13 @@ def sim_tables(m: MotorData, n_theta: int = 720, n_psi: int = 512) -> SimTables:
     w = np.concatenate([np.zeros((n_theta, 1)), np.cumsum(dw, axis=1)], axis=1)
     return SimTables(np.ascontiguousarray(current), np.ascontiguousarray(torque), np.ascontiguousarray(w),
                      psi_max, i_top, err, m.pole_pitch / n_theta, psi_max / (n_psi - 1))
+
+
+def emu_tables(m: MotorData, n_theta: int = 180, n_psi: int = 192) -> SimTables:
+    """The simulator tables on the emulator's grid, as float32 arrays."""
+    t = sim_tables(m, n_theta, n_psi)
+    return replace(t, current=t.current.astype(np.float32), torque=t.torque.astype(np.float32),
+                   w_field=t.w_field.astype(np.float32))
 
 
 @dataclass(frozen=True)
