@@ -6,7 +6,7 @@ This is a living list. Every session that does writing work updates it in the sa
 
 | Document | Where | State |
 | --- | --- | --- |
-| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 11 tabs written 2026-10-29, owner review open |
+| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 12 tabs written 2026-10-29 and 2026-10-30, owner review open |
 | Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | Rewrite in place not started |
 | Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
@@ -20,7 +20,8 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Overview: what the tool is, packages, where it stands
 - [x] Architecture: srmcore layers, import rules, package layering, and a drawing of the pipeline
 - [x] Solve and maps: mesh pipeline, presets, one solve, map building, map products
-- [x] Validation: M5a to M5e2, the 2D-verified label, the uncertainty budget, material grades
+- [x] Validation: M5a to M5e2, the 2D-verified label, the uncertainty budget, material grades, the EMDLAB / Maxwell row
+- [x] EMDLAB comparison: the accuracy check and the ranked list of features to port, and what not to copy
 - [x] Search: `srmapp` stages, winding choice, limits and margin
 - [x] Web tool: cases, jobs and lanes, tabs, export and import, chips, security
 - [x] Losses: iron loss, cut edge, copper loss, efficiency map, the open Materu finding
