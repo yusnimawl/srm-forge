@@ -6,9 +6,9 @@ This is a living list. Every session that does writing work updates it in the sa
 
 | Document | Where | State |
 | --- | --- | --- |
-| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | Started 2026-10-29: Overview and Architecture tabs |
+| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 11 tabs written 2026-10-29, owner review open |
 | Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | Rewrite in place not started |
-| Dissertation-style project report | Google Docs | Waiting on the Google Drive connector |
+| Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
 
 The wiki explains the tool as it is now. The project doc keeps the history (what was decided, when, and why). The specs in `docs/superpowers/specs/` stay authoritative. When a wiki tab and a spec disagree, the spec wins and the tab gets fixed.
@@ -18,17 +18,17 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 ### Wiki tabs
 
 - [x] Overview: what the tool is, packages, where it stands
-- [x] Architecture: srmcore layers, third-party import rules, package layering
-- [ ] Architecture: a drawn diagram of the M1 pipeline (Design, validator, outline, Gmsh geometry, static mesh, moving band, quality gate)
-- [ ] Solve and map pipeline: materials, physics, solvers, post, maps, map products
-- [ ] Validation: M5a to M5e2, the 2D-verified label, the uncertainty budget
-- [ ] Search: `srmapp` requirements, windings, turns scan, drive envelope, Pareto set
-- [ ] Web tool: `srmweb`, `web/`, jobs and lanes, cases, DXF round trip, run report
-- [ ] Losses: R3 iron and copper loss, efficiency map, R3c cut edge, the open Materu finding
-- [ ] Control: R8a SIL and R8b HIL
-- [ ] Roadmap R1 to R10 as a drawn timeline
-- [ ] Commands
-- [ ] Glossary: SRM, ψ, La, Lu, band, preset, 2D-verified, reference turns
+- [x] Architecture: srmcore layers, import rules, package layering, and a drawing of the pipeline
+- [x] Solve and maps: mesh pipeline, presets, one solve, map building, map products
+- [x] Validation: M5a to M5e2, the 2D-verified label, the uncertainty budget, material grades
+- [x] Search: `srmapp` stages, winding choice, limits and margin
+- [x] Web tool: cases, jobs and lanes, tabs, export and import, chips, security
+- [x] Losses: iron loss, cut edge, copper loss, efficiency map, the open Materu finding
+- [x] Control: the controller contract, SIL, HIL, the comparison, known limits
+- [x] Roadmap: merged items and a drawing of the six items ahead
+- [x] Commands
+- [x] Glossary
+- [ ] Owner review of all tabs
 
 ### Project doc rewrite
 
@@ -36,7 +36,7 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 
 ### Academic writing
 
-- [ ] Connect the Google Drive connector in claude.ai Settings, Connectors. A later session then writes into Google Docs directly.
+- [x] Connect the Google Docs and Google Drive connectors (2026-10-29).
 - [ ] Dissertation-style report: abstract, introduction, background on SRMs, method (geometry, mesh, solver, maps), validation, losses, control, results, discussion, references.
 - [ ] Paper: pick the venue, then cut the report down to the venue's format. A journal or conference submission likely needs LaTeX and a `.bib` file.
 
