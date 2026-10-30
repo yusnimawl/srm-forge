@@ -5,8 +5,9 @@ Jamali-Fard, Mirsalim, Sharifi, Majlesi, "EMDLAB: An open-source finite element 
 electromagnetic analysis of electrical machines", SoftwareX 32 (2025) 102446,
 doi:10.1016/j.softx.2025.102446. Repo: https://github.com/EMDLAB-Package/emdlab-win64 (GPL-3.0).
 
-Generated 2026-10-30 with MATLAB R2026b by `docs/emdlab-data/export_emdlab_8_6.m`. No srmcore
-test reads these files yet. Background is in `docs/emdlab-srm-reference.md`.
+Generated 2026-10-30 with MATLAB R2026b by `docs/emdlab-data/export_emdlab_8_6.m`. The slow test
+`tests/validation/test_emdlab.py` reads them; results are in `docs/emdlab-results.md`. Background is in
+`docs/emdlab-srm-reference.md`.
 
 ## Files
 

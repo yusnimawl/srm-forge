@@ -161,6 +161,7 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | [lattepanda-sigma-i5](#machine-lattepanda-sigma-i5) | 13th Gen Intel(R) Core(TM) i5-1340P | 12C/16T | 33 | Linux (glibc 2.43) | standard | 1.8 | 16 | 1.7 | ~15 | ~6.1 | 0.47 | +2.2 | ✓ | 195/234 |
 | [thinkpad-x1-yoga-i5-linux](#machine-thinkpad-x1-yoga-i5-linux) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 16 | Linux (glibc 2.43) | standard | 2.0 | 8 | 3.4 | ~31 | ~13 | 0.47 | -1.5 | ✓ | 169/117 |
 | [i7-13620h-laptop](#machine-i7-13620h-laptop) | 13th Gen Intel(R) Core(TM) i7-13620H | 10C/16T | 17 | Windows 11 | standard | 3.4 | 10 | 4.1 | ~36 | ~14 | 0.29 | +0.8 | ✓ | 100/100 |
+| [claude-cloud-4c](#machine-claude-cloud-4c) | Intel(R) Xeon(R) Processor @ 2.10GHz | 4C/4T | 17 | Linux (glibc 2.39) | quick | 2.9 | 4 | ~5.8 | ~38 | ~15 | 0.46 | – | ✓ | 119/100 |
 | [thinkpad-x1-yoga-i5](#machine-thinkpad-x1-yoga-i5) | 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz | 4C/8T | 17 | Windows 11 | standard | 3.1 | 8 | 4.4 | ~60 | ~24 | 0.30 | +8.7 | ✓ | 112/65 |
 
 `~` marks a projected value (a map not run, estimated from the batch throughput); the search is always projected. Correct: ✓ passed, ✗ failed, – not checked.
@@ -320,6 +321,40 @@ Temperature and GPU. There is no reliable cross-platform temperature reading wit
 | 8 | 57.8 | 3.48 | 43 |
 | 10 | 61.7 | 3.71 | 37 |
 | 16 | 62.6 | 3.77 | 24 |
+
+</details>
+
+<details id="machine-claude-cloud-4c">
+<summary><b>claude-cloud-4c</b> – Intel(R) Xeon(R) Processor @ 2.10GHz, quick, 2026-10-29</summary>
+
+- Machine: Intel(R) Xeon(R) Processor @ 2.10GHz; 4 cores, 4 threads; 16.9 GB RAM; Linux (glibc 2.39) (#1 SMP PREEMPT_DYNAMIC @0, x86_64); Python 3.12.14
+- Versions: engine commit 35cdccb, gmsh 4.15.2, matplotlib 3.11.2, ngsolve 6.2.2608, numpy 2.5.4, psutil 7.2.2, scipy 1.18.1, srmcore 0.7.0; srmbench 1.0; lock 6ff044847626
+- Run: 2026-10-29T21:27:39+00:00 to 2026-10-29T21:29:08+00:00, tier quick, status complete
+- Result file: [2026-10-29T2127-quick.json](results/claude-cloud-4c/2026-10-29T2127-quick.json)
+
+**Mesh (8/6)**
+
+| Preset | Seconds | Nodes | Grid points |
+|---|---|---|---|
+| screening | 5.78 | 42 914 | 360 |
+| full | 8.50 | 81 968 | 1008 |
+
+**Single solve (8/6)**
+
+| Preset | Median (s) | Samples (s) |
+|---|---|---|
+| screening | 2.891 | 3.121, 2.911, 2.676, 2.891, 2.646 |
+| full | 6.769 | 7.253, 6.439, 6.769 |
+
+**Correctness points:** pass; mesh differs: 42914 nodes vs 42935
+
+**Batches**
+
+| Workers | Points | Seconds | Solves per minute | Peak RAM per worker (GB) |
+|---|---|---|---|---|
+| 4 | 32 | 30.56 | 62.8 | 0.46 |
+
+**Recommended workers:** 4 (uncapped choice 4, RAM cap 4)
 
 </details>
 
