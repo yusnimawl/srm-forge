@@ -18,7 +18,7 @@ The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-d
 
 ## Commands
 
-The project needs Python 3.12 or newer. CI runs the fast suite on Linux 3.12 for pushes to main and pull requests, and on 3.12 and 3.14 on both Windows and Linux for version tags (free-tier Actions minutes). A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
+The project needs Python 3.12 or newer. CI runs the fast suite on 3.12 and 3.14 on both Windows and Linux for pushes to main, pull requests and version tags; the slow suite runs on version tags, weekly (Sunday 03:17 UTC) and on manual dispatch. The repository is public (since 2026-10-30), so standard GitHub runners have no minute limit. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -140,7 +140,7 @@ Analytic test problems (the current-sheet toroid and MMS on the unit square) liv
 
 - `tests/conftest.py` provides the reference designs as factories `make_8_6`, `make_12_8` and `make_24_16`. Each accepts `**overrides`. The same designs are available as fixtures (`srm_8_6`, …, and the parametrized `reference_design`). `pythonpath = ["tests"]`, so tests can `from conftest import make_8_6`.
 - Property tests use hypothesis over a bounded valid-design box. Keep the fast-suite variants deterministic and small, and mark long-running ones `@pytest.mark.slow`.
-- The spec sets the CI budget for the fast suite at under 30 minutes (raised from 10 on 2026-10-06; the CI job timeout is 60 min, raised from 40 on 2026-10-29 because runner speed varies; tests/hil are marked slow in tests/conftest.py).
+- The spec sets the CI budget for the fast suite at under 30 minutes (raised from 10 on 2026-10-06; the CI job timeout is 60 min on Linux (raised from 40 on 2026-10-29 because runner speed varies) and 90 min on Windows, which took 59 min on 2026-10-30; tests/hil are marked slow in tests/conftest.py).
 
 ## Conventions
 
