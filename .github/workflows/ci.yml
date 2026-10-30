@@ -14,7 +14,8 @@ jobs:
         os: [windows-latest, ubuntu-latest]
         python-version: ["3.12", "3.14"]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # Windows runs the fast suite in about 59 min, Linux in about 44 min (2026-10-30).
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 90 || 60 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
