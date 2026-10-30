@@ -25,7 +25,7 @@ Everything the script installs goes under `bench/.runtime/` (uv, Python, the vir
 
 ### Windows (10 or 11)
 
-1. **Get the repository.** Install Git for Windows (https://git-scm.com/download/win) if `git --version` fails. The repository is private, so sign in when Git asks (a browser window opens). Then, in PowerShell:
+1. **Get the repository.** Install Git for Windows (https://git-scm.com/download/win) if `git --version` fails. Then, in PowerShell:
    ```powershell
    git clone https://github.com/yusnimawl/srm-forge.git
    cd srm-forge
@@ -43,7 +43,7 @@ Everything the script installs goes under `bench/.runtime/` (uv, Python, the vir
    - If it warns about battery or a busy CPU, fix that and answer `N`, then run again.
 5. **Wait.** Each step prints a timestamped line. Do not use the machine meanwhile.
 6. **Read the summary** it prints at the end: single-solve time, recommended workers, projected map and search times, correctness. The result is saved in `bench\results\<label>\` and this README is rebuilt.
-7. **Publish** (optional): answer `y` to "Commit and push results?". It commits only the result and this README and pushes them. It refuses if your branch has other unpushed commits.
+7. **Publish** (optional): answer `y` to "Commit and push results?". It commits only the result and this README and pushes them. It refuses if your branch has other unpushed commits. Pushing needs write access to the repository. Without it, run with `--no-push`, then commit `bench/results/<label>/` on a fork and open a pull request.
 8. **Finish:** "Delete the benchmark environment?" `y` frees about 0.7 GB (the next run downloads it again); `N` keeps it for faster reruns.
 9. **See the comparison:** open `bench/README.md` on GitHub. The table and charts at the bottom show every machine that has published.
 
@@ -55,7 +55,6 @@ Everything the script installs goes under `bench/.runtime/` (uv, Python, the vir
    git clone https://github.com/yusnimawl/srm-forge.git
    cd srm-forge
    ```
-   The repository is private: use `gh auth login` (GitHub CLI) or a personal access token as the password when Git asks.
 2. **Prepare the machine.** Laptops: plug in. Close heavy programs. On WSL, the Windows side must also be idle.
 3. **Start it as your normal user** (not with `sudo`; the script asks for `sudo` itself only to install the Gmsh libraries the first time):
    ```sh

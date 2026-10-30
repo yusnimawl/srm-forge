@@ -1,7 +1,11 @@
 name: slow
+permissions:
+  contents: read
 on:
   push:
     tags: ["v*"]
+  schedule:
+    - cron: "17 3 * * 0"   # weekly, Sunday 03:17 UTC, on main
   workflow_dispatch:
 jobs:
   slow:
