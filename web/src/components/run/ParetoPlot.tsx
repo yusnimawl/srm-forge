@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
 import { INFERNO_SCALE } from "@/lib/inferno"
 import { SELECT_CLASS } from "@/components/case/fields"
+import { cn } from "@/lib/utils"
 
 const SYMBOLS = ["circle", "square", "diamond", "triangle-up"]
 // scatter3d has no triangle marker
@@ -26,7 +27,7 @@ function AxisSelect({ label, value, onChange }: { label: string; value: AxisKey;
   return (
     <label className="flex items-center gap-2 text-sm">
       {label}
-      <select className={`${SELECT_CLASS} w-auto`} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
+      <select className={cn(SELECT_CLASS, "w-auto")} value={value} onChange={(e) => onChange(e.target.value as AxisKey)}>
         {KEYS.map((k) => (
           <option key={k} value={k}>
             {AXES[k]}
