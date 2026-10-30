@@ -141,8 +141,11 @@ def test_events_queued_then_running_then_end(make):
     finally:
         for g in gates:
             g.set()
-    assert [(n, d["status"]) for n, d in ev] == [
-        ("progress", "queued"), ("progress", "running"), ("end", "done")]
+    # A status can repeat: the elapsed clock ticks every whole second, and the runner may take the job
+    # before the store says "running". The order of the status changes is what matters.
+    changes = [(n, d["status"]) for n, d in ev]
+    changes = [x for i, x in enumerate(changes) if i == 0 or x != changes[i - 1]]
+    assert changes == [("progress", "queued"), ("progress", "running"), ("end", "done")]
 
 
 def test_events_tick_while_progress_is_idle(make, gate):
