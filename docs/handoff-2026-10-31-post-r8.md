@@ -9,12 +9,12 @@ For the next session. Read `CLAUDE.md`, then the roadmap `docs/superpowers/specs
 ## Where things stand
 
 - **Merged to `main`:** R1, R2, R3, R3b, R3c, R8a, R8b, the EMDLAB / Maxwell check (PR #9) and the public-repository change (PR #10, GPL-3.0-or-later, full CI matrix, weekly slow suite).
-- **0.7.0 validation campaign (PR #11, branch `validate-0.7.0`):** run on the LattePanda Sigma (i5-1340P, 30 GB, Python 3.14). Every `em_validate` check passes except `engine_version` before the add; FEMM worst error / limit 0.20; EMDLAB unchanged; speed 8/6 `full` 694 s, 12/8 `full` 928 s (budget 2640 s). `VALIDATED_VERSIONS = ("0.4.0", "0.7.0")`. The report reads PENDING: `docs/validation/ci.json` waits for the `v0.7.0` tag's slow run.
+- **0.7.0 validation campaign (PR #11, merged 2026-10-31; tag `v0.7.0` pushed the same day):** run on the LattePanda Sigma (i5-1340P, 30 GB, Python 3.14). Every `em_validate` check passes except `engine_version` before the add; FEMM worst error / limit 0.20; EMDLAB unchanged; speed 8/6 `full` 694 s, 12/8 `full` 928 s (budget 2640 s). `VALIDATED_VERSIONS = ("0.4.0", "0.7.0")`. The report reads PENDING until the tag's slow run is recorded in `docs/validation/ci.json`.
 - **Cleanup (branch `cleanup-handoff-minors`):** the parked minors from the 2026-10-13 and 2026-10-19 handoffs, the R1 and R8 roadmap ticks and this file.
 
 ## To finish 0.7.0
 
-1. Merge PR #11, tag `v0.7.0` on `main`, wait for the `slow` and `ci` tag runs (Windows and Linux).
+1. Wait for the `slow` and `ci` runs on the `v0.7.0` tag (Windows and Linux; slow run https://github.com/yusnimawl/srm-forge/actions/runs/41183063852).
 2. Write the slow run into `docs/validation/ci.json` (`tag`, `run_url`, `result`), run `python tools/validation_report.py` (expect PASS), commit to `main`.
 
 ## Still open
