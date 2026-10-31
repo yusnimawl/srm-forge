@@ -9,7 +9,6 @@ from srmcore.fields.solution import SolveStatus
 from srmcore.materials.laws import LinearLaw, library_law
 from srmcore.solvers import ngsolve_adapter as mod
 from srmcore.solvers.settings import FactorizationFailed
-from srmcore.solvers.settings import FactorizationFailed
 
 
 def _fail_first(monkeypatch, n):

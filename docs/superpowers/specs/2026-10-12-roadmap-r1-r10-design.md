@@ -30,11 +30,11 @@ What holds: the 2D solution (solvers agree to ~1e-13, FEMM within 0.1–0.6 %, d
 Order chosen by the owner: physics first, with the DXF round trip early because it is independent of the physics.
 
 ### R1 — UI reskin and label rename
-- [ ] Theme tokens: black, Scalar-style, no blue; light and dark only if the R1 spec keeps both
-- [ ] Plots themed to match
-- [ ] Every existing page restyled
-- [ ] Label "EM-validated" renamed "2D-verified" in the engine, API, UI and docs; `VALIDATED_VERSIONS` and the report keep working
-- [ ] "Assumes j_limit = N A/mm²" shown on every ranked result until R5
+- [x] Theme tokens: black, Scalar-style, no blue; light and dark only if the R1 spec keeps both
+- [x] Plots themed to match
+- [x] Every existing page restyled
+- [x] Label "EM-validated" renamed "2D-verified" in the engine, API, UI and docs; `VALIDATED_VERSIONS` and the report keep working
+- [x] "Assumes j_limit = N A/mm²" shown on every ranked result until R5
 - Done when: the owner signs off on screenshots of every page.
 
 ### R2 — DXF round trip
@@ -89,12 +89,12 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - Done when: requirements in → ranked recommendations with reasons out, on a stated compute budget.
 
 ### R8 — Control SIL
-- [ ] C HAL interface (read currents, read position, set switches, timers)
-- [ ] Simulated drivers: asymmetric half-bridge, PWM, dead time
-- [ ] Simulated sensors: encoder and resolver errors, ADC sampling, noise and quantisation
-- [ ] Time-domain motor model from the maps (ψ(θ,i), T(θ,i), L_inc for HFI)
-- [ ] The owner's C code compiled and run inside the simulation; scopes in the UI
-- [ ] Reference controllers: hysteresis, PWM current, TSF
+- [x] C HAL interface (read currents, read position, set switches, timers)
+- [x] Simulated drivers: asymmetric half-bridge, PWM, dead time
+- [x] Simulated sensors: encoder and resolver errors, ADC sampling, noise and quantisation
+- [x] Time-domain motor model from the maps (ψ(θ,i), T(θ,i), L_inc for HFI)
+- [x] The owner's C code compiled and run inside the simulation; scopes in the UI
+- [x] Reference controllers: hysteresis, PWM current, TSF
 - Done when: a reference controller runs in the simulation and the same file compiles for a target.
 
 ### R9 — Ripple optimisation and export
