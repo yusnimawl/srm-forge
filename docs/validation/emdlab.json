@@ -1,0 +1,561 @@
+{
+ "srmcore": "0.7.0",
+ "nodes": 128639,
+ "assumed": {
+  "slot_liner_thickness": "0.1 mm; EMDLAB's coil touches the tooth flank (no liner)",
+  "coil_inner_clearance": "0.1 mm; EMDLAB's coil starts at the bore",
+  "fill_factor": "0.5, sets resistance only, not psi or torque",
+  "shaft": "copper (vacuum law); EMDLAB has no shaft and sets A = 0 at r = 10 mm",
+  "materials": "M530_50A from EMDLAB's library, stacking factor 1.0 as EMDLAB uses",
+  "band": "1392 circumferential divisions so every reference angle is a band node"
+ },
+ "worst": {
+  "psi": 0.015675446392214187,
+  "energy": 0.012466274554296275,
+  "coenergy": 0.0254906426714252,
+  "torque_vs_maxwell": 0.0298661820355678,
+  "torque_vs_emdlab": 0.037826104461587136
+ },
+ "rows": [
+  {
+   "theta_tab_deg": 0.0,
+   "psi": 0.1537558298317533,
+   "energy": 0.27780210906171215,
+   "coenergy": 0.27571887833260006,
+   "torque_arkkio": 3.423653643512279e-05,
+   "torque_virtual_work": 3.40205749856104e-05,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 0.0,
+    "angle": -0.5235987755982988,
+    "torque_maxwell": 0.000592030037857802,
+    "psi": 0.152715206511761,
+    "energy": 0.275942127862551,
+    "coenergy": 0.273832588192466,
+    "torque_emdlab": 1.32346414245343e-15
+   }
+  },
+  {
+   "theta_tab_deg": 1.03448275862069,
+   "psi": 0.15421925140364323,
+   "energy": 0.2786420816808316,
+   "coenergy": 0.2765472233722843,
+   "torque_arkkio": 0.09211642546416458,
+   "torque_virtual_work": 0.09211645852222686,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 1.03448275862069,
+    "angle": -0.5055436454052539,
+    "torque_maxwell": 0.0930567864363529,
+    "psi": 0.153203026113812,
+    "energy": 0.276817474290433,
+    "coenergy": 0.27471339709166,
+    "torque_emdlab": 0.0900319304726536
+   }
+  },
+  {
+   "theta_tab_deg": 2.06896551724138,
+   "psi": 0.15562813312862217,
+   "energy": 0.28119585482971593,
+   "coenergy": 0.2790654244333285,
+   "torque_arkkio": 0.18795904731267268,
+   "torque_virtual_work": 0.18795932743564947,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 2.06896551724138,
+    "angle": -0.48748851521220893,
+    "torque_maxwell": 0.188553606529489,
+    "psi": 0.154446250268889,
+    "energy": 0.279074203518809,
+    "coenergy": 0.276932270384715,
+    "torque_emdlab": 0.18343313409545
+   }
+  },
+  {
+   "theta_tab_deg": 3.10344827586207,
+   "psi": 0.15804100482582373,
+   "energy": 0.28556970599090004,
+   "coenergy": 0.2833779113820695,
+   "torque_arkkio": 0.29178034238349543,
+   "torque_virtual_work": 0.2917808067477365,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 3.10344827586207,
+    "angle": -0.469433385019164,
+    "torque_maxwell": 0.292048639567276,
+    "psi": 0.156932936461402,
+    "energy": 0.283582951639277,
+    "coenergy": 0.28137559159122,
+    "torque_emdlab": 0.28671759316639
+   }
+  },
+  {
+   "theta_tab_deg": 4.13793103448276,
+   "psi": 0.16156574118776748,
+   "energy": 0.29195907805222737,
+   "coenergy": 0.2896775902237382,
+   "torque_arkkio": 0.40937419547084564,
+   "torque_virtual_work": 0.4093749625955212,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 4.13793103448276,
+    "angle": -0.451378254826119,
+    "torque_maxwell": 0.407951029633923,
+    "psi": 0.160381110769681,
+    "energy": 0.289831968924544,
+    "coenergy": 0.28754000323479,
+    "torque_emdlab": 0.400066440772948
+   }
+  },
+  {
+   "theta_tab_deg": 5.17241379310345,
+   "psi": 0.16638181871008995,
+   "energy": 0.30068913357920174,
+   "coenergy": 0.29828541377712264,
+   "torque_arkkio": 0.5494249784183219,
+   "torque_virtual_work": 0.5494259305034027,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 5.17241379310345,
+    "angle": -0.433323124633074,
+    "torque_maxwell": 0.549648499948365,
+    "psi": 0.165076300364313,
+    "energy": 0.298349113711787,
+    "coenergy": 0.295925539039111,
+    "torque_emdlab": 0.536588721263697
+   }
+  },
+  {
+   "theta_tab_deg": 6.20689655172414,
+   "psi": 0.17278016838291615,
+   "energy": 0.31228690409877297,
+   "coenergy": 0.3097217020797237,
+   "torque_arkkio": 0.7258989859708952,
+   "torque_virtual_work": 0.7259001349735339,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 6.20689655172414,
+    "angle": -0.4152679944400308,
+    "torque_maxwell": 0.725579662957989,
+    "psi": 0.17131750633633,
+    "energy": 0.309657655242584,
+    "coenergy": 0.307085340472323,
+    "torque_emdlab": 0.70480158913533
+   }
+  },
+  {
+   "theta_tab_deg": 7.24137931034483,
+   "psi": 0.18123887873312877,
+   "energy": 0.32761686014571806,
+   "coenergy": 0.3248431032935452,
+   "torque_arkkio": 0.9634746517278634,
+   "torque_virtual_work": 0.9634761456208535,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 7.24137931034483,
+    "angle": -0.3972128642469858,
+    "torque_maxwell": 0.965079804839598,
+    "psi": 0.179518054460968,
+    "energy": 0.32453624882927,
+    "coenergy": 0.321728717071872,
+    "torque_emdlab": 0.933564083943753
+   }
+  },
+  {
+   "theta_tab_deg": 8.27586206896552,
+   "psi": 0.19256456042391562,
+   "energy": 0.34809970232184745,
+   "coenergy": 0.34513271520424926,
+   "torque_arkkio": 1.3097403879935519,
+   "torque_virtual_work": 1.3097420725003557,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 8.27586206896552,
+    "angle": -0.3791577340539409,
+    "torque_maxwell": 1.30350487518605,
+    "psi": 0.190202155261381,
+    "energy": 0.34390733113068,
+    "coenergy": 0.34082039983795,
+    "torque_emdlab": 1.24442492287161
+   }
+  },
+  {
+   "theta_tab_deg": 9.31034482758621,
+   "psi": 0.20821188409144709,
+   "energy": 0.37621430191203387,
+   "coenergy": 0.37334848081718724,
+   "torque_arkkio": 1.8672316678775087,
+   "torque_virtual_work": 1.8672344415607973,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 9.31034482758621,
+    "angle": -0.3611026038608959,
+    "torque_maxwell": 1.86745247117704,
+    "psi": 0.205462656584573,
+    "energy": 0.371582057958078,
+    "coenergy": 0.368083475362274,
+    "torque_emdlab": 1.76135898170637
+   }
+  },
+  {
+   "theta_tab_deg": 10.3448275862069,
+   "psi": 0.23067604975156183,
+   "energy": 0.4153756504961181,
+   "coenergy": 0.41505812860950486,
+   "torque_arkkio": 2.8455683921545565,
+   "torque_virtual_work": 2.8455784835852707,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 10.3448275862069,
+    "angle": -0.34304747366785093,
+    "torque_maxwell": 2.84226387377615,
+    "psi": 0.227115906533871,
+    "energy": 0.410756756806357,
+    "coenergy": 0.406860490687065,
+    "torque_emdlab": 2.64161871729831
+   }
+  },
+  {
+   "theta_tab_deg": 11.3793103448276,
+   "psi": 0.2617045456247592,
+   "energy": 0.4630319991092497,
+   "coenergy": 0.4791043651398821,
+   "torque_arkkio": 4.240306664017164,
+   "torque_virtual_work": 4.240321598406732,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 11.3793103448276,
+    "angle": -0.32499234347480593,
+    "torque_maxwell": 4.24016193338132,
+    "psi": 0.258421217999804,
+    "energy": 0.463120070476166,
+    "coenergy": 0.467195257766375,
+    "torque_emdlab": 4.10017846560089
+   }
+  },
+  {
+   "theta_tab_deg": 12.4137931034483,
+   "psi": 0.2986749477501579,
+   "energy": 0.5107358632598097,
+   "coenergy": 0.5644939486407577,
+   "torque_arkkio": 5.031106362524111,
+   "torque_virtual_work": 5.031127601536068,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 12.4137931034483,
+    "angle": -0.306937213281761,
+    "torque_maxwell": 4.97541606948513,
+    "psi": 0.295932589508454,
+    "energy": 0.512119291618507,
+    "coenergy": 0.553779197955785,
+    "torque_emdlab": 5.09353034405306
+   }
+  },
+  {
+   "theta_tab_deg": 13.448275862069,
+   "psi": 0.33869736982362497,
+   "energy": 0.5613529060625192,
+   "coenergy": 0.6579576253025309,
+   "torque_arkkio": 5.2610036293583144,
+   "torque_virtual_work": 5.261028096593956,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 13.448275862069,
+    "angle": -0.288882083088716,
+    "torque_maxwell": 5.152153601597,
+    "psi": 0.336189428685741,
+    "energy": 0.563748724901405,
+    "coenergy": 0.647445676591088,
+    "torque_emdlab": 5.30075014870058
+   }
+  },
+  {
+   "theta_tab_deg": 14.4827586206897,
+   "psi": 0.38029315766124483,
+   "energy": 0.6151927491323722,
+   "coenergy": 0.7538626184481111,
+   "torque_arkkio": 5.340805396220388,
+   "torque_virtual_work": 5.340831151223746,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 14.4827586206897,
+    "angle": -0.27082695289567105,
+    "torque_maxwell": 5.23603407425489,
+    "psi": 0.378234857163093,
+    "energy": 0.617774182736426,
+    "coenergy": 0.744092076826213,
+    "torque_emdlab": 5.34936306558068
+   }
+  },
+  {
+   "theta_tab_deg": 15.5172413793103,
+   "psi": 0.4227458908253444,
+   "energy": 0.6712356095880668,
+   "coenergy": 0.8506495973831901,
+   "torque_arkkio": 5.36914852628848,
+   "torque_virtual_work": 5.369174857119963,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 15.5172413793103,
+    "angle": -0.2527718227026278,
+    "torque_maxwell": 5.30534303861049,
+    "psi": 0.420682223522633,
+    "energy": 0.674726927753923,
+    "coenergy": 0.839243671449583,
+    "torque_emdlab": 5.38517871051534
+   }
+  },
+  {
+   "theta_tab_deg": 16.551724137931,
+   "psi": 0.4656497397104584,
+   "energy": 0.7286531784158425,
+   "coenergy": 0.9476858845418223,
+   "torque_arkkio": 5.3721784750121095,
+   "torque_virtual_work": 5.372205305831379,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 16.551724137931,
+    "angle": -0.23471669250958285,
+    "torque_maxwell": 5.29401983399321,
+    "psi": 0.463711462066802,
+    "energy": 0.733302969666355,
+    "coenergy": 0.935640502898676,
+    "torque_emdlab": 5.39177051825043
+   }
+  },
+  {
+   "theta_tab_deg": 17.5862068965517,
+   "psi": 0.5087300419769054,
+   "energy": 0.7868315521824563,
+   "coenergy": 1.0445965989344093,
+   "torque_arkkio": 5.356892907164001,
+   "torque_virtual_work": 5.3569202658476645,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 17.5862068965517,
+    "angle": -0.21666156231653788,
+    "torque_maxwell": 5.22757577466167,
+    "psi": 0.506784189629485,
+    "energy": 0.791713422499939,
+    "coenergy": 1.03259907361425,
+    "torque_emdlab": 5.36719819311339
+   }
+  },
+  {
+   "theta_tab_deg": 18.6206896551724,
+   "psi": 0.5517028276071492,
+   "energy": 0.8450662227274905,
+   "coenergy": 1.1410639566582441,
+   "torque_arkkio": 5.323359979239956,
+   "torque_virtual_work": 5.32338680264699,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 18.6206896551724,
+    "angle": -0.1986064321234929,
+    "torque_maxwell": 5.21684273491013,
+    "psi": 0.549997879400938,
+    "energy": 0.849458455895202,
+    "coenergy": 1.13039470972576,
+    "torque_emdlab": 5.31620815508404
+   }
+  },
+  {
+   "theta_tab_deg": 19.6551724137931,
+   "psi": 0.5940513801143605,
+   "energy": 0.901882197941879,
+   "coenergy": 1.2367027704698141,
+   "torque_arkkio": 5.262010145331196,
+   "torque_virtual_work": 5.262036551212379,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 19.6551724137931,
+    "angle": -0.18055130193044794,
+    "torque_maxwell": 5.20575059683046,
+    "psi": 0.59238306629426,
+    "energy": 0.906540252967813,
+    "coenergy": 1.22592927514925,
+    "torque_emdlab": 5.25351301426569
+   }
+  },
+  {
+   "theta_tab_deg": 20.6896551724138,
+   "psi": 0.6342479503871394,
+   "energy": 0.9526211058852044,
+   "coenergy": 1.3306715155084987,
+   "torque_arkkio": 5.128377002270355,
+   "torque_virtual_work": 5.12840280027238,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 20.6896551724138,
+    "angle": -0.16249617173740297,
+    "torque_maxwell": 5.0333793043684,
+    "psi": 0.632424247958422,
+    "energy": 0.956862547992346,
+    "coenergy": 1.31969514665002,
+    "torque_emdlab": 5.14799228040579
+   }
+  },
+  {
+   "theta_tab_deg": 21.7241379310345,
+   "psi": 0.6711370328687121,
+   "energy": 0.9948066949850232,
+   "coenergy": 1.4212866233423447,
+   "torque_arkkio": 4.893382912416758,
+   "torque_virtual_work": 4.893407353864787,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 21.7241379310345,
+    "angle": -0.144441041544358,
+    "torque_maxwell": 4.77883059951779,
+    "psi": 0.669089295852712,
+    "energy": 0.998709603419456,
+    "coenergy": 1.4099890650246,
+    "torque_emdlab": 4.86761559738964
+   }
+  },
+  {
+   "theta_tab_deg": 22.7586206896552,
+   "psi": 0.7049034332422525,
+   "energy": 1.030756631735451,
+   "coenergy": 1.5068957279368207,
+   "torque_arkkio": 4.575355742444542,
+   "torque_virtual_work": 4.5753785978819295,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 22.7586206896552,
+    "angle": -0.12638591135131302,
+    "torque_maxwell": 4.53590794106122,
+    "psi": 0.702385973840926,
+    "energy": 1.03360744846482,
+    "coenergy": 1.49498507763937,
+    "torque_emdlab": 4.55613413031161
+   }
+  },
+  {
+   "theta_tab_deg": 23.7931034482759,
+   "psi": 0.7345009465025234,
+   "energy": 1.0582454625198456,
+   "coenergy": 1.5859579448892358,
+   "torque_arkkio": 4.166060383973229,
+   "torque_virtual_work": 4.166080815326545,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 23.7931034482759,
+    "angle": -0.10833078115826807,
+    "torque_maxwell": 4.11577817705054,
+    "psi": 0.732007785544736,
+    "energy": 1.06107880035982,
+    "coenergy": 1.57414808055202,
+    "torque_emdlab": 4.14203777551431
+   }
+  },
+  {
+   "theta_tab_deg": 24.8275862068966,
+   "psi": 0.758132198673944,
+   "energy": 1.0724953808586914,
+   "coenergy": 1.6567805343675066,
+   "torque_arkkio": 3.6672027766589834,
+   "torque_virtual_work": 3.667220665970472,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 24.8275862068966,
+    "angle": -0.09027565096522311,
+    "torque_maxwell": 3.50875243570671,
+    "psi": 0.755967958003798,
+    "energy": 1.07642176805051,
+    "coenergy": 1.64506551410506,
+    "torque_emdlab": 3.66010707427005
+   }
+  },
+  {
+   "theta_tab_deg": 25.8620689655172,
+   "psi": 0.7749501744110692,
+   "energy": 1.0716682086907907,
+   "coenergy": 1.7181524191890598,
+   "torque_arkkio": 3.1296754452194757,
+   "torque_virtual_work": 3.1296911836287133,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 25.8620689655172,
+    "angle": -0.07222052077217987,
+    "torque_maxwell": 2.97984911175424,
+    "psi": 0.77121292440734,
+    "energy": 1.07179487389283,
+    "coenergy": 1.70457250872341,
+    "torque_emdlab": 3.0893095854164
+   }
+  },
+  {
+   "theta_tab_deg": 26.8965517241379,
+   "psi": 0.7859906663891755,
+   "energy": 1.0598123459227486,
+   "coenergy": 1.769754053078276,
+   "torque_arkkio": 2.5789357187962945,
+   "torque_virtual_work": 2.5789500955331057,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 26.8965517241379,
+    "angle": -0.05416539057913491,
+    "torque_maxwell": 2.49594191253427,
+    "psi": 0.782844716850854,
+    "energy": 1.06161439244507,
+    "coenergy": 1.75662608021617,
+    "torque_emdlab": 2.56508982451278
+   }
+  },
+  {
+   "theta_tab_deg": 27.9310344827586,
+   "psi": 0.7929554184119496,
+   "energy": 1.0441608213636584,
+   "coenergy": 1.8104786849195524,
+   "torque_arkkio": 1.8647625079948458,
+   "torque_virtual_work": 1.864777465943046,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 27.9310344827586,
+    "angle": -0.036110260386089936,
+    "torque_maxwell": 1.75552119263959,
+    "psi": 0.790591767820618,
+    "energy": 1.04781431886467,
+    "coenergy": 1.7983230737669,
+    "torque_emdlab": 1.87413748979918
+   }
+  },
+  {
+   "theta_tab_deg": 28.9655172413793,
+   "psi": 0.7962398292956132,
+   "energy": 1.0332445504734282,
+   "coenergy": 1.8332188349907763,
+   "torque_arkkio": 0.637440752991921,
+   "torque_virtual_work": 0.6374498276728868,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 28.9655172413793,
+    "angle": -0.018055130193044968,
+    "torque_maxwell": 0.54777690432842,
+    "psi": 0.793150149760528,
+    "energy": 1.0344828695935,
+    "coenergy": 1.82086832953091,
+    "torque_emdlab": 0.681964629849662
+   }
+  },
+  {
+   "theta_tab_deg": 30.0,
+   "psi": 0.7969567715416195,
+   "energy": 1.0308596339655527,
+   "coenergy": 1.838184743584277,
+   "torque_arkkio": 6.911096485898327e-06,
+   "torque_virtual_work": 4.989286761514222e-06,
+   "status": "SolveStatus.OK",
+   "ref": {
+    "theta_tab_deg": 30.0,
+    "angle": 0.0,
+    "torque_maxwell": 0.00501201616935875,
+    "psi": 0.793213027727813,
+    "energy": 1.03082876041578,
+    "coenergy": 1.82474879464789,
+    "torque_emdlab": 3.60180147927513e-14
+   }
+  }
+ ]
+}

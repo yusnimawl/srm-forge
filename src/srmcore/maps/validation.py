@@ -30,7 +30,7 @@ KEYS = ("la", "lu", "peak_torque", "psi_max")
 
 # srmcore versions whose results the validation campaign has covered (docs/validation-report.md); the label needs
 # the running one in here.
-VALIDATED_VERSIONS: tuple[str, ...] = ("0.4.0",)
+VALIDATED_VERSIONS: tuple[str, ...] = ("0.4.0", "0.7.0")
 LABEL = "2D-verified"
 PSI_POINT_TOLERANCE = 0.005       # full vs reference mesh, ψ at the La, Lu and ψ_max points
 TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-torque point
