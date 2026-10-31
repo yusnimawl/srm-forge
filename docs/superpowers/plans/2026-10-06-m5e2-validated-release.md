@@ -47,7 +47,7 @@
 - [ ] **Step 1: Copy the source PDFs**
 
 ```powershell
-$S = "C:\Users\FORMUL~1\AppData\Local\Temp\claude\D--y-srm-designer\57cd2d0a-19aa-4b6c-9986-9e77d5f072d6\scratchpad"
+$S = "C:\Users\<user>\AppData\Local\Temp\claude\D--y-srm-designer\57cd2d0a-19aa-4b6c-9986-9e77d5f072d6\scratchpad"
 New-Item -ItemType Directory -Force docs\sources\materials
 Copy-Item "$S\f2e-001.pdf" docs\sources\materials\jfe_f2e-001_magnetic_property_curves.pdf
 Copy-Item "$S\f1e-002.pdf" docs\sources\materials\jfe_f1e-002_super_core.pdf
