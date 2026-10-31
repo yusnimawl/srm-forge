@@ -1,4 +1,6 @@
 name: hil
+permissions:
+  contents: read
 on:
   push:
     paths: ["hil/**", "src/srmsil/c/**", "src/srmsil/hil/**", "src/srmsil/tables.py", ".github/workflows/hil.yml"]

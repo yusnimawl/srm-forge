@@ -32,3 +32,7 @@ srmweb          # http://127.0.0.1:8000
 ```
 
 Binding to a non-loopback host needs `SRMWEB_TOKEN`. Frontend development: `cd web && npm run dev`.
+
+## Licence
+
+GPL-3.0-or-later. See `LICENSE`.

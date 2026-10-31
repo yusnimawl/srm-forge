@@ -1,4 +1,6 @@
 name: bench
+permissions:
+  contents: read
 on:
   push:
     paths:
@@ -10,8 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pushes run Linux only (free-tier minutes); a manual run adds Windows.
-        os: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["ubuntu-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
