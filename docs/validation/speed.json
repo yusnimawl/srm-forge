@@ -1,39 +1,39 @@
 {
- "srmcore": "0.4.0",
- "cpu": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+ "srmcore": "0.7.0",
+ "cpu": "13th Gen Intel(R) Core(TM) i5-1340P",
  "logical_cpus": 16,
  "workers": 8,
- "date": "2026-10-06",
+ "date": "2026-10-31",
  "runs": [
   {
    "design": "8_6",
    "item": "screening",
-   "seconds": 228.40016820002347
+   "seconds": 113.31346271600341
   },
   {
    "design": "8_6",
    "item": "full",
-   "seconds": 1549.6394678999204
+   "seconds": 694.2198190759955
   },
   {
    "design": "8_6",
    "item": "full_extras",
-   "seconds": 1462.8200186998583
+   "seconds": 656.3847748029948
   },
   {
    "design": "12_8",
    "item": "screening",
-   "seconds": 342.05740610021167
+   "seconds": 161.71053993499663
   },
   {
    "design": "12_8",
    "item": "full",
-   "seconds": 2094.1432928000577
+   "seconds": 928.2983473779896
   },
   {
    "design": "12_8",
    "item": "full_extras",
-   "seconds": 979.8532893999945
+   "seconds": 445.66448033301276
   }
  ]
 }
