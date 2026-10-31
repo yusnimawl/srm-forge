@@ -8,7 +8,7 @@
 
 | Package | Version | Licence |
 |---|---|---|
-| srmcore | 0.7.0 | not stated |
+| srmcore | 0.7.0 | GPL-3.0-or-later |
 | numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
 | scipy | 1.18.1 | BSD License |
 | gmsh | 4.15.2 | GNU General Public License v2 or later (GPLv2+) |
