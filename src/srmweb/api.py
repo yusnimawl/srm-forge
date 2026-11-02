@@ -459,8 +459,6 @@ def create_app(settings: Settings,
             return inputs
         if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
             raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
-        if not _evaluated_since_0_6(store.case_result(case_id, "evaluate")):
-            raise HTTPException(409, "evaluation made before 0.6.0 — re-evaluate the case")
         try:
             check_loss_data(inputs.design)
         except MissingLossData as exc:

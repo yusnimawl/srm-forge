@@ -4,12 +4,13 @@ import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tan
 import { MessageSquare, Tag, Trash2 } from "lucide-react"
 import type { CasePatch } from "@/api/cases"
 import { Badge } from "@/components/ui/badge"
+import { CaseStatusBadge } from "@/components/cases/CaseStatusBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { MAX_SHOWN, type CaseRow, type CaseStatus } from "@/lib/cases"
+import { MAX_SHOWN, type CaseRow } from "@/lib/cases"
 import { fmt } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -19,17 +20,6 @@ export type CaseActions = {
   /** False once `MAX_SHOWN` cases are shown in the graphs. */
   canShowMore: boolean
 }
-
-const STATUS_VARIANT: Record<CaseStatus, "secondary" | "outline" | "ok" | "destructive"> = {
-  Draft: "secondary",
-  Evaluated: "outline",
-  "2D-verified": "ok",
-  Failed: "destructive",
-}
-
-export const CaseStatusBadge = ({ status }: { status: CaseStatus }) => (
-  <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>
-)
 
 /** Text that turns into an input on click; Enter or leaving the field commits, Escape cancels. An empty value is committed only when `allowEmpty`. */
 function InlineText({

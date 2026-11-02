@@ -23,6 +23,12 @@ def test_rescale_moves_current_and_flux_and_keeps_torque_and_energy():
     assert s.angles is r.angles and s.complete == r.complete
 
 
+@pytest.mark.parametrize("k", [0.0, -1.0, float("nan")])
+def test_rescale_rejects_a_non_positive_turn_ratio(k):
+    with pytest.raises(ValueError, match="turn ratio"):
+        rescale_turns(synthetic_map(n_angles=16), k)
+
+
 def test_rescaled_drive_equals_the_original_at_scaled_voltage():
     # k times the turns: ψ' = kψ, i' = i/k, R' = k²R, so dψ/dt = V/k − R·i on the original map
     r, k, res = synthetic_map(n_angles=24), 3.0, 0.2

@@ -149,13 +149,16 @@ describe("LossesTab", () => {
     await act(async () => {
       svg.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 150, clientY: 50 }))
     })
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)) })
-    const call = m.calls.find((u) => u.includes("/losses/b"))!
+    const call = await vi.waitFor(() => {
+      const c = m.calls.find((u) => u.includes("/losses/b"))
+      if (!c) throw new Error("no /losses/b request yet")
+      return c
+    })
     const q = new URL(call, "http://x").searchParams
     expect(q.get("point")).toBe("1")
     expect(Number(q.get("x"))).toBeCloseTo(0.025, 9)
     expect(Number(q.get("y"))).toBeCloseTo(0.025, 9)
-    expect(m.host.querySelector("[data-testid=line-plot]")?.textContent).toContain("B (T)")
+    await vi.waitFor(() => expect(m.host.querySelector("[data-testid=line-plot]")?.textContent).toContain("B (T)"))
   })
 })
 

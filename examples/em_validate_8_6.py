@@ -27,6 +27,17 @@ def design_8_6() -> Design:
     return Design(machine=machine, mesh=MeshSettings(preset="full"))
 
 
+def map_progress(label: str):
+    """A progress callback that prints one line per 10 % of the map points."""
+    step = [0]
+
+    def report(done: int, total: int) -> None:
+        if done * 10 >= (step[0] + 1) * total or done == total:
+            step[0] = done * 10 // total
+            print(f"{label}: {done}/{total} points", flush=True)
+    return report
+
+
 def _num(x: float) -> float | None:
     return None if not math.isfinite(x) else float(x)
 
@@ -55,8 +66,9 @@ def main() -> None:
     workers = int(args[0]) if args else None
     design = design_8_6()
     t0 = time.perf_counter()
-    result = build_map(design, 20.0, workers=workers)
+    result = build_map(design, 20.0, workers=workers, progress=map_progress("map"))
     t1 = time.perf_counter()
+    print(f"map {t1 - t0:.0f} s; em_validate running (up to 16 solves, no progress)", flush=True)
     v = em_validate(design, result, workers=workers)
     t2 = time.perf_counter()
     print(f"map {t1 - t0:.0f} s, em_validate {t2 - t1:.0f} s, engine {v.engine_version}, grades {v.material_grades}")
