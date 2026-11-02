@@ -8,7 +8,7 @@ Three machines. Tell Claude Code on each one: "set up this machine per docs/remo
 
 ## LattePanda
 
-- [ ] Linux; `sudo apt install git python3.12 python3.12-venv libglu1-mesa libxcursor1 libxft2 libxinerama1`; Node 22.
+- [ ] Linux; `sudo apt install git python3.12 python3.12-venv libglu1-mesa libxcursor1 libxft2 libxinerama1`; Node 26 (NodeSource apt repo, `deb.nodesource.com/node_26.x`).
 - [ ] `git clone https://github.com/yusnimawl/srm-forge.git && cd srm-forge`
 - [ ] `python3.12 -m venv .venv && . .venv/bin/activate && python -m pip install -e ".[dev,ngsolve,web,hil]"`
 - [ ] `sh hil/setup.sh`
