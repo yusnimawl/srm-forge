@@ -341,6 +341,13 @@ def test_onshape_file_with_arc_trimmed_imports_holes():
     assert len(iron.rotor_holes) == 6 and len(iron.stator_holes) == 8
 
 
+def test_onshape_file_trimmed_in_cad_imports_cleanly():
+    # the owner's re-export after trimming the OD arc at the 0 deg notch in Onshape
+    iron, issues = import_dxf((FIXTURE.parent / "onshape_8_6_trimmed.dxf").read_bytes(), _reference_8_6())
+    assert issues == []
+    assert len(iron.rotor_holes) == 6 and len(iron.stator_holes) == 8
+
+
 def test_binary_dxf_is_read(tmp_path):
     doc = _doc()
     msp = doc.modelspace()
