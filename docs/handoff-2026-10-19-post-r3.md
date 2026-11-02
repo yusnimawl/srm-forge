@@ -21,7 +21,7 @@ For the next session, which starts the next roadmap step. Read `CLAUDE.md`, then
 3. Visual check of the Losses tab (desktop and 375 px) on `srmweb-smoke`, and re-evaluate existing cases before running Losses on them (pre-0.6.0 evaluations are refused).
 4. Parked minors: a duplicated two-line 0.6.0 check at `src/srmweb/api.py:419-422`; a B(t) vitest uses an 80 ms sleep instead of awaiting; a doubled import in `tests/solvers/test_factorization_failure.py`.
 5. Merge with the PR's checks run locally: GitHub Actions is blocked (private repo, free minutes used up, spending limit $0) until the minutes reset or the owner sets a budget.
-6. Owner side, still open from R2: the DXF done-check (trim the stator OD arc at the 0° notch in Onshape, re-export, import, evaluate it and its parent, before/after table, validate on `full`).
+6. Done 2026-11-02: the R2 DXF done-check (trimmed Onshape export imported, it and its parent evaluated, before/after table read, validate on `full` 2D-verified); `docs/r2-dxf-results.md`.
 
 ## Next roadmap step: R3b, run report
 
