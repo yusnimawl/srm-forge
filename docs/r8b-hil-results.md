@@ -1123,4 +1123,6 @@ the raw bytes of every read and of every bad frame.
 - Flashing from Linux needs PlatformIO's udev rules (`docs/remote-setup.md`); without them the Teensy upload hangs
   in the bootloader and the ST-LINK is root-only. The first Teensy upload after the rules failed once
   ("Error writing to Teensy") and the retry passed, as on Windows.
+- Owner decision (2026-11-03): the LattePanda is the HIL bench host; the packet-loss item is closed and the Windows
+  cause is not pursued.
 
