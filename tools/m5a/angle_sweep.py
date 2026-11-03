@@ -7,7 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, r"D:\y\srm-designer\tests")
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tests"))
 from conftest import make_8_6, make_12_8, make_24_16  # noqa: E402
 
 from srmcore.maps.grids import LA_CURRENT_FRACTION  # noqa: E402
@@ -18,8 +19,8 @@ from srmcore.model.design import Design, MeshSettings  # noqa: E402
 
 DESIGNS = {"8_6": make_8_6(), "8_6_sharp": make_8_6(stator_fillet_radius=0, rotor_fillet_radius=0),
            "12_8": make_12_8(), "24_16": make_24_16()}
-I_MAX = json.loads(Path(r"D:\y\srm-designer\docs\m5a-data\i_max.json").read_text())
-OUT = Path(__file__).parent
+I_MAX = json.loads((REPO / "docs" / "m5a-data" / "i_max.json").read_text())
+OUT = REPO / "docs" / "m5a-data" / "sweeps"
 
 if __name__ == "__main__":
     name = sys.argv[1]

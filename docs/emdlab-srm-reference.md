@@ -324,10 +324,10 @@ Update the living project doc ("SRM design tool — how it was built") as CLAUDE
 
 ## 7. Reproduce the EMDLAB numbers
 
-The scripts are in `docs/emdlab-data/`. They expect EMDLAB at `C:\emdlab-win64` (its README's
+The scripts are in `tools/emdlab/`. They expect EMDLAB at `C:\emdlab-win64` (its README's
 install path). MATLAB runs headless from any shell, with no MCP needed:
 ```bash
-cd docs/emdlab-data && "/c/Program Files/MATLAB/R2026b/bin/matlab.exe" -batch "bench_emdlab_srm86"
+cd tools/emdlab && "/c/Program Files/MATLAB/R2026b/bin/matlab.exe" -batch "bench_emdlab_srm86"
 ```
 * `bench_emdlab_srm86.m`: builds the 8/6 example at size scales 1, 0.5, 0.3 and 0.2 (then one
   thread) and prints nodes, stage times, Newton iterations, ψ and T.
