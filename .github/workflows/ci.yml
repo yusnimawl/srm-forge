@@ -5,7 +5,13 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # Skip changes that touch only Markdown. src/ and hil/ READMEs stay in: tests read the controller
+    # READMEs and the HIL build hash covers hil/. Path filters do not apply to tag pushes.
+    paths: ["**", "!**.md", "src/**", "hil/**"]
   pull_request:
+    # Skip changes that touch only Markdown. src/ and hil/ READMEs stay in: tests read the controller
+    # READMEs and the HIL build hash covers hil/. Path filters do not apply to tag pushes.
+    paths: ["**", "!**.md", "src/**", "hil/**"]
 jobs:
   fast:
     strategy:

@@ -5,13 +5,14 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, r"D:\y\srm-designer\tests")
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tests"))
 from conftest import make_8_6, make_12_8, make_24_16  # noqa: E402
 
 from srmcore.maps.grids import angle_grid  # noqa: E402
 from srmcore.maps.tables import angle_spline  # noqa: E402
 
-HERE = Path(__file__).parent
+HERE = REPO / "docs" / "m5a-data" / "sweeps"
 MACH = {"8_6": make_8_6(), "8_6_sharp": make_8_6(stator_fillet_radius=0, rotor_fillet_radius=0),
         "12_8": make_12_8(), "24_16": make_24_16()}
 
