@@ -103,7 +103,7 @@ exit /b %RC%
 del "%RT%\finish"
 "%UV%" pip install --python "%PY%" -e "%BENCH%..[web]"
 if errorlevel 1 echo Installing the web extra failed; the benchmark environment is unchanged otherwise.
-echo Web frontend: cd web, npm ci, npm run build (needs Node 22).
+echo Web frontend: cd web, npm ci, npm run build (needs Node 26).
 if "%~1"=="" pause
 exit /b %RC%
 
