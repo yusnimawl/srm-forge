@@ -158,7 +158,7 @@ case "$FIN" in
     keep-full)
         rm -f "$RT/finish"
         "$UV" pip install --python "$PY" -e "$REPO[web]" || echo "Installing the web extra failed; the benchmark environment is unchanged otherwise." >&2
-        echo "Web frontend: cd web, npm ci, npm run build (needs Node 22)."
+        echo "Web frontend: cd web, npm ci, npm run build (needs Node 26)."
         ;;
     *)
         rm -f "$RT/finish"
