@@ -14,6 +14,7 @@ Three machines. Tell Claude Code on each one: "set up this machine per docs/remo
 - [ ] `sh hil/setup.sh`
 - [ ] `cd web && npm ci && npm run build && cd ..`
 - [ ] `sudo usermod -aG dialout $USER` (serial ports for the Teensy and Nucleo), log out and in, plug in both boards.
+- [ ] `sudo cp hil/.runtime/lib/python3.*/site-packages/platformio/assets/system/99-platformio-udev.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger`: without it the Teensy bootloader (16c0:0478) and the ST-LINK are root-only and Build & Flash hangs; it also keeps ModemManager off both serial ports. Unplug and replug both boards after.
 - [ ] Install Claude Code, log in, turn Remote Control on.
 - [ ] Install Tailscale: `sudo tailscale up --ssh`; note the machine name.
 - [ ] No sleep, auto-login.
