@@ -1092,7 +1092,35 @@ Did not pass, or not run:
 - Step 5 (internal current sensing): not run, no DACs.
 - Streamed captures longer than the 8192-sample ring (49 ms at 6 us) do not work: the host falls behind 166.7 k
   samples/s, so the ring fills or a frame is lost (Step 1f). Buffered captures work.
-- Capture packet loss: 3 of 58 re-run captures invalid by a sequence gap (6 of 33 in Step 1; it comes in bursts; its
-  side is still open).
+- Capture packet loss: 3 of 58 re-run captures invalid by a sequence gap (6 of 33 in Step 1; it comes in bursts).
+  On a Linux host the same boards gave 0 of 1305 (see "Packet loss on a Linux host" below), so it is on the
+  Windows host side.
 - Warnings, not failures: pwm_current's step max is 84-86 % of the 6 us step in every run, above the 80 % warning
   line; tsf reached it in 1 of 11 runs.
+
+### Packet loss on a Linux host (2026-11-03)
+
+The capture packet loss (1 to 2 missing CAPTURE_DATA packets with 1 to 2 bad frames on the host, emulator `dropped`
+0) does not occur on a Linux host. Same Teensy 4.1 and Nucleo-H723ZG, rewired on the LattePanda Sigma (Ubuntu,
+kernel 7.0, `cdc_acm`), ad7606 + encoder, hysteresis on the analytic motor, 1000 rpm, 1 N m, build 3aff69f9.
+Each capture is the full 8192-sample buffered ring; the host reader is the stock `SerialTransport`, wrapped to keep
+the raw bytes of every read and of every bad frame.
+
+| Run | Captures | Invalid | Bad frames | Capture time | Die temperature |
+|---|---|---|---|---|---|
+| 1 session | 5 | 0 | 0 | 189 ms | 60 C |
+| 1 session | 1000 | 0 | 0 | 178-186 ms | 60-65 C |
+| 100 fresh sessions (connect, configure, start, 3 captures, stop, close) | 300 | 0 | 0 | 181-193 ms | 66-67 C |
+| `control_hil.py --controllers hysteresis` | 1 | 0 | 0 | - | - |
+
+- 0 of 1305. At the lowest Windows rate seen (2 of 280), 1305 clean captures have a probability of about 1e-4;
+  at the burst rate (6 of 33) far less. The loss is on the host side of the Windows bench: the Windows USB serial
+  driver (`usbser.sys`) or that PC's USB controller, hub or cable. This run does not separate those.
+- The fresh-session run covers the earlier burst pattern (most losses in the first runs after a session start).
+- `control_hil.py` on Linux: hysteresis passed, dT -0.26 %, dI -0.29 %, dR -0.02 points, valid, clock ratio
+  1.014672, emulator step 2.77 / 4.57 us, 0 overruns, 0 dropped, ISR 4.54 / 5.25 us, latency 6.75 us.
+- Not changed: the host still marks any gap or bad frame invalid, so a loss on any host cannot pass unnoticed.
+- Flashing from Linux needs PlatformIO's udev rules (`docs/remote-setup.md`); without them the Teensy upload hangs
+  in the bootloader and the ST-LINK is root-only. The first Teensy upload after the rules failed once
+  ("Error writing to Teensy") and the retry passed, as on Windows.
+
