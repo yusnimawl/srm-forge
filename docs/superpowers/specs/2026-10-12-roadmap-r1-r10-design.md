@@ -65,6 +65,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] 3D magnetostatic spot checks (NGSolve) on a few designs across stack-length/diameter ratios
 - [ ] An end-effect correction (as a function of geometry) calibrated against the 3D runs only; the measured TEAM 24 and Krishnan 6/4 data are a check, never a calibration (owner, 2026-11-03; spec `2026-11-03-r4-end-effects-design.md`)
 - [ ] The correction enters the key numbers and the uncertainty budget; the ranking bias with stack length is measured
+- [ ] The 3D sweep covers the whole air-gap range the R7 optimiser may choose, down to the smallest allowed gap (owner, 2026-11-04: small gaps are worth their cost)
 - Done when: the measured comparisons fall inside the stated uncertainty, or the remaining gap is stated in the budget.
 
 ### R5 — Thermal and rotor stress
@@ -85,6 +86,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] Spike first: NSGA-III vs surrogate/Bayesian vs the current sample-and-filter funnel, same budget and requirements; pick from the results
 - [ ] Explore at `screening`, confirm finalists at `full` (fidelity rule above)
 - [ ] Ratio `auto`: push motor rpm up until the owner's optional motor rpm cap, rotor stress, electrical frequency or bus voltage limits it (the tool says which one bound); report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
+- [ ] Air gap as a design variable the optimiser chooses (today `srmapp.sizing.generator` sets it by rule, OD/400 clamped to 0.3–0.8 mm). The limits are user inputs: a minimum buildable gap (machining and assembly) and optionally a maximum; the tool also checks rotor radial growth at max speed (R5 rotor stress) and eccentricity (bearing runout, unbalanced magnetic pull) against the chosen gap and says which limit bound (owner, 2026-11-04)
 - [ ] Plain-language recommendations ("pick this because …")
 - Done when: requirements in → ranked recommendations with reasons out, on a stated compute budget.
 
