@@ -60,9 +60,9 @@ Verdict: pass. Every row converged; psi within 0.35 % and torque within 0.15 % o
 | 8/6 | 0.5236 (unaligned) | 20 | 0.07236 | 0.07243 | 0.098 % | 1.5e-4 | -6.4e-6 | 0.001 % | 1 509 676 | 159 | 4.2 |
 | TEAM 24 | locked rotor | 7.41 | 0.36760 | 0.36890 | 0.352 % | 2.7996 | 2.8007 | 0.037 % | 1 260 964 | 106 | 5.5 |
 
-- Signs agree with 2D: motoring torque is negative at 0 < theta < pi/N_r in the srmcore sign convention (counter-clockwise positive, phase A excited from aligned), and psi is positive.
-- Torque rel peak is |T3D - T2D| / peak |T2D| of the machine's rows. The 8/6 aligned and unaligned torques are numerically zero in both models; the 3D aligned residual (-0.014 N·m, 0.11 % of peak) is the Arkkio shell noise on a prism mesh.
-- The TEAM 24 psi gap (0.35 %) is the largest; a missing or doubled factor would show as 100 %, so the gap is discretisation (not refined further, since the gate holds).
+- Signs agree with 2D wherever the torque is not numerically zero: at half overlap (0 < theta < pi/N_r) the torque is negative, pulling the rotor back to aligned (counter-clockwise positive), and psi is positive in every row. At unaligned both torques are numerically zero and their signs differ (2D +1.5e-4, 3D -6.4e-6 N·m).
+- Torque rel peak is |T3D - T2D| / peak |T2D| of the machine's rows. The 8/6 aligned and unaligned torques are numerically zero in both models; the 3D aligned residual is -0.014 N·m, 0.11 % of peak. Its cause was not measured; mesh asymmetry in the shell is the likely one.
+- The TEAM 24 psi gap (0.35 %) is the largest. It rules out a missing or doubled factor, which would show as 100 %. Its cause was not measured: discretisation is the likely one, but the mesh was not refined, since the gate holds.
 
 ## G1 TEAM 24 3D against measurement
 
