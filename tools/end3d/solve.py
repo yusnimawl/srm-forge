@@ -37,6 +37,7 @@ class Model3D:
     coils: tuple[str, ...]
     dirichlet: str = "sym_z|outer"
     order: int = 2
+    preconditioner: str = "bddc-condense"      # "bddc", "bddc-condense" (static condensation of interior dofs) or "hcurlamg"
 
 
 @dataclass(frozen=True, eq=False)
@@ -115,7 +116,8 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
     curl_u = ng.curl(u)
     nu0 = 1.0 / MU0
 
-    a = ng.BilinearForm(fes)
+    condense = model.preconditioner == "bddc-condense"
+    a = ng.BilinearForm(fes, condense=condense)
     for name in materials:
         law = model.laws[name]
         region = ng.dx(definedon=mesh.Materials(_names(name)))
@@ -124,7 +126,7 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
     j = sum((coil_current_density(mesh, c, ampere_turns[c], model.order) for c in model.coils),
             ng.CoefficientFunction((0, 0, 0)))
     a += ng.Variation(-ng.InnerProduct(j, u) * ng.dx(definedon=mesh.Materials(_names(*model.coils))))
-    pre = ng.Preconditioner(a, "bddc")
+    pre = ng.Preconditioner(a, "hcurlamg" if model.preconditioner == "hcurlamg" else "bddc")
 
     gf = ng.GridFunction(fes)
     if initial is not None:
@@ -132,7 +134,7 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
     free = fes.FreeDofs()
     fixed = np.array([not f for f in free])
     res, du = gf.vec.CreateVector(), gf.vec.CreateVector()
-    tmp = gf.vec.CreateVector()
+    tmp, rhs = gf.vec.CreateVector(), gf.vec.CreateVector()
 
     def residual_norm() -> float:
         a.Apply(gf.vec, res)
@@ -151,7 +153,13 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
         pre.Update()
         r = residual_norm()
         residuals.append(r)
-        du.data = CGSolver(a.mat, pre.mat, tol=LINEAR_TOL, maxiter=2000, printrates=False) * res
+        if condense:
+            rhs.data = res + a.harmonic_extension_trans * res
+            du.data = CGSolver(a.mat, pre.mat, tol=LINEAR_TOL, maxiter=2000, printrates=False) * rhs
+            du.data += a.harmonic_extension * du
+            du.data += a.inner_solve * res
+        else:
+            du.data = CGSolver(a.mat, pre.mat, tol=LINEAR_TOL, maxiter=2000, printrates=False) * res
         tmp.data = a.mat * du
         du_norm = float(ng.sqrt(abs(ng.InnerProduct(du, tmp))))
         tmp.data = a.mat * gf.vec

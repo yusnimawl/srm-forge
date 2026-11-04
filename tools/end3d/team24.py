@@ -152,6 +152,8 @@ def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     shell = (Cylinder(Pnt(0, 0, 0), Z, fx.BAND_OUTER, z_shell) - Cylinder(Pnt(0, 0, 0), Z, fx.BAND_INNER, z_shell))
     shell.mat("gap_shell")
     shell.maxh = p.gap_maxh
+    if not p.slab:
+        _name(shell, "outer", lambda bb: bb[0].z > z_air - EPS)
     # a slab ends at the stator outer surface (A = 0 there, as in the 2D fixture) and has no outer air
     r_air = p.r_stator_out if p.slab else p.air_radius_factor * p.r_stator_out
     air = Cylinder(Pnt(0, 0, 0), Z, r_air, z_air)
@@ -187,12 +189,21 @@ def _section_faces(p: Team24Params, h_gap: float):
     def rect(x0, y0, x1, y1):
         return WorkPlane().MoveTo(x0, y0).Rectangle(x1 - x0, y1 - y0).Face()
 
-    if p.fillet > 0:
-        raise NotImplementedError("the swept model has no pole-root fillets")
+    def round_roots(face, points):
+        """Fillet the section vertices at the xy `points` (the pole roots, as `_fillet_roots` does in 3D)."""
+        verts = {(round(v.p.x, 7), round(v.p.y, 7)): v for v in face.vertices
+                 if any(math.hypot(v.p.x - px, v.p.y - py) < 1e-6 for px, py in points)}
+        assert len(verts) == 4, f"expected 4 pole-root vertices, found {len(verts)}"
+        return face.faces[0].MakeFillet(list(verts.values()), p.fillet)
+
     R, w, wr = p.r_stator_out, p.pole_width_stator / 2, p.pole_width_rotor / 2
     stator = disk(R) - (disk(p.r_yoke_in) - rect(-w, -R, w, R)) - disk(p.r_stator_bore)
     bars = rect(-wr, -R / 2, wr, R / 2) * disk(p.r_rotor_tip)
     rotor = (disk(p.r_hub) + bars) - disk(p.r_shaft)
+    if p.fillet > 0:
+        ys, yr = math.sqrt(p.r_yoke_in ** 2 - w ** 2), math.sqrt(p.r_hub ** 2 - wr ** 2)
+        stator = round_roots(stator, [(sx * w, sy * ys) for sx in (-1, 1) for sy in (-1, 1)])
+        rotor = round_roots(rotor, [(sx * wr, sy * yr) for sx in (-1, 1) for sy in (-1, 1)])
     chord_y = math.sqrt(p.r_rotor_tip ** 2 - wr ** 2) - p.search_from_corner
     below = rotor * rect(-R, -R, R, chord_y)
     above = rotor - below
@@ -241,10 +252,11 @@ def _section_faces(p: Team24Params, h_gap: float):
     return faces, r_air
 
 
-def team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end: float, h_mid: float) -> Model3D:
+def team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end: float, h_mid: float,
+                       h_far: float | None = None) -> Model3D:
     """The same model as `team24_model` as a swept prism mesh: a 2D section (mesh size h_gap on the gap and the
     pole faces bordering it, h_iron elsewhere) stacked in layers of h_end at the stack end growing to h_mid.
-    Circles are polygons (no curved elements)."""
+    Layers above the coil bridge keep growing to h_far (default 4 h_mid). Circles are polygons (no curved elements)."""
     p = params
     if not p.r_rotor_tip < fx.BAND_INNER < fx.BAND_OUTER < p.r_stator_bore:
         raise ValueError(f"gap_shell [{fx.BAND_INNER}, {fx.BAND_OUTER}] m must lie between r_rotor_tip "
@@ -259,7 +271,7 @@ def team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end:
     if p.slab:
         layers = graded_layers(h, h, h_end, h_mid)
     else:
-        layers = graded_layers(h, top + p.air_end_factor * p.r_stator_out, h_end, h_mid, breaks=(bridge_lo, top))
+        layers = graded_layers(h, top + p.air_end_factor * p.r_stator_out, h_end, h_mid, breaks=(bridge_lo, top), h_far=h_far)
 
     def material(region: str, k: int) -> str | None:
         zc = (layers.z[k] + layers.z[k + 1]) / 2

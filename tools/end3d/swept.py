@@ -20,34 +20,47 @@ class Layers:
         return len(self.z) - 1
 
 
-def _graded(length: float, first: float, h_mid: float, ratio: float) -> list[float]:
+def _graded(length: float, first: float, cap: float, ratio: float) -> list[float]:
     """Steps over `length`: the first is exactly `first` (or all of `length` if shorter); later ones grow by at
-    most `ratio`, capped at h_mid, and are scaled down together to fit."""
+    most `ratio`, capped at `cap`. The steps that fit are scaled to fill the length: up when the remainder is
+    below half a step (no sliver layer) as long as that keeps the growth within `ratio`, down otherwise."""
     if length <= first * (1 + 1e-9):
         return [length]
     steps, total = [first], first
     while total < length - 1e-12:
-        steps.append(min(steps[-1] * ratio, h_mid))
+        steps.append(min(steps[-1] * ratio, cap))
         total += steps[-1]
-    scale = (length - first) / sum(steps[1:])
-    return [first] + [x * scale for x in steps[1:]]
+    fits = steps[:-1] if len(steps) > 2 and length - (total - steps[-1]) < 0.5 * steps[-1] else None
+    for cand in (fits, steps):
+        if cand is None or len(cand) < 2:
+            continue
+        scale = (length - first) / sum(cand[1:])
+        out = [first] + [x * scale for x in cand[1:]]
+        if all(b <= ratio * a * (1 + 1e-9) for a, b in zip(out, out[1:])):
+            return out
+    return [first] + [x * (length - first) / sum(steps[1:]) for x in steps[1:]]
 
 
 def graded_layers(z_end: float, z_top: float, h_end: float, h_mid: float, ratio: float = 1.3,
-                  breaks: Sequence[float] = ()) -> Layers:
+                  breaks: Sequence[float] = (), h_far: float | None = None) -> Layers:
     """Layer boundaries on [0, z_top] with a boundary at z_end and at every value in `breaks`.
 
     The spacing is h_end next to z_end on both sides and grows by at most `ratio` per layer away from it
-    (across breaks too), capped at h_mid. Layers shrink only where a segment is cut short by a break or an end.
+    (across breaks too), capped at h_mid below the last break (or z_end) and at `h_far` (default 4 h_mid)
+    above it. Layers shrink only where a segment is cut short by a break or an end.
     """
+    if any(not z_end < b < z_top for b in breaks):
+        raise ValueError(f"breaks {tuple(breaks)} must lie strictly between z_end {z_end} and z_top {z_top}")
+    h_far = 4 * h_mid if h_far is None else h_far
+    far_start = max(breaks, default=z_end)
     down = [z_end]
     for s in _graded(z_end, h_end, h_mid, ratio):
         down.append(down[-1] - s)
     z = [0.0, *reversed(down[1:-1]), z_end]
     up, step = z_end, h_end
-    for target in sorted({z_top, *(b for b in breaks if z_end < b <= z_top)} - {z_end}):
-        first = h_end if up == z_end else min(h_mid, step * ratio)
-        for s in _graded(target - up, first, h_mid, ratio):
+    for target in sorted({z_top, *breaks} - {z_end}):
+        first = h_end if up == z_end else min(h_far if up >= far_start else h_mid, step * ratio)
+        for s in _graded(target - up, first, h_far if up >= far_start else h_mid, ratio):
             up += s
             z.append(up)
             step = s

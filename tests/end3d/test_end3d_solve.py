@@ -111,3 +111,12 @@ def test_warm_start_converges(iron_model):
     first = solve3d(iron_model, {"coil_0": AT_SAT})
     again = solve3d(iron_model, {"coil_0": AT_SAT}, initial=first.a)
     assert again.converged and again.iterations <= 2
+
+
+def test_preconditioner_options_agree(iron_model):
+    energies = []
+    for pc in ("bddc", "bddc-condense"):
+        sol = solve3d(dataclasses.replace(iron_model, preconditioner=pc), {"coil_0": AT_SAT})
+        assert sol.converged
+        energies.append(ngsolve.Integrate(ngsolve.InnerProduct(sol.a, sol.a), sol.a.space.mesh))
+    assert energies[1] == pytest.approx(energies[0], rel=1e-6)
