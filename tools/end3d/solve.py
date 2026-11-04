@@ -1,7 +1,8 @@
 """Nonlinear H(curl) magnetostatics on a 3D mesh: Newton on the magnetic energy, CG + BDDC steps."""
 from __future__ import annotations
 
-import resource
+import re
+import sys
 import time
 from dataclasses import dataclass
 from typing import Mapping
@@ -50,15 +51,57 @@ class Solution3D:
 
 
 def _peak_rss_bytes() -> int:
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024   # kilobytes on Linux
+    """Peak resident set of this process: ru_maxrss (kilobytes on Linux, bytes on macOS) or the Windows peak working set."""
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        class Counters(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+
+        counters = Counters()
+        counters.cb = ctypes.sizeof(counters)
+        process = ctypes.windll.kernel32.GetCurrentProcess()
+        ctypes.windll.psapi.GetProcessMemoryInfo(
+            ctypes.c_void_p(process), ctypes.byref(counters), counters.cb)
+        return int(counters.PeakWorkingSetSize)
+    import resource
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
+
+
+def _names(*names: str) -> str:
+    """Region or face names as one NGSolve pattern (names are regular expressions there)."""
+    return "|".join(re.escape(n) for n in names)
 
 
 def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
-            initial: ng.GridFunction | None = None, max_iter: int = 30) -> Solution3D:
+            initial: ng.GridFunction | None = None, max_iter: int = 30,
+            threads: int | None = None) -> Solution3D:
     """Minimise the energy for the given coil ampere-turns; non-convergence is reported, never raised.
 
-    The update's energy norm is sqrt(du.K du) with K the current linearisation.
+    The update's energy norm is sqrt(du.K du) with K the current linearisation; the residual is
+    measured against the free-dof norm of the load (the gradient at A = 0). Runs inside a
+    TaskManager with `threads` NGSolve threads (None: the NGSolve default, all cores).
     """
+    previous = ng.GetNumThreads()
+    if threads is not None:
+        ng.SetNumThreads(threads)
+    try:
+        with ng.TaskManager():
+            return _solve(model, ampere_turns, initial, max_iter)
+    finally:
+        if threads is not None:
+            ng.SetNumThreads(previous)
+
+
+def _solve(model: Model3D, ampere_turns: Mapping[str, float],
+           initial: ng.GridFunction | None, max_iter: int) -> Solution3D:
     t0 = time.perf_counter()
     mesh = model.mesh
     materials = list(dict.fromkeys(mesh.GetMaterials()))   # one entry per region index otherwise
@@ -67,7 +110,7 @@ def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
         raise ValueError(f"no reluctivity law for mesh material {missing[0]!r}")
     coil_faces = [f"{c}{s}" for c in model.coils for s in ("_in", "_out")]
     fes = ng.HCurl(mesh, order=model.order, nograds=True,
-                   dirichlet="|".join([model.dirichlet, *coil_faces]))
+                   dirichlet=_names(*coil_faces) + "|" + model.dirichlet)
     u = fes.TrialFunction()
     curl_u = ng.curl(u)
     nu0 = 1.0 / MU0
@@ -75,12 +118,12 @@ def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
     a = ng.BilinearForm(fes)
     for name in materials:
         law = model.laws[name]
-        region = ng.dx(definedon=mesh.Materials(name))
+        region = ng.dx(definedon=mesh.Materials(_names(name)))
         a += ng.Variation(energy_bspline(law)(ng.InnerProduct(curl_u, curl_u)) * region)
         a += ng.Variation(REGULARISATION * nu0 * ng.InnerProduct(u, u) * region)
     j = sum((coil_current_density(mesh, c, ampere_turns[c]) for c in model.coils),
             ng.CoefficientFunction((0, 0, 0)))
-    a += ng.Variation(-ng.InnerProduct(j, u) * ng.dx(definedon=mesh.Materials("|".join(model.coils))))
+    a += ng.Variation(-ng.InnerProduct(j, u) * ng.dx(definedon=mesh.Materials(_names(*model.coils))))
     pre = ng.Preconditioner(a, "bddc")
 
     gf = ng.GridFunction(fes)
@@ -96,6 +139,11 @@ def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
         res.FV().NumPy()[fixed] = 0.0
         return float(np.linalg.norm(res.FV().NumPy()))
 
+    base = gf.vec.CreateVector()
+    base.data = gf.vec
+    gf.vec[:] = 0
+    reference = residual_norm()      # at A = 0 the gradient is minus the load
+    gf.vec.data = base
     residuals: list[float] = []
     converged, iterations = False, 0
     for _ in range(max_iter):
@@ -108,20 +156,21 @@ def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
         du_norm = float(ng.sqrt(abs(ng.InnerProduct(du, tmp))))
         tmp.data = a.mat * gf.vec
         u_norm = float(ng.sqrt(abs(ng.InnerProduct(gf.vec, tmp))))
-        if r <= NEWTON_TOL * residuals[0] and du_norm <= NEWTON_TOL * u_norm:
+        if r <= NEWTON_TOL * reference and du_norm <= NEWTON_TOL * u_norm:
             converged = True
             break
         e0, t = a.Energy(gf.vec), 1.0
-        base = gf.vec.CreateVector()
         base.data = gf.vec
         for _ in range(LINE_SEARCH_HALVINGS + 1):
             gf.vec.data = base - t * du
             if a.Energy(gf.vec) <= e0 + 1e-12 * abs(e0):
                 break
             t *= 0.5
+        else:
+            gf.vec.data = base      # no step lowers the energy
+            break
         iterations += 1
-    else:
-        a.AssembleLinearization(gf.vec)
+    if not converged:
         residuals.append(residual_norm())
     return Solution3D(gf, converged, iterations, tuple(residuals), fes.ndof,
                       time.perf_counter() - t0, _peak_rss_bytes())

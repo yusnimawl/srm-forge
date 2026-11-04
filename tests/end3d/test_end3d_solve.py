@@ -47,6 +47,7 @@ def test_current_sheet_field():
     assert sol.converged
     r = 16 * MM
     b = ngsolve.curl(sol.a)(mesh(r, 0, 2 * MM))
+    assert b[1] > 0     # current enters at coil_a_in (z = 0): +z on the inner shell, counter-clockwise B
     assert math.hypot(b[0], b[1]) == pytest.approx(MU0 * at / (2 * math.pi * r), rel=0.01)
 
 
@@ -104,3 +105,9 @@ def test_missing_law_raises(iron_model):
     model = dataclasses.replace(iron_model, laws={"air": LinearLaw(), "coil_0": LinearLaw()})
     with pytest.raises(ValueError, match="iron"):
         solve3d(model, {"coil_0": 1.0})
+
+
+def test_warm_start_converges(iron_model):
+    first = solve3d(iron_model, {"coil_0": AT_SAT})
+    again = solve3d(iron_model, {"coil_0": AT_SAT}, initial=first.a)
+    assert again.converged and again.iterations <= 2
