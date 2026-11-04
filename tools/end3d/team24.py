@@ -6,13 +6,14 @@ import math
 from dataclasses import dataclass
 
 import ngsolve as ng
-from netgen.occ import Axis, Box, Cylinder, Glue, OCCGeometry, Pnt, X, Y, Z
+from netgen.occ import Axis, Box, Cylinder, Glue, OCCGeometry, Pnt, WorkPlane, X, Y, Z
 
 import team24_fixture as fx
 from srmcore.materials.laws import VACUUM
 
 from .post import face_flux
 from .solve import Model3D, Solution3D
+from .swept import graded_layers, swept_mesh
 
 HALF = fx.DEPTH / 2
 EPS = 1e-6                      # OCC bounding boxes are padded by 1e-7
@@ -166,6 +167,126 @@ def team24_model(params: Team24Params = Team24Params()) -> Model3D:
         _name(s, "sym_z", _bottom)
     mesh = ng.Mesh(OCCGeometry(Glue([air, stator, *rotor, shaft, shell, *coils])).GenerateMesh(maxh=p.maxh))
     mesh.Curve(2)
+    materials = list(dict.fromkeys(mesh.GetMaterials()))
+    law = fx.steel_law(p.js)
+    laws = {m: (law if m == "steel" else VACUUM) for m in materials}
+    return Model3D(mesh, laws, tuple(m for m in materials if m.startswith("coil_")),
+                   dirichlet="sym_z|end_z|outer" if p.slab else "sym_z|outer")
+
+
+def _section_faces(p: Team24Params, h_gap: float):
+    """The TEAM 24 cross-section as named, non-overlapping OCC faces: {region: face}.
+
+    Region names: stator, rotor_lo, rotor_hi (the rotor split at the search chord), shaft, gap_shell, air,
+    coil_<k>a / coil_<k>b (the two coil sides) and, in a full model, `stator@fp<k>` / `air@fp<k>` (the parts of
+    the stator and air under coil k's bridge footprint).
+    """
+    def disk(r):
+        return WorkPlane().Circle(r).Face()
+
+    def rect(x0, y0, x1, y1):
+        return WorkPlane().MoveTo(x0, y0).Rectangle(x1 - x0, y1 - y0).Face()
+
+    if p.fillet > 0:
+        raise NotImplementedError("the swept model has no pole-root fillets")
+    R, w, wr = p.r_stator_out, p.pole_width_stator / 2, p.pole_width_rotor / 2
+    stator = disk(R) - (disk(p.r_yoke_in) - rect(-w, -R, w, R)) - disk(p.r_stator_bore)
+    bars = rect(-wr, -R / 2, wr, R / 2) * disk(p.r_rotor_tip)
+    rotor = (disk(p.r_hub) + bars) - disk(p.r_shaft)
+    chord_y = math.sqrt(p.r_rotor_tip ** 2 - wr ** 2) - p.search_from_corner
+    below = rotor * rect(-R, -R, R, chord_y)
+    above = rotor - below
+    turn = math.degrees(p.rotor_angle)
+    rotor_lo, rotor_hi = (s.Rotate(Axis(Pnt(0, 0, 0), Z), turn) for s in (below, above))
+    cx, cy = -chord_y * math.sin(p.rotor_angle), chord_y * math.cos(p.rotor_angle)
+    for s in (rotor_lo, rotor_hi):
+        for e in s.edges:
+            if math.hypot(e.center.x - cx, e.center.y - cy) < EPS and abs(e.end.x - e.start.x) + abs(e.end.y - e.start.y) > 2 * wr * 0.9:
+                e.name = "search"
+    faces = {"stator": stator, "rotor_lo": rotor_lo, "rotor_hi": rotor_hi, "shaft": disk(p.r_shaft),
+             "gap_shell": disk(fx.BAND_OUTER) - disk(fx.BAND_INNER)}
+    x0, b, t = p.coil_inner_half_width, p.coil_build, p.coil_thickness
+    bridges = []
+    for k, sign in enumerate((1, -1)):
+        lo, hi = sorted((sign * (p.coil_mid_y - t / 2), sign * (p.coil_mid_y + t / 2)))
+        faces[f"coil_{k}a"] = rect(x0, lo, x0 + b, hi)
+        faces[f"coil_{k}b"] = rect(-x0 - b, lo, -x0, hi)
+        bridges.append(rect(-x0 - b, lo, x0 + b, hi))
+    r_air = R if p.slab else p.air_radius_factor * R
+    air = disk(r_air)
+    for f in faces.values():
+        air = air - f
+    faces["air"] = air
+    if not p.slab:
+        for k, bridge in enumerate(bridges):
+            for name in ("stator", "air"):
+                part = faces[name] * bridge
+                if any(True for _ in part.faces):
+                    faces[f"{name}@fp{k}"] = part
+                    faces[name] = faces[name] - bridge
+    for name, f in faces.items():
+        f.name = name
+    for name in ("air", "stator"):
+        for e in faces[name].edges:
+            if e.bounding_box[1].x > r_air - EPS or e.bounding_box[0].x < -r_air + EPS:
+                e.name = "outer"
+    h = p.depth / 2
+    arcs = {p.r_stator_bore, p.r_rotor_tip, fx.BAND_INNER, fx.BAND_OUTER}
+    for f in faces.values():
+        for e in f.edges:
+            if any(abs(math.hypot(e.start.x, e.start.y) - r) < EPS and abs(math.hypot(e.end.x, e.end.y) - r) < EPS
+                   for r in arcs):
+                e.maxh = h_gap
+    faces["gap_shell"].maxh = h_gap
+    return faces, r_air
+
+
+def team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end: float, h_mid: float) -> Model3D:
+    """The same model as `team24_model` as a swept prism mesh: a 2D section (mesh size h_gap on the gap and the
+    pole faces bordering it, h_iron elsewhere) stacked in layers of h_end at the stack end growing to h_mid.
+    Circles are polygons (no curved elements)."""
+    p = params
+    if not p.r_rotor_tip < fx.BAND_INNER < fx.BAND_OUTER < p.r_stator_bore:
+        raise ValueError(f"gap_shell [{fx.BAND_INNER}, {fx.BAND_OUTER}] m must lie between r_rotor_tip "
+                         f"{p.r_rotor_tip} and r_stator_bore {p.r_stator_bore}")
+    if not p.slab and p.coil_mid_y - p.coil_thickness / 2 <= fx.BAND_OUTER:
+        raise ValueError("a coil overlaps the gap_shell")
+    section, _ = _section_faces(p, h_gap)
+    mesh2d = OCCGeometry(Glue(list(section.values())), dim=2).GenerateMesh(maxh=h_iron)
+    h = p.depth / 2
+    bridge_lo = h + p.end_clearance
+    top = bridge_lo + p.coil_thickness
+    if p.slab:
+        layers = graded_layers(h, h, h_end, h_mid)
+    else:
+        layers = graded_layers(h, top + p.air_end_factor * p.r_stator_out, h_end, h_mid, breaks=(bridge_lo, top))
+
+    def material(region: str, k: int) -> str | None:
+        zc = (layers.z[k] + layers.z[k + 1]) / 2
+        base, _, fp = region.partition("@")
+        if region.startswith("coil_"):
+            return region if p.slab else (f"coil_{region[5]}" if zc < top else "air")
+        if fp:
+            return f"coil_{fp[2]}" if bridge_lo < zc < top else (base_material(base) if zc < h else "air")
+        return base_material(base) if zc < h or region in ("gap_shell", "air") else "air"
+
+    def base_material(base: str) -> str:
+        return "steel" if base in ("stator", "rotor_lo", "rotor_hi") else base
+
+    def faces(edge: str, k: int) -> str | None:
+        if edge == "outer":
+            return "outer"
+        return "search" if edge == "search" and (layers.z[k] + layers.z[k + 1]) / 2 < h else None
+
+    def bottom(region: str) -> str:
+        if region.startswith("coil_"):
+            return f"{region}_in" if p.slab else f"coil_{region[5]}_{'in' if region[6] == 'a' else 'out'}"
+        return "sym_z"
+
+    def top_name(region: str) -> str:
+        return f"{region}_out" if p.slab and region.startswith("coil_") else ("end_z" if p.slab else "outer")
+
+    mesh = swept_mesh(mesh2d, layers, material, faces, bottom, top_name)
     materials = list(dict.fromkeys(mesh.GetMaterials()))
     law = fx.steel_law(p.js)
     laws = {m: (law if m == "steel" else VACUUM) for m in materials}

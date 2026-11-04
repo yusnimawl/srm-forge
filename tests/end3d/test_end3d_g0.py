@@ -13,6 +13,7 @@ def _stub(monkeypatch, build, ndof=10):
     monkeypatch.setattr(g0, "_build", build)
     monkeypatch.setattr(g0, "_ndof", lambda model: ndof)
     monkeypatch.setattr(g0, "_nelements", lambda model: 5)
+    monkeypatch.setattr(g0, "_nlayers", lambda model: 3)
 
     def no_solve(*a, **k):
         raise AssertionError("solver must not run")
@@ -20,7 +21,7 @@ def _stub(monkeypatch, build, ndof=10):
 
 
 def test_skips_level_over_max_dofs(monkeypatch, tmp_path):
-    _stub(monkeypatch, lambda maxh: SimpleNamespace(params=None, model=None))
+    _stub(monkeypatch, lambda level: SimpleNamespace(params=None, model=None))
     out = tmp_path / "g0.json"
     assert g0.main(["--max-dofs", "1", "--json", str(out)]) == 0
     data = json.loads(out.read_text())
@@ -29,8 +30,8 @@ def test_skips_level_over_max_dofs(monkeypatch, tmp_path):
 
 
 def test_meshing_failure_is_recorded_and_next_level_runs(monkeypatch, tmp_path):
-    def build(maxh):
-        if maxh == 2.8e-3:
+    def build(level):
+        if level == (0.7, 3.0, 0.7, 2.0):
             raise NgException("too many attempts in domain")
         return SimpleNamespace(params=None, model=None)
     _stub(monkeypatch, build)
