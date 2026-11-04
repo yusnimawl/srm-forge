@@ -1,6 +1,6 @@
 """G1: the 3D TEAM 24 model against the measured static torque and rotor-pole flux at 7.41 A, within a 3D budget.
 
-    systemd-run --user --scope -q -p MemoryMax=26G -p MemorySwapMax=0 \
+    systemd-run --user --scope -q -p MemoryMax=26G -p MemorySwapMax=0 -p OOMPolicy=continue \
         .venv/bin/python tools/end3d/g1_team24.py [--max-dofs N] [--json PATH] [--dry-run]
 
 Mesh levels are (h_gap, h_iron, h_end, h_mid) in mm: COARSE, NOMINAL (1.5 / 10 / 2 / 8, G0's 1.71 M DOFs) and FINE
@@ -10,7 +10,7 @@ levels (to the FINE value when the levels are not monotone). Each row is a worst
 for torque and flux separately, and the gate passes when |3D - measured| / measured <= the sum for both.
 
 Each 3D solve runs in its own process, one at a time. The JSON is rewritten after every run; a rerun with the same
---json reuses the converged runs. A run over --max-dofs is recorded as skipped and fails the gate; a run that did not
+--json reuses the converged runs whose parameters and level are unchanged. A run over --max-dofs is recorded as skipped and fails the gate; a run that did not
 converge is stored and makes `verdict` raise ValueError naming its row.
 
 The material row follows `srmcore.maps.validation`: Js + 2 % only, as |plus - nominal|, because Js x 0.98 = 1.96 T lies
@@ -78,12 +78,12 @@ def _rel(a, b):
 
 def _richardson_distance(f1: float, f2: float, f3: float, h: tuple[float, float, float]) -> float:
     """|f2 - extrapolated limit| / |f2| for values f1, f2, f3 at sizes h1 > h2 > h3 with the order fitted from the
-    three values (bisection, order 0.05 to 8); |f2 - f3| / |f2| when the sequence is not monotone."""
+    three values (bisection, order 1 to 8); |f2 - f3| / |f2| when the sequence is not monotone."""
     if (f1 - f2) * (f2 - f3) <= 0:
         return abs(f2 - f3) / abs(f2)
     q = (f1 - f2) / (f2 - f3)
     ratio = lambda p: (h[0] ** p - h[1] ** p) / (h[1] ** p - h[2] ** p)    # noqa: E731
-    lo, hi = 0.05, 8.0
+    lo, hi = 1.0, 8.0      # below order 1 the fit is noise between levels, and the extrapolation grows without limit
     for _ in range(60):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if ratio(mid) < q else (lo, mid)
@@ -191,7 +191,8 @@ def main(argv=None) -> int:
     if not args.dry_run and args.json.exists():
         runs = json.loads(args.json.read_text()).get("runs", {})
     for key, (params, level) in RUNS.items():
-        if _ok(runs.get(key)) and not args.dry_run:
+        old = runs.get(key) or {}
+        if _ok(old) and old.get("params") == params and old.get("level_mm") == list(level) and not args.dry_run:
             print(f"{key}: reused", flush=True)
             continue
         rec = _in_child({"key": key, "params": params, "level_mm": list(level)}, args.max_dofs, args.dry_run)
@@ -199,14 +200,19 @@ def main(argv=None) -> int:
             print(f"{key}: level {level} ndof {rec.get('ndof')} layers {rec.get('layers')}"
                   f"{' (over --max-dofs)' if rec.get('ndof', 0) > args.max_dofs else ''}", flush=True)
             continue
-        runs[key] = rec
+        runs[key] = {**rec, "params": params, "level_mm": list(level)}
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps({"runs": runs, **_report(runs)}, indent=2))
+        tmp = args.json.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"runs": runs, **_report(runs)}, indent=2))
+        tmp.replace(args.json)
         print(f"{key}: " + json.dumps({k: rec.get(k) for k in ("ndof", "converged", "skipped", "torque", "flux", "seconds",
                                                                "peak_gb")}), flush=True)
     if args.dry_run:
         return 0
     v = _report(runs)["verdict"]
+    if "reason" in v:
+        print("G1 INCOMPLETE", json.dumps(v), flush=True)
+        return 2
     print("G1", "PASS" if v["pass"] else "FAIL", json.dumps(v), flush=True)
     return 0 if v["pass"] else 1
 

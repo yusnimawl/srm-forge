@@ -87,9 +87,33 @@ def test_resume_does_not_rerun_converged(tmp_path, monkeypatch):
         return run(3.0, 4e-4) if spec["key"] != "fillet" else run(None, None, converged=False)
 
     monkeypatch.setattr(g1, "_in_child", fake)
-    g1.main(["--json", str(path)])
+    assert g1.main(["--json", str(path)]) == 2      # a run failed: incomplete, not a verdict
     assert sorted(calls) == sorted(g1.RUN_KEYS)
     assert not json.loads(path.read_text())["verdict"]["pass"]
     calls.clear()
     g1.main(["--json", str(path)])
     assert calls == ["fillet"]
+
+
+def test_resume_reruns_a_changed_run(tmp_path, monkeypatch):
+    path = tmp_path / "g1.json"
+    calls = []
+
+    def fake(spec, max_dofs, dry_run=False):
+        calls.append(spec["key"])
+        return run(3.0, 4e-4)
+
+    monkeypatch.setattr(g1, "_in_child", fake)
+    g1.main(["--json", str(path)])
+    calls.clear()
+    monkeypatch.setitem(g1.RUNS, "fillet", ({"fillet": 1e-3}, g1.NOMINAL))
+    monkeypatch.setitem(g1.RUNS, "hub_plus", (g1.RUNS["hub_plus"][0], (2.0, 10.0, 2.0, 8.0)))
+    g1.main(["--json", str(path)])
+    assert sorted(calls) == ["fillet", "hub_plus"]
+
+
+def test_mesh_row_order_floor():
+    """A fitted order below 1 is noise between levels: the row stays at the order-1 extrapolation, 5 x |f2 - f3| here."""
+    f1, f2, f3 = 2.8440, 2.8425, 2.8410
+    assert g1._richardson_distance(f1, f2, f3, (1.9, 1.5, 1.2)) == pytest.approx(5 * abs(f2 - f3) / f2)
+    assert g1._richardson_distance(2.84251, f2, f3, (1.9, 1.5, 1.2)) == pytest.approx(5 * abs(f2 - f3) / f2)

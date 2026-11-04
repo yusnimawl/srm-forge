@@ -39,12 +39,12 @@ Same case (full TEAM 24 half model, 7.41 A, nonlinear steel, H(curl) order 2), o
 
 | Level (mm) | Prisms | Layers | Free DOFs | Solve (s) | Newton | Torque (N·m) | ψ (Wb-turns) | Rotor-pole flux (Wb) |
 |---|---|---|---|---|---|---|---|---|
-| 1.5 / 10 / 2 / 8 | 75 420 | 18 | 1 711 242 | 540 | 7 | 2.84246 | 0.50307 | 4.3273e-4 |
+| 1.5 / 10 / 2 / 8 | 75 420 | 18 | 1 711 242 | 540 | 7 | 2.84246 | 0.50307 | 4.3281e-4 |
 | 1.2 / 8 / 1.5 / 6 | 140 760 | 24 | 3 202 278 | 2257 | 7 | 2.84101 | 0.50304 | 4.3273e-4 |
 | 1.0 / 7 / 1.2 / 5 | 179 699 | 23 | 4 089 610 | 2473 | 7 | 2.84073 | 0.50306 | 4.3270e-4 |
 | 0.8 / 6 / 1.0 / 4 | 260 350 | 25 | 5 931 208 | – | – | skipped (over the 4.2 M DOF cap) | | |
 
-- The levels agree to 0.06 % in torque and 0.01 % in ψ and flux, so the coarsest level is already mesh-converged for these quantities at this current. G1's mesh row measures this formally.
+- The levels agree to 0.06 % in torque, 0.01 % in ψ and 0.03 % in flux, so the coarsest level is already mesh-converged for these quantities at this current. G1's mesh row measures this formally.
 - Peak RSS is the process maximum, so the later levels inherit earlier peaks: 11.5 GB after level 1 (1.7 M DOFs), 31.2 GB (all RAM, swapping) during level 2. About 6.5 GB per million DOFs; one process per level would give per-level peaks.
 - Gate: one solve fits in RAM up to about 3 M DOFs. The script's sweep estimate (finest converged level × 336 solves) is 231 h, over the 168 h limit; at the coarsest level, which agrees with the finest within 0.06 %, it is 50 h. Controller ruling R20: the gate is read at the coarsest level that agrees with the finest within 0.1 %; with that reading G0 is met.
 - Coarse 3D against measurement, for orientation only (G1 decides): torque 2.841 N·m against 3.22 measured (−11.8 %; 2D −13.1 %), rotor-pole flux 4.327e-4 Wb against 4.72e-4 (−8.3 %; 2D −17.2 %).
