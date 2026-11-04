@@ -39,8 +39,8 @@ def setup():
 
 def test_current_through_in_and_out(setup):
     mesh, j = setup
-    assert face_current(mesh, j, "coil_0_in") == pytest.approx(AT, rel=1e-6)
-    assert face_current(mesh, j, "coil_0_out") == pytest.approx(-AT, rel=1e-6)
+    assert face_current(mesh, j, "coil_0_in") == pytest.approx(-AT, rel=1e-6)
+    assert face_current(mesh, j, "coil_0_out") == pytest.approx(AT, rel=1e-6)
 
 
 def test_current_through_internal_section(setup):
@@ -52,3 +52,15 @@ def test_current_through_internal_section(setup):
 def test_zero_outside_coil(setup):
     mesh, j = setup
     assert ngsolve.Integrate(ngsolve.InnerProduct(j, j), mesh, definedon=mesh.Materials("air")) == 0.0
+
+
+def test_current_direction(setup):
+    mesh, j = setup
+    assert j(mesh(5 * MM, 10 * MM, 10 * MM))[2] > 0
+    assert j(mesh(35 * MM, 10 * MM, 10 * MM))[2] < 0
+
+
+def test_missing_names_raise(setup):
+    mesh, _ = setup
+    with pytest.raises(ValueError, match="coil_9"):
+        coil_current_density(mesh, "coil_9", AT)
