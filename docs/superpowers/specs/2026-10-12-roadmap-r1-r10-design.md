@@ -63,7 +63,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 
 ### R4 — End effects
 - [ ] 3D magnetostatic spot checks (NGSolve) on a few designs across stack-length/diameter ratios
-- [ ] An end-effect correction (as a function of geometry) calibrated against the 3D runs and the measured TEAM 24 and Krishnan 6/4 data
+- [ ] An end-effect correction (as a function of geometry) calibrated against the 3D runs only; the measured TEAM 24 and Krishnan 6/4 data are a check, never a calibration (owner, 2026-11-03; spec `2026-11-03-r4-end-effects-design.md`)
 - [ ] The correction enters the key numbers and the uncertainty budget; the ranking bias with stack length is measured
 - Done when: the measured comparisons fall inside the stated uncertainty, or the remaining gap is stated in the budget.
 
