@@ -63,7 +63,8 @@ def _fillet_roots(solid, points, r, h):
     edges = [e for e in solid.edges
              if abs(e.end.z - e.start.z) > 0.5 * h
              and any(math.hypot(e.start.x - px, e.start.y - py) < 1e-6 for px, py in points)]
-    return solid.MakeFillet(edges, r) if edges else solid
+    assert len({(round(e.center.x, 7), round(e.center.y, 7)) for e in edges}) == 4, "expected 4 pole-root edges"
+    return solid.MakeFillet(edges, r)
 
 
 def _iron(p: Team24Params):
@@ -117,8 +118,19 @@ def _coils(p: Team24Params):
     return out, top
 
 
+def ampere_turns(params: Team24Params, current: float) -> dict[str, float]:
+    """Coil ampere-turns for a series-circuit `current`: a slab's return side (`b`) carries the negative."""
+    n = params.turns * current
+    if params.slab:
+        return {f"coil_{k}{s}": sign * n for k in (0, 1) for s, sign in (("a", 1.0), ("b", -1.0))}
+    return {"coil_0": n, "coil_1": n}
+
+
 def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     p = params
+    if not p.r_rotor_tip < fx.BAND_INNER < fx.BAND_OUTER < p.r_stator_bore:
+        raise ValueError(f"gap_shell [{fx.BAND_INNER}, {fx.BAND_OUTER}] m must lie between r_rotor_tip "
+                         f"{p.r_rotor_tip} and r_stator_bore {p.r_stator_bore}")
     stator, rotor = _iron(p)
     coils, top = _coils(p)
     shaft = Cylinder(Pnt(0, 0, 0), Z, p.r_shaft, p.depth / 2)
@@ -127,14 +139,17 @@ def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     shell.mat("gap_shell")
     shell.maxh = p.gap_maxh
     z_air = top if p.slab else top + p.air_end_factor * p.r_stator_out
-    r_air = p.air_radius_factor * p.r_stator_out
+    # a slab ends at the stator outer surface (A = 0 there, as in the 2D fixture) and has no outer air
+    r_air = p.r_stator_out if p.slab else p.air_radius_factor * p.r_stator_out
     air = Cylinder(Pnt(0, 0, 0), Z, r_air, z_air)
     for s in (stator, *rotor, shaft, shell, *coils):
         air = air - s
     air.mat("air")
     _name(air, "outer", lambda bb: bb[0].z > z_air - EPS or bb[1].x > r_air - EPS)
     if p.slab:
-        _name(air, "end_z", lambda bb: bb[0].z > z_air - EPS)
+        for s in (air, stator, *rotor, shaft, shell):
+            _name(s, "end_z", lambda bb: bb[0].z > z_air - EPS)
+        _name(stator, "outer", lambda bb: bb[1].x > r_air - EPS and bb[0].z < EPS and bb[1].z > z_air - EPS)
     for s in (air, stator, *rotor, shaft, shell):
         _name(s, "sym_z", _bottom)
     mesh = ng.Mesh(OCCGeometry(Glue([air, stator, *rotor, shaft, shell, *coils])).GenerateMesh(maxh=p.maxh))
