@@ -82,6 +82,27 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] Linked inputs: P = T·ω (any two give the third)
 - [ ] Sweeps of cooling, bus voltage and current limit on a chosen design (absorbs the planned v0b-3 sweep and design study)
 
+### R6b — Software QA (added 2026-11-04, owner)
+- [ ] Whole-repo audit: bugs, untested risky code, error handling, CI health, dead or duplicated code; ranked report with fixes
+- [ ] Fix what the report ranks as must-fix, each with a test
+- Done when: the report is in `docs/`, the must-fix items are merged with CI green, and the rest are tracker items.
+
+### R6c — Speed report (added 2026-11-04, owner)
+- [ ] Measured times for every stage (mesh, 2D solve, map, evaluate, winding scan, losses, SIL, 3D) on the LattePanda, with hot spots profiled
+- [ ] Comparison with published timings of other tools (FEMM, Ansys Maxwell, JMAG, Motor-CAD, EMDLAB), at matched accuracy where the sources allow (time to a stated torque error), with sources cited
+- Done when: the report is in `docs/` with every number traceable to a run or a cited source.
+
+### R6d — Optimisation research (added 2026-11-04, owner)
+- [ ] Literature review of SRM design optimisation: algorithms (NSGA-II/III, differential evolution, PSO, surrogate/Bayesian, multi-fidelity), pole-shape and topology optimisation, coil and winding choice; which suit this tool and which are fastest for a given accuracy
+- [ ] A recommendation of the methods R7's spike compares
+- Done when: the review is in `docs/` with cited sources and the R7 spike list follows from it.
+
+### R6e — Web review and polish (added 2026-11-04, owner)
+- [ ] UX review of every tab with findings ranked
+- [ ] Visual polish from the review
+- [ ] 3D motor view in the browser: the 2D outline extruded with coils and end turns, rotatable
+- Done when: the review's must-fix items and the 3D view are merged, checked on desktop and at 375 px.
+
 ### R7 — Decide for me
 - [ ] Spike first: NSGA-III vs surrogate/Bayesian vs the current sample-and-filter funnel, same budget and requirements; pick from the results
 - [ ] Explore at `screening`, confirm finalists at `full` (fidelity rule above)
@@ -135,6 +156,10 @@ The owner has a US$100 credit for Claude cloud sessions. A cloud session is Ubun
 | R4 end effects | Local | 3D NGSolve runs take hours and need RAM |
 | R5 thermal and stress | Split | Solver and UI code in the cloud; calibration runs locally |
 | R6 what-if tab | Cloud | Mostly UI; sweeps reuse cached maps |
+| R6b software QA | Cloud | Code reading and fixes with fast tests |
+| R6c speed report | Split | Timings on the LattePanda; literature comparison anywhere |
+| R6d optimisation research | Cloud | Reading and writing only |
+| R6e web review and polish | Cloud | UI code; the visual check stays local |
 | R7 recommender | Split | Spike code in the cloud; the budgeted comparison runs (many maps) locally |
 | R8 control SIL | Cloud | C and Python simulation code with fast tests; the biggest code item, so the best use of the credit |
 | R9 ripple optimisation | Split | Optimiser code in the cloud; long optimisation runs locally |
