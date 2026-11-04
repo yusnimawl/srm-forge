@@ -245,7 +245,7 @@ Budget rows, each from 3D runs (spec G1), perturbation sizes fixed here before a
 |---|---|---|
 | mesh | nominal at 3 `maxh` levels (each `gap_maxh` scaled with it) | \|finest − Richardson extrapolation\| / finest; if the levels are not monotone, \|finest − next\| |
 | air box | `air_radius_factor` 1.5 → 2.25 and `air_end_factor` 1.0 → 1.5 | \|change\| |
-| material | `steel_law(js)` at Js × 1.02 and × 0.98 (`ASSUMED_JS` nominal) | half spread |
+| material | `steel_law(js)` at Js × 1.02 (`ASSUMED_JS` nominal); × 0.98 is below the B-H data, so as in `maps.validation` the row is one-sided (2026-11-05, before any run). No grade allowance: rows come from 3D runs only | \|change\| |
 | table rounding | none | ±0.005 / measured (0.16 % torque, 0.11 % flux) |
 | fillets | `fillet` 0 → 3e-3 | \|change\| |
 | figure dimensions | hub radius and yoke thickness each ±0.5 mm | half spread, each its own row |

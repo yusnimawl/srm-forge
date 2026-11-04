@@ -1,6 +1,6 @@
 """G1: the 3D TEAM 24 model against the measured static torque and rotor-pole flux at 7.41 A, within a 3D budget.
 
-    systemd-run --user --scope -q -p MemoryMax=20G -p MemorySwapMax=0 \
+    systemd-run --user --scope -q -p MemoryMax=26G -p MemorySwapMax=0 \
         .venv/bin/python tools/end3d/g1_team24.py [--max-dofs N] [--json PATH] [--dry-run]
 
 Mesh levels are (h_gap, h_iron, h_end, h_mid) in mm: COARSE, NOMINAL (1.5 / 10 / 2 / 8, G0's 1.71 M DOFs) and FINE
@@ -13,8 +13,9 @@ Each 3D solve runs in its own process, one at a time. The JSON is rewritten afte
 --json reuses the converged runs. A run over --max-dofs is recorded as skipped and fails the gate; a run that did not
 converge is stored and makes `verdict` raise ValueError naming its row.
 
-The material row's low run (Js x 0.98 = 1.96 T) is below the last B-H data point (1.979 T), which `process_bh` rejects, so
-that run fails to build and is recorded as not converged: as written the row cannot be run.
+The material row follows `srmcore.maps.validation`: Js + 2 % only, as |plus - nominal|, because Js x 0.98 = 1.96 T lies
+below the B-H data (last point J = 1.979 T), which `process_bh` rejects. It has no grade allowance: the spec builds this
+budget from 3D runs only, and the curve is the measured EN9 curve with no grade given.
 """
 from __future__ import annotations
 
@@ -51,7 +52,6 @@ RUNS = {
     "air_radius": ({"air_radius_factor": 2.25}, NOMINAL),
     "air_end": ({"air_end_factor": 1.5}, NOMINAL),
     "js_hi": ({"js": fx.ASSUMED_JS * 1.02}, NOMINAL),
-    "js_lo": ({"js": fx.ASSUMED_JS * 0.98}, NOMINAL),
     "fillet": ({"fillet": 3 * MM}, NOMINAL),
     "hub_plus": ({"r_hub": fx.R_HUB + 0.5 * MM}, NOMINAL),
     "hub_minus": ({"r_hub": fx.R_HUB - 0.5 * MM}, NOMINAL),
@@ -105,7 +105,7 @@ def budget(nominal: dict, runs: dict) -> dict[str, dict[str, float | None]]:
     row("mesh", ("mesh_coarse", "mesh_fine"),
         lambda n, c, f: _richardson_distance(c, n, f, (COARSE[0], NOMINAL[0], FINE[0])))
     row("air_box", ("air_radius", "air_end"), lambda n, r, e: (abs(r - n) + abs(e - n)) / abs(n))
-    row("material", ("js_hi", "js_lo"), lambda n, hi, lo: abs(hi - lo) / 2 / abs(n))
+    row("material", ("js_hi",), lambda n, hi: _rel(hi, n))
     out["table_rounding"] = {q: ROUNDING[q] / MEASURED[q] for q in QUANTITIES}
     row("fillets", ("fillet",), lambda n, v: _rel(v, n))
     row("hub_radius", ("hub_plus", "hub_minus"), lambda n, a, b: abs(a - b) / 2 / abs(n))

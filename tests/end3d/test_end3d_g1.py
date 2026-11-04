@@ -25,7 +25,7 @@ def test_budget_sums_rows():
     r = runs(1.0,
              mesh_coarse=run(3.03, 4.04e-4), mesh_fine=run(3.0, 4e-4),
              air_radius=run(3.03, 4e-4), air_end=run(3.0, 4.04e-4),
-             js_hi=run(3.06, 4.0e-4), js_lo=run(2.94, 4.0e-4),
+             js_hi=run(3.06, 4.0e-4),
              fillet=run(2.97, 4e-4), search_plus=run(3.0, 4.04e-4), search_minus=run(3.0, 3.96e-4),
              end_1mm=run(3.0, 4.0e-4), end_5mm=run(3.0, 4.0e-4))
     rows = g1.budget(r["nominal"], r)
