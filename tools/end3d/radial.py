@@ -121,6 +121,8 @@ def radial_model(design: Design, angle: float, phase: str = "A", slab: bool = Fa
     p = design.machine
     if p.iron is not None:
         raise NotImplementedError("imported iron is not supported by the 3D reference model")
+    if slab and design.mesh.outer_air_thickness > 0:
+        raise NotImplementedError("a slab puts its boundary at the stator outer radius: no outer air ring")
     resolved = resolve_mesh_settings(p, design.mesh)
     h_gap = resolved.gap_size if h_gap is None else h_gap
     h_iron = resolved.region_sizes["stator_iron"] if h_iron is None else h_iron
