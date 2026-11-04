@@ -51,7 +51,18 @@ Same case (full TEAM 24 half model, 7.41 A, nonlinear steel, H(curl) order 2), o
 
 ## G2 slab against 2D
 
-Not run yet.
+Verdict: pass. Every row converged; psi within 0.35 % and torque within 0.15 % of the machine's peak torque, signed, against limits of 0.5 % and 1 %. Script `tools/end3d/g2_slab.py`, data `docs/validation/r4_g2.json`. The 3D model is the swept prism slab (a stack half with its end face at z = depth/2 on a Dirichlet face, so coil sides run straight); 2D references are the srmcore `full` mesh solved with the NGSolve adapter (8/6) and the fixture mesh (TEAM 24). One mesh level, no refinement was needed: 8/6 h_gap/h_iron/h_end/h_mid 1 / 3 / 4 / 12 mm; TEAM 24 1 / 4 / 1 / 3 mm. Each solve ran in its own process under a 20 GB cap.
+
+| Machine | Angle (rad) | Current (A) | psi 2D | psi 3D | psi rel | T 2D (N·m) | T 3D (N·m) | T rel peak | Free DOFs | Solve (s) | Peak RSS (GB) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 8/6 | 0 (aligned) | 20 | 0.32030 | 0.32045 | 0.045 % | -3.7e-5 | -0.0137 | 0.110 % | 1 504 006 | 302 | 4.3 |
+| 8/6 | 0.2618 (half overlap) | 20 | 0.19518 | 0.19540 | 0.114 % | -12.436 | -12.455 | 0.153 % | 1 521 961 | 272 | 4.3 |
+| 8/6 | 0.5236 (unaligned) | 20 | 0.07236 | 0.07243 | 0.098 % | 1.5e-4 | -6.4e-6 | 0.001 % | 1 509 676 | 159 | 4.2 |
+| TEAM 24 | locked rotor | 7.41 | 0.36760 | 0.36890 | 0.352 % | 2.7996 | 2.8007 | 0.037 % | 1 260 964 | 106 | 5.5 |
+
+- Signs agree with 2D: motoring torque is negative at 0 < theta < pi/N_r in the srmcore sign convention (counter-clockwise positive, phase A excited from aligned), and psi is positive.
+- Torque rel peak is |T3D - T2D| / peak |T2D| of the machine's rows. The 8/6 aligned and unaligned torques are numerically zero in both models; the 3D aligned residual (-0.014 N·m, 0.11 % of peak) is the Arkkio shell noise on a prism mesh.
+- The TEAM 24 psi gap (0.35 %) is the largest; a missing or doubled factor would show as 100 %, so the gap is discretisation (not refined further, since the gate holds).
 
 ## G1 TEAM 24 3D against measurement
 
