@@ -17,8 +17,8 @@ pytestmark = pytest.mark.slow
 
 
 @functools.lru_cache(maxsize=None)
-def _run(**kw):
-    p = Team24Params(slab=True, maxh=8e-3, **kw)
+def _run(slab=True, **kw):
+    p = Team24Params(slab=slab, **{"maxh": 8e-3, **kw})
     m = team24_model(p)
     m = dataclasses.replace(m, laws={k: (LinearLaw(1000.0) if k == "steel" else v)
                                      for k, v in m.laws.items()})
@@ -56,3 +56,27 @@ def test_torque_virtual_work():
         w[sgn] = post.coenergy(m, sol)
     m, sol, _ = _run()
     assert _torque(m, sol) == pytest.approx((w[1] - w[-1]) / (2 * d), rel=2e-2)
+
+
+def test_torque_virtual_work_full():
+    d = math.radians(0.5)
+    w = {}
+    for sgn in (1, -1):
+        m, sol, _ = _run(slab=False, maxh=10e-3, gap_maxh=1.5e-3, rotor_angle=fx.ROTOR_ANGLE + sgn * d)
+        w[sgn] = post.coenergy(m, sol)
+    m, sol, _ = _run(slab=False, maxh=10e-3, gap_maxh=1.5e-3)
+    assert _torque(m, sol) == pytest.approx((w[1] - w[-1]) / (2 * d), rel=2e-2)
+
+
+def test_rotor_pole_flux_matches_2d():
+    from srmcore.materials.laws import VACUUM
+    from srmcore.solvers.skfem_reference import SkfemReference
+    from end3d.team24 import rotor_pole_flux
+    m, sol, _ = _run(depth=fx.DEPTH / 2)
+    p = fx.team24_problem(CURRENT)
+    p = dataclasses.replace(p, laws=(VACUUM, LinearLaw(1000.0)))
+    s = SkfemReference().solve(p)
+    ref = fx.rotor_pole_flux(p, s) / 2          # 2D flux is for DEPTH; the slab is DEPTH / 2
+    got = rotor_pole_flux(m, sol)
+    assert got > 0
+    assert got == pytest.approx(ref, rel=2e-2)

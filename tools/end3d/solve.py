@@ -121,7 +121,7 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
         region = ng.dx(definedon=mesh.Materials(_names(name)))
         a += ng.Variation(energy_bspline(law)(ng.InnerProduct(curl_u, curl_u)) * region)
         a += ng.Variation(REGULARISATION * nu0 * ng.InnerProduct(u, u) * region)
-    j = sum((coil_current_density(mesh, c, ampere_turns[c]) for c in model.coils),
+    j = sum((coil_current_density(mesh, c, ampere_turns[c], model.order) for c in model.coils),
             ng.CoefficientFunction((0, 0, 0)))
     a += ng.Variation(-ng.InnerProduct(j, u) * ng.dx(definedon=mesh.Materials(_names(*model.coils))))
     pre = ng.Preconditioner(a, "bddc")

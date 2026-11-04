@@ -11,7 +11,8 @@ from netgen.occ import Axis, Box, Cylinder, Glue, OCCGeometry, Pnt, X, Y, Z
 import team24_fixture as fx
 from srmcore.materials.laws import VACUUM
 
-from .solve import Model3D
+from .post import face_flux
+from .solve import Model3D, Solution3D
 
 HALF = fx.DEPTH / 2
 EPS = 1e-6                      # OCC bounding boxes are padded by 1e-7
@@ -126,6 +127,12 @@ def ampere_turns(params: Team24Params, current: float) -> dict[str, float]:
     return {"coil_0": n, "coil_1": n}
 
 
+def rotor_pole_flux(model: Model3D, sol: Solution3D) -> float:
+    """Full-machine flux (Wb) into the rotor pole through the `search` chord: minus the radially outward `face_flux`,
+    so it is positive for the TEAM 24 excitation, like team24_fixture.rotor_pole_flux."""
+    return -face_flux(model, sol, "search")
+
+
 def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     p = params
     if not p.r_rotor_tip < fx.BAND_INNER < fx.BAND_OUTER < p.r_stator_bore:
@@ -135,10 +142,15 @@ def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     coils, top = _coils(p)
     shaft = Cylinder(Pnt(0, 0, 0), Z, p.r_shaft, p.depth / 2)
     shaft.mat("shaft")
-    shell = (Cylinder(Pnt(0, 0, 0), Z, fx.BAND_OUTER, p.depth / 2) - Cylinder(Pnt(0, 0, 0), Z, fx.BAND_INNER, p.depth / 2))
+    z_air = top if p.slab else top + p.air_end_factor * p.r_stator_out
+    # the full model's shell runs to the top of the end air, where tangential A = 0 (outer face), so the
+    # end-cap B_theta B_z term of the Arkkio torque vanishes
+    z_shell = p.depth / 2 if p.slab else z_air
+    if not p.slab and p.coil_mid_y - p.coil_thickness / 2 <= fx.BAND_OUTER:
+        raise ValueError("a coil overlaps the gap_shell")
+    shell = (Cylinder(Pnt(0, 0, 0), Z, fx.BAND_OUTER, z_shell) - Cylinder(Pnt(0, 0, 0), Z, fx.BAND_INNER, z_shell))
     shell.mat("gap_shell")
     shell.maxh = p.gap_maxh
-    z_air = top if p.slab else top + p.air_end_factor * p.r_stator_out
     # a slab ends at the stator outer surface (A = 0 there, as in the 2D fixture) and has no outer air
     r_air = p.r_stator_out if p.slab else p.air_radius_factor * p.r_stator_out
     air = Cylinder(Pnt(0, 0, 0), Z, r_air, z_air)

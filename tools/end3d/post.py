@@ -9,7 +9,7 @@ from srmcore.model.constants import MU0
 
 from .coil import coil_current_density
 from .material import energy_bspline
-from .solve import Model3D, Solution3D
+from .solve import Model3D, Solution3D, _names
 
 MIRROR = 2.0
 QUAD_ORDER = 8
@@ -19,9 +19,9 @@ def _b(sol: Solution3D) -> ng.CoefficientFunction:
     return ng.curl(sol.a)
 
 
-def _integral(cf, model: Model3D, region: str | None = None) -> float:
+def _integral(cf, model: Model3D, region: Sequence[str] | None = None) -> float:
     mesh = model.mesh
-    kw = {"definedon": mesh.Materials(region)} if region else {}
+    kw = {"definedon": mesh.Materials(_names(*region))} if region else {}
     return ng.Integrate(cf, mesh, order=QUAD_ORDER, **kw)
 
 
@@ -30,7 +30,7 @@ def flux_linkage(model: Model3D, sol: Solution3D, coils: Sequence[str], current:
     """psi = 2 int A.J dV / current (Wb-turns), J the ampere-turn density of `coils`."""
     j = sum((coil_current_density(model.mesh, c, ampere_turns[c], model.order) for c in coils),
             ng.CoefficientFunction((0, 0, 0)))
-    return MIRROR * _integral(ng.InnerProduct(sol.a, j), model, "|".join(coils)) / current
+    return MIRROR * _integral(ng.InnerProduct(sol.a, j), model, coils) / current
 
 
 def arkkio_torque(model: Model3D, sol: Solution3D, r_inner: float, r_outer: float,
@@ -39,7 +39,7 @@ def arkkio_torque(model: Model3D, sol: Solution3D, r_inner: float, r_outer: floa
     x, y = ng.x, ng.y
     b = _b(sol)
     r_br_bt = (b[0] * x + b[1] * y) * (-b[0] * y + b[1] * x) / ng.sqrt(x * x + y * y)
-    return MIRROR * _integral(r_br_bt, model, shell) / (MU0 * (r_outer - r_inner))
+    return MIRROR * _integral(r_br_bt, model, [shell]) / (MU0 * (r_outer - r_inner))
 
 
 def coenergy(model: Model3D, sol: Solution3D) -> float:
@@ -49,7 +49,7 @@ def coenergy(model: Model3D, sol: Solution3D) -> float:
     total = 0.0
     for name in dict.fromkeys(model.mesh.GetMaterials()):
         w = energy_bspline(model.laws[name])
-        total += _integral(2 * s * w.Differentiate()(s) - w(s), model, name)
+        total += _integral(2 * s * w.Differentiate()(s) - w(s), model, [name])
     return MIRROR * total
 
 
