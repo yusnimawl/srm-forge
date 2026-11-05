@@ -95,8 +95,8 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - Done when: the report is in `docs/` with every number traceable to a run or a cited source.
 
 ### R6d — Optimisation research (added 2026-11-04, owner)
-- [ ] Literature review of SRM design optimisation: algorithms (NSGA-II/III, differential evolution, PSO, surrogate/Bayesian, multi-fidelity), pole-shape and topology optimisation, coil and winding choice; which suit this tool and which are fastest for a given accuracy
-- [ ] A recommendation of the methods R7's spike compares
+- [x] Literature review of SRM design optimisation: algorithms (NSGA-II/III, differential evolution, PSO, surrogate/Bayesian, multi-fidelity), pole-shape and topology optimisation, coil and winding choice; which suit this tool and which are fastest for a given accuracy (`docs/r6d-optimisation-research.md`, 2026-11-06)
+- [x] A recommendation of the methods R7's spike compares: funnel, NSGA-II/III (pymoo), GP surrogate with qLogNEHVI (BoTorch); stack length rescaled after the map like turns
 - Done when: the review is in `docs/` with cited sources and the R7 spike list follows from it.
 
 ### R6e — Web review and polish (added 2026-11-04, owner)
