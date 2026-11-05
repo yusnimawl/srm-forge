@@ -41,6 +41,9 @@ GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade
 # 2D-Lu share). The values are fractions of the measured value; the end_effect row converts them to fractions of
 # the model value, g / (1 - g), because budget rows are relative to the model value.
 MEASURED_GAP = {"la": 0.172, "lu": 0.0, "peak_torque": 0.192, "psi_max": 0.172}
+# Krishnan 6/4 Lu at 1 A with the end winding, model high, as a fraction of the measured value. It is a 2D-model and
+# geometry gap, not an end effect. Model high, so the fraction of the model value is g / (1 + g).
+MEASURED_LU_GAP = 0.452
 END_WINDING_IMAGE = (1.0, 2.0)    # image-factor bounds of the end-winding inductance; corrected values use the midpoint
 
 
@@ -196,7 +199,9 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
                         "19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and ψ_max (TEAM 24)")
     digitisation = max(m.digitisation_error or 0.0 for m in loaded.values())
     digitisation_row = BudgetRow("digitisation", {k: digitisation for k in KEYS}, "digitised B-H curve")
-    rows = (mesh_row, material_row, end_row, digitisation_row)
+    lu_row = BudgetRow("measured_lu", {k: MEASURED_LU_GAP / (1.0 + MEASURED_LU_GAP) if k == "lu" else 0.0 for k in KEYS},
+                       "measured gap, not a modelled effect: model high by 45.2 % of measured in Lu (Krishnan 6/4, 1 A)")
+    rows = (mesh_row, material_row, end_row, digitisation_row, lu_row)
     budget = UncertaintyBudget(values_2d, values, rows, {k: sum(r.rel[k] for r in rows) for k in KEYS})
 
     expected_hash = design_hash(design)
