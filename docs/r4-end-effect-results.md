@@ -135,8 +135,9 @@ Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec de
 - The values are not a constraint anywhere. No search, margin or ranking reads the budget.
 - The map values are not scaled by the gap: measurements are a check, not a calibration.
 - Evaluations stored before this change keep the old row in the web store and show a peak-torque row of 0 %. Validating again updates them. The note text tells the two apart. There is no migration.
-- The R5 spec (section 7, row "EM torque") takes the current for a rated torque at torque x (1 + the EM peak-torque row, end-effect row included). R5's rated torque therefore carries 23.76 % in the end-effect row and 33.88 % in the 8/6 peak-torque total. No change is proposed here.
-- Not in the budget: the largest measured residual is Krishnan Lu, +27.3 % to +45.2 % after the end-winding term (`docs/validation/krishnan_6_4.json`), far outside the 10.98 % Lu total on the 8/6; `docs/m5d-krishnan-results.md` gives the cause as "the 2D model with the coil packed against the yoke already over-predicts Lu". Decision 7 leaves Lu out, so it is not in the budget. It is stated here and is a tracker item for an owner ruling.
+- R5 does not use the measured gap (owner, 2026-11-06). Its EM torque row (R5 spec section 7) takes the peak-torque total less the gap, because the model is low on torque in every measured comparison. On the 8/6 the factor is 1.10, not 1.34.
+- Lu has its own row, `measured_lu` (owner, 2026-11-06): the Krishnan Lu residual after the end-winding term is +27.3 % to +45.2 % (`docs/validation/krishnan_6_4.json`). The row uses +45.2 % at 1 A, the point that matches the Lu key number at 5 % of I_max. The model is high, so the row is g / (1 + g) = 31.13 % of the model value. `docs/m5d-krishnan-results.md` calls it a 2D-model and geometry issue, not an end effect, so it is not in `end_effect`. It comes from one machine, and coil placement alone moves Lu from 37 to 45 mH, so the row is conservative.
+- 8/6 totals with this row (code eff5be8, wrapped in the result commit; report PASS): La 30.98 %, Lu 42.11 %, peak torque 33.88 %, ψ_max 30.99 %.
 
 ## G3 (R4b)
 

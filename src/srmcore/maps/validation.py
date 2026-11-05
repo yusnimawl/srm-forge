@@ -199,8 +199,10 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
                         "19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and ψ_max (TEAM 24)")
     digitisation = max(m.digitisation_error or 0.0 for m in loaded.values())
     digitisation_row = BudgetRow("digitisation", {k: digitisation for k in KEYS}, "digitised B-H curve")
-    lu_row = BudgetRow("measured_lu", {k: MEASURED_LU_GAP / (1.0 + MEASURED_LU_GAP) if k == "lu" else 0.0 for k in KEYS},
-                       "measured gap, not a modelled effect: model high by 45.2 % of measured in Lu (Krishnan 6/4, 1 A)")
+    lu_gap = MEASURED_LU_GAP / (1.0 + MEASURED_LU_GAP)
+    lu_row = BudgetRow("measured_lu", {k: lu_gap if k == "lu" else 0.0 for k in KEYS},
+                       "measured gap, not a modelled effect: model high by 45.2 % of measured in Lu "
+                       "(Krishnan 6/4, 1 A)")
     rows = (mesh_row, material_row, end_row, digitisation_row, lu_row)
     budget = UncertaintyBudget(values_2d, values, rows, {k: sum(r.rel[k] for r in rows) for k in KEYS})
 
