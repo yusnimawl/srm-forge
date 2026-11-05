@@ -210,8 +210,8 @@ def test_measured_lu_row_is_on_lu_only_and_traces_to_krishnan(monkeypatch):
     assert all(row.rel[k] == 0.0 for k in V.KEYS if k != "lu")
     assert "Krishnan" in row.note
     rows = json.loads((Path(__file__).resolve().parents[2] / "docs/validation/krishnan_6_4.json").read_text())["rows"]
-    worst = max(r["error_after_pct"] for r in rows if r["quantity"] == "Lu")
-    assert V.MEASURED_LU_GAP == pytest.approx(worst / 100, abs=5e-4)
+    at_1a = next(r["error_after_pct"] for r in rows if r["quantity"] == "Lu" and r["current"] == 1.0)
+    assert V.MEASURED_LU_GAP == pytest.approx(at_1a / 100, abs=5e-4)
 
 
 def test_measured_gap_is_the_larger_residual():
