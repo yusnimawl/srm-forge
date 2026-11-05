@@ -192,9 +192,12 @@ def test_budget_rows_sum_and_use_the_corrected_values(monkeypatch):
     assert material.rel["la"] == pytest.approx((0.01 + V.GRADE_ALLOWANCE["C"]) * scale["la"])
     assert material.rel["peak_torque"] == pytest.approx(0.01 + V.GRADE_ALLOWANCE["C"])
     end = next(row for row in b.rows if row.source == "end_effect")
-    assert end.rel["peak_torque"] == pytest.approx(V.MEASURED_GAP["peak_torque"])
-    assert end.rel["la"] == pytest.approx((l2 - l1) / 2 / b.values["la"] + V.MEASURED_GAP["la"])
-    assert end.rel["lu"] == pytest.approx((l2 - l1) / 2 / b.values["lu"])
+    gap = {k: g / (1 - g) for k, g in V.MEASURED_GAP.items()}
+    half = (l2 - l1) / 2
+    assert end.rel["peak_torque"] == pytest.approx(gap["peak_torque"])
+    assert end.rel["la"] == pytest.approx(half / b.values["la"] + gap["la"])
+    assert end.rel["lu"] == pytest.approx(half / b.values["lu"])
+    assert end.rel["psi_max"] == pytest.approx(half * key.i_max / b.values["psi_max"] + gap["psi_max"])
     assert "Krishnan" in end.note and "TEAM 24" in end.note
 
 
