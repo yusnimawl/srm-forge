@@ -65,6 +65,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] 3D magnetostatic spot checks (NGSolve) on a few designs across stack-length/diameter ratios
 - [ ] An end-effect correction (as a function of geometry) calibrated against the 3D runs only; the measured TEAM 24 and Krishnan 6/4 data are a check, never a calibration (owner, 2026-11-03; spec `2026-11-03-r4-end-effects-design.md`)
 - [ ] The correction enters the key numbers and the uncertainty budget; the ranking bias with stack length is measured
+- [ ] The 3D sweep covers the whole air-gap range the R7 optimiser may choose, down to the smallest allowed gap (owner, 2026-11-04: small gaps are worth their cost)
 - Done when: the measured comparisons fall inside the stated uncertainty, or the remaining gap is stated in the budget.
 
 ### R5 — Thermal and rotor stress
@@ -75,16 +76,39 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] Steady state and the 30 s peak transient
 - [ ] Continuous rating; the options graph gets continuous kW/kg and kW/L
 - [ ] Analytic rotor stress (spinning disc plus pole root) at max speed × safety factor, as a constraint from here on
-- Done when: continuous and peak ratings, compared against a published thermal case.
+- [ ] Ratings replace `j_limit` in the winding choice; iron loss carried as a band (× 2.0) and every budget row stacked worst-case (owner, 2026-11-05; spec `2026-11-05-r5-thermal-stress-design.md`)
+- Done when: the peak rating matches the measured Kiyota 2014 coil-end transient within its budget, the solver matches Faiz 2009, the winding model matches Márquez-Fernández 2018, the missing measured continuous case is stated in the budget, and ratings and stress render on an 8/6 and a bench-target case (owner, 2026-11-05: no published SRM with a measured continuous temperature and enough geometry was found).
 
 ### R6 — What-if tab
 - [ ] Linked inputs: P = T·ω (any two give the third)
 - [ ] Sweeps of cooling, bus voltage and current limit on a chosen design (absorbs the planned v0b-3 sweep and design study)
 
+### R6b — Software QA (added 2026-11-04, owner)
+- [ ] Whole-repo audit: bugs, untested risky code, error handling, CI health, dead or duplicated code; ranked report with fixes
+- [ ] Fix what the report ranks as must-fix, each with a test
+- Done when: the report is in `docs/`, the must-fix items are merged with CI green, and the rest are tracker items.
+
+### R6c — Speed report (added 2026-11-04, owner)
+- [ ] Measured times for every stage (mesh, 2D solve, map, evaluate, winding scan, losses, SIL, 3D) on the LattePanda, with hot spots profiled
+- [ ] Comparison with published timings of other tools (FEMM, Ansys Maxwell, JMAG, Motor-CAD, EMDLAB), at matched accuracy where the sources allow (time to a stated torque error), with sources cited
+- Done when: the report is in `docs/` with every number traceable to a run or a cited source.
+
+### R6d — Optimisation research (added 2026-11-04, owner)
+- [ ] Literature review of SRM design optimisation: algorithms (NSGA-II/III, differential evolution, PSO, surrogate/Bayesian, multi-fidelity), pole-shape and topology optimisation, coil and winding choice; which suit this tool and which are fastest for a given accuracy
+- [ ] A recommendation of the methods R7's spike compares
+- Done when: the review is in `docs/` with cited sources and the R7 spike list follows from it.
+
+### R6e — Web review and polish (added 2026-11-04, owner)
+- [ ] UX review of every tab with findings ranked
+- [ ] Visual polish from the review
+- [ ] 3D motor view in the browser: the 2D outline extruded with coils and end turns, rotatable
+- Done when: the review's must-fix items and the 3D view are merged, checked on desktop and at 375 px.
+
 ### R7 — Decide for me
 - [ ] Spike first: NSGA-III vs surrogate/Bayesian vs the current sample-and-filter funnel, same budget and requirements; pick from the results
 - [ ] Explore at `screening`, confirm finalists at `full` (fidelity rule above)
 - [ ] Ratio `auto`: push motor rpm up until the owner's optional motor rpm cap, rotor stress, electrical frequency or bus voltage limits it (the tool says which one bound); report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
+- [ ] Air gap as a design variable the optimiser chooses (today `srmapp.sizing.generator` sets it by rule, OD/400 clamped to 0.3–0.8 mm). The limits are user inputs: a minimum buildable gap (machining and assembly) and optionally a maximum; the tool also checks rotor radial growth at max speed (R5 rotor stress) and eccentricity (bearing runout, unbalanced magnetic pull) against the chosen gap and says which limit bound (owner, 2026-11-04)
 - [ ] Plain-language recommendations ("pick this because …")
 - Done when: requirements in → ranked recommendations with reasons out, on a stated compute budget.
 
@@ -133,6 +157,10 @@ The owner has a US$100 credit for Claude cloud sessions. A cloud session is Ubun
 | R4 end effects | Local | 3D NGSolve runs take hours and need RAM |
 | R5 thermal and stress | Split | Solver and UI code in the cloud; calibration runs locally |
 | R6 what-if tab | Cloud | Mostly UI; sweeps reuse cached maps |
+| R6b software QA | Cloud | Code reading and fixes with fast tests |
+| R6c speed report | Split | Timings on the LattePanda; literature comparison anywhere |
+| R6d optimisation research | Cloud | Reading and writing only |
+| R6e web review and polish | Cloud | UI code; the visual check stays local |
 | R7 recommender | Split | Spike code in the cloud; the budgeted comparison runs (many maps) locally |
 | R8 control SIL | Cloud | C and Python simulation code with fast tests; the biggest code item, so the best use of the credit |
 | R9 ripple optimisation | Split | Optimiser code in the cloud; long optimisation runs locally |
