@@ -102,22 +102,56 @@ Run notes:
 - The first run stopped after `hub_minus` (04:47) with no out-of-memory kill. The cause was not found. The rerun reused the 9 finished runs.
 - `yoke_plus` took 3560 s against about 500 s for the same-size runs, with the same 7 Newton steps. The cause was not measured.
 
+## Measured gap in the budget
+
+Run 2026-11-05 on commit fd80b55 (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache, the checks and the label are not changed. srmcore stays 0.7.0.
+
+Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec decision 7):
+
+| Budget key | TEAM 24 | Krishnan 6/4 at 20 A | `MEASURED_GAP` | Set by |
+|---|---|---|---|---|
+| `peak_torque` | 13.05 % (`static_torque`) | 28.53 - 9.3 = 19.2 % (`T_avg`) | 0.192 | Krishnan 6/4 |
+| `la` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
+| `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
+| `lu` | not measured | not in decision 7 | 0.0 | none |
+
+- The 9.3 points are the Lu share of the Krishnan torque residual: 3.9 N·m of 41.6 N·m at 20 A (`docs/m5d-krishnan-results.md`).
+- The 3D errors of G1 (11.72 %, 8.30 %) are not used, because no design's map is a 3D result.
+- Krishnan's `T_avg` is computed from measured flux linkage, not from a torque sensor.
+- `la` is the secant at 5 % of I_max, where the Krishnan error is only 2.0 %. The row is conservative there on purpose: decision 7 asks for a constant fraction and names understating as the failure.
+
+8/6 `end_effect` row and totals, before and after:
+
+| Key | Row before | Row after | Total before | Total after |
+|---|---|---|---|---|
+| `la` | 0.13 % | 17.33 % | 10.21 % | 27.41 % |
+| `lu` | 1.16 % | 1.16 % | 10.98 % | 10.98 % |
+| `peak_torque` | 0.00 % | 19.20 % | 10.12 % | 29.32 % |
+| `psi_max` | 0.27 % | 17.47 % | 10.22 % | 27.42 % |
+
+- Every other number in the run equals the old run to the last digit, apart from timings.
+- The stored run predated 0.7.0 joining `VALIDATED_VERSIONS`, so `engine_version` went from fail to pass and the label from none to 2D-verified.
+- The values are not a constraint anywhere. No search, margin or ranking reads the budget.
+- The map values are not scaled by the gap: measurements are a check, not a calibration.
+- Evaluations stored before this change keep the old row in the web store and show a peak-torque row of 0 %. Validating again updates them. The note text tells the two apart. There is no migration.
+- The R5 spec (section 7, row "EM torque") takes the current for a rated torque at torque x (1 + the EM peak-torque row, end-effect row included). R5's rated value therefore carries this 19.2 % gap. No change is proposed here.
+
 ## G3 (R4b)
 
-Not run yet.
+Not done: G1 failed.
 
 ## G4 (R4b)
 
-Not run yet.
+Not done: G1 failed.
 
 ## G5 (R4b)
 
-Not run yet.
+Not done: G1 failed.
 
 ## Fitted constants (R4b)
 
-Not run yet.
+Not done: G1 failed.
 
 ## Ranking bias (R4b)
 
-Not run yet.
+Not done: G1 failed.
