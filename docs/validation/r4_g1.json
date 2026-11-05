@@ -1,0 +1,393 @@
+{
+  "runs": {
+    "mesh_coarse": {
+      "ndof": 1148479,
+      "layers": 17,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.9,
+        12.5,
+        2.5,
+        10.0
+      ],
+      "seconds": 304.8898043549998,
+      "peak_gb": 7.275659264,
+      "torque": 2.8435456133520085,
+      "flux": 0.00043276221533038774,
+      "psi": 0.5030210106616807,
+      "iterations": 7,
+      "params": {}
+    },
+    "nominal": {
+      "ndof": 1711242,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 532.1733254999999,
+      "peak_gb": 11.535818752,
+      "torque": 2.842456616245549,
+      "flux": 0.0004328108582003181,
+      "psi": 0.5030696420166867,
+      "iterations": 7,
+      "params": {}
+    },
+    "mesh_fine": {
+      "ndof": 3202278,
+      "layers": 24,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.2,
+        8.0,
+        1.5,
+        6.0
+      ],
+      "seconds": 2247.407465419,
+      "peak_gb": 23.694508032,
+      "torque": 2.8410118000485167,
+      "flux": 0.0004327322245582293,
+      "psi": 0.5030380799400475,
+      "iterations": 7,
+      "params": {}
+    },
+    "slab": {
+      "ndof": 378380,
+      "layers": 5,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 22.433127225000135,
+      "peak_gb": 1.52553472,
+      "torque": 2.8055296131161023,
+      "flux": 0.00039251509306312553,
+      "psi": 0.36891067281528656,
+      "iterations": 6,
+      "params": {
+        "slab": true
+      }
+    },
+    "air_radius": {
+      "ndof": 2545008,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 1393.5235751349992,
+      "peak_gb": 21.513474048,
+      "torque": 2.843522092542643,
+      "flux": 0.0004330150729526316,
+      "psi": 0.5031831070439221,
+      "iterations": 8,
+      "params": {
+        "air_radius_factor": 2.25
+      }
+    },
+    "air_end": {
+      "ndof": 1903004,
+      "layers": 20,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 681.1257825730008,
+      "peak_gb": 13.68922112,
+      "torque": 2.842768661460268,
+      "flux": 0.0004328570633925726,
+      "psi": 0.5030777197425135,
+      "iterations": 7,
+      "params": {
+        "air_end_factor": 1.5
+      }
+    },
+    "js_hi": {
+      "ndof": 1711242,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 530.3283896909998,
+      "peak_gb": 11.36412672,
+      "torque": 2.8424565562732234,
+      "flux": 0.00043281090242346305,
+      "psi": 0.5030696758167885,
+      "iterations": 7,
+      "params": {
+        "js": 2.04
+      }
+    },
+    "fillet": {
+      "ndof": 1901714,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 639.7247995810012,
+      "peak_gb": 13.116194816,
+      "torque": 2.8502076359695856,
+      "flux": 0.00043340808265892894,
+      "psi": 0.5039898021676973,
+      "iterations": 7,
+      "params": {
+        "fillet": 0.003
+      }
+    },
+    "hub_plus": {
+      "ndof": 1704674,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 559.0471766360006,
+      "peak_gb": 11.804577792,
+      "torque": 2.8295851935103875,
+      "flux": 0.0004327137824330956,
+      "psi": 0.5046061724347137,
+      "iterations": 7,
+      "params": {
+        "r_hub": 0.038599999999999995
+      }
+    },
+    "hub_minus": {
+      "ndof": 1706316,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 511.47401391899984,
+      "peak_gb": 10.912960512,
+      "torque": 2.8532507524720536,
+      "flux": 0.0004328329729039538,
+      "psi": 0.501612453013437,
+      "iterations": 7,
+      "params": {
+        "r_hub": 0.037599999999999995
+      }
+    },
+    "yoke_plus": {
+      "ndof": 1712063,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 3560.4512137349993,
+      "peak_gb": 11.339722752,
+      "torque": 2.85249753054375,
+      "flux": 0.0004335211060467497,
+      "psi": 0.5039946732093966,
+      "iterations": 7,
+      "params": {
+        "r_yoke_in": 0.08259999999999999
+      }
+    },
+    "yoke_minus": {
+      "ndof": 1720273,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 435.4064990630004,
+      "peak_gb": 10.665197568,
+      "torque": 2.832274845807009,
+      "flux": 0.0004320819678443209,
+      "psi": 0.5021384900708449,
+      "iterations": 7,
+      "params": {
+        "r_yoke_in": 0.0836
+      }
+    },
+    "search_plus": {
+      "ndof": 1697285,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 517.6602592710005,
+      "peak_gb": 11.184119808,
+      "torque": 2.8426937995468347,
+      "flux": 0.00043832262149182756,
+      "psi": 0.5030595951925367,
+      "iterations": 7,
+      "params": {
+        "search_from_corner": 0.0097
+      }
+    },
+    "search_minus": {
+      "ndof": 1707137,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 531.4719747349991,
+      "peak_gb": 11.718148096,
+      "torque": 2.842525743884811,
+      "flux": 0.00042636828134804875,
+      "psi": 0.5030536498606969,
+      "iterations": 7,
+      "params": {
+        "search_from_corner": 0.007699999999999999
+      }
+    },
+    "end_1mm": {
+      "ndof": 1998885,
+      "layers": 21,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 827.3886723639989,
+      "peak_gb": 17.056948224,
+      "torque": 2.8374941439064423,
+      "flux": 0.0004311305100539412,
+      "psi": 0.5007752576521224,
+      "iterations": 7,
+      "params": {
+        "end_clearance": 0.001
+      }
+    },
+    "end_5mm": {
+      "ndof": 1903004,
+      "layers": 20,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 794.0493987440004,
+      "peak_gb": 15.289659392,
+      "torque": 2.8555471377528834,
+      "flux": 0.0004373893249880002,
+      "psi": 0.511588525491292,
+      "iterations": 7,
+      "params": {
+        "end_clearance": 0.005
+      }
+    }
+  },
+  "measured": {
+    "torque": 3.22,
+    "flux": 0.000472
+  },
+  "rows": {
+    "mesh": {
+      "torque": 0.0025414920825437034,
+      "flux": 0.00018168130627725253
+    },
+    "air_box": {
+      "torque": 0.00048462358367744605,
+      "flux": 0.0005785897923385156
+    },
+    "material": {
+      "torque": 2.1098765564051072e-08,
+      "flux": 1.0217660696501534e-07
+    },
+    "table_rounding": {
+      "torque": 0.0015527950310559005,
+      "flux": 0.001059322033898305
+    },
+    "fillets": {
+      "torque": 0.002726873535988873,
+      "flux": 0.0013798740195525114
+    },
+    "hub_radius": {
+      "torque": 0.004162870741176817,
+      "flux": 0.00013769348504078747
+    },
+    "yoke_thickness": {
+      "torque": 0.003557254774120726,
+      "flux": 0.0016625486343074792
+    },
+    "search_coil": {
+      "torque": 0.0,
+      "flux": 0.01381012042244788
+    },
+    "coil_end": {
+      "torque": 0.003175597077412275,
+      "flux": 0.007230427351203658
+    }
+  },
+  "verdict": {
+    "torque": {
+      "error_rel": 0.11724949806038852,
+      "budget_rel": 0.018201527924741306,
+      "pass": false
+    },
+    "flux": {
+      "error_rel": 0.0830278427959362,
+      "budget_rel": 0.026040359221673352,
+      "pass": false
+    },
+    "pass": false
+  },
+  "hook": {
+    "psi_full_minus_slab": 0.13415896920140014,
+    "analytic_image_1_5": 0.07282406133414922
+  }
+}

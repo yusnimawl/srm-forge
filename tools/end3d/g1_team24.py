@@ -1,6 +1,6 @@
 """G1: the 3D TEAM 24 model against the measured static torque and rotor-pole flux at 7.41 A, within a 3D budget.
 
-    systemd-run --user --scope -q -p MemoryMax=26G -p MemorySwapMax=0 -p OOMPolicy=continue \
+    systemd-run --user --scope -q -p MemoryMax=22G -p OOMPolicy=continue \
         .venv/bin/python tools/end3d/g1_team24.py [--max-dofs N] [--json PATH] [--dry-run]
 
 Mesh levels are (h_gap, h_iron, h_end, h_mid) in mm: COARSE, NOMINAL (1.5 / 10 / 2 / 8, G0's 1.71 M DOFs) and FINE

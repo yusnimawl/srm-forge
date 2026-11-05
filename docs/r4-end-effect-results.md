@@ -66,7 +66,41 @@ Verdict: pass. Every row converged; psi within 0.35 % and torque within 0.15 % o
 
 ## G1 TEAM 24 3D against measurement
 
-Not run yet.
+Verdict: fail, 2026-11-05. For torque and for flux, the error is larger than the budget. Under spec decision 3, R4 stops here. Script `tools/end3d/g1_team24.py`, data `docs/validation/r4_g1.json`. All 16 runs converged. Mesh level for the verdict and every perturbation: 1.5 / 10 / 2 / 8 mm, 1.71 M DOFs.
+
+| Quantity | Measured | 2D | 3D slab | 3D full | 3D error | Budget | Result |
+|---|---|---|---|---|---|---|---|
+| Torque (N·m) | 3.22 | 2.7996 | 2.8055 | 2.8425 | −11.72 % | 1.82 % | fail |
+| Rotor-pole flux (Wb) | 4.72e-4 | 3.9069e-4 | 3.9252e-4 | 4.3281e-4 | −8.30 % | 2.60 % | fail |
+
+Budget rows, each from 3D runs, with sizes fixed before any run (plan Task 9):
+
+| Row | Runs | Torque | Flux |
+|---|---|---|---|
+| Mesh | 3 levels, Richardson | 0.254 % | 0.018 % |
+| Air box | radius × 1.5, end × 1.5 | 0.048 % | 0.058 % |
+| Material | Js + 2 % | 0.000 % | 0.000 % |
+| Table rounding | ±0.005 | 0.155 % | 0.106 % |
+| Fillets | 0 to 3 mm | 0.273 % | 0.138 % |
+| Hub radius | ±0.5 mm | 0.416 % | 0.014 % |
+| Yoke thickness | ±0.5 mm | 0.356 % | 0.166 % |
+| Search coil | ±1 mm | not applicable | 1.381 % |
+| Coil end | clearance 1 and 5 mm | 0.318 % | 0.723 % |
+| **Sum** | | **1.82 %** | **2.60 %** |
+
+- The errors exceed the budgets by 9.9 points (torque) and 5.7 points (flux). No single row is near that size.
+- End effects are not the main cause of the torque gap. Going from slab to full adds 1.3 % torque, which closes 9 % of the gap between the slab and the measurement.
+- End effects are about half of the flux gap. Going from slab to full adds 10.3 % flux, which closes 51 % of that gap. The other 8.3 % stays.
+- The steel saturation level has no effect at this point: Js + 2 % changes torque and flux by less than 1e-6. This row tests Js only, not the rest of the B-H curve.
+- The cause of the remaining gap was not measured. Decision 3 names B-H data and the measurement as candidates, and that hunt is a new tracker item.
+
+Hook check: ψ(full) − ψ(slab) at 7.41 A is 0.1342 Wb-turns. The analytic end-winding term at image factor 1.5 gives 0.0728, which is 46 % lower. The 3D difference holds all the flux the slab does not have, so it can include stack-end fringing as well as end turns. The split was not measured.
+
+Run notes:
+
+- `mesh_fine` first died at 26 GB with swap off (kernel cgroup kill, 03:35). It was rerun with `MemoryMax=22G` and swap allowed, because 3.2 M DOFs needs more than 22 GB. It took 2247 s, peak 23.7 GB, and gave the same torque as G0's run of this level to 13 digits. The cap changes no result.
+- The first run stopped after `hub_minus` (04:47) with no out-of-memory kill. The cause was not found. The rerun reused the 9 finished runs.
+- `yoke_plus` took 3560 s against about 500 s for the same-size runs, with the same 7 Newton steps. The cause was not measured.
 
 ## G3 (R4b)
 
