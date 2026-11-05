@@ -1,19 +1,19 @@
 {
  "engine_version": "0.7.0",
- "label": null,
+ "label": "2D-verified",
  "material_grades": {
   "stator": "C",
   "rotor": "C"
  },
- "map_s": 695.3835539810098,
- "validate_s": 289.23395546499523,
+ "map_s": 707.1459526990002,
+ "validate_s": 284.05564129000413,
  "checks": [
   {
    "name": "engine_version",
-   "status": "fail",
+   "status": "pass",
    "value": null,
    "limit": null,
-   "detail": "srmcore 0.7.0; validated versions: 0.4.0"
+   "detail": "srmcore 0.7.0; validated versions: 0.4.0, 0.7.0"
   },
   {
    "name": "preset",
@@ -143,12 +143,12 @@
    {
     "source": "end_effect",
     "rel": {
-     "la": 0.0013089365436035826,
+     "la": 0.17330893654360358,
      "lu": 0.011616457085768913,
-     "peak_torque": 0.0,
-     "psi_max": 0.0026753824517111824
+     "peak_torque": 0.192,
+     "psi_max": 0.17467538245171116
     },
-    "note": "end winding, image factor 1 to 2; iron-end 3D fringing not modelled"
+    "note": "end winding, image factor 1 to 2; measured gap, not a modelled effect: peak torque 19.2 % (Krishnan 6/4), La and \u03c8_max 17.2 % (TEAM 24)"
    },
    {
     "source": "digitisation",
@@ -162,10 +162,10 @@
    }
   ],
   "total": {
-   "la": 0.10209253962717528,
+   "la": 0.2740925396271753,
    "lu": 0.10975715599351697,
-   "peak_torque": 0.10119515107573833,
-   "psi_max": 0.1021981502572805
+   "peak_torque": 0.29319515107573835,
+   "psi_max": 0.2741981502572805
   }
  }
 }
