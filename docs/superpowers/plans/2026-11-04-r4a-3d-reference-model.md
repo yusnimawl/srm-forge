@@ -164,6 +164,33 @@ Formulation: H(curl), `nograds=True`, order `model.order`, Dirichlet on `model.d
 - [ ] **Step 6: Gate.** If one solve does not fit in RAM, or `sweep_estimate_hours` × 1 (no variants) exceeds 168 h (one week), stop and report to the owner with the numbers (spec G0: shrink the sweep, then re-plan). Otherwise continue.
 - [ ] **Step 7: Commit** `git commit -m "end3d: G0 timing spike and results"`
 
+### Task 6b: Swept prism mesh (added 2026-11-04 after G0 failed on RAM)
+
+G0 showed the free-tetrahedral TEAM 24 model fits in 30 GB only up to about 3 M DOFs (12 mm / 1.5 mm gap), because the fine gap cells repeat through the whole height (`docs/r4-end-effect-results.md`). The owner chose a swept (layered) mesh, as COMSOL's 3D rotating-machine guide recommends: a fine 2D cross-section mesh stacked in z layers, thin near the stack end and thick mid-stack; end turns are a different material in the end layers. The solver (Task 3) and post-processing (Task 5) do not change.
+
+**Files:**
+- Create: `tools/end3d/swept.py`
+- Modify: `tools/end3d/team24.py` (a swept builder beside the tetrahedral one), `tools/end3d/g0_timing.py` (levels for the swept model)
+- Test: `tests/end3d/test_end3d_swept.py`
+
+**Interfaces:**
+- Produces: `@dataclass(frozen=True) class Layers: z: tuple[float, ...]` (increasing layer boundaries from 0) and `graded_layers(z_end: float, z_top: float, h_end: float, h_mid: float, ratio: float = 1.3, breaks: Sequence[float] = ()) -> Layers`. The spacing is `h_end` at z_end (the stack end), grows by at most `ratio` per layer towards z = 0 and towards z_top, is capped at `h_mid`, and puts a boundary exactly on z_end and on every value in `breaks` (coil bridge bottom and top).
+- Produces: `swept_mesh(section: netgen 2D mesh with named regions and named edges, layers: Layers, material: Callable[[str, int], str | None], faces: Callable[[str, int], str | None], bottom: Callable[[str], str], top: Callable[[str], str | None]) -> ngsolve.Mesh`. Each 2D triangle becomes one prism per layer. `material(region2d, k)` names the 3D material of that region in layer k (None leaves the cell out, so the mesh may end at the stator outer surface in slab mode). `faces(edge2d, k)` names the vertical boundary or internal faces swept from a named 2D edge in layer k (None: no boundary element). `bottom(region2d)` names the z = 0 face of each region (`sym_z` or a coil `_in`/`_out`). `top(region2d)` names the top face (`outer`, `end_z` or a coil face; None where the column ends lower). Faces between cells of different material get no boundary element unless `faces` names them (internal faces such as `search`).
+- Produces: `team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end: float, h_mid: float) -> Model3D` with the same material, face and coil names as `team24_model` (so `ampere_turns`, `rotor_pole_flux` and every post function work unchanged). The 2D section is built with `netgen.occ` in 2D (WorkPlane faces, `OCCGeometry(..., dim=2)`), with local mesh size `h_gap` on the gap shell and the pole faces bordering it, and `h_iron` elsewhere; it includes as separate regions the bridge footprint (split into its steel and air parts) and, in full mode, the outer air out to `air_radius_factor`·R_STATOR_OUT; the search chord is a named internal 2D edge. Full mode: stack layers z ∈ [0, DEPTH/2] carry the 2D materials; end layers up to z_top carry air, except coil sides (continuing to the bridge top), the bridge footprint in the bridge layers (the coil) and the gap shell (all layers, ruling R15). Slab mode: stack layers only, `end_z` on top, no cells outside R_STATOR_OUT (ruling R13).
+
+- [ ] **Step 1: Write failing tests**
+  - `test_graded_layers`: boundaries are increasing, include z_end and every break exactly, the spacing at z_end is h_end within 1 %, no step exceeds `ratio` × its neighbour, none exceeds h_mid.
+  - `test_swept_volumes_match_tet_model`: for full and slab TEAM 24 at a coarse setting, the volume of each material equals the tetrahedral `team24_model`'s within 0.5 %.
+  - `test_swept_faces_complete`: every boundary element at z = 0 is `sym_z` or a coil face; in slab mode every element at z = DEPTH/2 is `end_z` or a coil `_out`; `search` exists with area 25.4 × 12.7 mm within 0.5 %; in full mode the coils' `_in`/`_out` currents are ±AT (`coil.face_current`).
+  - `test_swept_matches_tet_linear` (slow): linear steel (μr 1000) at 5 A, coarse: swept and tetrahedral models agree on ψ and Arkkio torque within 1 %, full and slab.
+- [ ] **Step 2: Run** `.venv/bin/python -m pytest tests/end3d/test_end3d_swept.py -v`. Expected: FAIL.
+- [ ] **Step 3: Implement** `swept.py` and `team24_swept_model`; switch `g0_timing.py` to the swept model, a level being `(h_gap, h_iron, h_end, h_mid)` with defaults (1.0, 4.0, 1.0, 3.0), (0.7, 3.0, 0.7, 2.0), (0.5, 2.0, 0.5, 1.5) mm; record the layer count and prism count per level.
+- [ ] **Step 4: Run** the tests. Expected: PASS.
+- [ ] **Step 5: Commit** `git commit -m "end3d: swept prism mesh for TEAM 24"`
+- [ ] **Step 6: Re-run G0** (Task 6 Steps 5–7) with the swept levels; same gate.
+
+Tasks 7, 8 and 9 use the swept builder: Task 7's `radial_model` builds its 2D section from the srmcore outline and calls `swept_mesh`; Tasks 8 and 9 use `team24_swept_model`. The tetrahedral `team24_model` stays as the cross-check of Task 6b's tests.
+
 ### Task 7: Radial machine 3D geometry
 
 **Files:**
@@ -216,9 +243,9 @@ Budget rows, each from 3D runs (spec G1), perturbation sizes fixed here before a
 
 | Row | Runs | Value |
 |---|---|---|
-| mesh | nominal at 3 `maxh` levels (each `gap_maxh` scaled with it) | \|finest − Richardson extrapolation\| / finest; if the levels are not monotone, \|finest − next\| |
+| mesh | nominal at 3 swept levels | \|nominal − Richardson extrapolation\| / nominal, the verdict being read at the nominal level, with the fitted order floored at 1 (a lower fit is noise between levels); if the levels are not monotone, \|nominal − finest\| (2026-11-05, before any run) |
 | air box | `air_radius_factor` 1.5 → 2.25 and `air_end_factor` 1.0 → 1.5 | \|change\| |
-| material | `steel_law(js)` at Js × 1.02 and × 0.98 (`ASSUMED_JS` nominal) | half spread |
+| material | `steel_law(js)` at Js × 1.02 (`ASSUMED_JS` nominal); × 0.98 is below the B-H data, so as in `maps.validation` the row is one-sided (2026-11-05, before any run). No grade allowance: rows come from 3D runs only | \|change\| |
 | table rounding | none | ±0.005 / measured (0.16 % torque, 0.11 % flux) |
 | fillets | `fillet` 0 → 3e-3 | \|change\| |
 | figure dimensions | hub radius and yoke thickness each ±0.5 mm | half spread, each its own row |

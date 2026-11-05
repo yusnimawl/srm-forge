@@ -1,0 +1,43 @@
+{
+  "host": {
+    "node": "server-LattePanda-Sigma",
+    "cpus": 16,
+    "ram_bytes": 32827330560,
+    "ngsolve": "6.2.2608"
+  },
+  "current": 7.41,
+  "levels": [
+    {
+      "maxh": 0.012,
+      "gap_maxh": 0.0015,
+      "skipped": false,
+      "mesh_seconds": 40.95093220900162,
+      "elements": 556958,
+      "ndof": 2863501,
+      "seconds": 582.941051731992,
+      "newton_iterations": 6,
+      "peak_rss_bytes": 14550024192,
+      "converged": true,
+      "torque": 2.827937295046666,
+      "psi": 0.5016136721440989,
+      "rotor_pole_flux": 0.0004312780394798146
+    },
+    {
+      "maxh": 0.009,
+      "gap_maxh": 0.001125,
+      "skipped": false,
+      "mesh_seconds": 108.13645959099813,
+      "elements": 1149775,
+      "ndof": 5918310,
+      "seconds": 4049.1044525350007,
+      "newton_iterations": 1,
+      "peak_rss_bytes": 30306172928,
+      "converged": false,
+      "torque": null,
+      "psi": null,
+      "rotor_pole_flux": null
+    }
+  ],
+  "sweep_solves": 336,
+  "sweep_estimate_hours": 54.40783149498593
+}
