@@ -1,6 +1,6 @@
 # R5: thermal ratings and rotor stress
 
-Status: draft 2026-11-05, decisions agreed in chat with the owner (§2). Roadmap item R5
+Status: approved by the owner in chat 2026-11-05 (decisions in §2). Roadmap item R5
 (`2026-10-12-roadmap-r1-r10-design.md`). Build starts after R4 (`2026-11-03-r4-end-effects-design.md`) merges.
 Solver, app and UI code can run in the cloud. Calibration and check runs run on the LattePanda (roadmap §5).
 Branch for the build: `r5-thermal` off main.

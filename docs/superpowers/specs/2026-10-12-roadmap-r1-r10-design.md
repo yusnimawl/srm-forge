@@ -76,7 +76,8 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] Steady state and the 30 s peak transient
 - [ ] Continuous rating; the options graph gets continuous kW/kg and kW/L
 - [ ] Analytic rotor stress (spinning disc plus pole root) at max speed × safety factor, as a constraint from here on
-- Done when: continuous and peak ratings, compared against a published thermal case.
+- [ ] Ratings replace `j_limit` in the winding choice; iron loss carried as a band (× 2.0) and every budget row stacked worst-case (owner, 2026-11-05; spec `2026-11-05-r5-thermal-stress-design.md`)
+- Done when: the peak rating matches the measured Kiyota 2014 coil-end transient within its budget, the solver matches Faiz 2009, the winding model matches Márquez-Fernández 2018, the missing measured continuous case is stated in the budget, and ratings and stress render on an 8/6 and a bench-target case (owner, 2026-11-05: no published SRM with a measured continuous temperature and enough geometry was found).
 
 ### R6 — What-if tab
 - [ ] Linked inputs: P = T·ω (any two give the third)
