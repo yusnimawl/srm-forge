@@ -191,8 +191,29 @@ def test_budget_rows_sum_and_use_the_corrected_values(monkeypatch):
     # Js ±2 % gives ±1 % in the fake; the relative spread is rescaled from the 2D to the corrected value
     assert material.rel["la"] == pytest.approx((0.01 + V.GRADE_ALLOWANCE["C"]) * scale["la"])
     assert material.rel["peak_torque"] == pytest.approx(0.01 + V.GRADE_ALLOWANCE["C"])
-    end =next(row for row in b.rows if row.source == "end_effect")
-    assert end.rel["peak_torque"] == 0.0 and end.rel["la"] == pytest.approx((l2 - l1) / 2 / b.values["la"])
+    end = next(row for row in b.rows if row.source == "end_effect")
+    gap = {k: g / (1 - g) for k, g in V.MEASURED_GAP.items()}
+    half = (l2 - l1) / 2
+    assert end.rel["peak_torque"] == pytest.approx(gap["peak_torque"])
+    assert end.rel["la"] == pytest.approx(half / b.values["la"] + gap["la"])
+    assert end.rel["lu"] == pytest.approx(half / b.values["lu"])
+    assert end.rel["psi_max"] == pytest.approx(half * key.i_max / b.values["psi_max"] + gap["psi_max"])
+    assert "Krishnan" in end.note and "TEAM 24" in end.note
+
+
+def test_measured_gap_is_the_larger_residual():
+    import json
+    from pathlib import Path
+    d = Path(__file__).resolve().parents[2] / "docs" / "validation"
+    team = json.loads((d / "team24.json").read_text())
+    rows = json.loads((d / "krishnan_6_4.json").read_text())["rows"]
+    t, f = abs(team["static_torque"]["error_pct"]), abs(team["rotor_flux"]["error_pct"])
+    k_la = next(abs(r["error_after_pct"]) for r in rows if r["quantity"] == "La" and r["current"] == 20.0)
+    k_t = next(abs(r["error_after_pct"]) for r in rows if r["quantity"] == "T_avg" and r["current"] == 20.0)
+    assert V.MEASURED_GAP["peak_torque"] == pytest.approx(max(t, k_t - 9.3) / 100, abs=5e-4)
+    assert V.MEASURED_GAP["la"] == V.MEASURED_GAP["psi_max"] == pytest.approx(max(f, k_la) / 100, abs=5e-4)
+    assert V.MEASURED_GAP["lu"] == 0.0
+    assert set(V.MEASURED_GAP) == set(V.KEYS)
 
 
 def test_js_minus_forbidden_uses_plus_only(monkeypatch):

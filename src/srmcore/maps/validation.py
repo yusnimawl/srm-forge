@@ -37,6 +37,10 @@ TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-t
 MAP_MATCH_TOLERANCE = 1e-3        # peak-torque solve on the design's mesh vs the map value (solvers agree to 1e-4)
 JS_STEP = 0.02                   # relative change of the saturation polarisation in the material row
 GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade -> relative allowance
+# measured gap of the 2D map: the larger of the TEAM 24 and Krishnan 6/4 residuals (Krishnan torque less its
+# 2D-Lu share). The values are fractions of the measured value; the end_effect row converts them to fractions of
+# the model value, g / (1 - g), because budget rows are relative to the model value.
+MEASURED_GAP = {"la": 0.172, "lu": 0.0, "peak_torque": 0.192, "psi_max": 0.172}
 END_WINDING_IMAGE = (1.0, 2.0)    # image-factor bounds of the end-winding inductance; corrected values use the midpoint
 
 
@@ -183,9 +187,13 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
     nan_note = f"; non-converged Js solve at {', '.join(nan_keys)}, row is NaN" if nan_keys else ""
     material_row = BudgetRow("material", {k: (js[k] + GRADE_ALLOWANCE[worst]) * to_corrected[k] for k in KEYS},
                              f"{js_note}; B-H data grade {worst}{nan_note}")
-    end_row = BudgetRow("end_effect", {"la": half / values["la"], "lu": half / values["lu"], "peak_torque": 0.0,
-                                       "psi_max": half * key.i_max / values["psi_max"]},
-                        "end winding, image factor 1 to 2; iron-end 3D fringing not modelled")
+    gap = {k: g / (1.0 - g) for k, g in MEASURED_GAP.items()}
+    end_row = BudgetRow("end_effect", {"la": half / values["la"] + gap["la"],
+                                       "lu": half / values["lu"] + gap["lu"],
+                                       "peak_torque": gap["peak_torque"],
+                                       "psi_max": half * key.i_max / values["psi_max"] + gap["psi_max"]},
+                        "end winding, image factor 1 to 2; measured gap, not a modelled effect: model low by "
+                        "19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and ψ_max (TEAM 24)")
     digitisation = max(m.digitisation_error or 0.0 for m in loaded.values())
     digitisation_row = BudgetRow("digitisation", {k: digitisation for k in KEYS}, "digitised B-H curve")
     rows = (mesh_row, material_row, end_row, digitisation_row)

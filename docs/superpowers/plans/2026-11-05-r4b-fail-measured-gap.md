@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close R4 after the G1 failure: put the measured gap into every design's `end_effect` budget row, re-run the 8/6 validation so the report shows it, and record the outcome.
+**Goal:** After the G1 failure: put the measured gap into every design's `end_effect` budget row, re-run the 8/6 validation so the report shows it, and record the outcome.
 
-**Architecture:** One change in `srmcore/maps/validation.py`: a constant `MEASURED_GAP` is added to the `end_effect` row of `UncertaintyBudget`. The map, its cache, the checks and the label do not change. The correction layer, the sweep, G3, G4, G5 and the ranking bias are not built.
+**Architecture:** One change in `srmcore/maps/validation.py`: the `end_effect` row of `UncertaintyBudget` adds g / (1 - g) of the constant `MEASURED_GAP` (g is its value). The map, its cache, the check and label code do not change. The correction layer, the sweep, G3, G4, G5 and the ranking bias are not built.
 
 **Tech Stack:** Python 3.12, srmcore, pytest; `examples/em_validate_8_6.py` and `tools/validation_report.py` on the LattePanda.
 
 **Spec:** `docs/superpowers/specs/2026-11-03-r4-end-effects-design.md`, decisions 3 and 7. Results: `docs/r4-end-effect-results.md`, section G1.
 
-**Starts after:** the R4a PR is merged. Work on a new branch from main, `r4b-fail-gap`.
+**Starts after:** the R4a PR is merged. Work on the branch `r4-end-effects`, restarted from main.
 
 ## Fixed values
 
@@ -23,13 +23,14 @@ Decision 7 takes the larger of the TEAM 24 and Krishnan residuals, as a constant
 | `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
 | `lu` | not measured | not in decision 7 | 0.0 | none |
 
+- The row adds g / (1 - g), not g, because the residuals are percent of the measured value and the budget rows are percent of the model value (found by the final review): 0.192 gives 23.76 % and 0.172 gives 20.77 %.
 - The 9.3 points are `docs/m5d-krishnan-results.md`: 3.9 N·m of 41.6 N·m at 20 A.
 - Krishnan's `T_avg` is computed from measured flux linkage, not from a torque sensor. The results section says so.
 - `la` is the secant at 5 % of I_max, where the Krishnan error is only 2.0 %. The row is conservative there on purpose: decision 7 asks for a constant fraction and names understating as the failure.
 
 ## Global Constraints
 
-- No version bump. srmcore stays 0.7.0 and stays in `VALIDATED_VERSIONS`: the map, solver, checks and label are unchanged, so nothing the validation campaign tested has changed. A bump would drop the 2D-verified label and invalidate every cached map for a budget note.
+- No version bump. srmcore stays 0.7.0 and stays in `VALIDATED_VERSIONS`: the map, solver, check and label code are unchanged, so nothing the validation campaign tested has changed. A bump would drop the 2D-verified label and invalidate every cached map for a budget note.
 - The new values are not used as a constraint anywhere. No search, margin or ranking reads the budget (`srmapp` hard limits stay as they are).
 - Measurements are a check, never a calibration (decision 1): the map values are not scaled by the gap.
 - The row's note names which machine set each value (decision 7).
@@ -61,8 +62,10 @@ Decision 7 takes the larger of the TEAM 24 and Krishnan residuals, as a constant
 Change the assertion at `tests/maps/test_em_validation.py:195` to:
 
 ```python
-assert end.rel["peak_torque"] == pytest.approx(V.MEASURED_GAP["peak_torque"])
-assert end.rel["la"] == pytest.approx((l2 - l1) / 2 / b.values["la"] + V.MEASURED_GAP["la"])
+g = V.MEASURED_GAP["peak_torque"]
+assert end.rel["peak_torque"] == pytest.approx(g / (1 - g))
+g = V.MEASURED_GAP["la"]
+assert end.rel["la"] == pytest.approx((l2 - l1) / 2 / b.values["la"] + g / (1 - g))
 assert end.rel["lu"] == pytest.approx((l2 - l1) / 2 / b.values["lu"])
 assert "Krishnan" in end.note and "TEAM 24" in end.note
 ```
@@ -78,7 +81,7 @@ assert set(V.MEASURED_GAP) == set(V.KEYS)
 
 - [ ] **Step 2: Run** `python -m pytest tests/maps/test_em_validation.py -v`. Expected: FAIL, `MEASURED_GAP` not defined.
 
-- [ ] **Step 3: Implement.** Add `MEASURED_GAP` with a one-line comment giving its rule (larger of the TEAM 24 and Krishnan 6/4 residuals of the 2D map, Krishnan torque less its 2D-Lu share). In `em_validate` add it to each key of `end_row`. Note text: `"end winding, image factor 1 to 2; measured gap, not a modelled effect: peak torque 19.2 % (Krishnan 6/4), La and ψ_max 17.2 % (TEAM 24)"`.
+- [ ] **Step 3: Implement.** Add `MEASURED_GAP` with a one-line comment giving its rule (larger of the TEAM 24 and Krishnan 6/4 residuals of the 2D map, Krishnan torque less its 2D-Lu share). In `em_validate` add g / (1 - g) of it to each key of `end_row`, with g the `MEASURED_GAP` value. Note text: `"end winding, image factor 1 to 2; measured gap, not a modelled effect: model low by 19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and ψ_max (TEAM 24)"`.
 
 - [ ] **Step 4: Run** `python -m pytest tests/maps/test_em_validation.py tests/test_examples_json.py tests/web/test_web_results.py tests/web/test_web_cases.py -q`. Expected: PASS.
 
@@ -95,7 +98,7 @@ assert set(V.MEASURED_GAP) == set(V.KEYS)
 
 - [ ] **Step 2: Run** `python tools/validation_report.py`. Expected: verdict PASS.
 
-- [ ] **Step 3: Check** the report's `end_effect` row against the old one (0.13, 1.16, 0.00, 0.27): la 17.33, lu 1.16, peak_torque 19.20, psi_max 17.47. Every other row must be the same as before to the printed digits, and the checks and label unchanged. Any other difference: stop and report it.
+- [ ] **Step 3: Check** the report's `end_effect` row against the old one (0.13, 1.16, 0.00, 0.27): la 20.90, lu 1.16, peak_torque 23.76, psi_max 21.04. Every other row must be the same as before to the printed digits, and the check and label code unchanged. Any other difference: stop and report it.
 
 - [ ] **Step 4: Commit** `git commit -m "validation: 8/6 budget with the measured gap"`.
 
@@ -104,7 +107,7 @@ assert set(V.MEASURED_GAP) == set(V.KEYS)
 **Files:**
 - Modify: `docs/r4-end-effect-results.md` (new section "Measured gap in the budget" after G1; mark G3, G4, G5, Fitted constants and Ranking bias "Not done: G1 failed")
 - Modify: `docs/superpowers/specs/2026-09-28-srm-core-engine-design.md` (§11 entry)
-- Modify: `docs/superpowers/specs/2026-10-12-roadmap-r1-r10-design.md` (R4 bullets: mark what was built and what was dropped; the "Done when" holds through its second branch)
+- Modify: `docs/superpowers/specs/2026-10-12-roadmap-r1-r10-design.md` (R4 bullets: mark what was built and what was dropped; say the gap for peak torque, La and ψ_max is in the budget and the Lu residual is stated outside it)
 
 - [ ] **Step 1: Write the results section:** the Fixed values table above, the new 8/6 totals, the two caveats (`T_avg` source, conservative `la`), and Review Focus 4.
 
@@ -112,7 +115,7 @@ assert set(V.MEASURED_GAP) == set(V.KEYS)
 
 - [ ] **Step 3: Commit, push, open the PR,** wait for CI green, merge.
 
-- [ ] **Step 4: Update the wiki and project doc** in the same session: Validation tab (the budget row), Progress tab (R4 and row 1c Done once merged and checked; rows 1a and 1b closed as not needed, with the reason; R5 build unblocked; the roadmap drawing and its count), project doc (R4 section and a milestone table row for each merge).
+- [ ] **Step 4: Update the wiki and project doc** in the same session: Validation tab (the budget row), Progress tab (row 1c Done once merged and checked; R4 stays open until the owner rules on the Lu residual; rows 1a and 1b closed as not needed, with the reason; R5 build unblocked; the roadmap drawing and its count), project doc (R4 section and a milestone table row for each merge).
 
 ## After this plan
 
