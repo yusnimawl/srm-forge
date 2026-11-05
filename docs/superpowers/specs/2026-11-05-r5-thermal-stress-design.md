@@ -222,7 +222,7 @@ Rows, each with a nominal and an unfavourable end:
 | Row | Unfavourable end |
 |---|---|
 | Iron loss | × `K_IRON_HI` (2.0), angle convergence inside |
-| EM torque | current for a rated torque taken at torque × (1 + the EM `UncertaintyBudget` peak-torque row, R4 end-effect row included) |
+| EM torque | current for a rated torque taken at torque × (1 + the EM `UncertaintyBudget` peak-torque total less its measured gap, g / (1 − g) of `MEASURED_GAP`). The model is low on torque in every measured comparison, so the gap's unfavourable end for current is zero (owner, 2026-11-06). On the 8/6 the factor is 1.10. High-speed voltage limits are not covered by this argument: real ψ is above the model, so R5 checks them separately |
 | Winding cross-wire conductivity | low end of the homogenisation band |
 | Slot liner and impregnation | low conductivity end |
 | Stator–housing contact | wide end of the interface gap band |
