@@ -49,11 +49,13 @@ stress as a hard constraint.
 6. **Internal oil spray is a full option**, the owner's likely choice (not decided). Spray on the end windings with
    oil inlet temperature and flow as inputs, and optional shaft oil to the rotor. The spray h is a band from cited
    sources. The cooling concept is a new owner-decision tracker item. When it is decided, the search default follows.
-7. **Rotor strength comes from a cited source or not at all.** 6.5 % Si steel is brittle (JFE F1E-002-02 p. 1:
-   above 3.5 % Si "the steel tends to harden and become brittle"), so R5 checks the maximum principal stress
-   against the tensile (fracture) strength for it, and von Mises against yield for ductile steels. Without a cited
-   strength, the stress result reads "no strength data" and the search refuses that rotor material. The owner asks
-   JFE for the data (§4.3).
+7. **Rotor strength comes from a cited source or not at all.** Without a cited strength, the stress result reads
+   "no strength data" and the search refuses that rotor material. A material flagged brittle in its data is checked
+   by maximum principal stress against tensile strength, every other one by von Mises against 0.2 % yield.
+   **10JNEX900 is ductile (amended 2026-11-05, owner):** Ou et al. 2021 tested it at a yield strength of 570 MPa,
+   "very stable", with fracture only after more than 14 % strain (§4.3). The JFE catalogue's "brittle" (F1E-002-02
+   p. 1) describes rolling sheet above 3.5 % Si before the CVD process, not the finished product. The JFE data
+   request becomes optional, for grade A.
 8. **Rotor growth:** R5 reports gap closure (rotor growth minus stator bore growth, centrifugal plus thermal) at the
    continuous hot point and at the peak end point. R7 owns the limit (minimum running gap, eccentricity) and says
    which limit bound.
@@ -118,7 +120,27 @@ modulus, Poisson's ratio and yield strength. R5 adds them as optional `thermal` 
 material JSON, each with provenance, grade A/B/C and test temperature, the same pattern as the R3 `loss` block. A
 `mechanical` block for a brittle steel carries `tensile_strength` and the flag `brittle`. Then yield is not used.
 
-10JNEX900 has no such data in the repo or in JFE catalogue F1E-002-02 (read 2026-11-05). The owner asks JFE for it:
+10JNEX900 has no such data in the repo or in JFE catalogue F1E-002-02 (read 2026-11-05). Published values,
+full text read 2026-11-05:
+
+- **Source:** J. Ou, Y. Liu, P. Breining, T. Gietzelt, T. Wunsch, M. Doppelbauer, "Experimental Characterization
+  and Feasibility Study on High Mechanical Strength Electrical Steels for High-speed Motors Application", IEEE
+  Trans. Ind. Appl. 57(1), 2021, pp. 284–293 (journal details from the HIT Scholar record, article 9237150, DOI
+  not yet confirmed). Accepted manuscript read at
+  https://publikationen.bibliothek.kit.edu/1000125982/128560422. The tensile tests are their ref. [24]: ICEMS 2019,
+  Harbin, pp. 1–4.
+- **Tested (Fig. 13 and text):** yield strength 570 MPa, "very stable". Samples "fail at plastic region" and break
+  "after the strain is higher than 14 %". Test temperature and cutting method of the samples: read from ref. [24]
+  at build. Ultimate tensile strength: only in the Fig. 13 plot, digitised at build if needed.
+- **Table I (from their refs. [22], [27], [28], not tested by them):** density 7490 kg/m³, Young's modulus
+  200–210 GPa, Poisson's ratio 0.33, yield 570 MPa, thermal conductivity 18.6 W/(m·K), Vickers hardness 200–300,
+  maximum operating temperature 150 °C.
+- **Second use of 570 MPa:** D. Ma et al., Materials 15(23), 8502, 2022 (no source given for the value).
+- **Library entry:** yield 570 MPa at grade B (an independent test, not the owner's lot), E, ν and conductivity at
+  grade C (secondary table). The grade allowance lowers the usable strength. Stated gaps: strength at temperature
+  (not reported, the rotor runs hot) and the effect of the owner's cutting process.
+
+Optional, for grade A (no longer on the critical path): the owner asks JFE, or tests a sample of the owner's lot.
 
 - Product name JNEX-Core, code number 10JNEX900, 0.10 mm (catalogue p. 9).
 - Contact: JFE Steel, Electrical Steel Section, Tokyo, TEL +81-3-3597-4099, or the nearest office (catalogue
@@ -129,9 +151,7 @@ material JSON, each with provenance, grade A/B/C and test temperature, the same 
 - Note for the anneal state (core spec §8.5): the catalogue says stress-relieving anneals are not required
   (p. 3).
 
-If JFE does not answer before the build ends, a build task looks for a published measurement of CVD 6.5 % Si sheet
-strength. Such a value enters at grade B or C with the grade allowance on the strength. Without either, decision 7
-applies and the default search refuses 10JNEX900 rotors. **This data is on R5's critical path.**
+Other materials follow the same rule: a cited value at its grade, or decision 7's refusal.
 
 ## 5. How ratings replace `j_limit`
 
@@ -208,7 +228,7 @@ Rows, each with a nominal and an unfavourable end:
 | Stator–housing contact | wide end of the interface gap band |
 | Air-gap convection | low end of the correlation band |
 | Cooling h (jacket, spray, shaft, slot) | low end of each band |
-| Lamination conductivity | low end until JFE data (grade allowance) |
+| Lamination conductivity | low end of the grade-C band around 18.6 W/(m·K) (Ou et al. 2021 Table I) until grade-A data |
 | Thermal mesh | measured convergence error (V5) |
 | End-winding model | the V4 residual |
 
@@ -281,7 +301,7 @@ and it is a new tracker item (§12).
 |---|---|
 | R6 what-if | `CoolingSetup` knobs as inputs. A re-rate with new cooling reuses the cached stroke fields and runs only the thermal solves. Bus voltage and current-limit sweeps change the strokes, so they solve new strokes. |
 | R7 recommender | Rated continuous and peak kW/kg and kW/L as objectives. Rotor stress as a hard constraint and `stress_speed_limit_rpm` as a named limit for ratio `auto`. Gap closure for the air-gap check. Rankings on rated values only. |
-| R10 fabrication | The §8.5 thermal criterion (hot spot ≤ class − 20 K at continuous and peak) checked from R5 output. Stress results with stress-concentration factor, location and material provenance as the input to FE stress and fatigue. The JFE data in the library at grade A. |
+| R10 fabrication | The §8.5 thermal criterion (hot spot ≤ class − 20 K at continuous and peak) checked from R5 output. Stress results with stress-concentration factor, location and material provenance as the input to FE stress and fatigue. 10JNEX900 strength at grade A (JFE data or a test of the owner's lot), with its temperature dependence. |
 
 ## 11. Where things go
 
@@ -317,7 +337,7 @@ acceptable to the owner, so the gap-closure numbers are reported against 0.3 mm 
 | Kiyota 10JNEX900 iron-loss check: R3 model on Kiyota 2014 Table III and Fig. 16 points | LattePanda, after R4 | errors in `docs/r3-loss-results.md`, `K_IRON_HI` revised from them |
 | Measured continuous thermal case (owner bench or another paper) | Owner | one continuous rating compared with a measurement |
 | Cooling concept (jacket, oil spray, or both) | Owner | decision in core spec §11, search default updated |
-| JFE 10JNEX900 mechanical and thermal data request (§4.3) | Owner | data in the material library with provenance |
+| 10JNEX900 grade-A mechanical and thermal data, from JFE or a test of the owner's lot (§4.3), optional | Owner | data in the material library with provenance at grade A |
 
 ## 13. Open questions for the owner
 
@@ -325,8 +345,8 @@ None. Decisions 1–9 settled the scope on 2026-11-05.
 
 ## 14. Risks
 
-- **JFE data late:** the default search refuses 10JNEX900 rotors (decision 7). Mitigation: the published-value
-  fallback in §4.3.
+- **10JNEX900 strength at grade B only:** the rotor runs hot and the published yield has no temperature data, so
+  the speed limit may be optimistic at temperature. The grade allowance covers part of it. Grade-A data closes it.
 - **Worst-case stack too conservative:** rankings stay valid in order, and the row shares show which measurement
   buys back margin.
 - **V4 is a weak check of cooling:** 10 s is nearly adiabatic. The continuous gap is stated, not hidden.
