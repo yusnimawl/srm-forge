@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-03-r4-end-effects-design.md`, decisions 3 and 7. Results: `docs/r4-end-effect-results.md`, section G1.
 
-**Starts after:** the R4a PR is merged. Work on a new branch from main, `r4b-fail-gap`.
+**Starts after:** the R4a PR is merged. Work on the branch `r4-end-effects`, restarted from main.
 
 ## Fixed values
 
@@ -23,6 +23,7 @@ Decision 7 takes the larger of the TEAM 24 and Krishnan residuals, as a constant
 | `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
 | `lu` | not measured | not in decision 7 | 0.0 | none |
 
+- The row adds g / (1 - g), not g, because the residuals are percent of the measured value and the budget rows are percent of the model value (found by the final review): 0.192 gives 23.76 % and 0.172 gives 20.77 %.
 - The 9.3 points are `docs/m5d-krishnan-results.md`: 3.9 N·m of 41.6 N·m at 20 A.
 - Krishnan's `T_avg` is computed from measured flux linkage, not from a torque sensor. The results section says so.
 - `la` is the secant at 5 % of I_max, where the Krishnan error is only 2.0 %. The row is conservative there on purpose: decision 7 asks for a constant fraction and names understating as the failure.
@@ -95,7 +96,7 @@ assert set(V.MEASURED_GAP) == set(V.KEYS)
 
 - [ ] **Step 2: Run** `python tools/validation_report.py`. Expected: verdict PASS.
 
-- [ ] **Step 3: Check** the report's `end_effect` row against the old one (0.13, 1.16, 0.00, 0.27): la 17.33, lu 1.16, peak_torque 19.20, psi_max 17.47. Every other row must be the same as before to the printed digits, and the checks and label unchanged. Any other difference: stop and report it.
+- [ ] **Step 3: Check** the report's `end_effect` row against the old one (0.13, 1.16, 0.00, 0.27): la 20.90, lu 1.16, peak_torque 23.76, psi_max 21.04. Every other row must be the same as before to the printed digits, and the check and label code unchanged. Any other difference: stop and report it.
 
 - [ ] **Step 4: Commit** `git commit -m "validation: 8/6 budget with the measured gap"`.
 

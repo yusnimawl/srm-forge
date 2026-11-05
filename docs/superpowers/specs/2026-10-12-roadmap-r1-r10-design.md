@@ -64,7 +64,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 ### R4 — End effects
 - [x] 3D magnetostatic model (NGSolve) built and checked: cost spike G0, slab against 2D G2, TEAM 24 against measurement G1. G1 failed, so the spot checks across stack-length/diameter ratios were not run
 - [ ] Dropped, G1 failed: an end-effect correction (as a function of geometry) calibrated against the 3D runs only; the measured TEAM 24 and Krishnan 6/4 data are a check, never a calibration (owner, 2026-11-03; spec `2026-11-03-r4-end-effects-design.md`)
-- [x] The measured gap enters the uncertainty budget (`end_effect` row, `MEASURED_GAP`, 2026-11-05)
+- [x] The measured gap enters the uncertainty budget (`end_effect` row, `MEASURED_GAP`, 2026-11-05). The largest measured residual, Krishnan Lu (+27.3 % to +45.2 %), is not in the budget: decision 7 leaves Lu out, and it is a tracker item for an owner ruling
 - [ ] Dropped, G1 failed: the correction in the key numbers and the ranking-bias measure
 - [ ] Dropped, G1 failed: the 3D sweep covers the whole air-gap range the R7 optimiser may choose, down to the smallest allowed gap (owner, 2026-11-04: small gaps are worth their cost)
 - Done when: the measured comparisons fall inside the stated uncertainty, or the remaining gap is stated in the budget.

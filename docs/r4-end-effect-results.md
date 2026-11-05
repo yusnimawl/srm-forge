@@ -104,17 +104,18 @@ Run notes:
 
 ## Measured gap in the budget
 
-Run 2026-11-05 on commit fd80b55 (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache, the checks and the label are not changed. srmcore stays 0.7.0.
+Run 2026-11-05 on code 94f5fd7, results committed in 4a74fdb (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache and the check and label code are not changed. srmcore stays 0.7.0.
 
 Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec decision 7):
 
-| Budget key | TEAM 24 | Krishnan 6/4 at 20 A | `MEASURED_GAP` | Set by |
-|---|---|---|---|---|
-| `peak_torque` | 13.05 % (`static_torque`) | 28.53 - 9.3 = 19.2 % (`T_avg`) | 0.192 | Krishnan 6/4 |
-| `la` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
-| `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | TEAM 24 |
-| `lu` | not measured | not in decision 7 | 0.0 | none |
+| Budget key | TEAM 24 | Krishnan 6/4 at 20 A | `MEASURED_GAP` | Row value g / (1 - g) | Set by |
+|---|---|---|---|---|---|
+| `peak_torque` | 13.05 % (`static_torque`) | 28.53 - 9.3 = 19.2 % (`T_avg`) | 0.192 | 23.76 % | Krishnan 6/4 |
+| `la` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | 20.77 % | TEAM 24 |
+| `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | 20.77 % | TEAM 24 |
+| `lu` | not measured | not in decision 7 | 0.0 | 0 % | none |
 
+- The residuals are percent of the measured value and the budget rows are percent of the model value, and the model is low. The row therefore adds g / (1 - g), not g: a model 19.2 % below the measurement is 23.76 % below its own value. The final review found this.
 - The 9.3 points are the Lu share of the Krishnan torque residual: 3.9 N·m of 41.6 N·m at 20 A (`docs/m5d-krishnan-results.md`).
 - The 3D errors of G1 (11.72 %, 8.30 %) are not used, because no design's map is a 3D result.
 - Krishnan's `T_avg` is computed from measured flux linkage, not from a torque sensor.
@@ -124,17 +125,18 @@ Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec de
 
 | Key | Row before | Row after | Total before | Total after |
 |---|---|---|---|---|
-| `la` | 0.13 % | 17.33 % | 10.21 % | 27.41 % |
+| `la` | 0.13 % | 20.90 % | 10.21 % | 30.98 % |
 | `lu` | 1.16 % | 1.16 % | 10.98 % | 10.98 % |
-| `peak_torque` | 0.00 % | 19.20 % | 10.12 % | 29.32 % |
-| `psi_max` | 0.27 % | 17.47 % | 10.22 % | 27.42 % |
+| `peak_torque` | 0.00 % | 23.76 % | 10.12 % | 33.88 % |
+| `psi_max` | 0.27 % | 21.04 % | 10.22 % | 30.99 % |
 
 - Every other number in the run equals the old run to the last digit, apart from timings.
 - The stored run predated 0.7.0 joining `VALIDATED_VERSIONS`, so `engine_version` went from fail to pass and the label from none to 2D-verified.
 - The values are not a constraint anywhere. No search, margin or ranking reads the budget.
 - The map values are not scaled by the gap: measurements are a check, not a calibration.
 - Evaluations stored before this change keep the old row in the web store and show a peak-torque row of 0 %. Validating again updates them. The note text tells the two apart. There is no migration.
-- The R5 spec (section 7, row "EM torque") takes the current for a rated torque at torque x (1 + the EM peak-torque row, end-effect row included). R5's rated value therefore carries this 19.2 % gap. No change is proposed here.
+- The R5 spec (section 7, row "EM torque") takes the current for a rated torque at torque x (1 + the EM peak-torque row, end-effect row included). R5's rated torque therefore carries 23.76 % in the end-effect row and 33.88 % in the 8/6 peak-torque total. No change is proposed here.
+- Not in the budget: the largest measured residual is Krishnan Lu, +27.3 % to +45.2 % after the end-winding term (`docs/validation/krishnan_6_4.json`), far outside the 10.98 % Lu total on the 8/6; `docs/m5d-krishnan-results.md` gives the cause as "the 2D model with the coil packed against the yoke already over-predicts Lu". Decision 7 leaves Lu out, so it is not in the budget. It is stated here and is a tracker item for an owner ruling.
 
 ## G3 (R4b)
 
