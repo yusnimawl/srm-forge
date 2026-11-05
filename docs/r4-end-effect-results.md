@@ -115,7 +115,7 @@ Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec de
 | `psi_max` | 17.23 % (`rotor_flux`) | 15.04 % (`La`, `error_after_pct`) | 0.172 | 20.77 % | TEAM 24 |
 | `lu` | not measured | not in decision 7 | 0.0 | 0 % | none |
 
-- The residuals are percent of the measured value and the budget rows are percent of the model value, and the model is low. The row therefore adds g / (1 - g), not g: a model 19.2 % below the measurement is 23.76 % below its own value. The final review found this.
+- The residuals are percent of the measured value and the budget rows are percent of the model value, and the model is low. The row therefore adds g / (1 - g), not g: the measurement is 23.76 % above the model value, which is the same gap as 19.2 % of the measured value. The final review found this.
 - The 9.3 points are the Lu share of the Krishnan torque residual: 3.9 N·m of 41.6 N·m at 20 A (`docs/m5d-krishnan-results.md`).
 - The 3D errors of G1 (11.72 %, 8.30 %) are not used, because no design's map is a 3D result.
 - Krishnan's `T_avg` is computed from measured flux linkage, not from a torque sensor.

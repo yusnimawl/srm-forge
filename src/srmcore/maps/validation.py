@@ -37,9 +37,9 @@ TORQUE_POINT_TOLERANCE = 0.01     # full vs reference mesh, torque at the peak-t
 MAP_MATCH_TOLERANCE = 1e-3        # peak-torque solve on the design's mesh vs the map value (solvers agree to 1e-4)
 JS_STEP = 0.02                   # relative change of the saturation polarisation in the material row
 GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade -> relative allowance
-# measured gap of the 2D map: the larger of the TEAM 24 and Krishnan 6/4 residuals (Krishnan torque less its 2D-Lu share).
-# The values are fractions of the measured value; the end_effect row converts them to fractions of the model value,
-# g / (1 - g), because budget rows are relative to the model value.
+# measured gap of the 2D map: the larger of the TEAM 24 and Krishnan 6/4 residuals (Krishnan torque less its
+# 2D-Lu share). The values are fractions of the measured value; the end_effect row converts them to fractions of
+# the model value, g / (1 - g), because budget rows are relative to the model value.
 MEASURED_GAP = {"la": 0.172, "lu": 0.0, "peak_torque": 0.192, "psi_max": 0.172}
 END_WINDING_IMAGE = (1.0, 2.0)    # image-factor bounds of the end-winding inductance; corrected values use the midpoint
 
