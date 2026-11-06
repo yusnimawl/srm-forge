@@ -17,7 +17,7 @@ def prob(dom, k=1.0, cap=1.0, depth=1.0, lumps=(), links=()):
 def rc_solver(c=5.0, g=2.0):
     nodes, tri = rect(1e-3, 1e-3, 1, 1)
     # the plate is a negligible adiabatic island; the physics is the lump pair
-    p = prob(domain(nodes, tri), cap=1e-9, lumps=[Lump("c", capacity=c), Lump("f", fixed_c=20.0)],
+    p = prob(domain(nodes, tri), cap=1e-9, lumps=[Lump("c", capacity=c, hot_spot=True), Lump("f", fixed_c=20.0)],
              links=[LumpLink("c", "f", g)])
     return ThermalSolver(p), len(tri), len(nodes)
 
@@ -35,16 +35,50 @@ def test_lumped_rc_step():
     assert rc_error(200) < 5e-3
 
 
+def test_load_sees_previous_step_and_hot_spot_trace():
+    s, m, n = rc_solver()
+    c, g, p0, alpha, dt, n_steps = 5.0, 2.0, 10.0, 0.01, 0.5, 6
+    seen = []
+
+    def load(t):
+        seen.append((t.lumps["c"], t.lumps["f"]))
+        return ThermalLoad(np.zeros(m), {"c": p0 * (1 + alpha * (t.lumps["c"] - 20.0))})
+
+    start = Temperatures(np.full(n, 20.0), {"c": 30.0, "f": 99.0})
+    tr = s.transient(start, load, dt * n_steps, n_steps)
+    ref = [30.0]
+    for _ in range(n_steps):
+        tk = ref[-1]
+        ref.append((c / dt * tk + p0 * (1 + alpha * (tk - 20.0)) + g * 20.0) / (c / dt + g))
+    assert seen[0] == (30.0, 20.0)
+    assert np.allclose([x[0] for x in seen], ref[:-1], rtol=1e-12)
+    assert np.allclose(tr.hot_spot_c, ref, rtol=1e-12)
+    assert tr.hot_spot_c[0] == 30.0 and tr.hot_spot_c[-1] == s.hot_spot(tr.final).temperature_c
+
+
 def test_time_step_is_first_order():
     assert 1.8 < rc_error(50) / rc_error(100) < 2.2
 
 
 def test_adiabatic_element_heating():
     nodes, tri = rect(0.02, 0.01, 6, 3)
-    rho_c, q, t_end = 4e6, 1e6, 30.0
-    s = ThermalSolver(prob(domain(nodes, tri), cap=rho_c))
-    tr = s.transient(Temperatures(np.full(len(nodes), 25.0), {}), uniform(q, len(tri)), t_end, 7)
-    assert np.allclose(tr.final.field, 25.0 + q * t_end / rho_c, rtol=1e-9, atol=0)
+    q, t_end, depth = 1e6, 30.0, 0.1
+    cap = np.linspace(2e6, 6e6, len(tri))   # unequal per element, so a reversed array shows
+    dom = domain(nodes, tri)
+    p = ThermalProblem(dom, np.full(len(tri), 1e-12), cap, depth, (Lump("h", capacity=1.0, hot_spot=True),), ())
+    s = ThermalSolver(p)
+    start = Temperatures(np.full(len(nodes), 25.0), {"h": 25.0})
+    tr = s.transient(start, lambda _t: ThermalLoad(np.full(len(tri), q)), t_end, 7)
+    # lumped node balance: dT_i = q t sum(area_e) / sum(cap_e area_e) over the elements at node i, built here
+    p0 = nodes[tri]
+    e1, e2 = p0[:, 1] - p0[:, 0], p0[:, 2] - p0[:, 0]
+    area = 0.5 * np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0])
+    num, den = np.zeros(len(nodes)), np.zeros(len(nodes))
+    np.add.at(num, tri, np.repeat(area[:, None], 3, 1))
+    np.add.at(den, tri, np.repeat((cap * area)[:, None], 3, 1))
+    assert np.allclose(tr.final.field - 25.0, q * t_end * num / den, rtol=1e-9, atol=0)
+    stored = (s._capacity()[:len(nodes)] * (tr.final.field - 25.0)).sum()
+    assert stored == pytest.approx(q * (area * depth).sum() * t_end, rel=1e-9)
     assert tr.times_s.shape == tr.hot_spot_c.shape == (8,)
 
 
@@ -52,7 +86,7 @@ def test_transient_settles_on_steady():
     nodes, tri = rect(0.04, 0.01, 16, 2)
     ends = [np.flatnonzero(np.isclose(nodes[:, 0], x)) for x in (0.0, 0.04)]
     links = [EdgeLink(np.stack([e[:-1], e[1:]], 1), "air", 200.0) for e in ends]
-    s = ThermalSolver(prob(domain(nodes, tri), k=3.0, cap=3e6, depth=0.1, lumps=[Lump("air", fixed_c=25.0)],
+    s = ThermalSolver(prob(domain(nodes, tri), k=3.0, cap=3e6, depth=0.1, lumps=[Lump("air", fixed_c=25.0, hot_spot=True)],
                            links=links))
     load = uniform(2e5, len(tri))
     start = Temperatures(np.full(len(nodes), 25.0), {"air": 25.0})
@@ -112,6 +146,13 @@ def test_transient_rejects_bad_steps_and_names_capacity_free_orphan():
 
 def test_transient_runaway():
     nodes, tri = rect(0.02, 0.01, 2, 1)
-    s = ThermalSolver(prob(domain(nodes, tri), cap=1e3))
+    s = ThermalSolver(prob(domain(nodes, tri), cap=1e3, lumps=[Lump("h", capacity=1.0, hot_spot=True)]))
     with pytest.raises(ThermalRunaway):
-        s.transient(Temperatures(np.zeros(len(nodes)), {}), uniform(1e9, len(tri)), 10.0, 5)
+        s.transient(Temperatures(np.zeros(len(nodes)), {"h": 0.0}), uniform(1e9, len(tri)), 10.0, 5)
+
+
+def test_transient_needs_a_hot_spot_target():
+    nodes, tri = rect(0.02, 0.01, 2, 1)
+    s = ThermalSolver(prob(domain(nodes, tri), cap=1e3))
+    with pytest.raises(ThermalModelError, match="hot spot"):
+        s.transient(Temperatures(np.zeros(len(nodes)), {}), uniform(1.0, len(tri)), 1.0, 2)

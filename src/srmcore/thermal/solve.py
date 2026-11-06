@@ -176,9 +176,6 @@ class ThermalSolver:
         c[self._n:] = [lump.capacity for lump in p.lumps]
         return c
 
-    def _has_hot_spot(self) -> bool:
-        return bool(self.problem.domain.coil_elements) or any(lump.hot_spot for lump in self.problem.lumps)
-
     def hot_spot(self, t: Temperatures) -> HotSpot:
         d = self.problem.domain
         found = {name: float(t.field[np.unique(d.triangles[el])].max()) for name, el in d.coil_elements.items()}
@@ -203,12 +200,12 @@ class ThermalSolver:
         a_fix = self._a[free][:, fixed] @ self._t_fixed
         x = np.concatenate([start.field, [start.lumps[nm] for nm in self._names]])[free]
         t = self._unpack(x)
-        trace = [self.hot_spot(t).temperature_c] if self._has_hot_spot() else [np.nan]
+        trace = [self.hot_spot(t).temperature_c]
         for _ in range(n_steps):
             x = lu.solve(self._rhs(load(t))[free] - a_fix + c_dt * x)
             t = self._unpack(x)
             peak = max(t.field.max(), *t.lumps.values()) if t.lumps else t.field.max()
             if not peak < RUNAWAY_C:
                 raise ThermalRunaway(f"temperature passed {RUNAWAY_C:g} degC")
-            trace.append(self.hot_spot(t).temperature_c if self._has_hot_spot() else np.nan)
+            trace.append(self.hot_spot(t).temperature_c)
         return Transient(np.linspace(0.0, duration_s, n_steps + 1), np.array(trace), t)
