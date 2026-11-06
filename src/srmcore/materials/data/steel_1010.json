@@ -29,8 +29,7 @@
       "date": "2026-11-07",
       "typical": true
     },
-    "confidence": "C",
-    "temperature_c": 20.0
+    "confidence": "C"
   },
   "mechanical": {
     "youngs_modulus": 205000000000.0,
@@ -44,7 +43,6 @@
     },
     "brittle": false,
     "confidence": "C",
-    "strength_confidence": "C",
-    "temperature_c": 20.0
+    "strength_confidence": "C"
   }
 }

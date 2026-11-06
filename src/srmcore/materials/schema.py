@@ -78,7 +78,7 @@ class ThermalData(_Frozen):
     expansion: float | None = Field(default=None, gt=0)   # 1/K
     provenance: Provenance
     confidence: Literal["A", "B", "C"]
-    temperature_c: float = 20.0
+    temperature_c: float | None = None
 
 
 class MechanicalData(_Frozen):
@@ -92,7 +92,7 @@ class MechanicalData(_Frozen):
     provenance: Provenance
     confidence: Literal["A", "B", "C"]   # of the modulus and Poisson ratio
     strength_confidence: Literal["A", "B", "C"]
-    temperature_c: float = 20.0
+    temperature_c: float | None = None
 
     @model_validator(mode="after")
     def _governing_strength(self) -> "MechanicalData":

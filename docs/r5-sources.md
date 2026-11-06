@@ -15,7 +15,7 @@ Grades: **A** measured on the owner's lot or a measured table, **B** a test or m
 | 1e | Test temperature and cutting method of the 570 MPa test | Ou et al. ref. [24] (ICEMS 2019) | - | **not found** (paper not reachable) |
 | 2 | Copper k, c, expansion | National Bronze C11000 data sheet p. 2 (CDA values) | B | found |
 | 3 | steel_1010 k, c, expansion, E, Poisson ratio, yield | Elgin Fasteners grade 1010 data sheet pp. 1-3 | C | found, cold-drawn condition |
-| 4 | Kt of a shoulder fillet in tension | AmesWeb calculator page quoting Pilkey 2005 | C | formula found, not checked against Peterson or Roark |
+| 4 | Kt of a shoulder fillet in tension | AmesWeb calculator page quoting Pilkey 2005 | C | formula found, book page not recorded, to be checked against Peterson (gate V6 interim) |
 
 ## 1. 10JNEX900
 
@@ -54,11 +54,11 @@ Source: Elgin Fasteners, "Carbon Steel Grade 1010 Data Sheet" (AISI 1010, UNS G1
 | Poisson ratio | 0.29, "Typical for steel" | 2 |
 | Yield | 305 MPa (44200 psi); ultimate 365 MPa | 1 |
 
-Caveats: the library's `steel_1010` is the FEMM magnetic curve, whose condition is unknown, while this sheet is cold-drawn bar. Cold drawing raises the yield, so 305 MPa may be higher than an annealed lamination: use with the grade C allowance. The specific heat is quoted only for >= 100 degC (the first row, 0.448, is the lowest figure on the sheet); it is stored as the lowest value and `temperature_c` of the block (20) is therefore not exact for it. Thermal data are typical values, the elastic constants are "typical for steel".
+Caveats: the library's `steel_1010` is the FEMM magnetic curve, whose condition is unknown, while this sheet is cold-drawn bar. Cold drawing raises the yield, so 305 MPa may be higher than an annealed lamination: use with the grade C allowance. The specific heat is quoted only for >= 100 degC (the first row, 0.448, is the lowest figure on the sheet); it is stored as the lowest value, and the block carries no `temperature_c` because the sheet states none for the other quantities either. Thermal data are typical values, the elastic constants are "typical for steel".
 
 ## 4. Stress concentration factor of a shoulder fillet in tension
 
-Neither Peterson nor Roark was reachable. The formula below was read from the AmesWeb page "Stress Concentration Calculator - Shoulder Fillets in a Flat Bar", https://amesweb.info/stress-concentration-factor-calculator/shoulder-fillets-in-flat-bar.aspx, which gives as its reference Pilkey, W. D. (2005), Formulas for Stress, Strain, and Structural Matrices, 2nd ed., Wiley (the Roark-family fit, also printed in Peterson's Stress Concentration Factors 2nd ed., Pilkey 1997, p. 156 according to a second page, https://fchartsoftware.com/ees/mechanical_design/stress_concentration_factors/hs203.htm, which gives only an example, not the formula). So the page read is a secondary copy of Pilkey; the grade is C and the formula has not been compared with a figure in Peterson or Roark.
+Neither Peterson nor Roark was reachable. The formula below was read from the AmesWeb page "Stress Concentration Calculator - Shoulder Fillets in a Flat Bar", https://amesweb.info/stress-concentration-factor-calculator/shoulder-fillets-in-flat-bar.aspx, which gives as its reference Pilkey, W. D. (2005), Formulas for Stress, Strain, and Structural Matrices, 2nd ed., Wiley ). The book page is not recorded: a page number "p. 156" for Peterson's Stress Concentration Factors (2nd ed., Pilkey 1997) is only an inference from the EES page "Rod with shoulder fillets under tension" (https://fchartsoftware.com/ees/mechanical_design/stress_concentration_factors/hs203.htm), which gives no formula, only one example, and says "rod", not flat bar. The source actually read is a calculator page quoting Pilkey 2005. Grade C. The coefficients and the D/d range still need checking against Peterson; gate V6 is the interim check.
 
 Geometry (figure on the page): opposite shoulder fillets in a stepped flat bar; D = width of the wide part, d = width of the narrow part, h = step height = (D - d)/2 (drawn in the figure), r = fillet radius, L = length of the wide part, t = thickness. Load P in tension, nominal stress sigma_nom = P / (t d), sigma_max = Kt sigma_nom.
 
@@ -71,4 +71,4 @@ Kt = C1 + C2 (2h/D) + C3 (2h/D)^2 + C4 (2h/D)^3, with s = sqrt(h/r) and x = h/r:
 | C3 | 0.245 - 1.006 s - 0.257 x | -3.459 + 1.266 s - 0.016 x |
 | C4 | -0.135 + 0.582 s - 0.017 x | 3.505 - 2.109 s + 0.069 x |
 
-Validity as printed: the h/r ranges above, and L/D > -1.89 (r/d - 0.15) + 5.5 (a long enough wide part). The page gives no range for 2h/D (physically 0 to below 1). At 2h/D = 0 the fit returns C1, which is above 1 (1.32 at h/r = 0.1), so a Kt from this fit is not meaningful for a vanishing step; Task 6 should state its own 2h/D and h/r limits and clamp or refuse outside the printed h/r range. The formula is for a plate in plane stress; a rotor bridge or pole root is not an isolated step, so it is a screening estimate.
+Validity as printed: the h/r ranges above, and L/D > -1.89 (r/d - 0.15) + 5.5 (a long enough wide part). The page gives no range for 2h/D. Task 6 refuses or clamps outside the printed h/r range (0.1 to 20). At 2h/D = 0 the fit returns C1, about 1 + sqrt(h/r), the semi-infinite-plate limit (1.32 at h/r = 0.1), a real value. The formula is for a plate in plane stress; a rotor bridge or pole root is not an isolated step, so it is a screening estimate.

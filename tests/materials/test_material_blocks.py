@@ -59,3 +59,10 @@ def test_copper_and_steel_1010_blocks():
     st = load_material("steel_1010")
     assert st.thermal.conductivity == 49.8 and st.mechanical.strength == 305e6
     assert st.mechanical.confidence == "C" and st.mechanical.strength_confidence == "C"
+
+
+def test_blocks_without_a_stated_temperature_carry_none():
+    assert load_material("10JNEX900").mechanical.temperature_c is None
+    assert load_material("10JNEX900").thermal.temperature_c is None
+    assert load_material("steel_1010").thermal.temperature_c is None
+    assert load_material("copper").thermal.temperature_c == 20.0
