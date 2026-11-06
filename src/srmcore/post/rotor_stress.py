@@ -51,6 +51,12 @@ def pole_force_per_depth(machine: RadialSRMParams, density: float, omega: float)
     return float(density * omega**2 * (hi - lo) / 2 * np.sum(_GAUSS[1] * 2 * r * _flank_y(machine, r)))
 
 
+def _rim_load(machine: RadialSRMParams, density: float, omega: float) -> float:
+    """Radial tension at the yoke rim from the centrifugal pull of all rotor poles, Pa."""
+    force = pole_force_per_depth(machine, density, omega)
+    return machine.n_rotor_poles * force / (2 * math.pi * machine.rotor_yoke_outer_radius)
+
+
 def _root_geometry(machine: RadialSRMParams) -> tuple[float, float]:
     """h/r and 2h/D of the pole root: d = pole width at the root, D = pole pitch at the root."""
     b = machine.rotor_yoke_outer_radius
@@ -102,7 +108,7 @@ def rotor_stress(machine: RadialSRMParams, density: float, mechanical: Mechanica
     omega = check_rpm * 2 * math.pi / 60
     a, b, nu = machine.shaft_radius, machine.rotor_yoke_outer_radius, mechanical.poisson_ratio
     force = pole_force_per_depth(machine, density, omega)
-    rim = machine.n_rotor_poles * force / (2 * math.pi * b)
+    rim = _rim_load(machine, density, omega)
     bore = density * omega**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * rim
     nominal = force / (2 * pole_half_width(machine, b))
     kt = root_stress_concentration(machine)
@@ -127,3 +133,51 @@ def rotor_stress(machine: RadialSRMParams, density: float, mechanical: Mechanica
                   usable_strength=usable, safety_factor=safety,
                   speed_limit_rpm=max_speed_rpm * math.sqrt(safety / SAFETY_FACTOR))
     return RotorStress("ok", "; ".join(notes), **fields)
+
+
+def _disc_rim_displacement(a: float, b: float, density: float, omega: float, nu: float, youngs_modulus: float,
+                           rim_load: float) -> float:
+    """Radial displacement at the rim of a spinning annulus with a free bore a and a tensile load on the rim b,
+    plane stress: u = (b/E)(sigma_theta(b) - nu p) with the rotating-annulus hoop stress at b plus the Lame term."""
+    hoop = (density * omega**2 / 4 * ((1 - nu) * b**2 + (3 + nu) * a**2)
+            + rim_load * (b**2 + a**2) / (b**2 - a**2))
+    return b / youngs_modulus * (hoop - nu * rim_load)
+
+
+@dataclass(frozen=True)
+class GapClosure:
+    centrifugal: float               # m, disc plus pole elongation at the pole tip
+    rotor_thermal: float | None      # m, None without expansion data
+    stator_thermal: float | None     # m
+    closure: float | None            # m, rotor growth minus bore growth; None without expansion data
+    note: str
+
+
+def gap_closure(machine: RadialSRMParams, density: float, mechanical: MechanicalData,
+                rotor_expansion: float | None, stator_expansion: float | None, rpm: float,
+                rotor_temperature_c: float, stator_temperature_c: float, reference_c: float = 20.0) -> GapClosure:
+    """Growth of the rotor tip radius minus the growth of the stator bore, m (positive closes the gap), at the
+    actual speed `rpm`: the caller applies any overspeed. Pole width comes from the flank, so the elongation
+    is the integral of sigma(r)/E with sigma(r) = rho omega^2 / w(r) times the integral of r' w(r') from r to the tip."""
+    if rpm <= 0:
+        raise ValueError("rpm must be positive")
+    omega = rpm * 2 * math.pi / 60
+    a, b, big = machine.shaft_radius, machine.rotor_yoke_outer_radius, machine.rotor_outer_radius
+    nu, young = mechanical.poisson_ratio, mechanical.youngs_modulus
+    disc = _disc_rim_displacement(a, b, density, omega, nu, young, _rim_load(machine, density, omega))
+
+    def width_moment(r: float) -> float:
+        s = (big - r) / 2 * _GAUSS[0] + (big + r) / 2
+        return float((big - r) / 2 * np.sum(_GAUSS[1] * s * 2 * _flank_y(machine, s)))
+
+    r = (big - b) / 2 * _GAUSS[0] + (big - b) / 2 + b
+    sigma = np.array([density * omega**2 * width_moment(ri) / (2 * float(_flank_y(machine, ri))) for ri in r])
+    centrifugal = disc + float((big - b) / 2 * np.sum(_GAUSS[1] * sigma)) / young
+
+    rotor_thermal = None if rotor_expansion is None else rotor_expansion * (rotor_temperature_c - reference_c) * big
+    stator_thermal = (None if stator_expansion is None
+                      else stator_expansion * (stator_temperature_c - reference_c) * machine.bore_radius)
+    missing = [n for n, v in (("rotor", rotor_expansion), ("stator", stator_expansion)) if v is None]
+    closure = None if missing else centrifugal + rotor_thermal - stator_thermal
+    note = f"no thermal expansion for the {' and '.join(missing)} material" if missing else ""
+    return GapClosure(centrifugal, rotor_thermal, stator_thermal, closure, note)
