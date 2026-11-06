@@ -111,6 +111,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - [ ] Ratio `auto`: push motor rpm up until the owner's optional motor rpm cap, rotor stress, electrical frequency or bus voltage limits it (the tool says which one bound); report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
 - [ ] Air gap as a design variable the optimiser chooses (today `srmapp.sizing.generator` sets it by rule, OD/400 clamped to 0.3–0.8 mm). The limits are user inputs: a minimum buildable gap (machining and assembly) and optionally a maximum; the tool also checks rotor radial growth at max speed (R5 rotor stress) and eccentricity (bearing runout, unbalanced magnetic pull) against the chosen gap and says which limit bound (owner, 2026-11-04)
 - [ ] Plain-language recommendations ("pick this because …")
+- [ ] Live search view while the search runs (owner, 2026-11-06): the options graph filling in map by map with the front redrawn, the design being mapped (outline and its map grid filling in), the stage-1 funnel counts, where the optimiser looks next, and a ticker of finished designs with their binding limit. Only data the job already makes; a still view under `prefers-reduced-motion`
 - Done when: requirements in → ranked recommendations with reasons out, on a stated compute budget.
 
 ### R8 — Control SIL
