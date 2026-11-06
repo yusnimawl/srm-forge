@@ -2,13 +2,15 @@
 
 Date: 2026-11-06. Roadmap item R6d (`docs/superpowers/specs/2026-10-12-roadmap-r1-r10-design.md`). This review is the input to R7's spike. It does not change code.
 
-**Recommendation.** R7's spike compares three arms on the same budget of `screening` maps, then confirms every arm's finalists at `full`:
+**Recommendation (accepted by the owner 2026-11-06).** R7's spike compares a baseline and three methods on the same budget of `screening` maps, then confirms every arm's finalists at `full`. The methods are ranked by expected performance at this budget:
 
-1. **Funnel (baseline):** today's Latin-hypercube sample, stage-1 filter and shortlist.
-2. **Evolutionary:** NSGA-II (NSGA-III if the R7 spec keeps four or more objectives), from pymoo.
-3. **Surrogate:** a Gaussian-process (Kriging) model per pole set, with batch noisy expected-hypervolume infill (qLogNEHVI, BoTorch).
+1. **GP surrogate with expected-hypervolume infill:** a Gaussian-process (Kriging) model of the map outputs, with noisy expected-hypervolume infill (qLogNEHVI, BoTorch).
+2. **Kriging with NSGA-II on the model:** NSGA-II searches the cheap model, and its best proposals are mapped and fed back.
+3. **SMS-EMOA on the maps:** steady-state, one map per selection, survivors chosen by hypervolume contribution (pymoo).
 
-The literature gives the surrogate arm the best odds. Direct evolutionary search on FE needs thousands of design evaluations in the SRM papers below. The tool can afford about 220 to 320 `screening` maps in a 10-hour night on the LattePanda. Before the spike, R7 should also cut the FE dimension and the cost per map (§4). Those gains multiply with any algorithm.
+The baseline is today's funnel: Latin-hypercube sample, stage-1 filter and shortlist. Plain NSGA-II and NSGA-III are out: with two objectives NSGA-III gains nothing, and at this budget NSGA-II gets about 7 generations.
+
+The literature gives the surrogate arms the best odds. Direct evolutionary search on FE needs thousands of design evaluations in the SRM papers below. The tool can afford about 220 to 320 `screening` maps in a 10-hour night on the LattePanda. Before the spike, R7 should also cut the FE dimension and the cost per map (§4). Those gains multiply with any algorithm. §6 reviews the spike design and gives the version to build.
 
 ## 1. The problem R7 has to solve
 
@@ -78,15 +80,16 @@ Radial scaling (all lengths × k, ampere-turns × k) is exact in 2D magnetostati
 
 ## 5. The R7 spike list
 
-Each arm runs on the same requirements, the same pole set and the same number of `screening` maps. The finalists of each arm are confirmed at `full`. The score is the hypervolume of the confirmed feasible front against maps spent.
+Each arm runs on the same requirements, the same pole set and the same number of `screening` maps. The finalists of each arm are confirmed at `full`. The score is the hypervolume of the feasible front against maps spent. §6 sets the scale.
 
 | Arm | Method | Library | Why it is in the spike |
 | --- | --- | --- | --- |
-| A | Funnel: LHS, stage-1 filter, shortlist (today) | none new | Baseline. Cheap per design, no learning. |
-| B | NSGA-II, or NSGA-III with 4 or more objectives | pymoo ([Blank and Deb 2020](https://arxiv.org/abs/2002.04504), Apache 2.0) | The roadmap names it. The literature's default. |
-| C | GP per pole set on the map's key outputs, initial LHS, then qLogNEHVI batches | BoTorch ([repository](https://github.com/meta-pytorch/botorch), MIT, needs PyTorch) | Best data efficiency in the sources, and the cheap/expensive split fits the tool. |
+| A | Funnel: LHS, stage-1 filter, shortlist (today) | none new | Baseline. Cheap per design, learns nothing from the maps. |
+| B | GP per pole set on the map's key outputs, initial LHS, then qLogNEHVI | BoTorch ([repository](https://github.com/meta-pytorch/botorch), MIT, needs PyTorch) | Best data efficiency in the sources. The cheap/expensive split fits the tool. |
+| C | Kriging model, NSGA-II run on the model, the best proposals mapped and the model refitted | pymoo plus the GP of arm B | The method of Diao et al. 2020 without the subspaces. Simpler than B, falls back to plain NSGA-II. |
+| D | SMS-EMOA on the maps, one offspring per step | pymoo `SMSEMOA` ([documentation](https://pymoo.org/algorithms/moo/sms.html)) | The best model-free method for slow evaluations ([Beume et al. 2007](https://econpapers.repec.org/RePEc:eee:ejores:v:181:y:2007:i:3:p:1653-1669)). An honest check on the models. |
 
-Suggested spike scale: the 8/6 pole set, one requirement set at the 400 V bus, 150 `screening` maps per arm, two seeds. That is 6 runs of about 5 hours on the LattePanda, plus `full` confirmation of about 5 finalists per run. Arm C uses about 20 initial LHS designs (about 2 per variable) before infill.
+pymoo's `SMSEMOA` defaults `n_offsprings` to the population size, which makes it generational. Arm D must set `n_offsprings=1`.
 
 Kept out of the spike, with the reason:
 
@@ -95,11 +98,49 @@ Kept out of the spike, with the reason:
 - **Sequential subspace and multi-level optimisation:** a fallback if the dimension grows past about 10. It needs a sensitivity study first.
 - **Pole-shape and topology optimisation:** after R7 (§3).
 
-Open questions for the R7 spec:
+Owner decisions (2026-11-06):
 
-1. How many objectives? Peak and continuous kW/kg and kW/L are four, which needs NSGA-III. kW/kg and kW/L are strongly correlated, so two or three may do.
-2. Is PyTorch acceptable as an optional extra (`opt`), like `ngsolve`?
-3. What budget is acceptable for one R7 search: one night on the LattePanda?
+1. **Objectives:** two, continuous kW/kg and peak kW/kg. kW/L is shown on the options graph and is a limit when the user gives a size envelope. So NSGA-III is not needed.
+2. **PyTorch:** an optional extra (`opt`) for the spike only. Whether the `web` extra takes it is decided after the spike.
+3. **Budget:** one night on the LattePanda for a full search (about 220 to 320 `screening` maps), plus a quick mode of about 1 hour (about 30 maps).
+4. **Spike arms:** the baseline and the three ranked methods above, replacing "NSGA-III vs surrogate vs funnel" in the roadmap.
+
+## 6. Spike review: pros, cons and the version to build
+
+The first spike sketch (§5 before 2026-11-06: 8/6 only, one requirement set, two seeds, 150 maps per arm) has these strengths:
+
+- Every arm gets the same budget, the same requirements and the same engine, so the comparison is fair.
+- The funnel baseline shows whether learning from the maps helps at all.
+- Hypervolume against maps spent shows each arm at any budget, not only at the end.
+- The `full` confirmation catches designs that only look good at `screening`.
+
+It also has these weaknesses:
+
+| # | Weakness | Effect | Fix |
+| --- | --- | --- | --- |
+| 1 | Two seeds | Evolutionary runs vary a lot from seed to seed. Two cannot separate arms unless the gap is large. | Replay on an emulator (below) for 20 seeds |
+| 2 | One requirement set | A loose problem rewards broad search, a tight one rewards constraint modelling. The winner can change. | Two requirement sets: loose and tight |
+| 3 | 8/6 only | R7 splits the budget over 4 pole sets. That split is untested. | One overnight run of the winner on all pole sets |
+| 4 | Runs before R5 | The continuous rating is not built yet. | A stand-in continuous rating from `j_limit`. R5's limits are post-processing, so the ranking should hold. Rerun the winner once after R5. |
+| 5 | No scoring rule fixed in advance | A reference point or rule chosen after the results invites bias | Fix the normalisation, the hypervolume reference point (from the requirement minimums) and the decision rule in the spike spec |
+| 6 | Failed evaluations not handled | A design can fail the validator or the mesh, or end in `MapFailed`. A GP arm that keeps proposing such designs wastes maps. | Every arm records failures. Arms B and C model feasibility (a classifier, or a penalty). Wasted maps are a reported metric. |
+| 7 | Different first samples per arm | Adds noise that is not about the method | The same 20 initial LHS designs for B, C and D in each run (common random numbers) |
+| 8 | 150 maps tests neither product budget | Quick mode is about 30 maps, overnight about 250 | Read hypervolume at 30 and 150 maps in the real runs, and at 300 in the replay |
+| 9 | The spike could optimise a different problem from the one R7 ships | Without the gap variable and the stack rescale, the arms search 8 dimensions R7 will not have | Build cost lever 1 (stack rescale) and the gap variable first |
+| 10 | Four arms are more code | More to build and test | B and C share the GP code. D is a pymoo call. |
+| 11 | LattePanda time | The spike competes with R4's leftovers, the Kiyota check and `ANGLE_CONVERGENCE_REL` | Plan it as about 6 nights |
+
+The version to build:
+
+1. **Problem.** 8/6 at the 400 V bus. FE variables: OD, rotor/OD, two pole arcs, two yoke ratios, shaft ratio and air gap (8). Stack length is searched exactly after the map. Objectives: continuous kW/kg (stand-in until R5) and peak kW/kg.
+2. **Requirement sets.** Loose (large feasible region) and tight (an OD cap and high torque).
+3. **Real runs.** 4 arms × 2 requirement sets × 1 seed × 150 `screening` maps. That is 8 runs, about 40 h.
+4. **Confirmation.** The 5 designs that add most hypervolume in each run, at `full`: about 8 to 10 h. Report the hypervolume at `full` and Spearman ρ between `screening` and `full` (rule ρ ≥ 0.95).
+5. **Replay.** Pool the roughly 1200 maps. Fit an emulator of a different model class from the arms' GP (radial-basis interpolation), so it does not favour arms B and C. Run every arm for 20 seeds at budgets of 30, 150 and 300 maps. This takes minutes. The replay estimates spread only. Where it and the real runs disagree, the real runs decide.
+6. **Decision rule.** The winner has the highest median hypervolume at 150 maps on both requirement sets. Arms within the replay spread of each other count as a tie, and a tie goes to the simpler arm (A, D, C, B in rising complexity). Quick mode is judged separately at 30 maps and may use a different arm.
+7. **End-to-end check.** The winner, one overnight run on all 4 pole sets, finalists at `full`: about 11 to 12 h.
+
+Total LattePanda time: about 60 h, about 6 nights. Code in the cloud: the harness (one ask/tell interface, the run log, hypervolume), the four arms, the emulator, with fast tests on an analytic stand-in objective.
 
 ## Sources
 
@@ -119,4 +160,6 @@ Pages were opened on 2026-11-05 or 2026-11-06. "Abstract only" means the abstrac
 - A. Manninen et al., "Impact of topology optimization problem setup on switched reluctance machine design," COMPUMAG 2019, doi 10.1109/COMPUMAG45669.2019.9032826. Abstract only. https://cris.vtt.fi/en/publications/impact-of-topology-optimization-problem-setup-on-switched-relucta/
 - M. Abdalmagid, M. H. Bakr and A. Emadi, "A linesearch-based algorithm for topology and generative optimization of switched reluctance machines," IEEE Trans. Transp. Electrif. 9(3), 2023, pp. 3849–3866, doi 10.1109/TTE.2023.3245992. Abstract only. https://pure.kfupm.edu.sa/en/publications/a-linesearch-based-algorithm-for-topology-and-generative-optimiza/
 - J. Blank and K. Deb, "pymoo: Multi-objective optimization in Python," IEEE Access 8, 2020, pp. 89497–89509. https://arxiv.org/abs/2002.04504
+- N. Beume, B. Naujoks and M. Emmerich, "SMS-EMOA: multiobjective selection based on dominated hypervolume," European Journal of Operational Research 181(3), 2007, pp. 1653–1669, doi 10.1016/j.ejor.2006.08.008. Abstract only. https://econpapers.repec.org/RePEc:eee:ejores:v:181:y:2007:i:3:p:1653-1669
+- pymoo SMS-EMOA documentation and source (`SMSEMOA`, `n_offsprings` default). https://pymoo.org/algorithms/moo/sms.html, https://github.com/anyoptimization/pymoo/blob/main/pymoo/algorithms/moo/sms.py
 - BoTorch repository (MIT licence, Python ≥ 3.11, PyTorch ≥ 2.0.1) and its multi-objective documentation (qLogNEHVI). https://github.com/meta-pytorch/botorch, https://botorch.org/docs/multi_objective

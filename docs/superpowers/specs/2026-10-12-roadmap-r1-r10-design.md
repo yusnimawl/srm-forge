@@ -96,7 +96,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 
 ### R6d — Optimisation research (added 2026-11-04, owner)
 - [x] Literature review of SRM design optimisation: algorithms (NSGA-II/III, differential evolution, PSO, surrogate/Bayesian, multi-fidelity), pole-shape and topology optimisation, coil and winding choice; which suit this tool and which are fastest for a given accuracy (`docs/r6d-optimisation-research.md`, 2026-11-06)
-- [x] A recommendation of the methods R7's spike compares: funnel, NSGA-II/III (pymoo), GP surrogate with qLogNEHVI (BoTorch); stack length rescaled after the map like turns
+- [x] A recommendation of the methods R7's spike compares: the funnel baseline, a GP surrogate with qLogNEHVI (BoTorch), Kriging with NSGA-II on the model, SMS-EMOA (pymoo); stack length rescaled after the map like turns (owner accepted 2026-11-06)
 - Done when: the review is in `docs/` with cited sources and the R7 spike list follows from it.
 
 ### R6e — Web review and polish (added 2026-11-04, owner)
@@ -106,7 +106,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - Done when: the review's must-fix items and the 3D view are merged, checked on desktop and at 375 px.
 
 ### R7 — Decide for me
-- [ ] Spike first: NSGA-III vs surrogate/Bayesian vs the current sample-and-filter funnel, same budget and requirements; pick from the results
+- [ ] Spike first: the current sample-and-filter funnel as the baseline against a GP surrogate with qLogNEHVI, Kriging with NSGA-II on the model, and SMS-EMOA, same budget and requirements; pick from the results (owner, 2026-11-06, replaces NSGA-III; design in `docs/r6d-optimisation-research.md` §6)
 - [ ] Explore at `screening`, confirm finalists at `full` (fidelity rule above)
 - [ ] Ratio `auto`: push motor rpm up until the owner's optional motor rpm cap, rotor stress, electrical frequency or bus voltage limits it (the tool says which one bound); report the ratio and a stage-count hint (rule of thumb, labelled rough); `fixed` uses the given ratio
 - [ ] Air gap as a design variable the optimiser chooses (today `srmapp.sizing.generator` sets it by rule, OD/400 clamped to 0.3–0.8 mm). The limits are user inputs: a minimum buildable gap (machining and assembly) and optionally a maximum; the tool also checks rotor radial growth at max speed (R5 rotor stress) and eccentricity (bearing runout, unbalanced magnetic pull) against the chosen gap and says which limit bound (owner, 2026-11-04)
@@ -140,7 +140,7 @@ Side step before R3 (2026-10-18): UI polish — SRM logo and favicon, motor-shap
 - Losses (iron, copper) before thermal; thermal plan as in R5.
 - Inputs: output-side torque and rpm with ratio `auto` or fixed.
 - Motor only; no gearbox or inverter mass models.
-- NSGA is not assumed; R7 starts with a spike.
+- NSGA is not assumed; R7 starts with a spike. (2026-11-06: the spike arms are set in `docs/r6d-optimisation-research.md` §5 and §6.)
 - Rotor stress is a safety constraint, not an option.
 - End effects are handled before the recommender (R4 before R7).
 - Fabrication package added as R10.
