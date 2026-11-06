@@ -1,4 +1,5 @@
-"""Turns, wire and current chosen after the map (v0a-2 spec §2-3)."""
+"""Turns, wire and current chosen after the map (v0a-2 spec §2-3), and the exact rescales of a map to other turns and
+other stack lengths."""
 import dataclasses
 import math
 from dataclasses import dataclass
@@ -22,6 +23,26 @@ def rescale_turns(result: MapResult, k: float) -> MapResult:
         raise ValueError(f"turn ratio k must be positive, got {k}")
     return dataclasses.replace(result, currents=result.currents / k, psi=result.psi * k,
                                l_inc=result.l_inc * (k * k))
+
+
+def rescale_stack(result: MapResult, k: float) -> MapResult:
+    """The 2D map of the same cross-section with k times the stack length. The solver works per unit depth, so the
+    field, the flux density and the axes are unchanged, and every quantity integrated over the depth (flux
+    linkage, torque, energy, coenergy, L_inc, pole forces) scales by k. The end winding is not part of a 2D map:
+    add it after the rescale, for the target machine. `design_hash` still names the design that was solved."""
+    if not (k > 0 and math.isfinite(k)):
+        raise ValueError(f"stack ratio k must be positive and finite, got {k}")
+    return dataclasses.replace(result, psi=result.psi * k, torque_arkkio=result.torque_arkkio * k,
+                               torque_virtual_work=result.torque_virtual_work * k, energy=result.energy * k,
+                               coenergy=result.coenergy * k, l_inc=result.l_inc * k,
+                               pole_force=result.pole_force * k)
+
+
+def restack(result: MapResult, mapped: RadialSRMParams, target: RadialSRMParams) -> MapResult:
+    """The map of `mapped` rescaled to `target`, a machine that differs from it only in `stack_length`."""
+    if mapped.model_dump(exclude={"stack_length"}) != target.model_dump(exclude={"stack_length"}):
+        raise ValueError("restack needs machines that differ only in stack_length")
+    return rescale_stack(result, target.stack_length / mapped.stack_length)
 
 
 def speed_grid(req: Requirements, n: int = 12) -> np.ndarray:
