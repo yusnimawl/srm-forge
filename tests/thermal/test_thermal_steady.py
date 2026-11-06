@@ -53,7 +53,8 @@ def test_slab_uniform_heat_robin_ends():
     err = np.abs(t.field - exact)[centre].max() / scale
     print("slab centre row", err, "all nodes", np.abs(t.field - exact).max() / scale)
     assert err < 1e-9
-    assert np.abs(t.field - exact).max() / scale < 5e-3
+    cols = (t.field - exact).reshape(21, 3).mean(axis=1)
+    assert np.abs(cols).max() / scale < 1e-9
 
 
 def test_annulus_uniform_heat():
@@ -176,3 +177,58 @@ def test_unknown_lump_refused():
         ThermalSolver(problem(dom, lumps=[Lump("a")], links=[LumpLink("a", "a", -1.0)]))
     with pytest.raises(ThermalModelError):
         ThermalSolver(problem(dom, k=-1.0))
+
+
+def test_orphan_lump_named():
+    dom = domain(*rect(1, 1, 1, 1))
+    sol = ThermalSolver(problem(dom, lumps=[Lump("f", fixed_c=0.0), Lump("orphan")],
+                                links=[AreaLink(np.arange(2), "f", 1.0)]))
+    with pytest.raises(ThermalModelError, match="orphan"):
+        sol.steady(uniform(1.0, 2))
+
+
+def test_unconverged_iteration_raises():
+    p0, alpha, tf = 10.0, 0.004, 20.0
+    sol = lone_triangle_case(0.5)
+    with pytest.raises(ThermalRunaway, match="iterations"):
+        sol.steady(lambda prev: ThermalLoad(np.zeros(2), {"x": p0 * (1 + alpha * (prev.lumps["x"] if prev else tf))}),
+                   tol_k=1e-9, max_iter=3)
+
+
+@pytest.mark.parametrize("depth", [0.05, 0.2])
+def test_area_link_block(depth):
+    nodes, tri = rect(0.1, 0.05, 5, 3)
+    dom = domain(nodes, tri)
+    q, g, tf = 2e5, 700.0, 30.0
+    sol = ThermalSolver(problem(dom, 5.0, depth, [Lump("f", fixed_c=tf)], [AreaLink(np.arange(len(tri)), "f", g)]))
+    t = sol.steady(uniform(q, len(tri)))
+    assert np.abs(t.field - (tf + q * depth / g)).max() < 1e-9
+
+
+def test_link_quadratic_form_matches_exact_integrals():
+    # T = 3 + 2x - y on the lump side L = 5: int h (T - L)^2 over the link, exact by hand per element/edge
+    nodes, tri = rect(0.3, 0.2, 3, 2)
+    dom = domain(nodes, tri)
+    t_nodes = 3 + 2 * nodes[:, 0] - nodes[:, 1]
+    lump_c = 5.0
+    edges = np.array([[0, 1], [1, 2]])
+    cases = [(AreaLink(np.arange(len(tri)), "l", 7.0), 1.0, None), (EdgeLink(edges, "l", 7.0), 0.4, edges)]
+    for link, depth, e in cases:
+        sol = ThermalSolver(problem(dom, 1.0, depth, [Lump("l")], [link]))
+        # remove conduction: quadratic form of the link alone = full form - conduction form
+        cond = ThermalSolver(problem(dom, 1.0, depth, [Lump("l")], [LumpLink("l", "l", 1e-30)]))
+        x = np.concatenate([t_nodes, [lump_c]])
+        got = x @ (sol._a - cond._a) @ x
+        if e is None:
+            p = nodes[tri]
+            area = 0.5 * np.abs((p[:, 1, 0] - p[:, 0, 0]) * (p[:, 2, 1] - p[:, 0, 1])
+                                - (p[:, 1, 1] - p[:, 0, 1]) * (p[:, 2, 0] - p[:, 0, 0]))
+            tt = t_nodes[tri]
+            # int (T-L)^2 for linear T = A (mean(d)^2 + var-term): A/12 (sum d_i^2 + (sum d_i)^2)
+            d = tt - lump_c
+            want = 7.0 * (area / 12 * ((d ** 2).sum(1) + d.sum(1) ** 2)).sum()
+        else:
+            d = t_nodes[e] - lump_c
+            length = np.hypot(*(nodes[e[:, 1]] - nodes[e[:, 0]]).T)
+            want = 7.0 * depth * (length / 3 * (d[:, 0] ** 2 + d[:, 0] * d[:, 1] + d[:, 1] ** 2)).sum()
+        assert got == pytest.approx(want, rel=1e-9)

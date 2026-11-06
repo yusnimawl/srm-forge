@@ -101,8 +101,6 @@ class ThermalSolver:
         ns = len(d.stator_elements)
         for c in sorted(set(label) - anchored):
             members = np.flatnonzero(label == c)
-            if len(members) == 1 and a[members[0], members[0]] == 0:
-                continue
             if np.isin(members, np.unique(d.triangles[:ns])).any():
                 what = "stator"
             elif (members < n).any():
@@ -136,24 +134,18 @@ class ThermalSolver:
 
     def steady(self, load: LoadFn, tol_k: float = 0.01, max_iter: int = 50) -> Temperatures:
         self._factorise()
-        prev, last_change = None, np.inf
+        prev = None
         for _ in range(max_iter):
             b = self._rhs(load(prev))[self._free] - self._a_fix @ self._t_fixed
             t = self._unpack(self._lu.solve(b))
             peak = max(t.field.max(), *t.lumps.values()) if t.lumps else t.field.max()
             if not peak < RUNAWAY_C:
                 raise ThermalRunaway(f"temperature passed {RUNAWAY_C:g} degC")
-            if prev is None:
-                change = np.inf
-            else:
-                change = max(np.abs(t.field - prev.field).max(),
-                             *(abs(v - prev.lumps[k]) for k, v in t.lumps.items()), 0.0)
-                if change < tol_k:
-                    return t
-            if prev is not None and change >= last_change:
-                raise ThermalRunaway("thermal iteration is not converging")
-            prev, last_change = t, change
-        return t
+            if prev is not None and max(np.abs(t.field - prev.field).max(),
+                                        *(abs(v - prev.lumps[k]) for k, v in t.lumps.items()), 0.0) < tol_k:
+                return t
+            prev = t
+        raise ThermalRunaway(f"no steady state within {max_iter} iterations")
 
     def heat_to_fixed(self, t: Temperatures) -> dict[str, float]:
         x = np.concatenate([t.field, [t.lumps[nm] for nm in self._names]])
