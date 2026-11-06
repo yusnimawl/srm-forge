@@ -10,12 +10,13 @@ from ..model.design import Design
 
 
 def material_digest(raw: bytes) -> str:
-    """Digest of a material record's content; line endings and key order do not matter. The `loss` block is
-    left out: iron-loss data cannot change a magnetostatic map, so editing it never changes a design hash or a
-    cache key, and a material without a loss block hashes as it always did."""
+    """Digest of a material record's content; line endings and key order do not matter. The `loss`, `thermal` and
+    `mechanical` blocks are left out: none of them can change a magnetostatic map, so editing them never changes
+    a design hash or a cache key, and a material without them hashes as it always did."""
     record = json.loads(raw)
     if isinstance(record, dict):
-        record.pop("loss", None)
+        for block in ("loss", "thermal", "mechanical"):
+            record.pop(block, None)
     return hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
 
 
