@@ -53,7 +53,22 @@ def test_thermal_growth_cancels_for_equal_temperature_and_alpha():
     assert c.rotor_thermal == pytest.approx(ALPHA * dt * 0.04, rel=1e-12)
     assert c.stator_thermal == pytest.approx(ALPHA * dt * 0.0404, rel=1e-12)
     assert c.rotor_thermal - c.stator_thermal == pytest.approx(-3.84e-7, rel=1e-9)
-    assert c.closure == pytest.approx(c.centrifugal - 3.84e-7, rel=1e-9)
+
+
+def test_closure_at_speed_adds_centrifugal_and_thermal_difference():
+    assert _closure().closure == pytest.approx(3.089841e-6 - 3.84e-7, rel=1e-6)
+
+
+def test_thermal_terms_use_own_temperature_and_reference():
+    c = gap_closure(P, RHO, MECH, ALPHA, ALPHA, 20000.0, 150.0, 80.0, reference_c=30.0)
+    assert c.rotor_thermal == pytest.approx(1.2e-5 * 120 * 0.04, rel=1e-12)   # 5.76e-5 m
+    assert c.stator_thermal == pytest.approx(1.2e-5 * 50 * 0.0404, rel=1e-12)   # 2.424e-5 m
+
+
+def test_tapered_pole_centrifugal_literal():
+    # the pole narrows towards the tip, so the width moment differs from the untapered case
+    c = _closure(make_8_6(rotor_pole_taper=0.1))
+    assert c.centrifugal == pytest.approx(3.2025618e-6, rel=1e-6)
 
 
 def test_growth_scales_with_speed_squared():
