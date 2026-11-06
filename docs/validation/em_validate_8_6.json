@@ -5,8 +5,8 @@
   "stator": "C",
   "rotor": "C"
  },
- "map_s": 708.1123753369975,
- "validate_s": 284.84057278500404,
+ "map_s": 699.6402926660012,
+ "validate_s": 286.6557346280024,
  "checks": [
   {
    "name": "engine_version",
@@ -159,11 +159,21 @@
      "psi_max": 0.0
     },
     "note": "digitised B-H curve"
+   },
+   {
+    "source": "measured_lu",
+    "rel": {
+     "la": 0.0,
+     "lu": 0.3112947658402204,
+     "peak_torque": 0.0,
+     "psi_max": 0.0
+    },
+    "note": "measured gap, not a modelled effect: model high by 45.2 % of measured in Lu (Krishnan 6/4, 1 A)"
    }
   ],
   "total": {
    "la": 0.3098220082262091,
-   "lu": 0.10975715599351697,
+   "lu": 0.4210519218337374,
    "peak_torque": 0.33881891345197596,
    "psi_max": 0.3099276188563143
   }
