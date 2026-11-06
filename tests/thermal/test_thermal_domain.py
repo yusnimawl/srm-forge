@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pytest
 from conftest import make_8_6
@@ -6,7 +8,8 @@ from srmcore.maps.end_winding import coil_geometry
 from srmcore.mesh.static import build_static_mesh
 from srmcore.model.design import Design, MeshSettings
 from srmcore.thermal.domain import EXCLUDED_REGIONS, thermal_domain
-from srmcore.topology.imported import parametric_iron
+from srmcore.model.iron import IronArc
+from srmcore.topology.imported import _canonical, parametric_iron, to_segments
 
 
 def _areas(nodes, tri):
@@ -16,7 +19,7 @@ def _areas(nodes, tri):
 
 
 def _build(machine, **mesh):
-    static = build_static_mesh(Design(machine=machine, mesh=MeshSettings(**mesh)))
+    static = build_static_mesh(Design(machine=machine, mesh=MeshSettings(preset="screening", **mesh)))
     return static, thermal_domain(static, machine)
 
 
@@ -92,12 +95,34 @@ def test_slot_centre_is_not_liner(case):
     assert all((dom.element_kind[v] == "coil").all() for v in dom.coil_elements.values())
 
 
+def _hole(r, angle, size):
+    cx, cy = r * math.cos(angle), r * math.sin(angle)
+    pts = [(cx + size * math.cos(a), cy + size * math.sin(a)) for a in (0, math.pi / 2, math.pi, 3 * math.pi / 2)]
+    return tuple(IronArc(start=pts[i], end=pts[(i + 1) % 4], center=(cx, cy)) for i in range(4))
+
+
 def test_imported_iron_builds():
     machine = make_8_6()
-    machine = machine.model_copy(update={"iron": parametric_iron(machine)})
+    canon = lambda loop: _canonical(list(to_segments(loop)), machine)  # noqa: E731
+    r_s = (machine.stator_yoke_inner_radius + machine.stator_outer_radius) / 2
+    r_r = (machine.shaft_radius + machine.rotor_yoke_outer_radius) / 2
+    iron = parametric_iron(machine).model_copy(update={
+        "stator_holes": tuple(canon(_hole(r_s, 2 * math.pi * k / 8, 1e-3)) for k in range(8)),
+        "rotor_holes": tuple(canon(_hole(r_r, 2 * math.pi * k / 6, 1e-3)) for k in range(6))})
+    machine = machine.model_copy(update={"iron": iron})
     static, dom = _build(machine)
     assert {"stator_iron", "rotor_iron", "shaft", "coil", "liner"} <= set(dom.element_kind)
     assert len(dom.outer_edges) > 0 and len(dom.rotor_edges) > 0
+    names = np.array(static.region_names)
+    for part, rows in ((static.stator, dom.stator_elements), (static.rotor, dom.rotor_elements)):
+        hole = np.isin(names[part.region_ids], ["stator_hole_air", "rotor_hole_air"])
+        assert hole.any()
+        assert np.isin(np.flatnonzero(hole), rows).all()
+    kept_names = np.concatenate([names[static.stator.region_ids[dom.stator_elements]],
+                                 names[static.rotor.region_ids[dom.rotor_elements]]])
+    for n in ("stator_hole_air", "rotor_hole_air"):
+        assert (kept_names == n).any()
+        assert (dom.element_kind[kept_names == n] == "air").all()
 
 
 def test_outer_air_design_keeps_outer_edges(case):
