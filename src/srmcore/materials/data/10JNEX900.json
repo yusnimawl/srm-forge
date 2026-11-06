@@ -83,5 +83,31 @@
     "thickness": 0.0001,
     "conductivity": 1219512.1951219512,
     "conductivity_source": "JFE f1e-002 p. 5 sample characteristics table, specific resistance 0.82 uOhm m (grade A, typical in-house value)"
+  },
+  "thermal": {
+    "conductivity": 18.6,
+    "provenance": {
+      "source": "Ou et al., IEEE Trans. Ind. Appl. 57(1), 2021, accepted manuscript, Table I (quoting their refs. [22], [27], [28], not tested by them); see docs/r5-sources.md",
+      "page": "manuscript p. 2, Table I",
+      "date": "2026-11-07",
+      "typical": true
+    },
+    "confidence": "C",
+    "temperature_c": 20.0
+  },
+  "mechanical": {
+    "youngs_modulus": 200000000000.0,
+    "poisson_ratio": 0.33,
+    "yield_strength": 570000000.0,
+    "provenance": {
+      "source": "Ou et al., IEEE Trans. Ind. Appl. 57(1), 2021, accepted manuscript: yield 570 MPa tested on two samples (Fig. 13, p. 5, test temperature and cutting method not stated); E 200-210 GPa (lower end used) and Poisson ratio 0.33 from Table I (p. 2, secondary); see docs/r5-sources.md",
+      "page": "manuscript pp. 2 and 5",
+      "date": "2026-11-07",
+      "method": "tensile test of two samples (strength); published table (E, Poisson ratio)"
+    },
+    "brittle": false,
+    "confidence": "C",
+    "strength_confidence": "B",
+    "temperature_c": 20.0
   }
 }

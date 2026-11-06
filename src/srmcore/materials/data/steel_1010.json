@@ -18,5 +18,33 @@
   "saturation_polarisation_source": "PROVISIONAL: low-carbon steel, somewhat below pure iron's 2.15 T (Bozorth, Ferromagnetism, 1951); the FEMM tail is flat at J = 2.073 T so the value barely matters (spec §10)",
   "density": 7870.0,
   "density_source": "PROVISIONAL: typical carbon-steel value (ASM Handbook), not yet checked (spec §10)",
-  "provisional_fields": ["saturation_polarisation", "density"]
+  "provisional_fields": ["saturation_polarisation", "density"],
+  "thermal": {
+    "conductivity": 49.8,
+    "specific_heat": 448.0,
+    "expansion": 1.22e-05,
+    "provenance": {
+      "source": "Elgin Fasteners data sheet, Carbon Steel Grade 1010 (AISI 1010, cold drawn, MatWeb-style table): k 49.8 W/m K 'typical steel', c 0.448 J/g C quoted for >= 100 degC with condition unknown, expansion 12.2 um/m C over 0-100 degC; see docs/r5-sources.md",
+      "page": "PDF pp. 2-3",
+      "date": "2026-11-07",
+      "typical": true
+    },
+    "confidence": "C",
+    "temperature_c": 20.0
+  },
+  "mechanical": {
+    "youngs_modulus": 205000000000.0,
+    "poisson_ratio": 0.29,
+    "yield_strength": 305000000.0,
+    "provenance": {
+      "source": "Elgin Fasteners data sheet, Carbon Steel Grade 1010, cold drawn: E 205 GPa and Poisson ratio 0.29 'typical for steel', yield 305 MPa (cold drawn; the library steel is a magnetic FEMM curve of unknown condition); see docs/r5-sources.md",
+      "page": "PDF pp. 1-2",
+      "date": "2026-11-07",
+      "typical": true
+    },
+    "brittle": false,
+    "confidence": "C",
+    "strength_confidence": "C",
+    "temperature_c": 20.0
+  }
 }

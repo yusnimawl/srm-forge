@@ -9,5 +9,18 @@
   "reference_temperature_c": 20.0,
   "temperature_coefficient": 0.00393,
   "density": 8890.0,
-  "density_source": "IEC 60028 International Annealed Copper Standard (8890 kg/m3)"
+  "density_source": "IEC 60028 International Annealed Copper Standard (8890 kg/m3)",
+  "thermal": {
+    "conductivity": 391.1,
+    "specific_heat": 385.2,
+    "expansion": 1.692e-05,
+    "provenance": {
+      "source": "National Bronze Manufacturing, C11000 (ETP) data sheet, Physical Properties, quoting the Copper Development Association values: 226 Btu ft/(hr ft2 F), 0.092 Btu/lb/F, 9.40e-6 per F (68-212 F), converted to SI; see docs/r5-sources.md",
+      "page": "PDF p. 2",
+      "date": "2026-11-07",
+      "typical": true
+    },
+    "confidence": "B",
+    "temperature_c": 20.0
+  }
 }
