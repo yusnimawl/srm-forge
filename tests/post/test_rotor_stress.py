@@ -107,7 +107,21 @@ def test_safety_factor_is_strength_over_governing_stress():
                                           / (2 * pole_half_width(P, P.rotor_yoke_outer_radius)))
 
 
+def test_bore_governs_with_a_large_fillet():
+    m = make_8_6(rotor_fillet_radius=0.002)
+    s = rotor_stress(m, RHO, MECH, 20000)
+    assert s.bore_stress > s.root_stress and s.governing == "bore"
+    assert s.safety_factor == pytest.approx(s.usable_strength / s.bore_stress)
+    assert s.safety_factor == pytest.approx(8.65, abs=0.01)
+
+
+def test_spec_constants():
+    assert OVERSPEED == 1.2 and SAFETY_FACTOR == 1.5
+    assert rotor_stress(P, RHO, MECH, 20000).check_speed_rpm == pytest.approx(24000)
+
+
 def test_grade_b_lowers_strength():
+    assert rotor_stress(P, RHO, _mech(strength_confidence="C"), 20000).usable_strength == pytest.approx(300e6 * 0.90)
     s = rotor_stress(P, RHO, _mech(strength_confidence="B"), 20000)
     assert s.usable_strength == pytest.approx(300e6 * 0.97)
     assert rotor_stress(P, RHO, MECH, 20000).usable_strength == pytest.approx(570e6 * 0.97)
