@@ -1,4 +1,5 @@
 """Steady thermal solve: P1 conduction in the domain coupled to lumps, one sparse factorisation reused per iteration."""
+from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
@@ -11,6 +12,19 @@ from .model import (AreaLink, EdgeLink, LumpLink, Temperatures, ThermalLoad, The
 
 RUNAWAY_C = 1000.0
 LoadFn = Callable[[Temperatures | None], ThermalLoad]
+
+
+@dataclass(frozen=True)
+class HotSpot:
+    temperature_c: float
+    location: str          # coil region name or lump name
+
+
+@dataclass(frozen=True)
+class Transient:
+    times_s: np.ndarray        # (n + 1,)
+    hot_spot_c: np.ndarray     # (n + 1,)
+    final: Temperatures
 
 
 def _areas_and_gradients(nodes: np.ndarray, tri: np.ndarray):
@@ -93,7 +107,8 @@ class ThermalSolver:
             raise ThermalModelError(f"unknown lump {name!r}")
         return self._index[name]
 
-    def _check_anchored(self):
+    def _check_anchored(self, capacity: np.ndarray | None = None):
+        """Every part needs a path to a fixed lump; with a capacity vector (transient) a part holding capacity is exempt."""
         a = self._a
         _, label = connected_components(abs(a) > 0, directed=False)
         anchored = set(label[self._fixed])
@@ -101,6 +116,8 @@ class ThermalSolver:
         ns = len(d.stator_elements)
         for c in sorted(set(label) - anchored):
             members = np.flatnonzero(label == c)
+            if capacity is not None and capacity[members].sum() > 0:
+                continue
             if np.isin(members, np.unique(d.triangles[:ns])).any():
                 what = "stator"
             elif (members < n).any():
@@ -151,3 +168,47 @@ class ThermalSolver:
         x = np.concatenate([t.field, [t.lumps[nm] for nm in self._names]])
         out = self._a[self._fixed] @ x
         return {self._names[i - self._n]: float(-v) for i, v in zip(self._fixed, out)}
+
+    def _capacity(self) -> np.ndarray:
+        d, p = self.problem.domain, self.problem
+        c = np.zeros(self._a.shape[0])
+        np.add.at(c, d.triangles, np.repeat((p.capacity * self._area * p.depth / 3)[:, None], 3, 1))
+        c[self._n:] = [lump.capacity for lump in p.lumps]
+        return c
+
+    def _has_hot_spot(self) -> bool:
+        return bool(self.problem.domain.coil_elements) or any(lump.hot_spot for lump in self.problem.lumps)
+
+    def hot_spot(self, t: Temperatures) -> HotSpot:
+        d = self.problem.domain
+        found = {name: float(t.field[np.unique(d.triangles[el])].max()) for name, el in d.coil_elements.items()}
+        found.update({lump.name: t.lumps[lump.name] for lump in self.problem.lumps if lump.hot_spot})
+        if not found:
+            raise ThermalModelError("no coil elements or hot spot lumps: the hot spot is undefined")
+        name = max(found, key=found.get)
+        return HotSpot(found[name], name)
+
+    def transient(self, start: Temperatures, load: LoadFn, duration_s: float, n_steps: int = 200) -> Transient:
+        """Backward Euler with lumped capacity; the load is evaluated at the previous step's temperatures."""
+        if not duration_s > 0:
+            raise ThermalModelError("duration must be positive")
+        if n_steps < 1:
+            raise ThermalModelError("n_steps must be at least 1")
+        cap = self._capacity()
+        self._check_anchored(cap)
+        dt = duration_s / n_steps
+        free, fixed = self._free, self._fixed
+        c_dt = cap[free] / dt
+        lu = splu((self._a[free][:, free] + sp.diags(c_dt)).tocsc())
+        a_fix = self._a[free][:, fixed] @ self._t_fixed
+        x = np.concatenate([start.field, [start.lumps[nm] for nm in self._names]])[free]
+        t = self._unpack(x)
+        trace = [self.hot_spot(t).temperature_c] if self._has_hot_spot() else [np.nan]
+        for _ in range(n_steps):
+            x = lu.solve(self._rhs(load(t))[free] - a_fix + c_dt * x)
+            t = self._unpack(x)
+            peak = max(t.field.max(), *t.lumps.values()) if t.lumps else t.field.max()
+            if not peak < RUNAWAY_C:
+                raise ThermalRunaway(f"temperature passed {RUNAWAY_C:g} degC")
+            trace.append(self.hot_spot(t).temperature_c if self._has_hot_spot() else np.nan)
+        return Transient(np.linspace(0.0, duration_s, n_steps + 1), np.array(trace), t)
