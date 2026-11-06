@@ -177,7 +177,7 @@ def test_budget_rows_sum_and_use_the_corrected_values(monkeypatch):
     r = _map()
     v = V.em_validate(DESIGN, r)
     b = v.budget
-    assert [row.source for row in b.rows] == ["mesh", "material", "end_effect", "digitisation"]
+    assert [row.source for row in b.rows] == ["mesh", "material", "end_effect", "digitisation", "measured_lu"]
     for k in V.KEYS:
         assert b.total[k] == pytest.approx(sum(row.rel[k] for row in b.rows))
     key = key_numbers(r, DESIGN.machine)
@@ -199,6 +199,19 @@ def test_budget_rows_sum_and_use_the_corrected_values(monkeypatch):
     assert end.rel["lu"] == pytest.approx(half / b.values["lu"])
     assert end.rel["psi_max"] == pytest.approx(half * key.i_max / b.values["psi_max"] + gap["psi_max"])
     assert "Krishnan" in end.note and "TEAM 24" in end.note
+
+
+def test_measured_lu_row_is_on_lu_only_and_traces_to_krishnan(monkeypatch):
+    import json
+    from pathlib import Path
+    _patch(monkeypatch)
+    row = next(r for r in V.em_validate(DESIGN, _map()).budget.rows if r.source == "measured_lu")
+    assert row.rel["lu"] == pytest.approx(0.452 / 1.452)
+    assert all(row.rel[k] == 0.0 for k in V.KEYS if k != "lu")
+    assert "Krishnan" in row.note
+    rows = json.loads((Path(__file__).resolve().parents[2] / "docs/validation/krishnan_6_4.json").read_text())["rows"]
+    at_1a = next(r["error_after_pct"] for r in rows if r["quantity"] == "Lu" and r["current"] == 1.0)
+    assert V.MEASURED_LU_GAP == pytest.approx(at_1a / 100, abs=5e-4)
 
 
 def test_measured_gap_is_the_larger_residual():

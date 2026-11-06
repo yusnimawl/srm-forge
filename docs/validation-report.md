@@ -105,7 +105,7 @@ srmcore 0.7.0.
 
 ## EM validation (8/6 full)
 
-Engine 0.7.0, label: 2D-verified, grades {'stator': 'C', 'rotor': 'C'}, map 708 s, validation 285 s.
+Engine 0.7.0, label: 2D-verified, grades {'stator': 'C', 'rotor': 'C'}, map 700 s, validation 287 s.
 
 | Check | Status | Value | Limit | Detail |
 |---|---|---|---|---|
@@ -133,7 +133,8 @@ Uncertainty budget (worst case, % of the corrected value):
 | material | 9.96 | 9.65 | 10.00 | 9.92 |
 | end_effect | 20.90 | 1.16 | 23.76 | 21.04 |
 | digitisation | 0.00 | 0.00 | 0.00 | 0.00 |
-| **total** | **30.98** | **10.98** | **33.88** | **30.99** |
+| measured_lu | 0.00 | 31.13 | 0.00 | 0.00 |
+| **total** | **30.98** | **42.11** | **33.88** | **30.99** |
 
 ![budget](validation/budget.png)
 
