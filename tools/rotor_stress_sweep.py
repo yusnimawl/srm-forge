@@ -27,7 +27,7 @@ SHAFT = (0.25, 0.45)          # shaft diameter / rotor diameter
 ARC = (1.0, 1.7)              # rotor pole arc / Lawrenson limit 2 pi / (m Nr)
 YOKE = (0.5, 1.15)            # yoke thickness / tip chord
 TAPER = (-5.0, 10.0)          # degrees
-FILLET = (0.01, 0.3)          # fillet radius / pole width at the root, log-uniform
+FILLET = (0.015, 0.3)         # fillet radius / pole width at the root, log-uniform
 LEVELS = (20, 40, 80)         # fillet radius / element size
 
 

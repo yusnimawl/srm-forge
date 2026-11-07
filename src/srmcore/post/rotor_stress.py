@@ -31,7 +31,7 @@ _FIT_SHAFT = (0.25, 0.45)       # shaft diameter / rotor diameter
 _FIT_ARC = (1.0, 1.7)           # pole arc / Lawrenson limit 2 pi / (m Nr)
 _FIT_YOKE = (0.5, 1.15)         # yoke thickness / pole tip chord
 _FIT_TAPER = (-5.0, 10.0)       # degrees
-_FIT_FILLET = (0.01, 0.3)       # fillet radius / pole width at the root
+_FIT_FILLET = (0.015, 0.3)      # fillet radius / pole width at the root
 _FIT_MIN_SPAN = 0.1             # free ring half span / half pitch
 _GAUSS = np.polynomial.legendre.leggauss(32)
 
