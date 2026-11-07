@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from conftest import make_12_8, make_8_6
-from rotor_elastic_fe import elastic_fe_mesh, rotor_elastic_fe
+from rotor_elastic_fe import elastic_fe_mesh, rotor_elastic_fe, rotor_sector_fe, sector_fe
 from srmcore.materials.library import load_material
 from srmcore.mesh.static import build_static_mesh
 from srmcore.model.design import Design, MeshSettings
@@ -30,6 +30,28 @@ def test_fe_annulus_against_closed_form():
     hoop = RHO * OMEGA**2 / 4 * ((3 + NU) * b**2 + (1 - NU) * a**2)
     assert fe.bore_peak == pytest.approx(hoop, rel=0.01)
     assert fe.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=0.01)
+
+
+def test_sector_fe_annulus_against_closed_form():
+    a, b, half = 0.02, 0.05, math.pi / 6
+    c, s = math.cos(half), math.sin(half)
+    origin = (0.0, 0.0)
+    curves = [("line", (a, 0.0), (b, 0.0), "cut"), ("arc", (b, 0.0), (b * c, b * s), origin, "rim"),
+              ("line", (b * c, b * s), (a * c, a * s), "cut"), ("arc", (a * c, a * s), (a, 0.0), origin, "bore")]
+    sizes = {name: (5e-4, 0.25) for name in ("cut", "rim", "bore")}
+    fe = sector_fe(curves, sizes, half, a, b, RHO, E, NU, OMEGA)
+    hoop = RHO * OMEGA**2 / 4 * ((3 + NU) * b**2 + (1 - NU) * a**2)
+    assert fe.bore_peak == pytest.approx(hoop, rel=1e-4)
+    assert fe.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=1e-4)
+
+
+def test_sector_fe_matches_the_whole_rotor():
+    machine = make_8_6()
+    static = build_static_mesh(Design(machine=machine, mesh=MeshSettings(preset="screening")))
+    whole = rotor_elastic_fe(static, RHO, E, NU, OMEGA, machine)
+    sector = rotor_sector_fe(machine, RHO, E, NU, OMEGA)
+    assert sector.bore_peak == pytest.approx(whole.bore_peak, rel=0.03)
+    assert sector.tip_displacement == pytest.approx(whole.tip_displacement, rel=0.01)
 
 
 @pytest.mark.slow
