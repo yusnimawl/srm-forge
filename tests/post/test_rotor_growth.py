@@ -37,14 +37,14 @@ def test_uniform_pole_elongation():
     expected = RHO * omega**2 / 200e9 * (R**2 * (R - b) / 2 - (R**3 - b**3) / 6)
     w = 2 * R * math.sin(P.rotor_pole_arc / 2)
     rim = P.n_rotor_poles * RHO * omega**2 * (w / 2) * (R**2 - b**2) / (2 * math.pi * b)
-    disc = _disc_rim_displacement(P.shaft_radius, b, RHO, omega, 0.33, 200e9, rim)
+    disc = _disc_rim_displacement(P.shaft_radius, b, RHO, omega, 0.33, 200e9, rim * 0.9675336390)
     assert _closure().centrifugal - disc == pytest.approx(expected, rel=1e-6)
 
 
 def test_end_to_end_centrifugal_literal():
-    # 8/6, 10JNEX900, 20 000 r/min: disc 2.18502e-6 m plus pole 9.04822e-7 m, solved separately by Lame
-    # coefficients and quadrature
-    assert _closure().centrifugal == pytest.approx(3.089841e-6, rel=1e-6)
+    # 8/6, 10JNEX900, 20 000 r/min: disc 2.13336e-6 m (rim load x 0.96753) plus pole 9.04822e-7 m, solved
+    # separately by Lame coefficients and quadrature
+    assert _closure().centrifugal == pytest.approx(3.038182e-6, rel=1e-6)
 
 
 def test_thermal_growth_cancels_for_equal_temperature_and_alpha():
@@ -56,7 +56,7 @@ def test_thermal_growth_cancels_for_equal_temperature_and_alpha():
 
 
 def test_closure_at_speed_adds_centrifugal_and_thermal_difference():
-    assert _closure().closure == pytest.approx(3.089841e-6 - 3.84e-7, rel=1e-6)
+    assert _closure().closure == pytest.approx(3.038182e-6 - 3.84e-7, rel=1e-6)
 
 
 def test_thermal_terms_use_own_temperature_and_reference():
@@ -68,7 +68,7 @@ def test_thermal_terms_use_own_temperature_and_reference():
 def test_tapered_pole_centrifugal_literal():
     # the pole narrows towards the tip, so the width moment differs from the untapered case
     c = _closure(make_8_6(rotor_pole_taper=0.1))
-    assert c.centrifugal == pytest.approx(3.2025618e-6, rel=1e-6)
+    assert c.centrifugal == pytest.approx(3.1303339e-6, rel=1e-6)
 
 
 def test_growth_scales_with_speed_squared():
@@ -80,7 +80,7 @@ def test_growth_scales_with_speed_squared():
 def test_missing_expansion_keeps_centrifugal(rotor_exp, stator_exp, missing):
     c = _closure(rotor_exp=rotor_exp, stator_exp=stator_exp)
     assert c.closure is None
-    assert c.centrifugal == pytest.approx(3.089841e-6, rel=1e-6)
+    assert c.centrifugal == pytest.approx(3.038182e-6, rel=1e-6)
     assert (c.rotor_thermal is None) == (rotor_exp is None)
     assert (c.stator_thermal is None) == (stator_exp is None)
     assert missing in c.note

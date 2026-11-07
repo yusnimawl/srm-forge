@@ -3,6 +3,7 @@ import math
 
 import numpy as np
 import pytest
+from scipy.optimize import brentq
 
 from conftest import make_8_6
 from srmcore.materials.library import load_material
@@ -52,13 +53,68 @@ def test_pole_force_matches_the_mesh(taper):
     assert pole_force_per_depth(machine, RHO, OMEGA) == pytest.approx(from_mesh, rel=0.01)
 
 
-def test_bore_hoop_formula():
+def test_bore_is_annulus_plus_relieved_rim_load_plus_ring_bending():
+    # docs/r5-sources.md section 5 evaluated by a separate script: relief 0.967534, inner fibre 1.285504 MPa
     nu = MECH.poisson_ratio
     a, b, n = P.shaft_radius, P.rotor_yoke_outer_radius, P.n_rotor_poles
-    f = pole_force_per_depth(P, RHO, OMEGA)
-    p = n * f / (2 * math.pi * b)
-    expected = RHO * OMEGA**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * p
-    assert rotor_stress(P, RHO, MECH, 20000).bore_stress == pytest.approx(expected, rel=1e-12)
+    p = n * pole_force_per_depth(P, RHO, OMEGA) / (2 * math.pi * b)
+    expected = (RHO * OMEGA**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * p * 0.9675336390
+                + 1.97 * 1.2855043102e6)
+    assert rotor_stress(P, RHO, MECH, 20000).bore_stress == pytest.approx(expected, rel=1e-9)
+    assert rotor_stress(P, RHO, MECH, 20000).bore_stress == pytest.approx(65050119.38, rel=1e-8)
+
+
+def test_rim_relief():
+    assert rs._rim_relief(P) == pytest.approx(0.9675336390, rel=1e-9)
+
+
+def test_ring_bending_of_the_8_6():
+    # separate script: half span 0.146581 rad, Winkler-Bach fibres of a 12 mm ring on a 16 mm mean radius
+    assert rs._ring_half_span(P) == pytest.approx(0.14658054598, rel=1e-9)
+    inner, outer = rs._ring_bending(P, pole_force_per_depth(P, RHO, OMEGA))
+    assert inner == pytest.approx(1285504.3102, rel=1e-8)
+    assert outer == pytest.approx(1516467.6993, rel=1e-8)
+
+
+def test_ring_bending_point_load_limit():
+    # a pole of almost no width: the ring moment between equal radial point loads, M = (W R / 2)(1/sin a - 1/a)
+    m = make_8_6(rotor_pole_arc=1e-7, rotor_fillet_radius=0.0)
+    a, b, alpha = m.shaft_radius, m.rotor_yoke_outer_radius, math.pi / m.n_rotor_poles
+    t, mean = b - a, (a + b) / 2
+    neutral = t / math.log(b / a)
+    moment = 1.0 * mean / 2 * (1 / math.sin(alpha) - 1 / alpha)
+    assert rs._ring_bending(m, 1.0)[0] == pytest.approx(moment * (neutral - a) / (t * (mean - neutral) * a), rel=1e-5)
+
+
+def test_ring_bending_short_span_is_a_fixed_beam():
+    # end moment twice the mid moment as the free arc gets short; the fibre factors are taken out
+    m = make_8_6(rotor_pole_arc=math.radians(58.0), rotor_fillet_radius=0.0)
+    a, b = m.shaft_radius, m.rotor_yoke_outer_radius
+    neutral = (b - a) / math.log(b / a)
+    inner, outer = rs._ring_bending(m, 1.0)
+    assert (outer * b / (b - neutral)) / (inner * a / (neutral - a)) == pytest.approx(2.0, rel=0.02)
+
+
+def test_corner_exponent_is_the_corner_eigenvalue():
+    # symmetric mode of a free corner of solid angle w: sin(lambda w) = -lambda sin(w) (Williams 1952)
+    def eigenvalue(w):
+        return brentq(lambda x: math.sin(x * w) + x * math.sin(w), 0.3, 0.95)
+    assert 1 - eigenvalue(1.5 * math.pi) == pytest.approx(rs._CORNER_EXPONENT, abs=1e-4)
+    slope = (eigenvalue(1.5 * math.pi - 0.1) - eigenvalue(1.5 * math.pi + 0.1)) / 0.2
+    assert slope == pytest.approx(rs._CORNER_EXPONENT_SLOPE, rel=0.2)
+
+
+@pytest.mark.parametrize("taper, stem, shoulder", [(0.0, 0.86661706094, 2.62536813563),
+                                                   (0.06, 0.82992760007, 2.71025375301)])
+def test_root_factors(taper, stem, shoulder):
+    # separate script, flank found by bisection
+    got = rs._root_factors(make_8_6(rotor_pole_taper=taper))
+    assert got == pytest.approx((stem, shoulder), rel=1e-8)
+
+
+def test_root_stress_of_the_8_6():
+    # separate script: 0.86662 x 26.40 MPa nominal + 2.62537 x (34.376 + 0.758) MPa
+    assert rotor_stress(P, RHO, MECH, 20000).root_stress == pytest.approx(115119002.9, rel=1e-8)
 
 
 def test_root_nominal_stress_without_fillet_effect():
@@ -75,22 +131,33 @@ def test_kt_from_the_cited_formula(x, t, expected):
     assert rs._kt(x, t) == pytest.approx(expected, rel=1e-12)
 
 
-def test_kt_of_the_8_6():
-    # pole half width 40 mm sin 11 deg, D = 2 pi 22 mm / 6, r = 1 mm: h/r 3.8868, 2h/D 0.33742, hand-evaluated
-    assert root_stress_concentration(P) == pytest.approx(2.5502925444339035, rel=1e-9)
+def test_stress_concentration_of_the_8_6():
+    # root peak over nominal, the ring stress included
+    assert root_stress_concentration(P, MECH.poisson_ratio) == pytest.approx(4.360650534, rel=1e-8)
 
 
-def test_kt_falls_with_radius():
-    assert root_stress_concentration(make_8_6(rotor_fillet_radius=0.002)) < root_stress_concentration(P)
+def test_stress_concentration_falls_with_radius():
+    nu = MECH.poisson_ratio
+    assert root_stress_concentration(make_8_6(rotor_fillet_radius=0.002), nu) < root_stress_concentration(P, nu)
 
 
-def test_kt_out_of_range_is_not_clamped():
-    m = make_8_6(rotor_fillet_radius=1e-4)    # h/r about 39, past the printed 20
-    assert root_stress_concentration(m) is None
+@pytest.mark.parametrize("overrides, name", [
+    (dict(rotor_fillet_radius=1e-4), "fillet ratio"), (dict(rotor_fillet_radius=0.005), "fillet ratio"),
+    (dict(n_rotor_poles=18, rotor_pole_arc=math.radians(10.0), n_phases=3), "rotor poles"),
+    (dict(shaft_diameter=0.016), "shaft ratio"), (dict(shaft_diameter=0.040, rotor_yoke_thickness=0.012), "shaft ratio"),
+    (dict(rotor_pole_arc=math.radians(14.0)), "pole arc ratio"), (dict(rotor_pole_arc=math.radians(27.0)), "pole arc ratio"),
+    (dict(rotor_yoke_thickness=0.007), "yoke ratio"), (dict(rotor_yoke_thickness=0.019), "yoke ratio"),
+    (dict(rotor_pole_taper=math.radians(-6.0)), "taper"), (dict(rotor_pole_taper=math.radians(11.0)), "taper"),
+    (dict(rotor_pole_taper=math.radians(10.0), rotor_fillet_radius=0.004, rotor_yoke_thickness=0.015), "free ring span"),
+])
+def test_outside_the_validity_box_is_not_clamped(overrides, name):
+    m = make_8_6(**overrides)
+    assert root_stress_concentration(m, MECH.poisson_ratio) is None
     s = rotor_stress(m, RHO, MECH, 20000)
     assert s.status == "kt_out_of_range" and s.safety_factor is None and s.stress_concentration is None
-    assert s.root_stress == pytest.approx(pole_force_per_depth(m, RHO, OMEGA) / (2 * pole_half_width(m, m.rotor_yoke_outer_radius)))
-    assert "h/r" in s.note and s.bore_stress is not None
+    assert name in s.note and s.bore_stress is not None
+    omega = OVERSPEED * 20000 * 2 * math.pi / 60
+    assert s.root_stress == pytest.approx(pole_force_per_depth(m, RHO, omega) / (2 * pole_half_width(m, m.rotor_yoke_outer_radius)))
 
 
 def test_speed_limit_gives_exactly_the_safety_factor():
@@ -107,12 +174,13 @@ def test_safety_factor_is_strength_over_governing_stress():
                                           / (2 * pole_half_width(P, P.rotor_yoke_outer_radius)))
 
 
-def test_bore_governs_with_a_large_fillet():
-    m = make_8_6(rotor_fillet_radius=0.002)
+def test_bore_governs_on_a_short_pole():
+    m = make_8_6(n_rotor_poles=4, n_phases=3, rotor_pole_arc=math.radians(36.0), shaft_diameter=0.024,
+                 rotor_yoke_thickness=0.022, rotor_fillet_radius=0.003)
     s = rotor_stress(m, RHO, MECH, 20000)
-    assert s.bore_stress > s.root_stress and s.governing == "bore"
+    assert s.status == "ok" and s.bore_stress > s.root_stress and s.governing == "bore"
     assert s.safety_factor == pytest.approx(s.usable_strength / s.bore_stress)
-    assert s.safety_factor == pytest.approx(8.65, abs=0.01)
+    assert s.bore_stress == pytest.approx(60985617.61924025, rel=1e-8)   # separate script
 
 
 def test_spec_constants():

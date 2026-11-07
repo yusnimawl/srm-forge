@@ -1,19 +1,25 @@
 """Gate V6: the analytic rotor stress against a test-only 2D elastic FE (spec R5 section 8)."""
+import json
 import math
+import multiprocessing
+import os
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+import rotor_elastic_fe as fe
 from conftest import make_12_8, make_8_6
 from rotor_elastic_fe import elastic_fe_mesh, rotor_elastic_fe, rotor_sector_fe, sector_fe
 from srmcore.materials.library import load_material
 from srmcore.mesh.static import build_static_mesh
 from srmcore.model.design import Design, MeshSettings
-from srmcore.post.rotor_stress import _disc_rim_displacement, gap_closure, rotor_stress
+from srmcore.post.rotor_stress import OVERSPEED, _disc_rim_displacement, gap_closure, rotor_stress
 
 RHO, E, NU = 7490.0, 200e9, 0.33
 OMEGA = 2 * math.pi * 12000 / 60
 MECH = load_material("10JNEX900").mechanical
+SWEEP = Path(__file__).parents[2] / "docs" / "validation" / "rotor_sweep.json"
 
 
 def test_fe_annulus_against_closed_form():
@@ -26,10 +32,10 @@ def test_fe_annulus_against_closed_form():
     for i in range(nr):
         for j in range(nt):
             tris += [(idx(i, j), idx(i, j + 1), idx(i + 1, j + 1)), (idx(i, j), idx(i + 1, j + 1), idx(i + 1, j))]
-    fe = elastic_fe_mesh(nodes, np.array(tris), RHO, E, NU, OMEGA, a, b)
+    result = elastic_fe_mesh(nodes, np.array(tris), RHO, E, NU, OMEGA, a, b)
     hoop = RHO * OMEGA**2 / 4 * ((3 + NU) * b**2 + (1 - NU) * a**2)
-    assert fe.bore_peak == pytest.approx(hoop, rel=0.01)
-    assert fe.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=0.01)
+    assert result.bore_peak == pytest.approx(hoop, rel=0.01)
+    assert result.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=0.01)
 
 
 def test_sector_fe_annulus_against_closed_form():
@@ -39,10 +45,10 @@ def test_sector_fe_annulus_against_closed_form():
     curves = [("line", (a, 0.0), (b, 0.0), "cut"), ("arc", (b, 0.0), (b * c, b * s), origin, "rim"),
               ("line", (b * c, b * s), (a * c, a * s), "cut"), ("arc", (a * c, a * s), (a, 0.0), origin, "bore")]
     sizes = {name: (5e-4, 0.25) for name in ("cut", "rim", "bore")}
-    fe = sector_fe(curves, sizes, half, a, b, RHO, E, NU, OMEGA)
+    result = sector_fe(curves, sizes, half, a, b, RHO, E, NU, OMEGA)
     hoop = RHO * OMEGA**2 / 4 * ((3 + NU) * b**2 + (1 - NU) * a**2)
-    assert fe.bore_peak == pytest.approx(hoop, rel=1e-4)
-    assert fe.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=1e-4)
+    assert result.bore_peak == pytest.approx(hoop, rel=1e-4)
+    assert result.tip_displacement == pytest.approx(_disc_rim_displacement(a, b, RHO, OMEGA, NU, E, 0.0), rel=1e-4)
 
 
 def test_sector_fe_matches_the_whole_rotor():
@@ -54,22 +60,54 @@ def test_sector_fe_matches_the_whole_rotor():
     assert sector.tip_displacement == pytest.approx(whole.tip_displacement, rel=0.01)
 
 
+def _analytic(row):
+    """The model at the sweep speed; check speed equal to the FE speed, as rotor_stress applies 1.2 x its argument."""
+    machine = make_8_6(**row["params"])
+    rpm = fe.OMEGA * 60 / (2 * math.pi)
+    mech = MECH.model_copy(update={"poisson_ratio": fe.NU, "youngs_modulus": fe.E})
+    return (rotor_stress(machine, fe.RHO, mech, rpm / OVERSPEED),
+            gap_closure(machine, fe.RHO, mech, None, None, rpm, 20.0, 20.0).centrifugal)
+
+
+def _assert_pass_rule(row, bore, root, tip, peak):
+    st, growth = _analytic(row)
+    assert st.bore_stress == pytest.approx(bore, rel=0.15), row["set"]
+    assert st.root_stress == pytest.approx(root, rel=0.15), row["set"]
+    assert growth == pytest.approx(tip, rel=0.15), row["set"]
+    assert max(st.bore_stress, st.root_stress) >= 0.95 * peak, row["set"]
+
+
+def _in_box(rows):
+    return [row for row in rows if _analytic(row)[0].status == "ok"]
+
+
+def test_model_against_the_recorded_sweep():
+    rows = json.loads(SWEEP.read_text())
+    box = _in_box(rows)
+    assert {"derived", "round3", "held_out", "reference"} == {row["set"] for row in box}
+    assert len(box) > 1000
+    for row in box:
+        _assert_pass_rule(row, row["bore"][-1], row["root"][-1], row["tip"][-1], row["peak"])
+
+
+@pytest.mark.slow
+def test_fe_convergence_and_pass_rule_on_the_sweep():
+    rows = _in_box(json.loads(SWEEP.read_text()))
+    with multiprocessing.get_context("spawn").Pool(os.cpu_count()) as pool:
+        solved = pool.map(fe.sweep_point, [row["params"] for row in rows], chunksize=4)
+    for row, new in zip(rows, solved):
+        for key in ("bore", "root"):
+            assert abs(new[key][-1] / new[key][-2] - 1) < 0.02
+        assert new["peak"] <= 1.001 * max(new["bore"][-1], new["root"][-1])   # the peak is on the fillet or the bore
+        _assert_pass_rule(row, new["bore"][-1], new["root"][-1], new["tip"][-1], new["peak"])
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("make", [make_8_6, make_12_8])
-def test_analytic_stress_against_fe(make):
+def test_sector_against_the_whole_rotor_at_reference(make):
     machine = make()
-    # check speed equal to the FE speed: rotor_stress applies 1.2 x its argument
-    rpm = OMEGA * 60 / (2 * math.pi)
-    st = rotor_stress(machine, RHO, MECH, rpm / 1.2)
-    assert st.status == "ok"
-    ana_tip = gap_closure(machine, RHO, MECH, None, None, rpm, 20.0, 20.0).centrifugal
-    fes = []
-    for preset in ("screening", "full", "reference"):
-        static = build_static_mesh(Design(machine=machine, mesh=MeshSettings(preset=preset)))
-        fes.append(rotor_elastic_fe(static, RHO, E, NU, OMEGA, machine))
-    assert max(abs(fes[2].bore_peak / fes[1].bore_peak - 1), abs(fes[2].root_peak / fes[1].root_peak - 1)) < 0.02
-    fe = fes[2]
-    assert st.bore_stress == pytest.approx(fe.bore_peak, rel=0.15)
-    assert st.root_stress == pytest.approx(fe.root_peak, rel=0.15)
-    assert max(st.bore_stress, st.root_stress) >= 0.95 * max(fe.bore_peak, fe.root_peak)
-    assert ana_tip == pytest.approx(fe.tip_displacement, rel=0.15)
+    static = build_static_mesh(Design(machine=machine, mesh=MeshSettings(preset="reference")))
+    whole = rotor_elastic_fe(static, RHO, E, NU, OMEGA, machine)
+    sector = rotor_sector_fe(machine, RHO, E, NU, OMEGA, 80)
+    assert sector.bore_peak == pytest.approx(whole.bore_peak, rel=0.02)
+    assert sector.tip_displacement == pytest.approx(whole.tip_displacement, rel=0.002)

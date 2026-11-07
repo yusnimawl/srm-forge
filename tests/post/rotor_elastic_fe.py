@@ -9,8 +9,13 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu, spsolve
 from skfem import Basis, BilinearForm, ElementTriP2, ElementVector, LinearForm, MeshTri, MeshTri2, asm
 from skfem.helpers import ddot, dot, sym_grad, trace
+from srmapp.references import make_8_6
+from srmcore.geometry.session import gmsh_model
 from srmcore.post.rotor_stress import pole_half_width
 from srmcore.topology.radial import _pole_side
+
+RHO, E, NU, OMEGA = 7490.0, 200e9, 0.33, 2 * math.pi * 200   # the sweep conditions
+LEVELS = (20, 40, 80)   # fillet radius / element size
 
 
 @dataclass(frozen=True)
@@ -110,10 +115,11 @@ class SectorStress:
 def _curved_mesh(curves, sizes) -> MeshTri2:
     """Quadratic mesh of the closed loop `curves`: ("line", p, q, tag) or ("arc", p, q, centre, tag), boundary nodes on
     the true arcs. `sizes` maps a tag to (size on the curve, growth per metre); the size is the minimum over tags."""
-    gmsh.initialize(["-noenv"])
-    try:
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.model.add("sector")
+    options = {f"Mesh.{name}": value for name, value in (
+        ("MeshSizeExtendFromBoundary", 0), ("MeshSizeFromPoints", 0), ("MeshSizeFromCurvature", 0), ("Algorithm", 6),
+        ("MeshSizeMax", 1e3))}
+    with gmsh_model():
+        saved = {name: gmsh.option.getNumber(name) for name in options}   # the session's options are process-wide
         geo = gmsh.model.geo
         ids: dict[tuple[float, float], int] = {}
 
@@ -142,16 +148,16 @@ def _curved_mesh(curves, sizes) -> MeshTri2:
         low = field.add("Min")
         field.setNumbers(low, "FieldsList", parts)
         field.setAsBackgroundMesh(low)
-        for name in ("MeshSizeExtendFromBoundary", "MeshSizeFromPoints", "MeshSizeFromCurvature"):
-            gmsh.option.setNumber(f"Mesh.{name}", 0)
-        gmsh.option.setNumber("Mesh.Algorithm", 6)
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 1e3)
-        gmsh.model.mesh.generate(2)
+        try:
+            for name, value in options.items():
+                gmsh.option.setNumber(name, value)
+            gmsh.model.mesh.generate(2)
+        finally:
+            for name, value in saved.items():
+                gmsh.option.setNumber(name, value)
         gmsh.model.mesh.setOrder(2)
         tags, xyz, _ = gmsh.model.mesh.getNodes()
         _, _, nodes = gmsh.model.mesh.getElements(2)
-    finally:
-        gmsh.finalize()
     order = np.zeros(int(tags.max()) + 1, dtype=np.int64)
     order[tags.astype(np.int64)] = np.arange(len(tags))
     tri = order[nodes[0].astype(np.int64)].reshape(-1, 6)
@@ -293,3 +299,21 @@ def rotor_sector_fe(machine, density, youngs_modulus, poisson_ratio, omega, per_
 
     return sector_fe(curves, sizes, half, a, big, density, youngs_modulus, poisson_ratio, omega, element, body, b,
                      (centre, rf, place))
+
+
+def sweep_point(values) -> dict:
+    """FE of one sweep design at every level, and the load split at the middle level; the `values` override make_8_6.
+    A shape that does not fit gives {"params", "skipped"}."""
+    machine = make_8_6(**values)
+    b = machine.rotor_yoke_outer_radius
+    try:
+        levels = [rotor_sector_fe(machine, RHO, E, NU, OMEGA, n) for n in LEVELS]
+        pole = rotor_sector_fe(machine, RHO, E, NU, OMEGA, LEVELS[1], body=lambda x: 1.0 * (np.hypot(*x) > b))
+        yoke = rotor_sector_fe(machine, RHO, E, NU, OMEGA, LEVELS[1], body=lambda x: 1.0 * (np.hypot(*x) <= b))
+    except ValueError as exc:
+        return {"params": values, "skipped": str(exc)}
+    fe = levels[-1]
+    return {"params": values, "bore": [s.bore_peak for s in levels], "root": [s.root_peak for s in levels],
+            "tip": [s.tip_displacement for s in levels], "peak": fe.peak,
+            "root_position": float(fe.fillet_position[np.argmax(np.abs(fe.fillet_stress))]),
+            "pole_root": pole.root_peak, "yoke_root": yoke.root_peak}

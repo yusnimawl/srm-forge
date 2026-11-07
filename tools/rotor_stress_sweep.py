@@ -4,6 +4,7 @@ section 5). Run from the repository root with PYTHONPATH=src;tests;tests/post:
     python tools/rotor_stress_sweep.py run SEED N_PER_POLE_COUNT OUT.json [--poles 4 6 8 16]
     python tools/rotor_stress_sweep.py fit DERIVED.json ...   # print the constants
     python tools/rotor_stress_sweep.py check SWEEP.json ...   # errors of the model against the FE
+    python tools/rotor_stress_sweep.py pack OUT.json LABEL=SWEEP.json ...   # the labelled file tests read
 """
 import argparse
 import json
@@ -16,11 +17,10 @@ from scipy.optimize import least_squares
 from scipy.stats import qmc
 
 from conftest import make_8_6
-from rotor_elastic_fe import rotor_sector_fe
+from rotor_elastic_fe import E, LEVELS, NU, OMEGA, RHO, sweep_point
 from srmcore.materials.library import load_material
 from srmcore.post import rotor_stress as rs
 
-RHO, E, NU, OMEGA = 7490.0, 200e9, 0.33, 2 * math.pi * 200
 RADIUS = 0.05
 PHASES = {4: 3, 6: 4, 8: 3, 10: 3, 12: 3, 16: 3}
 SHAFT = (0.25, 0.45)          # shaft diameter / rotor diameter
@@ -28,7 +28,6 @@ ARC = (1.0, 1.7)              # rotor pole arc / Lawrenson limit 2 pi / (m Nr)
 YOKE = (0.5, 1.15)            # yoke thickness / tip chord
 TAPER = (-5.0, 10.0)          # degrees
 FILLET = (0.015, 0.3)         # fillet radius / pole width at the root, log-uniform
-LEVELS = (20, 40, 80)         # fillet radius / element size
 
 
 def machine_at(n_poles, u):
@@ -42,28 +41,6 @@ def machine_at(n_poles, u):
     d = 2 * rs.pole_half_width(make_8_6(**base), shaft / 2 + yoke)
     ratio = FILLET[0] * (FILLET[1] / FILLET[0])**u[4]
     return {**base, "rotor_fillet_radius": ratio * d}
-
-
-def evaluate(values):
-    machine = make_8_6(**values)
-    b = machine.rotor_yoke_outer_radius
-    try:
-        levels = [rotor_sector_fe(machine, RHO, E, NU, OMEGA, n) for n in LEVELS]
-        pole = rotor_sector_fe(machine, RHO, E, NU, OMEGA, LEVELS[1], body=lambda x: 1.0 * (np.hypot(*x) > b))
-        yoke = rotor_sector_fe(machine, RHO, E, NU, OMEGA, LEVELS[1], body=lambda x: 1.0 * (np.hypot(*x) <= b))
-    except ValueError as exc:
-        return {"params": values, "skipped": str(exc)}
-    fe = levels[-1]
-    i = int(np.argmax(np.abs(fe.fillet_stress)))
-    return {
-        "params": values,
-        "bore": [s.bore_peak for s in levels], "root": [s.root_peak for s in levels],
-        "tip": [s.tip_displacement for s in levels], "peak": fe.peak, "peak_xy": fe.peak_xy,
-        "root_position": float(fe.fillet_position[i]),
-        "bore_ends": [float(fe.bore_stress[0]), float(fe.bore_stress[-1])],
-        "rim_ends": [float(fe.rim_stress[0]), float(fe.rim_stress[-1])],
-        "pole_root": pole.root_peak, "yoke_root": yoke.root_peak, "pole_bore": pole.bore_peak, "yoke_bore": yoke.bore_peak,
-    }
 
 
 def fit(paths, target=1.05):
@@ -121,6 +98,18 @@ def check(path):
         print(f"  {name:10s} min {e[:, i].min():7.2f} % max {e[:, i].max():7.2f} %")
 
 
+def pack(out, labelled):
+    rows = []
+    for item in labelled:
+        label, path = item.split("=")
+        with open(path) as f:
+            rows += [{"set": label, **{k: row[k] for k in ("params", "bore", "root", "tip", "peak", "root_position",
+                                                           "pole_root", "yoke_root")}}
+                     for row in json.load(f) if "skipped" not in row]
+    with open(out, "w") as f:
+        json.dump(rows, f, separators=(",", ":"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -131,7 +120,13 @@ def main():
     run.add_argument("--poles", type=int, nargs="+", default=[4, 6, 8, 16])
     sub.add_parser("fit").add_argument("derived", nargs="+")
     sub.add_parser("check").add_argument("sweeps", nargs="+")
+    packing = sub.add_parser("pack")
+    packing.add_argument("out")
+    packing.add_argument("labelled", nargs="+")
     args = parser.parse_args()
+    if args.command == "pack":
+        pack(args.out, args.labelled)
+        return
     if args.command == "check":
         for path in args.sweeps:
             check(path)
@@ -145,7 +140,7 @@ def main():
         jobs += [machine_at(n_poles, u) for u in sampler.random(args.n)]
     os.environ.update(OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     with multiprocessing.get_context("spawn").Pool(14) as pool:
-        rows = pool.map(evaluate, jobs, chunksize=4)
+        rows = pool.map(sweep_point, jobs, chunksize=4)
     with open(args.out, "w") as f:
         json.dump(rows, f, indent=0)
 
