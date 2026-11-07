@@ -15,7 +15,8 @@ Grades: **A** measured on the owner's lot or a measured table, **B** a test or m
 | 1e | Test temperature and cutting method of the 570 MPa test | Ou et al. ref. [24] (ICEMS 2019) | - | **not found** (paper not reachable) |
 | 2 | Copper k, c, expansion | National Bronze C11000 data sheet p. 2 (CDA values) | B | found |
 | 3 | steel_1010 k, c, expansion, E, Poisson ratio, yield | Elgin Fasteners grade 1010 data sheet pp. 1-3 | C | found, cold-drawn condition |
-| 4 | Kt of a shoulder fillet in tension | AmesWeb calculator page quoting Pilkey 2005 | C | formula found, book page not recorded, to be checked against Peterson (gate V6 interim) |
+| 4 | Kt of a shoulder fillet in tension | AmesWeb calculator page quoting Pilkey 2005 | C | formula found, book page not recorded; its 2h/D = 0 limit is used in the root model (section 5) |
+| 5 | Rotor root and bore model, constants and validity range | derived from a converged 2D elastic FE sweep of this project, `tools/rotor_stress_sweep.py`, `docs/validation/rotor_sweep.json` | C (derived from this FE) | section 5 |
 
 ## 1. 10JNEX900
 
@@ -72,3 +73,80 @@ Kt = C1 + C2 (2h/D) + C3 (2h/D)^2 + C4 (2h/D)^3, with s = sqrt(h/r) and x = h/r:
 | C4 | -0.135 + 0.582 s - 0.017 x | 3.505 - 2.109 s + 0.069 x |
 
 Validity as printed: the h/r ranges above, and L/D > -1.89 (r/d - 0.15) + 5.5 (a long enough wide part). The page gives no range for 2h/D. An h/r outside the printed range (0.1 to 20) is refused, not clamped: status kt_out_of_range. At 2h/D = 0 the fit returns C1, about 1 + sqrt(h/r), the semi-infinite-plate limit (1.32 at h/r = 0.1), a real value. The formula is for a plate in plane stress; a rotor bridge or pole root is not an isolated step, so it is a screening estimate.
+
+Gate V6 showed the mapping d = pole width, D = pole pitch does not describe the root: nominal stress x Kt is 36 to 47 % below the FE. The full formula with that mapping is no longer used. Only its 2h/D = 0 limit C1 (one free shoulder of height h) is used, in section 5.
+
+## 5. Rotor root and bore model
+
+Grade C: derived from this project's FE, not from a measurement and not from a book. Code: `src/srmcore/post/rotor_stress.py`. Sweep: `tools/rotor_stress_sweep.py`. Data: `docs/validation/rotor_sweep.json`. Results: `docs/r5-thermal-results.md`.
+
+### The FE behind it
+
+Half-pole sector, plane stress, isoparametric P2 triangles on a gmsh second-order mesh with boundary nodes on the true arcs, u normal = 0 on both radial cuts, elements of fillet radius / 20, 40 and 80 on the fillet, stresses L2-projected to the continuous space and read at boundary nodes. Conditions: rho 7490 kg/m3, E 200 GPa, nu 0.33, 12 000 r/min, rotor radius 50 mm. All stresses scale with rho omega^2 R^2, so one speed and one size are enough: rescaling a design by 0.4 and 4 gives the same errors to 8 digits. Nu is nearly inert: on 37 designs at nu 0.25, 0.29 and 0.36 the root error moved by under 1 point and the bore error by under 1 point.
+
+### The model
+
+Notation: a shaft radius, b yoke outer radius, R rotor radius, t = b - a, N poles, d pole width at b, D = 2 pi b / N, r fillet radius, tau taper (rad, positive widens the root), h = R - b, F the pole force per depth, sigma_n = F / d.
+
+Ring with stiff pole blocks. The free yoke arc between two poles has half angle gamma = pi/N - asin(d / 2b) - r / 2b. Taking the poles as blocks that do not rotate, equilibrium at mid span gives an axial force Nm = F / (2 sin(pi/N)) with no shear, and zero end rotation (the integral of M over the half arc is zero, bending energy only, Castigliano) gives, with Rm = (a + b)/2:
+
+- M_mid = Nm Rm (1 - sin(gamma)/gamma), inner fibre in tension;
+- M_end = Nm Rm (sin(gamma)/gamma - cos(gamma)), outer fibre in tension.
+
+This derivation is ours. At gamma = pi/N it is the textbook ring with N point loads, (W R / 2)(1/sin a - 1/a); Roark was not reachable, so the limit was checked by a separate derivation and by a test, not against the book. Short arcs tend to a fixed-fixed beam, end moment twice the mid moment. Fibre stresses use the Winkler-Bach curved beam of a rectangular section: neutral radius rn = t / ln(b/a), sigma = M (distance from rn) / (t (Rm - rn) r_fibre), a standard result, cited from memory.
+
+Rim relief: rho_r = 1 - c1 d / D. The pole roots stiffen the rim, so the annulus carries less of the rim load p = N F / (2 pi b). It applies in the bore stress and in the disc term of `gap_closure`.
+
+Bore: sigma_bore = rho w^2 / 4 ((3 + nu) b^2 + (1 - nu) a^2) + 2 b^2 / (b^2 - a^2) p rho_r + c2 sigma(M_mid, inner).
+
+Root: sigma_root = sigma_n c3 (D/d)^c4 ((L/r)^q - 1) + (sigma_rim + 1/2 sigma(M_end, outer)) C1(x) x^(-0.1 tau), where
+
+- sigma_rim is the rotating annulus hoop stress at b with the rim load p;
+- L = 1 / sqrt(1/d^2 + 1/(c5 t)^2), the shorter of the pole width and a share of the yoke;
+- x = H / r with H = c6 d tanh(h / (c6 d)), the shoulder height the rim flow sees: the pole height for a short pole, limited for a long one;
+- C1 is section 4 at 2h/D = 0, about 1 + sqrt(x);
+- q = 0.4555 - 0.1 tau.
+
+q is the corner exponent. Williams 1952 (J. Appl. Mech. 19, 526-528) gives a free corner of solid angle w the symmetric eigenvalue from sin(lambda w) = -lambda sin(w); the paper was not read, its citation was confirmed by a web search and the equation agrees with the 0.5445 usually quoted for 270 degrees. A test solves the equation: 1 - lambda = 0.4555 at 270 degrees, slope 0.1 per radian of solid angle. Fitting the slope freely on the sweep gave 0.093, which supports it.
+
+The 1/2 was rounded from a free fit (0.48 to 0.60).
+
+### Constants
+
+| Symbol | Name in the code | Value | Meaning |
+|---|---|---|---|
+| c1 | `_BORE_RIM_RELIEF` | 0.049 | rim relief per unit d/D |
+| c2 | `_BORE_BEND_GAIN` | 1.97 | gain on the mid-span ring bending at the bore |
+| c3 | `_STEM_GAIN` | 0.682 | gain on the pole tension term |
+| c4 | `_STEM_PITCH_POWER` | 0.265 | power of D/d |
+| c5 | `_STEM_YOKE_SHARE` | 0.472 | share of t in L |
+| c6 | `_SHOULDER_HEIGHT` | 0.197 | largest shoulder height / d |
+
+Six fitted numbers, with no measured data in them. They come from `tools/rotor_stress_sweep.py fit` (fourth power of the log error, against 1.05 x FE, so errors centre on the high side) on 767 designs of the rounds below at commit 55ac728, when the fillet range still started at 0.01; the same command now gives other digits because it filters on the present box.
+
+### Derivation and held-out rounds
+
+| Round | Seeds, N_r | Role | Outcome |
+|---|---|---|---|
+| 1 | 1; 4, 6, 8, 16 | derivation of the form and the first constants | - |
+| 2 | 2 and 3; 4, 6, 8, 16 and 10, 12 | held out for the first constants | root -4.98 to +13.71 %, bore pass, tip +15.78 %: FAIL on tip. Rim relief added to the growth; rounds 1 and 2 then became the derivation set |
+| 3 | 4 and 5; same | held out for the present constants | root -5.40 %, one design of 337 at r/d 0.014: FAIL. The root error drifts low below r/d 0.015 (median +2.1 % there, +6.7 % at 0.04 to 0.16), so the box was cut to 0.015. Constants unchanged |
+| 4 | 6 and 7; same | held out for the present constants and box | PASS |
+
+Round 3 is not pure held-out evidence after that cut: its failure shaped the box. Round 4 is. 8/6, 12/8 and 24/16 took no part in any fit; their FE was seen before the fit only for 8/6 and 12/8, in the load split.
+
+### Validity range
+
+Outside it `root_stress_concentration` returns None and `rotor_stress` gives status `kt_out_of_range`, the nominal root stress and no safety factor.
+
+| Ratio | Range |
+|---|---|
+| N_r | 4 to 16 (swept: 4, 6, 8, 10, 12, 16; odd counts not swept) |
+| shaft diameter / rotor diameter | 0.25 to 0.45 |
+| rotor pole arc / (2 pi / (m N_r)) | 1.0 to 1.7 |
+| yoke thickness / pole tip chord | 0.5 to 1.15 |
+| taper | -5 to +10 degrees |
+| fillet radius / pole width at the root | 0.015 to 0.3 |
+| free ring half span / half pitch | at least 0.1 |
+
+This box holds every geometry `srmapp.sizing.generator` samples apart from the fillet: the generator leaves `rotor_fillet_radius` at 0, and those candidates read `no_fillet`.
