@@ -23,8 +23,8 @@ _KT_RANGE = (0.1, 20.0)
 _CORNER_EXPONENT, _CORNER_EXPONENT_SLOPE = 0.4555, 0.1
 _RING_BEND_SHARE = 0.5
 # Derived from the converged FE sweep, grade C (docs/r5-sources.md section 5): tools/rotor_stress_sweep.py fit.
-_STEM_GAIN, _STEM_YOKE_SHARE, _STEM_PITCH_POWER, _SHOULDER_HEIGHT = 0.659, 0.473, 0.274, 0.196
-_BORE_RIM_RELIEF, _BORE_BEND_GAIN = 0.059, 1.90
+_STEM_GAIN, _STEM_YOKE_SHARE, _STEM_PITCH_POWER, _SHOULDER_HEIGHT = 0.682, 0.472, 0.265, 0.197
+_BORE_RIM_RELIEF, _BORE_BEND_GAIN = 0.049, 1.97
 # Validity of those constants, the box of the sweep.
 _FIT_POLES = (4, 16)
 _FIT_SHAFT = (0.25, 0.45)       # shaft diameter / rotor diameter
@@ -75,6 +75,12 @@ def _rim_load(machine: RadialSRMParams, density: float, omega: float) -> float:
 def _rim_hoop(a: float, b: float, density: float, omega: float, nu: float, rim_load: float) -> float:
     """Hoop stress at the rim b of a spinning annulus with a free bore a and a tensile load on the rim, Pa."""
     return density * omega**2 / 4 * ((1 - nu) * b**2 + (3 + nu) * a**2) + rim_load * (b**2 + a**2) / (b**2 - a**2)
+
+
+def _rim_relief(machine: RadialSRMParams) -> float:
+    """Share of the rim load the annulus carries: the pole roots stiffen the rim, more so the wider they are."""
+    b = machine.rotor_yoke_outer_radius
+    return 1 - _BORE_RIM_RELIEF * machine.n_rotor_poles * pole_half_width(machine, b) / (math.pi * b)
 
 
 def _ring_half_span(machine: RadialSRMParams) -> float:
@@ -185,8 +191,8 @@ def rotor_stress(machine: RadialSRMParams, density: float, mechanical: Mechanica
     a, b, nu = machine.shaft_radius, machine.rotor_yoke_outer_radius, mechanical.poisson_ratio
     force = pole_force_per_depth(machine, density, omega)
     rim = _rim_load(machine, density, omega)
-    relief = 1 - _BORE_RIM_RELIEF * machine.n_rotor_poles * pole_half_width(machine, b) / (math.pi * b)
-    bore = (density * omega**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * rim * relief
+    bore = (density * omega**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2)
+            + 2 * b**2 / (b**2 - a**2) * rim * _rim_relief(machine)
             + _BORE_BEND_GAIN * _ring_bending(machine, force)[0])
     nominal = force / (2 * pole_half_width(machine, b))
     kt = root_stress_concentration(machine, nu)
@@ -238,7 +244,8 @@ def gap_closure(machine: RadialSRMParams, density: float, mechanical: Mechanical
     omega = rpm * 2 * math.pi / 60
     a, b, big = machine.shaft_radius, machine.rotor_yoke_outer_radius, machine.rotor_outer_radius
     nu, young = mechanical.poisson_ratio, mechanical.youngs_modulus
-    disc = _disc_rim_displacement(a, b, density, omega, nu, young, _rim_load(machine, density, omega))
+    disc = _disc_rim_displacement(a, b, density, omega, nu, young,
+                                  _rim_load(machine, density, omega) * _rim_relief(machine))
 
     def width_moment(r: float) -> float:
         s = (big - r) / 2 * _GAUSS[0] + (big + r) / 2

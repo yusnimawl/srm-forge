@@ -2,7 +2,7 @@
 section 5). Run from the repository root with PYTHONPATH=src;tests;tests/post:
 
     python tools/rotor_stress_sweep.py run SEED N_PER_POLE_COUNT OUT.json [--poles 4 6 8 16]
-    python tools/rotor_stress_sweep.py fit DERIVED.json    # print the constants
+    python tools/rotor_stress_sweep.py fit DERIVED.json ...   # print the constants
     python tools/rotor_stress_sweep.py check SWEEP.json ...   # errors of the model against the FE
 """
 import argparse
@@ -66,11 +66,13 @@ def evaluate(values):
     }
 
 
-def fit(path, target=1.045):
+def fit(paths, target=1.05):
     """Near-minimax fit (fourth power of the log error) of the two constant sets against `target` x FE, so the errors
     centre on the high side of the pass rule. Designs outside the validity box take no part."""
-    with open(path) as f:
-        rows = [row for row in json.load(f) if "skipped" not in row]
+    rows = []
+    for path in paths:
+        with open(path) as f:
+            rows += [row for row in json.load(f) if "skipped" not in row]
     machines = [make_8_6(**row["params"]) for row in rows]
     keep = [i for i, m in enumerate(machines) if rs._outside_fit(m) is None]
     machines = [machines[i] for i in keep]
@@ -127,7 +129,7 @@ def main():
     run.add_argument("n", type=int)
     run.add_argument("out")
     run.add_argument("--poles", type=int, nargs="+", default=[4, 6, 8, 16])
-    sub.add_parser("fit").add_argument("derived")
+    sub.add_parser("fit").add_argument("derived", nargs="+")
     sub.add_parser("check").add_argument("sweeps", nargs="+")
     args = parser.parse_args()
     if args.command == "check":
