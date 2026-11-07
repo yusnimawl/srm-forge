@@ -1,5 +1,6 @@
-"""Analytic rotor stress at 1.2 x max speed: the bore hoop stress of the yoke annulus and the stress at the
-pole root (spec R5 section 9)."""
+"""Analytic rotor stress at 1.2 x max speed: the peak at the bore and at the pole root fillet (spec R5 section 9).
+The yoke is a rotating annulus, loaded at the rim by the poles, that bends as a ring between the poles; the root
+model and its constants are in docs/r5-sources.md section 5."""
 import math
 from dataclasses import dataclass
 from typing import Literal
@@ -18,6 +19,20 @@ STRENGTH_GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # provisional, as 
 _KT_LOW = ((1.006, 1.008, -0.044), (-0.115, -0.584, 0.315), (0.245, -1.006, -0.257), (-0.135, 0.582, -0.017))
 _KT_HIGH = ((1.020, 1.009, -0.048), (-0.065, -0.165, -0.007), (-3.459, 1.266, -0.016), (3.505, -2.109, 0.069))
 _KT_RANGE = (0.1, 20.0)
+# Corner exponent of the fillet factors: 1 - lambda of a free 270 degree corner, and its change per radian of taper.
+_CORNER_EXPONENT, _CORNER_EXPONENT_SLOPE = 0.4555, 0.1
+_RING_BEND_SHARE = 0.5
+# Derived from the converged FE sweep, grade C (docs/r5-sources.md section 5): tools/rotor_stress_sweep.py fit.
+_STEM_GAIN, _STEM_YOKE_SHARE, _STEM_PITCH_POWER, _SHOULDER_HEIGHT = 0.659, 0.473, 0.274, 0.196
+_BORE_RIM_RELIEF, _BORE_BEND_GAIN = 0.059, 1.90
+# Validity of those constants, the box of the sweep.
+_FIT_POLES = (4, 16)
+_FIT_SHAFT = (0.25, 0.45)       # shaft diameter / rotor diameter
+_FIT_ARC = (1.0, 1.7)           # pole arc / Lawrenson limit 2 pi / (m Nr)
+_FIT_YOKE = (0.5, 1.15)         # yoke thickness / pole tip chord
+_FIT_TAPER = (-5.0, 10.0)       # degrees
+_FIT_FILLET = (0.01, 0.3)       # fillet radius / pole width at the root
+_FIT_MIN_SPAN = 0.1             # free ring half span / half pitch
 _GAUSS = np.polynomial.legendre.leggauss(32)
 
 
@@ -57,21 +72,82 @@ def _rim_load(machine: RadialSRMParams, density: float, omega: float) -> float:
     return machine.n_rotor_poles * force / (2 * math.pi * machine.rotor_yoke_outer_radius)
 
 
-def _root_geometry(machine: RadialSRMParams) -> tuple[float, float]:
-    """h/r and 2h/D of the pole root: d = pole width at the root, D = pole pitch at the root."""
+def _rim_hoop(a: float, b: float, density: float, omega: float, nu: float, rim_load: float) -> float:
+    """Hoop stress at the rim b of a spinning annulus with a free bore a and a tensile load on the rim, Pa."""
+    return density * omega**2 / 4 * ((1 - nu) * b**2 + (3 + nu) * a**2) + rim_load * (b**2 + a**2) / (b**2 - a**2)
+
+
+def _ring_half_span(machine: RadialSRMParams) -> float:
+    """Half angle of the free yoke arc between two poles, rad: half a pitch less the pole and half a fillet."""
     b = machine.rotor_yoke_outer_radius
+    return (math.pi / machine.n_rotor_poles - math.asin(pole_half_width(machine, b) / b)
+            - machine.rotor_fillet_radius / (2 * b))
+
+
+def _ring_bending(machine: RadialSRMParams, force: float) -> tuple[float, float]:
+    """Fibre stresses of the yoke as a ring of free arcs between poles too stiff to rotate, each pole pulling `force`:
+    the inner fibre at mid span and the outer fibre at the arc end, both tensile, Pa. Mid-span axial force
+    F / (2 sin(pi/N)), zero end rotation, Winkler-Bach stress of a rectangular section."""
+    a, b = machine.shaft_radius, machine.rotor_yoke_outer_radius
+    gamma = _ring_half_span(machine)
+    axial_moment = force / (2 * math.sin(math.pi / machine.n_rotor_poles)) * (a + b) / 2
+    t = b - a
+    neutral = t / math.log(b / a)
+    offset = (a + b) / 2 - neutral
+    mid = axial_moment * (1 - math.sin(gamma) / gamma) * (neutral - a) / (t * offset * a)
+    end = axial_moment * (math.sin(gamma) / gamma - math.cos(gamma)) * (b - neutral) / (t * offset * b)
+    return mid, end
+
+
+def _root_factors(machine: RadialSRMParams) -> tuple[float, float]:
+    """The fillet factors of the pole tension and of the ring stress at the root."""
+    a, b, r = machine.shaft_radius, machine.rotor_yoke_outer_radius, machine.rotor_fillet_radius
     d = 2 * pole_half_width(machine, b)
-    big_d = 2 * math.pi * b / machine.n_rotor_poles
-    h = (big_d - d) / 2
-    return h / machine.rotor_fillet_radius, 2 * h / big_d
+    taper = machine.rotor_pole_taper
+    exponent = _CORNER_EXPONENT - _CORNER_EXPONENT_SLOPE * taper
+    length = 1 / math.hypot(1 / d, 1 / (_STEM_YOKE_SHARE * (b - a)))
+    pitch = 2 * math.pi * b / machine.n_rotor_poles
+    stem = _STEM_GAIN * (pitch / d)**_STEM_PITCH_POWER * ((length / r)**exponent - 1)
+    height = _SHOULDER_HEIGHT * d * math.tanh((machine.rotor_outer_radius - b) / (_SHOULDER_HEIGHT * d))
+    x = height / r
+    return stem, _kt(x, 0.0) * x**(-_CORNER_EXPONENT_SLOPE * taper)
 
 
-def root_stress_concentration(machine: RadialSRMParams) -> float | None:
-    """Kt of the root fillet; None without a fillet or when h/r is outside the printed range of the formula."""
-    if machine.rotor_fillet_radius <= 0:
+def _root_peak(machine: RadialSRMParams, density: float, omega: float, nu: float) -> float:
+    """Peak stress on the root fillet, Pa: the concentrated pole tension plus the concentrated ring stress."""
+    a, b = machine.shaft_radius, machine.rotor_yoke_outer_radius
+    force = pole_force_per_depth(machine, density, omega)
+    stem, shoulder = _root_factors(machine)
+    ring = (_rim_hoop(a, b, density, omega, nu, _rim_load(machine, density, omega))
+            + _RING_BEND_SHARE * _ring_bending(machine, force)[1])
+    return stem * force / (2 * pole_half_width(machine, b)) + shoulder * ring
+
+
+def _outside_fit(machine: RadialSRMParams) -> str | None:
+    """The first ratio outside the swept box, as a note; None inside."""
+    a, b = machine.shaft_radius, machine.rotor_yoke_outer_radius
+    big, n = machine.rotor_outer_radius, machine.n_rotor_poles
+    limit = 2 * math.pi / (machine.n_phases * n)
+    for name, value, (lo, hi) in (
+            ("rotor poles", n, _FIT_POLES),
+            ("shaft ratio", a / big, _FIT_SHAFT),
+            ("pole arc ratio", machine.rotor_pole_arc / limit, _FIT_ARC),
+            ("yoke ratio", (b - a) / (2 * big * math.sin(machine.rotor_pole_arc / 2)), _FIT_YOKE),
+            ("taper in degrees", math.degrees(machine.rotor_pole_taper), _FIT_TAPER),
+            ("fillet ratio", machine.rotor_fillet_radius / (2 * pole_half_width(machine, b)), _FIT_FILLET),
+            ("free ring span ratio", _ring_half_span(machine) * n / math.pi, (_FIT_MIN_SPAN, 1.0))):
+        if not lo - 1e-9 <= value <= hi + 1e-9:
+            return f"{name} {value:.3g} is outside the validity range {lo} to {hi} of the root stress model"
+    return None
+
+
+def root_stress_concentration(machine: RadialSRMParams, poisson_ratio: float) -> float | None:
+    """Root peak stress over the nominal pole stress, ring stress included; None without a fillet or outside the
+    validity range of the model. Speed and density cancel."""
+    if machine.rotor_fillet_radius <= 0 or _outside_fit(machine) is not None:
         return None
-    x, t = _root_geometry(machine)
-    return _kt(x, t) if _KT_RANGE[0] <= x <= _KT_RANGE[1] else None
+    nominal = pole_force_per_depth(machine, 1.0, 1.0) / (2 * pole_half_width(machine, machine.rotor_yoke_outer_radius))
+    return _root_peak(machine, 1.0, 1.0, poisson_ratio) / nominal
 
 
 @dataclass(frozen=True)
@@ -80,8 +156,8 @@ class RotorStress:
     note: str
     check_speed_rpm: float
     bore_stress: float | None         # Pa
-    root_stress: float | None         # Pa, nominal x Kt; nominal when Kt is not available
-    stress_concentration: float | None
+    root_stress: float | None         # Pa, peak on the fillet; the nominal pole stress when the factor is not available
+    stress_concentration: float | None   # root_stress over the nominal pole stress, ring stress included
     governing: Literal["bore", "pole_root"] | None
     criterion: Literal["von_mises", "max_principal"] | None
     usable_strength: float | None     # Pa, after the grade allowance
@@ -109,9 +185,11 @@ def rotor_stress(machine: RadialSRMParams, density: float, mechanical: Mechanica
     a, b, nu = machine.shaft_radius, machine.rotor_yoke_outer_radius, mechanical.poisson_ratio
     force = pole_force_per_depth(machine, density, omega)
     rim = _rim_load(machine, density, omega)
-    bore = density * omega**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * rim
+    relief = 1 - _BORE_RIM_RELIEF * machine.n_rotor_poles * pole_half_width(machine, b) / (math.pi * b)
+    bore = (density * omega**2 / 4 * ((3 + nu) * b**2 + (1 - nu) * a**2) + 2 * b**2 / (b**2 - a**2) * rim * relief
+            + _BORE_BEND_GAIN * _ring_bending(machine, force)[0])
     nominal = force / (2 * pole_half_width(machine, b))
-    kt = root_stress_concentration(machine)
+    kt = root_stress_concentration(machine, nu)
     root = nominal if kt is None else kt * nominal
     fields = dict(check_speed_rpm=check_rpm, bore_stress=bore, root_stress=root, stress_concentration=kt,
                   governing=None, criterion=None, usable_strength=None, safety_factor=None, speed_limit_rpm=None)
@@ -122,9 +200,7 @@ def rotor_stress(machine: RadialSRMParams, density: float, mechanical: Mechanica
     if machine.rotor_fillet_radius <= 0:
         return RotorStress("no_fillet", "; ".join(["no root fillet, so no stress concentration factor"] + notes), **fields)
     if kt is None:
-        x, _ = _root_geometry(machine)
-        return RotorStress("kt_out_of_range", "; ".join(
-            [f"h/r = {x:.3g} is outside the printed range {_KT_RANGE[0]} to {_KT_RANGE[1]} of the factor"] + notes), **fields)
+        return RotorStress("kt_out_of_range", "; ".join([_outside_fit(machine)] + notes), **fields)
 
     usable = mechanical.strength * (1 - STRENGTH_GRADE_ALLOWANCE[mechanical.strength_confidence])
     safety = usable / max(bore, root)
@@ -139,9 +215,7 @@ def _disc_rim_displacement(a: float, b: float, density: float, omega: float, nu:
                            rim_load: float) -> float:
     """Radial displacement at the rim of a spinning annulus with a free bore a and a tensile load on the rim b,
     plane stress: u = (b/E)(sigma_theta(b) - nu p) with the rotating-annulus hoop stress at b plus the Lame term."""
-    hoop = (density * omega**2 / 4 * ((1 - nu) * b**2 + (3 + nu) * a**2)
-            + rim_load * (b**2 + a**2) / (b**2 - a**2))
-    return b / youngs_modulus * (hoop - nu * rim_load)
+    return b / youngs_modulus * (_rim_hoop(a, b, density, omega, nu, rim_load) - nu * rim_load)
 
 
 @dataclass(frozen=True)
