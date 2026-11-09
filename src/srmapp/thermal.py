@@ -1,11 +1,32 @@
 """Continuous and peak torque per speed from the hot-spot limit: root finding on a thermal solver, losses from a callable."""
+import dataclasses
+import math
 from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
 
-from srmcore.thermal.model import Temperatures, ThermalRunaway
+from srmcore.maps import build_map
+from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
+from srmcore.maps.stroke import stroke_angles
+from srmcore.maps.validation import MEASURED_GAP, UncertaintyBudget
+from srmcore.materials.library import load_material
+from srmcore.mesh import build_machine_mesh
+from srmcore.post.rotor_stress import GapClosure, RotorStress, gap_closure, rotor_stress
+from srmcore.thermal.domain import thermal_domain
+from srmcore.thermal.model import Temperatures, ThermalLoad, ThermalRunaway
 from srmcore.thermal.solve import HotSpot, ThermalSolver
+
+from . import __version__
+from .case import CaseInputs, map_request
+from .cooling import ROWS, CoolingSetup, K_IRON_HI, coefficients
+from .drive.envelope import envelope, min_copper_stroke
+from .evaluate import END_IMAGE_FACTOR, Evaluation
+from .losses import N_ANGLES, _capped, check_loss_data, phase_current_samples, stroke_losses
+from .sizing.generator import REFERENCE_TURNS
+from .thermal_load import load_fn, point_heat
+from .thermal_network import build_network
+from .turns import rescale_turns, turns_scale
 
 BRACKET_REL = 0.01       # stop when the bracket is under this share of the envelope torque
 TOL_K = 0.5              # or when the hot spot is this close below the limit
@@ -155,3 +176,193 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
         return result(cont, cont, t_c, pc[0] if pc else None, pc[1] if pc else 0, note, pc[2] if pc else None)
     peak, _, (t_p, steps, top) = _illinois(transient, cont, fc, pc, envelope_nm, fp, envelope_nm)
     return result(cont, peak, t_c, t_p, steps, note, top)
+
+
+# The FE showed the centrifugal growth up to 9.4 % low (docs/r5-thermal-results.md); the gap uses the unsafe-side correction.
+GROWTH_LOW = 0.094
+_TORQUE_TOL = 1e-9
+
+
+@dataclass(frozen=True)
+class Rating:
+    nominal: tuple[SpeedRating, ...]
+    rated: tuple[SpeedRating, ...]
+    shares: tuple[BudgetShare, ...]
+    limit_c: float
+    insulation_class: str
+    cooling: CoolingSetup
+    stress: RotorStress
+    gap: dict[str, GapClosure]
+    torque_factor: float
+    n_strokes: int
+    notes: tuple[str, ...]
+    srmapp_version: str
+
+
+def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBudget | None = None,
+         n_speeds: int = 6, n_angles: int = N_ANGLES, solver: str = "ngsolve", workers: int | None = None,
+         cache_dir=None, progress: Callable[[str, int, int], None] | None = None,
+         cancel: Callable[[], bool] | None = None) -> Rating:
+    """Continuous and peak torque per speed from the hot-spot limit, nominal and with every budget row at its
+    unfavourable end. Speeds: the base speed and linspace(max/n_speeds, max, n_speeds). The envelope that tops the
+    bracket has no current-density limit. Raises MissingLossData, MissingCoolingData and ValueError (no winding, no
+    thermal data) before any stroke solve, and InterruptedError when `cancel` fires."""
+    req, design = inputs.requirements, inputs.design
+    check_loss_data(design)
+    w = evaluation.winding
+    if evaluation.status != "ok" or w is None:
+        raise ValueError(f"the evaluation has no winding (status {evaluation.status!r})")
+    setup, limit = req.cooling, req.hot_spot_limit_c
+    ref, i_map, _ = map_request(inputs)
+    machine = evaluation.design.machine
+    fill = machine.fill_factor
+    q, tau = machine.n_phases, 2 * math.pi / machine.n_rotor_poles
+    rho = load_material(machine.materials.coil).resistivity_at
+    hot = dataclasses.replace(w, resistance=w.resistance * rho(limit) / rho(req.winding_temperature_c))
+    speeds = sorted({req.base_speed_rpm} | set(np.linspace(req.max_speed_rpm / n_speeds, req.max_speed_rpm, n_speeds).tolist()))
+
+    def check() -> None:
+        if cancel is not None and cancel():
+            raise InterruptedError("rating cancelled")
+
+    static = build_machine_mesh(ref)
+    domain = thermal_domain(static, ref.machine)
+    g = MEASURED_GAP["peak_torque"]
+    em_total = None if em_budget is None else em_budget.total["peak_torque"] - g / (1 - g)
+    iron = (machine.materials.stator, machine.materials.rotor)
+
+    def parts(rpm: float, rows: frozenset):
+        c = coefficients(setup, machine, rpm, rows, em_total, fill=fill)
+        return c, build_network(domain, machine, hot, fill, c, setup, iron_materials=iron)
+
+    parts(speeds[0], frozenset())     # refusals before any map or stroke solve
+
+    result = build_map(ref, i_map, solver=solver, workers=workers, cache_dir=cache_dir, cancel=cancel)
+    if not result.complete:
+        raise InterruptedError("map cancelled")
+    result = rescale_turns(with_end_winding(result, end_winding_inductance(ref.machine, image_factor=END_IMAGE_FACTOR)),
+                           turns_scale(ref.machine, w))
+    env = envelope(result, ref.machine, req.bus_voltage_v, hot.resistance, speeds, current_limit=w.current)
+    capped = _capped(result, w.current)
+    angles = stroke_angles(static, tau, n_angles)
+    scale = w.turns / (w.paths * REFERENCE_TURNS)
+    wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
+    strokes: dict = {}
+    band: dict = {}
+
+    def stroke(rpm: float, torque: float):
+        key = (rpm, torque)
+        if key not in strokes:
+            check()
+            trace = min_copper_stroke(capped, ref.machine, req.bus_voltage_v, hot.resistance, rpm,
+                                      torque * (1.0 - _TORQUE_TOL))
+            sl = None
+            if trace is not None:
+                coil = phase_current_samples(trace.current, angles, tau, q) * scale
+                sl = stroke_losses(static, ref, angles, coil, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
+                                   cancel=cancel, cut_process=req.cut_process, fractions=band)
+            strokes[key] = None if sl is None else (trace, sl)
+            if progress is not None:
+                progress("strokes", len(strokes), len(strokes))
+        return strokes[key]
+
+    cache: dict = {}
+
+    def at(rpm: float, rows: frozenset):
+        if (rpm, rows) not in cache:
+            cache[rpm, rows] = parts(rpm, rows)
+        return cache[rpm, rows]
+
+    def solver_for(rpm, rows):
+        return lambda: ThermalSolver(at(rpm, rows)[1].problem)
+
+    def load_at(rpm, rows):
+        coeffs, net = at(rpm, rows)
+
+        def load(torque: float):
+            if torque <= 0:
+                zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
+                return lambda t: zero
+            s = stroke(rpm, torque * coeffs.torque_factor)
+            if s is None:
+                return None
+            trace, sl = s
+            heat = point_heat(sl, trace, domain, static, hot, wire, machine, limit, coeffs.iron_factor, rpm)
+            return load_fn(heat, net, machine, hot)
+        return load
+
+    notes: list[str] = []
+    if setup.placeholder:
+        notes.append("cooling uses owner placeholders (ambient, housing or jacket dimensions and flow): ratings are not final")
+    notes.append(f"iron loss rated at x{K_IRON_HI:g} (K_IRON_HI band)")
+    notes.append("no measured continuous thermal case: the continuous rating has no measured check (spec §1 item 4)")
+    if em_budget is None:
+        notes.append("the EM budget was not computed: the EM torque row uses the 10 % floor")
+
+    nominal, rated, shares = [], [], []
+    for k, rpm in enumerate(speeds):
+        omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
+        start = None if req.continuous_power_w is None else req.continuous_power_w / omega
+        top = float(env.torque[k])
+        ratings = [rate_speed(rpm, top, limit, req.peak_duration_s, solver_for(rpm, rows), load_at(rpm, rows), start)
+                   for rows in (frozenset(), frozenset(ROWS))]
+        nominal.append(ratings[0])
+        rated.append(ratings[1])
+        t_rated = ratings[1].continuous_nm
+        if t_rated > 0:
+            def hot_spot(rows):
+                load = load_at(rpm, rows)(t_rated)
+                if load is None:
+                    return None
+                sv = ThermalSolver(at(rpm, rows)[1].problem)
+                try:
+                    return sv.hot_spot(sv.steady(load)).temperature_c
+                except ThermalRunaway:
+                    return None
+            base = hot_spot(frozenset())
+            for row in ROWS:
+                if row in ("thermal_mesh", "end_winding_model"):
+                    rise = 0.0
+                else:
+                    h = hot_spot(frozenset({row}))
+                    rise = BIG_K if h is None or base is None else max(0.0, h - base)
+                shares.append(BudgetShare(row, rpm, rise))
+        else:
+            notes.append(f"{rpm:.0f} rpm: rated continuous torque is 0, so no budget shares there")
+        if progress is not None:
+            progress("thermal", k + 1, len(speeds))
+        check()
+
+    for r in ratings_notes(nominal, rated):
+        notes.append(r)
+    c_all, n_all = at(speeds[0], frozenset(ROWS))
+    for n in (*c_all.notes, *n_all.notes):
+        if n not in notes:
+            notes.append(n)
+
+    rotor = load_material(machine.materials.rotor)
+    last = rated[-1]
+    stress = rotor_stress(machine, rotor.density, rotor.mechanical, req.max_speed_rpm, last.rotor_c)
+    gaps: dict[str, GapClosure] = {}
+    if rotor.mechanical is None:
+        notes.append("the rotor material has no mechanical data: no gap closure")
+    else:
+        stator = load_material(machine.materials.stator)
+        exp = lambda m: getattr(m.thermal, "expansion", None) if m.thermal is not None else None  # noqa: E731
+        for key, factor, (t_r, t_s) in (("continuous_max", 1.0, (last.rotor_c, last.bore_c)),
+                                        ("continuous_overspeed", 1.2, (last.rotor_c, last.bore_c)),
+                                        ("peak_max", 1.0, (last.rotor_peak_c, last.bore_peak_c)),
+                                        ("peak_overspeed", 1.2, (last.rotor_peak_c, last.bore_peak_c))):
+            gc = gap_closure(machine, rotor.density, rotor.mechanical, exp(rotor), exp(stator),
+                             factor * req.max_speed_rpm, t_r, t_s)
+            grown = gc.centrifugal / (1.0 - GROWTH_LOW)
+            gaps[key] = dataclasses.replace(gc, centrifugal=grown,
+                                            closure=None if gc.closure is None else gc.closure + grown - gc.centrifugal)
+        notes.append(f"gap closure: centrifugal growth raised by 1/(1 - {GROWTH_LOW}) for the FE comparison")
+    coeffs_top = at(speeds[-1], frozenset(ROWS))[0]
+    return Rating(tuple(nominal), tuple(rated), tuple(shares), limit, req.insulation_class, setup, stress, gaps,
+                  coeffs_top.torque_factor, len(strokes), tuple(dict.fromkeys(notes)), __version__)
+
+
+def ratings_notes(*sets) -> list[str]:
+    return [f"{s.rpm:.0f} rpm: {s.note}" for group in sets for s in group if s.note]
