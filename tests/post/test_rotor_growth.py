@@ -24,7 +24,7 @@ def test_thin_ring_growth():
 
 
 def test_disc_rim_load_adds_lame_displacement():
-    # at rest, bore a = 10 mm, b = 22 mm, p = 1 MPa: u = (b/E)(p (b^2 + a^2)/(b^2 - a^2) - nu p) = 7.8 nm hand value
+    # at rest, bore a = 10 mm, b = 22 mm, p = 1 MPa: u = (b/E)(p (b^2 + a^2)/(b^2 - a^2) - nu p) = 131 nm hand value
     u = _disc_rim_displacement(0.01, 0.022, RHO, 0.0, 0.33, 200e9, 1e6)
     assert u == pytest.approx(0.022 / 200e9 * 1e6 * (584 / 384 - 0.33), rel=1e-12)
 

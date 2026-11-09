@@ -25,9 +25,10 @@ _RING_BEND_SHARE = 0.5
 _STEM_GAIN, _STEM_YOKE_SHARE, _STEM_PITCH_POWER, _SHOULDER_HEIGHT = 0.682, 0.472, 0.265, 0.197
 _BORE_RIM_RELIEF, _BORE_BEND_GAIN = 0.049, 1.97
 # Validity of those constants, the box of the sweep.
-_FIT_POLES = (4, 6, 8, 12, 16)
+_FIT_PHASES = {4: 3, 6: 4, 8: 3, 12: 3, 16: 3}   # phase count of the swept designs; only the arc limit uses it
+_FIT_POLES = tuple(_FIT_PHASES)
 _FIT_SHAFT = (0.25, 0.45)       # shaft diameter / rotor diameter
-_FIT_ARC = (1.0, 1.7)           # pole arc / Lawrenson limit 2 pi / (m Nr)
+_FIT_ARC = (1.0, 1.7)           # pole arc / Lawrenson limit 2 pi / (q Nr) at the swept q
 _FIT_YOKE = (0.55, 1.15)        # yoke thickness / pole tip chord
 _FIT_TAPER = (-1.5, 1.5)        # degrees
 _FIT_FILLET = (0.025, 0.2)      # fillet radius / pole width at the root
@@ -133,9 +134,9 @@ def _outside_fit(machine: RadialSRMParams) -> str | None:
     """The first ratio outside the swept box, as a note; None inside."""
     a, b = machine.shaft_radius, machine.rotor_yoke_outer_radius
     big, n = machine.rotor_outer_radius, machine.n_rotor_poles
-    limit = 2 * math.pi / (machine.n_phases * n)
     if n not in _FIT_POLES:
         return f"{n} rotor poles is outside the validity set {_FIT_POLES} of the root stress model"
+    limit = 2 * math.pi / (_FIT_PHASES[n] * n)
     span = _ring_half_span(machine)
     for name, value, (lo, hi) in (
             ("shaft ratio", a / big, _FIT_SHAFT),

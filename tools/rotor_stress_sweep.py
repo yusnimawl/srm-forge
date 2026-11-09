@@ -26,7 +26,7 @@ from srmcore.post import rotor_stress as rs
 from srmcore.topology.radial import _pole_side
 
 RADIUS = 0.5                  # large, so the absolute web margin of the outline is no limit: stresses scale with R^2
-PHASES = {4: 3, 6: 4, 8: 3, 12: 3, 16: 3}
+PHASES = rs._FIT_PHASES
 RANGES = (rs._FIT_SHAFT, rs._FIT_ARC, rs._FIT_YOKE, rs._FIT_TAPER, rs._FIT_FILLET)
 MECH = load_material("10JNEX900").mechanical.model_copy(update={"poisson_ratio": NU, "youngs_modulus": E})
 
@@ -133,7 +133,7 @@ def solve(jobs, out):
 
 
 def fit(path, target=1.05):
-    """Near-minimax fit (eighth power of the log error) of the two constant sets against `target` x FE. Only designs
+    """Near-minimax fit (the residual is the fourth power of the log error, so the cost is the eighth power) of the two constant sets against `target` x FE. Only designs
     inside the validity box take part."""
     with open(path) as f:
         rows = [row for row in json.load(f) if "skipped" not in row]

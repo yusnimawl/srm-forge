@@ -156,3 +156,14 @@ def test_transient_needs_a_hot_spot_target():
     s = ThermalSolver(prob(domain(nodes, tri), cap=1e3))
     with pytest.raises(ThermalModelError, match="hot spot"):
         s.transient(Temperatures(np.zeros(len(nodes)), {}), uniform(1.0, len(tri)), 1.0, 2)
+
+
+def test_start_must_match_the_model():
+    s, m, n = rc_solver()
+    load = lambda _t: ThermalLoad(np.zeros(m), {})
+    with pytest.raises(ThermalModelError, match="field"):
+        s.transient(Temperatures(np.full(n + 1, 20.0), {"c": 20.0, "f": 20.0}), load, 1.0, 2)
+    with pytest.raises(ThermalModelError, match="'c'"):
+        s.transient(Temperatures(np.full(n, 20.0), {"f": 20.0}), load, 1.0, 2)
+    # a fixed lump need not be given: it holds its fixed temperature
+    s.transient(Temperatures(np.full(n, 20.0), {"c": 20.0}), load, 1.0, 2)

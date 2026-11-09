@@ -170,6 +170,14 @@ def test_pole_counts_inside(n_poles):
     assert _reads_ok(_at(n_poles, shaft=0.45, arc=1.2, fillet=0.04))
 
 
+def test_arc_limit_uses_the_swept_phase_count():
+    # a 12-pole rotor at q = 4 has a narrower Lawrenson limit than any swept design (q = 3)
+    machine = _at(12, shaft=0.45, arc=1.2, fillet=0.04)
+    narrow = machine.model_copy(update={"n_phases": 4, "rotor_pole_arc": machine.rotor_pole_arc * 3 / 4})
+    assert rotor_stress(narrow, RHO, MECH, 20000).status == "kt_out_of_range"
+    assert "pole arc ratio" in rotor_stress(narrow, RHO, MECH, 20000).note
+
+
 @pytest.mark.parametrize("n_poles", [3, 5, 7, 10, 14, 17])
 def test_pole_counts_outside(n_poles):
     _refused(_at(n_poles, shaft=0.45, arc=1.2, fillet=0.04), "rotor poles")

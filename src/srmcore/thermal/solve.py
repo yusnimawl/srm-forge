@@ -198,7 +198,12 @@ class ThermalSolver:
         c_dt = cap[free] / dt
         lu = splu((self._a[free][:, free] + sp.diags(c_dt)).tocsc())
         a_fix = self._a[free][:, fixed] @ self._t_fixed
-        x = np.concatenate([start.field, [start.lumps[nm] for nm in self._names]])[free]
+        if start.field.shape != (self._n,):
+            raise ThermalModelError(f"start field has {start.field.shape} values for {self._n} nodes")
+        for lump in self.problem.lumps:
+            if lump.fixed_c is None and lump.name not in start.lumps:
+                raise ThermalModelError(f"start has no temperature for the free lump '{lump.name}'")
+        x = np.concatenate([start.field, [start.lumps.get(nm, 0.0) for nm in self._names]])[free]
         t = self._unpack(x)
         trace = [self.hot_spot(t).temperature_c]
         for _ in range(n_steps):
