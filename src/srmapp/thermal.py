@@ -29,6 +29,7 @@ class SpeedRating:
     n_evaluations: int
     transient_steps: int
     note: str = ""
+    start_nm: float | None = None
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,8 @@ def _illinois(f, a, fa, pa, b, fb, span):
 
 
 def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: float,
-               solver_for: Callable[[], ThermalSolver], load_at: Callable[[float], Callable | None]) -> SpeedRating:
+               solver_for: Callable[[], ThermalSolver], load_at: Callable[[float], Callable | None],
+               start_nm: float | None = None) -> SpeedRating:
     solver = solver_for()
     n_eval = 0
     none_spot = HotSpot(float("nan"), "none")
@@ -94,7 +96,7 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
         hs_p = solver.hot_spot(t_p) if t_p else hs_c
         z = lambda t, k: _kind_mean(solver, t, k) if t else float("nan")
         return SpeedRating(rpm, envelope_nm, cont, peak, hs_c, hs_p, z(t_c, "rotor_iron"), z(t_p or t_c, "rotor_iron"),
-                           z(t_c, "stator_iron"), z(t_p or t_c, "stator_iron"), n_eval, steps, note)
+                           z(t_c, "stator_iron"), z(t_p or t_c, "stator_iron"), n_eval, steps, note, start_nm)
 
     f0, t0 = steady(0.0)
     if f0 > 0:
@@ -107,6 +109,16 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
     if cont >= envelope_nm:
         return result(cont, cont, t_c, None, 0)
 
+    note = ""
+    t_start = t_c
+    if start_nm is None:
+        note = ("no continuous requirement: the peak starts from the rated continuous state, "
+                "so it is about the continuous rating")
+    elif start_nm < cont:
+        _, t_start = steady(max(start_nm, 0.0))
+        if t_start is None:
+            t_start = t_c
+
     def transient(torque):
         nonlocal n_eval
         load = load_at(torque)
@@ -116,7 +128,7 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
         n, last = STEPS0, None
         while True:
             try:
-                tr = solver.transient(t_c, load, peak_duration_s, n)
+                tr = solver.transient(t_start, load, peak_duration_s, n)
             except ThermalRunaway:
                 return BIG_K, None
             end = tr.hot_spot_c[-1]
@@ -127,8 +139,7 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
 
     fp, pe = transient(envelope_nm)
     if fp <= 0:
-        return result(cont, envelope_nm, t_c, pe[0], pe[1])
-    fc, _ = steady(cont)  # one extra solve for the bracket start; not counted
-    n_eval -= 1
-    peak, _, (t_p, steps) = _illinois(transient, cont, min(fc, 0.0), (t_c, 0), envelope_nm, fp, envelope_nm)
-    return result(cont, peak, t_c, t_p, steps)
+        return result(cont, envelope_nm, t_c, pe[0], pe[1], note)
+    fc, pc = transient(cont)   # bracket start: the hot spot at the continuous torque from the start state
+    peak, _, (t_p, steps) = _illinois(transient, cont, min(fc, 0.0), pc, envelope_nm, fp, envelope_nm)
+    return result(cont, peak, t_c, t_p, steps, note)

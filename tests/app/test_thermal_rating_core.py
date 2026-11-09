@@ -35,9 +35,9 @@ def quad(torque):
     return loss_fn(A_LOSS * torque ** 2)
 
 
-def rate(solver=None, load_at=quad, envelope=20.0, limit=LIMIT, peak_s=10.0):
+def rate(solver=None, load_at=quad, envelope=20.0, limit=LIMIT, peak_s=10.0, start_nm=None):
     solver = solver or make_solver()
-    return rate_speed(1000.0, envelope, limit, peak_s, lambda: solver, load_at)
+    return rate_speed(1000.0, envelope, limit, peak_s, lambda: solver, load_at, start_nm)
 
 
 def test_continuous_hits_limit():
@@ -103,3 +103,13 @@ def test_transient_steps_doubled():
 def test_zone_temperatures():
     r = rate()
     assert r.rotor_c == pytest.approx(T_COOL, abs=1.0) and r.bore_c == pytest.approx(T_COOL, abs=1.0)
+
+
+def test_peak_above_continuous_from_lower_start():
+    r = rate(make_solver(cap=200.0), peak_s=30.0, start_nm=2.0)
+    assert r.continuous_nm < r.peak_nm <= 20.0 and r.start_nm == 2.0 and r.note == ""
+    assert r.peak_hot_spot.temperature_c <= LIMIT + 0.5   # end state; the trace max is held by the search to the limit
+
+
+def test_peak_without_requirement_note():
+    assert "no continuous requirement" in rate(make_solver(cap=200.0)).note
