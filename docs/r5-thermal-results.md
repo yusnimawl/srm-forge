@@ -4,7 +4,13 @@ This file holds the results of the R5a validation gates V1 to V6. V1 passed in t
 
 ## V6: analytic rotor stress against a 2D elastic FE
 
-Verdict: PASS. The model is the revised one in docs/r5-sources.md section 5 (grade C, constants derived from this FE). Model commit f7f2702; the FE code is the same at b41f2bc, where the mesh moved into the gmsh session (the 8/6 values did not change). Pass rule, unchanged: FE converged to under 2 % over the last two levels, bore and root within 15 % of the FE, analytic peak not more than 5 % below the FE peak. Tip growth is held to the same 15 %.
+Verdict: PASS on the box of docs/r5-sources.md section 5, commit 92b3fcc, constants unchanged since 55ac728. The held-out list (1447 designs: every corner of the box, the corners of its taper 0 plane, rays from the centre to every face and joint limit, face points and interior points) was committed at 37303cd before any FE on it, and its FE at 82e32a1 with no change to box or constants. Pass rule, unchanged: FE converged to under 2 % over the last two levels, bore and root within 15 % of the FE, analytic peak not more than 5 % below the FE peak. Tip growth is held to the same 15 %.
+
+What the pass covers: every design that reads `ok`, that is, inside the box with its joint limits, boundary included, for 10JNEX900-like elastic data (nu 0.25 to 0.36 checked) and any size. What it does not cover: pole counts other than 4, 6, 8, 12, 16; taper beyond +-1.5 degrees; fillets under 0.025 or over 0.2 of the pole width; yokes under 0.55 of the tip chord; designs that read `no_fillet` or `kt_out_of_range` (no safety factor is given there); and points between those tested, which no finite set proves. The first box passed four Latin hypercube rounds and failed at its corners; this one was chosen with corner lattices and passed its own corners.
+
+Tip growth: the analytic growth reads up to 9.4 % low on the lattice and 7.8 % low on the held-out set, and 10.2 % low on the first sweep. Low growth is the unsafe sign for the gap: the rotor grows more than computed. R5b carries it as a budget row. `gap_closure` has no range check: its rim relief `_BORE_RIM_RELIEF` is applied to any design, inside the box or not.
+
+Old box record, superseded: model commit f7f2702, FE code the same at b41f2bc.
 
 ### FE reference
 
@@ -45,28 +51,37 @@ Reference machines, no part in any fit. MPa and um, FE at n = 80:
 
 `stress_concentration` now reads 4.36, 5.45 and 8.24: it is root stress over nominal with the ring stress in it, not a pure fillet factor.
 
-Sweep, designs inside the validity box, worst errors of analytic against FE:
+Present box, analytic against FE, worst errors:
 
 | Set | Designs | Root | Bore | Tip | Peak | Convergence root, bore |
 |---|---|---|---|---|---|---|
-| Derived (rounds 1, 2) | 668 | -3.14 to +14.42 % | -3.31 to +13.19 % | -10.22 to +12.88 % | -3.31 % | 0.06, 0.05 % |
-| Round 3 (held out, shaped the fillet limit) | 297 | -3.54 to +13.22 % | -1.41 to +12.64 % | -6.58 to +10.93 % | -3.54 % | 0.06, 0.04 % |
-| Round 4 (held out) | 414 | -3.33 to +13.21 % | -0.77 to +14.29 % | -8.34 to +12.27 % | -3.07 % | 0.07, 0.04 % |
+| Lattice (chose the box, seen) | 16 338 | -3.44 to +12.87 % | -3.97 to +14.36 % | -9.40 to +11.20 % | -3.44 % | 0.09, 0.08 % |
+| Held out, all | 1447 | -3.44 to +11.81 % | -3.52 to +13.29 % | -7.77 to +10.76 % | -3.44 % | 0.08, 0.05 % |
+| Held out, corners | 160 | -3.44 to +11.31 % | -3.50 to +13.20 % | -7.35 to +10.76 % | -3.44 % | |
+| Held out, taper 0 corners | 80 | -3.07 to +10.58 % | -2.89 to +13.29 % | -6.96 to +9.78 % | -3.07 % | |
+| Held out, boundary rays | 300 | -2.95 to +11.81 % | -3.52 to +13.12 % | -7.36 to +9.67 % | -2.95 % | |
+| Held out, faces | 300 | -3.01 to +10.82 % | -1.03 to +11.45 % | -7.77 to +10.15 % | -3.01 % | |
+| Held out, interior | 607 | -2.64 to +11.35 % | -2.19 to +13.02 % | -6.88 to +9.20 % | -2.64 % | |
 
-Round 4 by pole count:
+Held out by pole count:
 
-| N_r | Designs | Root | Bore | Tip |
-|---|---|---|---|---|
-| 4 | 90 | -1.91 to +11.17 % | -0.77 to +6.59 % | -7.88 to +7.84 % |
-| 6 | 135 | -3.07 to +9.81 % | +3.32 to +14.29 % | -8.34 to +12.27 % |
-| 8 | 91 | -3.33 to +10.51 % | +1.55 to +9.20 % | -1.96 to +11.81 % |
-| 10 | 32 | +1.00 to +10.60 % | +2.50 to +6.90 % | -1.51 to +7.06 % |
-| 12 | 26 | -0.43 to +11.57 % | +0.13 to +7.86 % | -1.47 to +6.71 % |
-| 16 | 40 | -1.87 to +13.21 % | +0.13 to +5.83 % | -1.68 to +6.63 % |
+| N_r | Designs | Root | Bore | Tip | Peak |
+|---|---|---|---|---|---|
+| 4 | 287 | -2.30 to +10.62 % | -3.52 to +5.71 % | -7.77 to +7.59 % | -1.53 % |
+| 6 | 365 | -1.67 to +10.31 % | +1.94 to +13.20 % | -7.35 to +8.68 % | -1.67 % |
+| 8 | 315 | -3.44 to +11.81 % | +0.54 to +13.29 % | -2.17 to +10.76 % | -3.44 % |
+| 12 | 254 | -1.64 to +11.41 % | -1.33 to +10.66 % | -0.12 to +9.08 % | -1.64 % |
+| 16 | 226 | -3.01 to +11.18 % | -3.04 to +10.83 % | +0.13 to +8.96 % | -3.01 % |
 
-The FE peak is on the fillet or the bore in every design; the fillet governs in about 90 % of them, with the peak between 0.52 and 0.89 on the fillet.
+The FE peak is on the fillet or the bore in every held-out design. Margins left on the held-out set: 1.6 points on the low side, 1.7 on the high side (bore); on the lattice 1.0 and 0.6.
 
-The rounds, including the two that failed, are in docs/r5-sources.md section 5. The pass is on this finite sweep: the errors in round 3 reached -5.40 % before the fillet limit, and the margins left over all sets are about 1.5 points on the low side and 0.6 on the high side.
+The first box (LHS rounds, docs/r5-sources.md section 5), kept as record:
+
+| Set | Designs | Root | Bore | Tip | Peak |
+|---|---|---|---|---|---|
+| Derived (rounds 1, 2) | 668 | -3.14 to +14.42 % | -3.31 to +13.19 % | -10.22 to +12.88 % | -3.31 % |
+| Round 3 | 297 | -3.54 to +13.22 % | -1.41 to +12.64 % | -6.58 to +10.93 % | -3.54 % |
+| Round 4 | 414 | -3.33 to +13.21 % | -0.77 to +14.29 % | -8.34 to +12.27 % | -3.07 % |
 
 ### First run (failed)
 
