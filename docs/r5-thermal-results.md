@@ -1,6 +1,6 @@
 # R5 thermal and rotor stress results
 
-This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V0, V2, V3, V4 and V5 are pending.
+This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0, V2, V4 and V5 are pending.
 
 ## V1: solver against closed forms (tests/thermal)
 
@@ -128,14 +128,83 @@ The FE peak sits at the pole root fillet in every case (root peak above bore pea
 
 Verdict of that run: FAIL. Bore and tip growth pass the 15 % rule. The root stress fails it by a wide margin, the analytic peak is 36 to 47 % below the FE peak, and the root FE value is not converged to 2 %. The analytic root stress, the nominal pole stress times Kt, is low against the FE. Nothing in the model, Kt or the limits was changed.
 
-## Open for R5b
+## V3: winding conductivity against Marquez-Fernandez 2018
 
-- The liner band is 76 % yoke band (t + 2f). Giving the whole band the liner conductivity makes the coil-to-yoke resistance about 5x too high, so R5b sets that band's conductivity explicitly.
-- Liner classification costs 8.5 s (8/6 full) to 79 s (24/16 full). Use a KD-tree prefilter if it runs per candidate.
-- Backward Euler under-predicts a heating rise: 0.9985 of exact at 200 steps over one time constant, 0.972 at 10. The lagged rho(T) load errs the same way, the unsafe sign. R5b needs a step check or a budget row.
-- A temperature-dependent h means rebuilding `ThermalSolver` in R5b's outer loop (links are fixed per solver).
-- `gap_closure` takes a non-optional `MechanicalData`; callers gate `mechanical is None` first.
-- 10JNEX900 has no specific heat, expansion or through-stack conductivity: the transient has no iron capacity and the stator thermal growth is absent until one is sourced.
-- The six FE-derived constants need the owner's yes (spec section 3 bars invented correlations).
-- Search candidates have `rotor_fillet_radius` 0, so they read `no_fillet`: an owner decision before R5c.
-- Kiyota 18/12 V6 is in R5e.
+Verdict: the Milton formula (Eq. (6), xi 0.324, copper 300 W/(m K), resin 1 W/(m K)) reproduces the printed value at fill 0.37 within 0.8 % and does not reproduce it at fill 0.47. Nothing was fitted. Hand check and source: docs/r5-sources.md section 8. Tests pin the computed values within 0.5 %.
+
+| Fill | Printed (W/(m K)) | Computed | Difference | xi | Measured-agreement value |
+|---|---|---|---|---|---|
+| 0.37 | 2.41 | 2.430 | +0.8 % | 0.324 (cited) | 3.0 |
+| 0.47 | 3.11 | 3.439 | +10.6 % | not cited | 3.85 |
+
+The paper gives xi for fill 0.37 only. Solving for xi gives 0.304 (0.37) and 0.195 (0.47); these are derived here, not in the paper. The measured-agreement values are about 24 % above the Milton ones; the paper reports no temperature error as a number. Handling (spec section 8 V3: revise the band, not the measured values): the nominal winding conductivity is Milton where xi is cited (fill 0.37) and the Hashin-Shtrikman lower bound elsewhere; the band's upper end covers 3.0 and 3.85. The measured values only widen the band.
+
+## First rating (8/6 screening, test fixture)
+
+Source: `tests/app/test_thermal_rate.py` (slow), real 8/6 screening map, default placeholder cooling, 160 degC limit (class H). This is a test fixture. It is not a validation: no measured thermal case exists, the cooling is placeholder, and the map is `screening`.
+
+Inputs: peak 3.0 Nm at 628 W, base 2000 rpm, max 6000 rpm, 400 V bus, 24 turns at 20 A, continuous power 100 W, only the base and max speeds rated (`n_speeds=1`), iron loss x2 in the rated set.
+
+| Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
+|---|---|---|---|---|---|
+| 2000 rpm | nominal | 3.225 | 3.416 (envelope) | 158.6 | 123.9 |
+| 6000 rpm | nominal | 3.164 | 3.354 (envelope) | 158.5 | 119.5 |
+| 2000 rpm | rated | 2.304 | 3.105 (envelope) | 158.3 | 132.7 |
+| 6000 rpm | rated | 2.230 | 3.049 (envelope) | 160.0 | 125.9 |
+
+The lamination end faces are adiabatic (no cited through-stack conductivity); an earlier run that linked them to the end space gave continuous 3.245 / 3.184 Nm (nominal) and 2.340 / 2.223 Nm (rated) at 2000 / 6000 rpm, and the same peaks. Budget shares, in K of hot-spot rise at the rated continuous torque:
+
+| Row | 2000 rpm | 6000 rpm |
+|---|---|---|
+| iron | 0.75 | 2.67 |
+| em_torque | 6.80 | 6.58 |
+| cross_wire | 0 | 0 |
+| liner | 16.9 | 15.8 |
+| contact | 5.61 | 6.20 |
+| air_gap | 0 | 0 |
+| cooling_h | 0.07 | 0.08 |
+| lamination_k | 2.69 | 2.88 |
+| thermal_mesh, end_winding_model | 0 | 0 |
+
+28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 550 s for the module on the bench host.
+
+## R5b: the R5a open list, item by item
+
+- Liner band 76 % yoke band: done in R5b. `thermal_network.py` gives the band the plain `k_liner` over its full geometric width and assumes no coil-to-liner contact (errs hot; ratings read low if the real slot has resin contact). Owner may decide contact later.
+- Liner classification cost: not an issue at the single-case rating (done once per rating). A KD-tree prefilter is an R5c item, if the rating runs per candidate.
+- Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
+- Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
+- `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
+- No iron specific heat, expansion or through-stack conductivity: iron capacity is zero (a note says so; steady results are unaffected) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
+- Six FE-derived constants need the owner's yes: moved to the owner list below.
+- Search candidates read `no_fillet`: moved to the owner list below (before R5c).
+- Kiyota 18/12 V6: R5e.
+
+## Open after R5b
+
+R5c:
+- Ratings replace `j_limit` in the winding choice and the search ranking; `Evaluation.rating`; version bump.
+- Liner classification KD-tree prefilter, if the rating runs per candidate.
+
+R5d:
+- Web: route, job kind and Thermal tab for ratings; run report; options-graph axes. None exist yet.
+
+R5e:
+- V0, V2, V4 and V5 (no measured continuous case; the continuous rating has no measured check) and Kiyota 18/12 V6, on the LattePanda.
+- The 8/6 and bench-target demonstrations.
+
+R6:
+- A re-rate with new cooling needs new strokes. Spec section 10 promised cached strokes and thermal solves only; R5b does not meet that. R6 needs a loss-against-torque reuse design.
+
+Owner:
+- The cooling concept (jacket, spray, shaft oil, slot oil). Defaults are placeholders: ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
+- The contact gap and resin conductivity (cited nominals 0.03 mm and 1.0 W/(m K), unfavourable 0.08 mm and 0.6) and any placeholder in docs/r5-sources.md section 7.
+- Oil property data (specific heat, conductivity, viscosity) for end spray and shaft oil. Both are refused until cited; the spray h band stays recorded. Slot oil runs with water-glycol only.
+- Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
+- The six FE-derived rotor-stress constants, and `rotor_fillet_radius` for search candidates (all read `no_fillet` now).
+- Whether the peak starts from the required continuous torque (the current reading) or from the rated continuous state. The second reading makes the peak about equal to the continuous rating.
+
+Unresolved sources:
+- Romanazzi air-gap correlation: recorded, not coded. The air-gap and end-space rows have zero width until a second cited route exists.
+- Jacket Re below 1e4 (laminar or transitional): refused; the laminar Nu source is not read.
+- Idoughi 2011 (xi against fill factor): not read; Milton stays at fill 0.37 only.

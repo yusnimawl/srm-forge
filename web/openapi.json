@@ -1252,6 +1252,96 @@
         "title": "ConverterSettings",
         "type": "object"
       },
+      "CoolingSetup": {
+        "additionalProperties": false,
+        "properties": {
+          "ambient_c": {
+            "default": 40.0,
+            "title": "Ambient C",
+            "type": "number"
+          },
+          "contact_gap": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Gap"
+          },
+          "end_spray": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EndSpray"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "housing_thickness": {
+            "default": 0.008,
+            "exclusiveMinimum": 0.0,
+            "title": "Housing Thickness",
+            "type": "number"
+          },
+          "impregnation_conductivity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impregnation Conductivity"
+          },
+          "jacket": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Jacket"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": {
+              "channel_height": 0.004,
+              "channel_width": 0.02,
+              "coolant": "water_glycol_50",
+              "flow_m3s": 0.00015,
+              "inlet_c": 65.0,
+              "passes": 4
+            }
+          },
+          "shaft_oil": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShaftOil"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slot_oil": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SlotOil"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "CoolingSetup",
+        "type": "object"
+      },
       "Design": {
         "additionalProperties": false,
         "properties": {
@@ -1374,6 +1464,35 @@
           "inputs"
         ],
         "title": "EditCase",
+        "type": "object"
+      },
+      "EndSpray": {
+        "additionalProperties": false,
+        "properties": {
+          "flow_m3s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Flow M3S",
+            "type": "number"
+          },
+          "inlet_c": {
+            "title": "Inlet C",
+            "type": "number"
+          },
+          "rig": {
+            "default": "nozzle_hairpin",
+            "enum": [
+              "nozzle_hairpin",
+              "shaft_spray"
+            ],
+            "title": "Rig",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inlet_c",
+          "flow_m3s"
+        ],
+        "title": "EndSpray",
         "type": "object"
       },
       "EnvelopeOut": {
@@ -2822,6 +2941,48 @@
         "title": "IssuesOut",
         "type": "object"
       },
+      "Jacket": {
+        "additionalProperties": false,
+        "description": "Water jacket. Defaults are the owner placeholders of docs/r5-sources.md section 7.",
+        "properties": {
+          "channel_height": {
+            "default": 0.004,
+            "exclusiveMinimum": 0.0,
+            "title": "Channel Height",
+            "type": "number"
+          },
+          "channel_width": {
+            "default": 0.02,
+            "exclusiveMinimum": 0.0,
+            "title": "Channel Width",
+            "type": "number"
+          },
+          "coolant": {
+            "default": "water_glycol_50",
+            "title": "Coolant",
+            "type": "string"
+          },
+          "flow_m3s": {
+            "default": 0.00015,
+            "exclusiveMinimum": 0.0,
+            "title": "Flow M3S",
+            "type": "number"
+          },
+          "inlet_c": {
+            "default": 65.0,
+            "title": "Inlet C",
+            "type": "number"
+          },
+          "passes": {
+            "default": 4,
+            "minimum": 1.0,
+            "title": "Passes",
+            "type": "integer"
+          }
+        },
+        "title": "Jacket",
+        "type": "object"
+      },
       "JobCreated": {
         "properties": {
           "job_id": {
@@ -4236,6 +4397,33 @@
             "title": "Bus Voltage V",
             "type": "number"
           },
+          "continuous_power_w": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continuous Power W"
+          },
+          "cooling": {
+            "$ref": "#/components/schemas/CoolingSetup",
+            "default": {
+              "ambient_c": 40.0,
+              "housing_thickness": 0.008,
+              "jacket": {
+                "channel_height": 0.004,
+                "channel_width": 0.02,
+                "coolant": "water_glycol_50",
+                "flow_m3s": 0.00015,
+                "inlet_c": 65.0,
+                "passes": 4
+              }
+            }
+          },
           "cut_process": {
             "default": "unspecified",
             "enum": [
@@ -4245,6 +4433,16 @@
               "laser"
             ],
             "title": "Cut Process",
+            "type": "string"
+          },
+          "insulation_class": {
+            "default": "H",
+            "enum": [
+              "B",
+              "F",
+              "H"
+            ],
+            "title": "Insulation Class",
             "type": "string"
           },
           "max_mass_kg": {
@@ -4281,6 +4479,12 @@
           "max_speed_rpm": {
             "exclusiveMinimum": 0.0,
             "title": "Max Speed Rpm",
+            "type": "number"
+          },
+          "peak_duration_s": {
+            "default": 30.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Peak Duration S",
             "type": "number"
           },
           "peak_power_w": {
@@ -4981,6 +5185,68 @@
           "version"
         ],
         "title": "SetupFile",
+        "type": "object"
+      },
+      "ShaftOil": {
+        "additionalProperties": false,
+        "properties": {
+          "coolant": {
+            "default": "atf",
+            "title": "Coolant",
+            "type": "string"
+          },
+          "flow_m3s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Flow M3S",
+            "type": "number"
+          },
+          "inlet_c": {
+            "title": "Inlet C",
+            "type": "number"
+          }
+        },
+        "required": [
+          "inlet_c",
+          "flow_m3s"
+        ],
+        "title": "ShaftOil",
+        "type": "object"
+      },
+      "SlotOil": {
+        "additionalProperties": false,
+        "properties": {
+          "channel_height": {
+            "exclusiveMinimum": 0.0,
+            "title": "Channel Height",
+            "type": "number"
+          },
+          "channel_width": {
+            "exclusiveMinimum": 0.0,
+            "title": "Channel Width",
+            "type": "number"
+          },
+          "coolant": {
+            "default": "water_glycol_50",
+            "title": "Coolant",
+            "type": "string"
+          },
+          "flow_m3s": {
+            "exclusiveMinimum": 0.0,
+            "title": "Flow M3S",
+            "type": "number"
+          },
+          "inlet_c": {
+            "title": "Inlet C",
+            "type": "number"
+          }
+        },
+        "required": [
+          "channel_height",
+          "channel_width",
+          "inlet_c",
+          "flow_m3s"
+        ],
+        "title": "SlotOil",
         "type": "object"
       },
       "TargetCheckIn": {

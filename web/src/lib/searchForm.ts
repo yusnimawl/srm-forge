@@ -92,7 +92,11 @@ export function toSearchRequest(v: SearchFormValues): SearchRequest {
       phase_current_a: wireMode ? optional(v.phaseCurrentA) : null,
       winding_temperature_c: num(v.windingTemperatureC),
       cut_process: "unspecified",
-    },
+      continuous_power_w: null,
+      peak_duration_s: 30,
+      insulation_class: "H",
+      // cooling is left out: the backend default applies (the schema types it as required).
+    } as SearchRequest["requirements"],
     settings: {
       n_candidates: num(v.nCandidates),
       shortlist: num(v.shortlist),
