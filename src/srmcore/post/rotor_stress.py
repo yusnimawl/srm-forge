@@ -240,9 +240,9 @@ def gap_closure(machine: RadialSRMParams, density: float, mechanical: Mechanical
                 rotor_expansion: float | None, stator_expansion: float | None, rpm: float,
                 rotor_temperature_c: float, stator_temperature_c: float, reference_c: float = 20.0) -> GapClosure:
     """Growth of the rotor tip radius minus the growth of the stator bore, m (positive closes the gap), at the
-    actual speed `rpm`: the caller applies any overspeed. There is no range check: `_BORE_RIM_RELIEF` is used here
-    outside the root model's validity box too, and the result can read up to 11 % low on the box (docs/r5-thermal-results.md),
-    the unsafe sign for the gap. Pole width comes from the flank, so the elongation
+    actual speed `rpm`: the caller applies any overspeed. There is no range check: `_BORE_RIM_RELIEF` applies
+    outside the root model's validity box too, and inside it the growth reads up to 9.4 % low against the FE
+    (docs/r5-thermal-results.md), the unsafe sign for the gap. Pole width comes from the flank, so the elongation
     is the integral of sigma(r)/E with sigma(r) = rho omega^2 / w(r) times the integral of r' w(r') from r to the tip."""
     if rpm <= 0:
         raise ValueError("rpm must be positive")
