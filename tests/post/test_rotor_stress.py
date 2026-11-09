@@ -141,23 +141,82 @@ def test_stress_concentration_falls_with_radius():
     assert root_stress_concentration(make_8_6(rotor_fillet_radius=0.002), nu) < root_stress_concentration(P, nu)
 
 
-@pytest.mark.parametrize("overrides, name", [
-    (dict(rotor_fillet_radius=1e-4), "fillet ratio"), (dict(rotor_fillet_radius=0.005), "fillet ratio"),
-    (dict(n_rotor_poles=18, rotor_pole_arc=math.radians(10.0), n_phases=3), "rotor poles"),
-    (dict(shaft_diameter=0.016), "shaft ratio"), (dict(shaft_diameter=0.040, rotor_yoke_thickness=0.012), "shaft ratio"),
-    (dict(rotor_pole_arc=math.radians(14.0)), "pole arc ratio"), (dict(rotor_pole_arc=math.radians(27.0)), "pole arc ratio"),
-    (dict(rotor_yoke_thickness=0.007), "yoke ratio"), (dict(rotor_yoke_thickness=0.019), "yoke ratio"),
-    (dict(rotor_pole_taper=math.radians(-6.0)), "taper"), (dict(rotor_pole_taper=math.radians(11.0)), "taper"),
-    (dict(rotor_pole_taper=math.radians(10.0), rotor_fillet_radius=0.004, rotor_yoke_thickness=0.015), "free ring span"),
-])
-def test_outside_the_validity_box_is_not_clamped(overrides, name):
-    m = make_8_6(**overrides)
-    assert root_stress_concentration(m, MECH.poisson_ratio) is None
-    s = rotor_stress(m, RHO, MECH, 20000)
+def _at(n_poles=6, shaft=0.33, arc=1.3, yoke=0.8, taper=0.0, fillet=0.06):
+    """A machine at given box ratios, by the definitions of docs/r5-sources.md section 5."""
+    phases = {6: 4}.get(n_poles, 3)
+    beta = arc * 2 * math.pi / (phases * n_poles)
+    values = dict(n_rotor_poles=n_poles, n_phases=phases, rotor_pole_arc=beta, shaft_diameter=shaft * 0.08,
+                  rotor_yoke_thickness=yoke * 0.08 * math.sin(beta / 2), rotor_pole_taper=math.radians(taper))
+    bare = make_8_6(**values, rotor_fillet_radius=0.0)
+    return make_8_6(**values, rotor_fillet_radius=fillet * 2 * pole_half_width(bare, bare.rotor_yoke_outer_radius))
+
+
+def _reads_ok(machine):
+    return rotor_stress(machine, RHO, MECH, 20000).status == "ok"
+
+
+def _refused(machine, name):
+    assert root_stress_concentration(machine, MECH.poisson_ratio) is None
+    s = rotor_stress(machine, RHO, MECH, 20000)
     assert s.status == "kt_out_of_range" and s.safety_factor is None and s.stress_concentration is None
     assert name in s.note and s.bore_stress is not None
     omega = OVERSPEED * 20000 * 2 * math.pi / 60
-    assert s.root_stress == pytest.approx(pole_force_per_depth(m, RHO, omega) / (2 * pole_half_width(m, m.rotor_yoke_outer_radius)))
+    b = machine.rotor_yoke_outer_radius
+    assert s.root_stress == pytest.approx(pole_force_per_depth(machine, RHO, omega) / (2 * pole_half_width(machine, b)))
+
+
+@pytest.mark.parametrize("n_poles", [4, 6, 8, 12, 16])
+def test_pole_counts_inside(n_poles):
+    assert _reads_ok(_at(n_poles, shaft=0.45, arc=1.2, fillet=0.04))
+
+
+@pytest.mark.parametrize("n_poles", [3, 5, 7, 10, 14, 17])
+def test_pole_counts_outside(n_poles):
+    _refused(_at(n_poles, shaft=0.45, arc=1.2, fillet=0.04), "rotor poles")
+
+
+@pytest.mark.parametrize("key, limit, step, name", [
+    ("shaft", 0.25, -1, "shaft ratio"), ("shaft", 0.45, 1, "shaft ratio"),
+    ("arc", 1.0, -1, "pole arc ratio"), ("arc", 1.7, 1, "pole arc ratio"),
+    ("yoke", 0.55, -1, "yoke ratio"), ("yoke", 1.15, 1, "yoke ratio"),
+    ("taper", -1.5, -1, "taper"), ("taper", 1.5, 1, "taper"),
+    ("fillet", 0.025, -1, "fillet ratio"), ("fillet", 0.2, 1, "fillet ratio")])
+def test_box_limit(key, limit, step, name):
+    # the other ratios sit where no other limit binds; a 0.5 % step either side of the limit
+    base = dict(n_poles=4, shaft=0.3, arc=1.2, yoke=0.8, fillet=0.08)
+    if key == "yoke":
+        base.update(shaft=0.25, arc=1.1)
+    if key == "shaft" and step > 0:
+        base.update(yoke=0.7)
+    if key == "arc" and step > 0:
+        base.update(yoke=0.6)
+    assert _reads_ok(_at(**{**base, key: limit}))
+    assert _reads_ok(_at(**{**base, key: limit - step * 0.005 * abs(limit)}))
+    _refused(_at(**{**base, key: limit + step * 0.005 * abs(limit)}), name)
+
+
+def _with_fillet_at(base, target):
+    """The machine of `base` whose fillet ratio puts `target`(machine) at 1, by bisection on the fillet."""
+    ratio = brentq(lambda f: target(_at(**base, fillet=f)) - 1.0, 0.025, 0.2, xtol=1e-9)
+    return lambda scale: _at(**base, fillet=ratio * scale)
+
+
+def test_free_span_limit():
+    def span(m):
+        return rs._ring_half_span(m) * m.n_rotor_poles / math.pi / rs._FIT_MIN_SPAN
+    machine = _with_fillet_at(dict(n_poles=8, shaft=0.4, arc=1.7, yoke=0.6), span)
+    assert rs._ring_half_span(machine(1)) * machine(1).rotor_yoke_outer_radius / machine(1).rotor_fillet_radius > 1
+    assert _reads_ok(machine(0.99))
+    _refused(machine(1.01), "free ring span")
+
+
+def test_ring_arc_over_fillet_limit():
+    def neck(m):
+        return rs._ring_half_span(m) * m.rotor_yoke_outer_radius / m.rotor_fillet_radius / rs._FIT_MIN_NECK
+    machine = _with_fillet_at(dict(n_poles=6, shaft=0.35, arc=1.7, yoke=0.6), neck)
+    assert rs._ring_half_span(machine(1)) * 6 / math.pi > 0.1
+    assert _reads_ok(machine(0.99))
+    _refused(machine(1.01), "ring arc over fillet")
 
 
 def test_speed_limit_gives_exactly_the_safety_factor():

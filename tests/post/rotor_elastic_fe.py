@@ -45,7 +45,7 @@ def elastic_fe_mesh(nodes, triangles, density, youngs_modulus, poisson_ratio, om
 
     @LinearForm
     def load(v, w):
-        return density * omega**2 * (w.x[0] * v.value[0] + w.x[1] * v.value[1])
+        return density * omega**2 * dot(w.x, v)
 
     k, f = asm(stiffness, basis), asm(load, basis)
     nd = basis.nodal_dofs                      # (2, n_nodes)

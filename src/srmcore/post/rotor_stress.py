@@ -18,7 +18,6 @@ STRENGTH_GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # provisional, as 
 # docs/r5-sources.md section 4 (Pilkey 2005 via AmesWeb, grade C).
 _KT_LOW = ((1.006, 1.008, -0.044), (-0.115, -0.584, 0.315), (0.245, -1.006, -0.257), (-0.135, 0.582, -0.017))
 _KT_HIGH = ((1.020, 1.009, -0.048), (-0.065, -0.165, -0.007), (-3.459, 1.266, -0.016), (3.505, -2.109, 0.069))
-_KT_RANGE = (0.1, 20.0)
 # Corner exponent of the fillet factors: 1 - lambda of a free 270 degree corner, and its change per radian of taper.
 _CORNER_EXPONENT, _CORNER_EXPONENT_SLOPE = 0.4555, 0.1
 _RING_BEND_SHARE = 0.5
@@ -26,13 +25,14 @@ _RING_BEND_SHARE = 0.5
 _STEM_GAIN, _STEM_YOKE_SHARE, _STEM_PITCH_POWER, _SHOULDER_HEIGHT = 0.682, 0.472, 0.265, 0.197
 _BORE_RIM_RELIEF, _BORE_BEND_GAIN = 0.049, 1.97
 # Validity of those constants, the box of the sweep.
-_FIT_POLES = (4, 16)
+_FIT_POLES = (4, 6, 8, 12, 16)
 _FIT_SHAFT = (0.25, 0.45)       # shaft diameter / rotor diameter
 _FIT_ARC = (1.0, 1.7)           # pole arc / Lawrenson limit 2 pi / (m Nr)
-_FIT_YOKE = (0.5, 1.15)         # yoke thickness / pole tip chord
-_FIT_TAPER = (-5.0, 10.0)       # degrees
-_FIT_FILLET = (0.015, 0.3)      # fillet radius / pole width at the root
+_FIT_YOKE = (0.55, 1.15)        # yoke thickness / pole tip chord
+_FIT_TAPER = (-1.5, 1.5)        # degrees
+_FIT_FILLET = (0.025, 0.2)      # fillet radius / pole width at the root
 _FIT_MIN_SPAN = 0.1             # free ring half span / half pitch
+_FIT_MIN_NECK = 1.0             # free ring half arc / fillet radius
 _GAUSS = np.polynomial.legendre.leggauss(32)
 
 
@@ -134,14 +134,17 @@ def _outside_fit(machine: RadialSRMParams) -> str | None:
     a, b = machine.shaft_radius, machine.rotor_yoke_outer_radius
     big, n = machine.rotor_outer_radius, machine.n_rotor_poles
     limit = 2 * math.pi / (machine.n_phases * n)
+    if n not in _FIT_POLES:
+        return f"{n} rotor poles is outside the validity set {_FIT_POLES} of the root stress model"
+    span = _ring_half_span(machine)
     for name, value, (lo, hi) in (
-            ("rotor poles", n, _FIT_POLES),
             ("shaft ratio", a / big, _FIT_SHAFT),
             ("pole arc ratio", machine.rotor_pole_arc / limit, _FIT_ARC),
             ("yoke ratio", (b - a) / (2 * big * math.sin(machine.rotor_pole_arc / 2)), _FIT_YOKE),
             ("taper in degrees", math.degrees(machine.rotor_pole_taper), _FIT_TAPER),
             ("fillet ratio", machine.rotor_fillet_radius / (2 * pole_half_width(machine, b)), _FIT_FILLET),
-            ("free ring span ratio", _ring_half_span(machine) * n / math.pi, (_FIT_MIN_SPAN, 1.0))):
+            ("free ring span ratio", span * n / math.pi, (_FIT_MIN_SPAN, 1.0)),
+            ("ring arc over fillet", span * b / machine.rotor_fillet_radius, (_FIT_MIN_NECK, math.inf))):
         if not lo - 1e-9 <= value <= hi + 1e-9:
             return f"{name} {value:.3g} is outside the validity range {lo} to {hi} of the root stress model"
     return None
@@ -237,7 +240,9 @@ def gap_closure(machine: RadialSRMParams, density: float, mechanical: Mechanical
                 rotor_expansion: float | None, stator_expansion: float | None, rpm: float,
                 rotor_temperature_c: float, stator_temperature_c: float, reference_c: float = 20.0) -> GapClosure:
     """Growth of the rotor tip radius minus the growth of the stator bore, m (positive closes the gap), at the
-    actual speed `rpm`: the caller applies any overspeed. Pole width comes from the flank, so the elongation
+    actual speed `rpm`: the caller applies any overspeed. There is no range check: `_BORE_RIM_RELIEF` is used here
+    outside the root model's validity box too, and the result can read up to 11 % low on the box (docs/r5-thermal-results.md),
+    the unsafe sign for the gap. Pole width comes from the flank, so the elongation
     is the integral of sigma(r)/E with sigma(r) = rho omega^2 / w(r) times the integral of r' w(r') from r to the tip."""
     if rpm <= 0:
         raise ValueError("rpm must be positive")
