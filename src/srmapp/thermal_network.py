@@ -66,6 +66,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
         cap_iron[part] = 0.0 if c is None else c * m.density
     if any(v == 0.0 for v in cap_iron.values()):
         notes.append("iron has no cited specific heat: its capacity is zero (steady results unaffected)")
+    notes.append("lamination end faces are adiabatic: no cited through-stack conductivity (errs hot)")
     notes.append("resin has no cited specific heat: coil capacity counts the copper only")
 
     L, r_out, t_h = machine.stack_length, machine.stator_outer_radius, setup.housing_thickness
@@ -103,7 +104,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     l_end = (mtl - 2 * L) / 2
     geo = coil_geometry(machine)
     k_along = copper.thermal.conductivity * fill
-    # g_side counts one end although the merged lump stands for both: deliberately conservative (plan call 2)
+    # g_side counts one end although the merged lump stands for both: deliberately conservative
     g_side = k_along / (L / 2 + l_end / 2)
     end_cu_mass = winding.turns * winding.copper_area * 2 * l_end * copper.density
     end_area = 2 * (geo.depth + geo.build) * l_end * 2
@@ -118,9 +119,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
         links.append(AreaLink(el, end_lumps[coil_of_side[name]], g_side))
     links += [LumpLink(end_lumps[c], "end_space", h_end * end_area) for c in coils]
 
-    # end space: stator and rotor iron end faces of both ends, the end caps, the air gap's annulus
-    for sel in (kind == "stator_iron", kind == "rotor_iron"):
-        links.append(AreaLink(np.flatnonzero(sel), "end_space", 2 * coeffs.h_end_face))
+    # end space: the end caps and the air gap's annulus (the lamination end faces are adiabatic)
     cap_area = 2 * math.pi * r_out ** 2
     links += [LumpLink("end_caps", "end_space", coeffs.h_end_face * cap_area),
               LumpLink("end_caps", "ambient", coeffs.h_end_face * cap_area)]
@@ -131,6 +130,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
 
     # stator back: contact, housing, end caps, ambient
     links.append(EdgeLink(domain.outer_edges, "housing", k_air / coeffs.contact_gap))
+    # one end's conductance although the end_caps lump stands for both: deliberately conservative (factor 2)
     links.append(LumpLink("housing", "end_caps", coeffs.k_housing * 2 * math.pi * r_out * t_h / (L / 2)))
     links.append(LumpLink("housing", "ambient", coeffs.h_end_frame * 2 * math.pi * (r_out + t_h) * L))
     if (j := setup.jacket) is not None:

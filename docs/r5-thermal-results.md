@@ -147,26 +147,26 @@ Inputs: peak 3.0 Nm at 628 W, base 2000 rpm, max 6000 rpm, 400 V bus, 24 turns a
 
 | Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
 |---|---|---|---|---|---|
-| 2000 rpm | nominal | 3.245 | 3.416 (envelope) | 158.8 | not reported |
-| 6000 rpm | nominal | 3.184 | 3.354 (envelope) | 159.0 | not reported |
-| 2000 rpm | rated | 2.340 | 3.105 | not reported | 159.3 |
-| 6000 rpm | rated | 2.223 | 3.049 | not reported | 158.7 |
+| 2000 rpm | nominal | 3.225 | 3.416 (envelope) | 158.6 | 123.9 |
+| 6000 rpm | nominal | 3.164 | 3.354 (envelope) | 158.5 | 119.5 |
+| 2000 rpm | rated | 2.304 | 3.105 (envelope) | 158.3 | 132.7 |
+| 6000 rpm | rated | 2.230 | 3.049 (envelope) | 160.0 | 125.9 |
 
-The fix report prints one hot-spot value per row; it is placed under the torque that bound the limit. Budget shares, in K of hot-spot rise at the rated continuous torque:
+The lamination end faces are adiabatic (no cited through-stack conductivity); an earlier run that linked them to the end space gave continuous 3.245 / 3.184 Nm (nominal) and 2.340 / 2.223 Nm (rated) at 2000 / 6000 rpm, and the same peaks. Budget shares, in K of hot-spot rise at the rated continuous torque:
 
 | Row | 2000 rpm | 6000 rpm |
 |---|---|---|
-| iron | 0.76 | 2.70 |
-| em_torque | 7.67 | 6.47 |
+| iron | 0.75 | 2.67 |
+| em_torque | 6.80 | 6.58 |
 | cross_wire | 0 | 0 |
-| liner | 16.6 | 15.4 |
-| contact | 5.76 | 6.31 |
+| liner | 16.9 | 15.8 |
+| contact | 5.61 | 6.20 |
 | air_gap | 0 | 0 |
 | cooling_h | 0.07 | 0.08 |
-| lamination_k | 2.70 | 2.87 |
+| lamination_k | 2.69 | 2.88 |
 | thermal_mesh, end_winding_model | 0 | 0 |
 
-29 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 569 s for the module on the bench host.
+28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 550 s for the module on the bench host.
 
 ## R5b: the R5a open list, item by item
 
@@ -175,12 +175,12 @@ The fix report prints one hot-spot value per row; it is placed under the torque 
 - Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
 - Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
 - `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
-- No iron specific heat, expansion or through-stack conductivity: iron capacity is zero (a note says so; steady results are unaffected) and the 10JNEX900 gap entries have centrifugal growth only. Through-stack conductivity comes from the cited lamination value (18.6 W/(m K), band in `K_LAMINATION`). Specific heat and expansion move to the owner list below (material data, tracker 10d).
+- No iron specific heat, expansion or through-stack conductivity: iron capacity is zero (a note says so; steady results are unaffected) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
 - Six FE-derived constants need the owner's yes: moved to the owner list below.
 - Search candidates read `no_fillet`: moved to the owner list below (before R5c).
 - Kiyota 18/12 V6: R5e.
 
-## Open for R5c and later
+## Open after R5b
 
 R5c:
 - Ratings replace `j_limit` in the winding choice and the search ranking; `Evaluation.rating`; version bump.

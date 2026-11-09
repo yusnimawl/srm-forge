@@ -54,8 +54,9 @@ def duct_h(fluid: Fluid, hydraulic_diameter: float, velocity: float, length: flo
     """Turbulent duct h, W/(m2 K): Gnielinski with the Filonenko friction factor.
 
     docs/r5-sources.md 6.1 (Jacimovic 2026 Eqs. 7 and 8), including [1 + (d/L)^(2/3)];
-    phi_t is left out (it needs the wall temperature, ratio 1 to 10 in the source), which
-    the 10 % scatter has to cover. Valid Re 1e4 to 1e6 (Eq. 7 starts at 1e4, the
+    the wall-viscosity correction phi_t is omitted (it needs the wall temperature). For a
+    heated liquid phi_t >= 1, so leaving it out under-predicts h (conservative); valid for a
+    heated coolant only. Valid Re 1e4 to 1e6 (Eq. 7 starts at 1e4, the
     formula's author gives 1e6), Pr 0.5 to 500, L >= d. Laminar and transition are
     refused: the laminar Nu is not from a read source (6.1).
     """

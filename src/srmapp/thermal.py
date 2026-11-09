@@ -346,10 +346,16 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
 
     rotor = load_material(machine.materials.rotor)
     last = rated[-1]
-    stress = rotor_stress(machine, rotor.density, rotor.mechanical, req.max_speed_rpm, last.rotor_c)
+    known = math.isfinite(last.rotor_c)
+    if not known:
+        notes.append("rotor temperature unknown (no steady state): stress taken at the hot-spot limit temperature")
+    stress = rotor_stress(machine, rotor.density, rotor.mechanical, req.max_speed_rpm,
+                          last.rotor_c if known else limit)
     gaps: dict[str, GapClosure] = {}
     if rotor.mechanical is None:
         notes.append("the rotor material has no mechanical data: no gap closure")
+    elif not known:
+        notes.append("rotor temperature unknown (no steady state): no gap closure")
     else:
         stator = load_material(machine.materials.stator)
         exp = lambda m: getattr(m.thermal, "expansion", None) if m.thermal is not None else None  # noqa: E731
