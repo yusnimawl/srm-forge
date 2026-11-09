@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from conftest import make_8_6
 
-from srmapp.cooling import CoolingSetup, Jacket, SlotOil, coefficients
+from srmapp.cooling import CoolingSetup, EndSpray, Jacket, MissingCoolingData, SlotOil, coefficients
 from srmapp.sizing.estimates import coil_side_area
 from srmapp.sizing.winding import Winding
 from srmapp.thermal_network import _edge_keys, _tri_area, build_network
@@ -81,7 +81,11 @@ def test_liner_conductance():
     q = s.heat_to_fixed(t)["cold"]
     nodes = dom.nodes
     face = np.hypot(*(nodes[ce][:, 1] - nodes[ce][:, 0]).T).sum()
-    assert q == pytest.approx(co.k_liner * face * p.depth * 100.0 / co.liner_thickness, rel=0.05)
+    # independent bounds: contact (every face at gap t) above; every face at the widest gap
+    # t + 2 fillet (the slot back face, topology/radial.py) below
+    bound = co.k_liner * face * p.depth * 100.0
+    assert q <= bound / co.liner_thickness
+    assert q >= 0.9 * bound / (co.liner_thickness + 2 * M.stator_fillet_radius)
 
 
 def test_end_lump_per_coil():
@@ -104,6 +108,11 @@ def test_slot_oil_builds_and_balances():
 def test_missing_thermal_block_refused():
     with pytest.raises(ValueError, match="M19"):
         net(iron_materials=("M19", "M19"))
+
+
+def test_end_spray_refused():
+    with pytest.raises(MissingCoolingData, match="end spray"):
+        net(CoolingSetup(end_spray=EndSpray(inlet_c=60.0, flow_m3s=1e-5)))
 
 
 def test_jacket_wall_refused():

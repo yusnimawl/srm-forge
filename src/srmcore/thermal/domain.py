@@ -35,7 +35,7 @@ def boundary_edges(triangles: np.ndarray) -> np.ndarray:
     return uniq[count == 1]
 
 
-def _distance_to_segments(points: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def distance_to_segments(points: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Exact distance from each point to the nearest of the segments a-b, chunked over the points."""
     ab = b - a
     ab2 = np.maximum((ab ** 2).sum(axis=1), 1e-300)
@@ -76,7 +76,7 @@ def thermal_domain(static: StaticMesh, machine: RadialSRMParams) -> ThermalDomai
         near = np.ones(len(slot), dtype=bool)
         for k in ("coil", "stator_iron"):
             e = boundary_edges(triangles[:ns][kind[:ns] == k])
-            near &= _distance_to_segments(centroid, nodes[e[:, 0]], nodes[e[:, 1]]) <= reach
+            near &= distance_to_segments(centroid, nodes[e[:, 0]], nodes[e[:, 1]]) <= reach
         kind[slot[near]] = "liner"
 
     coil_elements = {n: np.flatnonzero(region == i) for i, n in enumerate(names) if static.region_kind[n] == "coil"}

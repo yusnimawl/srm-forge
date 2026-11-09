@@ -15,10 +15,10 @@ from srmcore.maps.end_winding import coil_geometry
 from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
 from srmcore.thermal.correlations import air_properties
-from srmcore.thermal.domain import ThermalDomain, _distance_to_segments, boundary_edges
+from srmcore.thermal.domain import ThermalDomain, boundary_edges
 from srmcore.thermal.model import AreaLink, EdgeLink, Lump, LumpLink, ThermalModelError, ThermalProblem
 
-from .cooling import AIR_FILM_C, Coefficients, CoolingSetup
+from .cooling import AIR_FILM_C, Coefficients, CoolingSetup, MissingCoolingData
 from .sizing.estimates import mean_turn_length
 from .sizing.winding import Winding
 
@@ -50,6 +50,9 @@ def _series(*g: float) -> float:
 def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Winding, fill: float,
                   coeffs: Coefficients, setup: CoolingSetup,
                   iron_materials: tuple[str, str] = ("10JNEX900", "10JNEX900")) -> Network:
+    if setup.end_spray is not None:
+        raise MissingCoolingData("end spray: oil properties (specific heat) not cited, "
+                                 "so the oil temperature rise cannot be computed")
     if not coeffs.h_air_gap > 0:
         raise ValueError("air-gap heat transfer coefficient must be positive")
     notes = list(coeffs.notes)
@@ -82,34 +85,29 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     k[coil] = coeffs.k_cross_wire
     cap[coil] = fill * copper.density * copper.thermal.specific_heat
 
-    # liner: the marked band is wider than the liner (the domain reach adds fillet radii), so each element takes
-    # k_liner * (local band width) / t_liner, local width = distance to the coil plus distance to the stator iron;
-    # across the band the conductance per length is then k_liner / t_liner wherever the band is wide
+    # liner: the marked band is the liner plus the fillet allowance; its full geometric width conducts at k_liner
     liner = np.flatnonzero(kind == "liner")
+    k[liner] = coeffs.k_liner
+    notes.append("slot liner band uses the liner conductivity across its full geometric width "
+                 "(no coil-to-liner contact assumed)")
     coil_edges = boundary_edges(tri[coil])
-    if len(liner):
-        centroid = nodes[tri[liner]].mean(axis=1)
-        width = 0.0
-        for sel in (coil, kind == "stator_iron"):
-            e = boundary_edges(tri[sel])
-            width = width + _distance_to_segments(centroid, nodes[e[:, 0]], nodes[e[:, 1]])
-        k[liner] = coeffs.k_liner * np.maximum(width, coeffs.liner_thickness) / coeffs.liner_thickness
     liner_keys = _edge_keys(tri[liner]) if len(liner) else set()
     facing = np.array([tuple(e) in liner_keys for e in np.sort(coil_edges, axis=1).tolist()], dtype=bool)
 
     # coils
+    if any(not (n.startswith("coil_") and n.endswith(("+", "-"))) for n in domain.coil_elements):
+        raise ThermalModelError("coil side names must look like coil_<name>+ or coil_<name>-")
     coil_of_side = {n: n[len("coil_"):-1] for n in domain.coil_elements}
     coils = sorted(set(coil_of_side.values()))
-    if any(not n.endswith(("+", "-")) for n in domain.coil_elements):
-        raise ThermalModelError("coil side names must end in + or -")
     mtl = mean_turn_length(machine)
     l_end = (mtl - 2 * L) / 2
     geo = coil_geometry(machine)
     k_along = copper.thermal.conductivity * fill
+    # g_side counts one end although the merged lump stands for both: deliberately conservative (plan call 2)
     g_side = k_along / (L / 2 + l_end / 2)
     end_cu_mass = winding.turns * winding.copper_area * 2 * l_end * copper.density
     end_area = 2 * (geo.depth + geo.build) * l_end * 2
-    h_end = coeffs.h_end_spray if setup.end_spray is not None else coeffs.h_end_face
+    h_end = coeffs.h_end_face
     end_lumps = {c: f"end_{c}" for c in coils}
 
     lumps = [Lump(end_lumps[c], capacity=end_cu_mass * copper.thermal.specific_heat, hot_spot=True) for c in coils]
@@ -118,12 +116,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     links: list = []
     for name, el in domain.coil_elements.items():
         links.append(AreaLink(el, end_lumps[coil_of_side[name]], g_side))
-    sink = "end_space"
-    if setup.end_spray is not None:
-        lumps.append(Lump("oil", fixed_c=coeffs.spray_inlet_c))
-        sink = "oil"
-        notes.append("end spray oil has no cited specific heat: the oil lump stays at the inlet temperature")
-    links += [LumpLink(end_lumps[c], sink, h_end * end_area) for c in coils]
+    links += [LumpLink(end_lumps[c], "end_space", h_end * end_area) for c in coils]
 
     # end space: stator and rotor iron end faces of both ends, the end caps, the air gap's annulus
     for sel in (kind == "stator_iron", kind == "rotor_iron"):
@@ -131,7 +124,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     cap_area = 2 * math.pi * r_out ** 2
     links += [LumpLink("end_caps", "end_space", coeffs.h_end_face * cap_area),
               LumpLink("end_caps", "ambient", coeffs.h_end_face * cap_area)]
-    gap_area = 2 * math.pi * (machine.bore_radius ** 2 - machine.rotor_outer_radius ** 2) / 2 * 2
+    gap_area = 2 * math.pi * (machine.bore_radius ** 2 - machine.rotor_outer_radius ** 2)  # both ends
     links.append(LumpLink("airgap", "end_space", coeffs.h_air_gap * gap_area))
     for edges in (domain.bore_edges, domain.rotor_edges):
         links.append(EdgeLink(edges, "airgap", coeffs.h_air_gap))
