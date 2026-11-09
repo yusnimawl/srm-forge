@@ -8,6 +8,7 @@ section 5). Run from the repository root with PYTHONPATH=src;tests;tests/post:
     python tools/rotor_stress_sweep.py check SWEEP.json ...   # errors of the model against the FE
 """
 import argparse
+import functools
 import itertools
 import json
 import math
@@ -27,7 +28,6 @@ from srmcore.topology.radial import _pole_side
 RADIUS = 0.5                  # large, so the absolute web margin of the outline is no limit: stresses scale with R^2
 PHASES = {4: 3, 6: 4, 8: 3, 12: 3, 16: 3}
 RANGES = (rs._FIT_SHAFT, rs._FIT_ARC, rs._FIT_YOKE, rs._FIT_TAPER, rs._FIT_FILLET)
-CENTRE = (0.5, 0.5, 0.5, 0.5, 0.5)
 MECH = load_material("10JNEX900").mechanical.model_copy(update={"poisson_ratio": NU, "youngs_modulus": E})
 
 
@@ -60,21 +60,30 @@ def usable(values) -> bool:
     return rs._outside_fit(m) is None
 
 
+@functools.cache
+def centre(n_poles):
+    """Median of the usable points of a Latin hypercube: inside the box for every pole count, where the plain box
+    centre is not (16 poles)."""
+    points = [u for u in qmc.LatinHypercube(d=5, seed=n_poles).random(4000) if usable(design(n_poles, u))]
+    middle = np.median(points, axis=0)
+    assert usable(design(n_poles, middle))
+    return middle
+
+
 def to_boundary(n_poles, u):
-    """The usable point nearest `u` on the line from the box centre: `u` itself when usable, else on a joint limit."""
-    u, centre = np.array(u, float), np.array(CENTRE)
+    """The usable point nearest `u` on the line from the pole count's centre: `u` itself when usable, else on a joint
+    limit."""
+    u, middle = np.array(u, float), centre(n_poles)
     if usable(design(n_poles, u)):
         return design(n_poles, u)
     inside, outside = 0.0, 1.0
-    if not usable(design(n_poles, centre)):
-        return None
     for _ in range(40):
         mid = (inside + outside) / 2
-        if usable(design(n_poles, centre + mid * (u - centre))):
+        if usable(design(n_poles, middle + mid * (u - middle))):
             inside = mid
         else:
             outside = mid
-    return design(n_poles, centre + inside * (u - centre))
+    return design(n_poles, middle + inside * (u - middle))
 
 
 def lattice_designs():
@@ -90,7 +99,8 @@ def lattice_designs():
 
 def heldout_designs(seed):
     """Every corner of the box, moved along the line to the centre onto a joint limit where it is outside them; the
-    corners of the taper 0 plane; random rays from the centre to the boundary; random interior points."""
+    corners of the taper 0 plane; random rays from the centre to the boundary (the clip puts many on edges); points on
+    each face; random interior points."""
     labelled = []
     for n_poles in PHASES:
         rng = np.random.default_rng(seed * 100 + n_poles)
@@ -100,7 +110,7 @@ def heldout_designs(seed):
             labelled.append(("corner_taper0", to_boundary(n_poles, u)))
         for _ in range(60):
             direction = rng.normal(size=5)
-            u = np.array(CENTRE) + direction * (0.5 / np.abs(direction).max())
+            u = np.clip(centre(n_poles) + direction / np.abs(direction).max(), 0.0, 1.0)
             labelled.append(("boundary", to_boundary(n_poles, u)))
         for axis, end in itertools.product(range(5), (0.0, 1.0)):
             for _ in range(6):
