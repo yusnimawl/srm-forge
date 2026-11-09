@@ -105,3 +105,18 @@ def test_cut_process_default_and_validation():
     assert Requirements.model_validate(data).cut_process == "unspecified"
     with pytest.raises(ValidationError):
         Requirements.model_validate({**data, "cut_process": "saw"})
+
+
+def test_ac_parts_sum_unchanged():
+    from srmapp.copper import ac_copper_parts
+    wire, w = _setup()
+    n = 64
+    t = np.arange(n) / n
+    b = np.zeros((n, 4, 2))
+    b[:, :, 0] = 0.4 * np.sin(2 * np.pi * t)[:, None]
+    args = (w, wire, 30.0 * np.sin(2 * np.pi * t), 1 / 400.0, b, np.array(["a", "a", "b", "b"]),
+            np.ones(4) * 1e-5, P, 120.0)
+    skin, prox = ac_copper_parts(*args)
+    assert skin > 0 and prox > 0
+    assert skin + prox == ac_copper_loss(*args)
+    assert ac_copper_parts(w, None, *args[2:]) is None

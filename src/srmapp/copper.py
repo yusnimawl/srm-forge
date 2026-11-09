@@ -43,10 +43,11 @@ def _harmonics(x: np.ndarray) -> np.ndarray:
     return amp
 
 
-def ac_copper_loss(winding: Winding, wire: Wire | None, current: np.ndarray, period_s: float, b_coil: np.ndarray,
-                   coil_side: np.ndarray, coil_areas: np.ndarray, machine: RadialSRMParams,
-                   temperature_c: float) -> float | None:
-    """W, skin plus proximity loss of all phases above the DC loss; None in density mode (`wire` None).
+def ac_copper_parts(winding: Winding, wire: Wire | None, current: np.ndarray, period_s: float, b_coil: np.ndarray,
+                    coil_side: np.ndarray, coil_areas: np.ndarray, machine: RadialSRMParams,
+                    temperature_c: float) -> tuple[float, float] | None:
+    """(skin, proximity) in W, the skin loss of all phases and the proximity loss, above the DC loss; None in
+    density mode (`wire` None). The sum is `ac_copper_loss`.
     `current` is one phase over one electrical period, `b_coil` (n_t, n_coil, 2) the coil-region field over the
     same period at the winding's own scale, `coil_areas` the area of each coil element (`coil_side` names them and
     is not needed: harmonics are taken per element and per component, so reversing and rotating fields count
@@ -66,4 +67,10 @@ def ac_copper_loss(winding: Winding, wire: Wire | None, current: np.ndarray, per
     length = 2 * machine.stack_length
     prox = sum(n_strands * math.pi * length * d**4 * (h * omega) ** 2 * b2[h] / (128 * rho)
                for h in range(1, len(b2)))
-    return float(machine.n_phases * skin + prox)
+    return float(machine.n_phases * skin), float(prox)
+
+
+def ac_copper_loss(*args, **kw) -> float | None:
+    """W, skin plus proximity loss of all phases above the DC loss; None in density mode. Arguments of `ac_copper_parts`."""
+    parts = ac_copper_parts(*args, **kw)
+    return None if parts is None else parts[0] + parts[1]

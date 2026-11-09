@@ -155,6 +155,7 @@ class _Side:
     classical_w: float = 0.0               # W, classical eddy loss of the whole side
     he_mass: np.ndarray | None = None      # W per element, hysteresis + excess before any cut-edge multiplier
     base_he: dict[str, float] | None = None   # W per region, the same summed
+    element_w: np.ndarray | None = None    # W per element: hysteresis and excess (after the cut-edge multiplier) plus classical
 
 
 def design_model(model: LossModel, thickness: float | None) -> LossModel:
@@ -175,13 +176,14 @@ def _side_loss(side: IronWaveforms, omega: float, stack_length: float, model: Lo
     he_mass = (el.hysteresis + el.excess) * mass
     hyst, excess = (el.hysteresis, el.excess) if multiplier is None else (el.hysteresis * multiplier,
                                                                          el.excess * multiplier)
+    element_w = (hyst + el.classical + excess) * mass
     regions, base_he = {}, {}
     for region in np.unique(side.region):
         m = side.region == region
         regions[str(region)] = RegionLoss(*(float(np.sum(w[m] * mass[m])) for w in (hyst, el.classical, excess)))
         base_he[str(region)] = float(np.sum(he_mass[m]))
     return _Side(regions, model.fit_error, model.confidence, el.high_b_share, el.low_b_share, el.beyond_fit_range,
-                 float(np.sum(el.classical * mass)), he_mass, base_he)
+                 float(np.sum(el.classical * mass)), he_mass, base_he, element_w)
 
 
 @dataclass(frozen=True)
