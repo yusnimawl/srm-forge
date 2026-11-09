@@ -51,8 +51,8 @@ def ac_copper_parts(winding: Winding, wire: Wire | None, current: np.ndarray, pe
     `current` is one phase over one electrical period, `b_coil` (n_t, n_coil, 2) the coil-region field over the
     same period at the winding's own scale, `coil_areas` the area of each coil element (`coil_side` names them and
     is not needed: harmonics are taken per element and per component, so reversing and rotating fields count
-    correctly). `temperature_c` is the single temperature of the AC terms and must equal the requirement's
-    `winding_temperature_c`, the one `winding.resistance` was built at. Proximity counts the active length only (twice the stack length); end turns see no slot field."""
+    correctly). `temperature_c` is the single temperature of the AC terms and must equal the temperature
+    `winding.resistance` was built at. Proximity counts the active length only (twice the stack length); end turns see no slot field."""
     if wire is None:
         return None
     rho = load_material(machine.materials.coil).resistivity_at(temperature_c)

@@ -206,7 +206,9 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     """Continuous and peak torque per speed from the hot-spot limit, nominal and with every budget row at its
     unfavourable end. Speeds: the base speed and linspace(max/n_speeds, max, n_speeds). The envelope that tops the
     bracket has no current-density limit. Raises MissingLossData, MissingCoolingData and ValueError (no winding, no
-    thermal data) before any stroke solve, and InterruptedError when `cancel` fires."""
+    thermal data) before any stroke solve, and InterruptedError when `cancel` fires. `progress(step, done, total)`:
+    "strokes" (each distinct stroke solved; the count is not known up front, so total = done) and "thermal" (speeds
+    done of all)."""
     req, design = inputs.requirements, inputs.design
     check_loss_data(design)
     w = evaluation.winding
@@ -219,7 +221,8 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     q, tau = machine.n_phases, 2 * math.pi / machine.n_rotor_poles
     rho = load_material(machine.materials.coil).resistivity_at
     hot = dataclasses.replace(w, resistance=w.resistance * rho(limit) / rho(req.winding_temperature_c))
-    speeds = sorted({req.base_speed_rpm} | set(np.linspace(req.max_speed_rpm / n_speeds, req.max_speed_rpm, n_speeds).tolist()))
+    speeds = sorted({req.base_speed_rpm} | {round(float(x), 6) for x in
+                                            np.linspace(req.max_speed_rpm / n_speeds, req.max_speed_rpm, n_speeds)})
 
     def check() -> None:
         if cancel is not None and cancel():
@@ -304,8 +307,9 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
         omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
         start = None if req.continuous_power_w is None else req.continuous_power_w / omega
         top = float(env.torque[k])
-        ratings = [rate_speed(rpm, top, limit, req.peak_duration_s, solver_for(rpm, rows), load_at(rpm, rows), start)
-                   for rows in (frozenset(), frozenset(ROWS))]
+        ratings = [rate_speed(rpm, top / at(rpm, rows)[0].torque_factor, limit, req.peak_duration_s,
+                              solver_for(rpm, rows), load_at(rpm, rows), start)
+                   for rows in (frozenset(), frozenset(ROWS))]   # the rated set's deliverable envelope is top / torque factor
         nominal.append(ratings[0])
         rated.append(ratings[1])
         t_rated = ratings[1].continuous_nm
@@ -361,7 +365,7 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
         notes.append(f"gap closure: centrifugal growth raised by 1/(1 - {GROWTH_LOW}) for the FE comparison")
     coeffs_top = at(speeds[-1], frozenset(ROWS))[0]
     return Rating(tuple(nominal), tuple(rated), tuple(shares), limit, req.insulation_class, setup, stress, gaps,
-                  coeffs_top.torque_factor, len(strokes), tuple(dict.fromkeys(notes)), __version__)
+                  coeffs_top.torque_factor, sum(v is not None for v in strokes.values()), tuple(dict.fromkeys(notes)), __version__)
 
 
 def ratings_notes(*sets) -> list[str]:
