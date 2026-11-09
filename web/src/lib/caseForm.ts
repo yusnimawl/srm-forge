@@ -183,6 +183,7 @@ export function toInputs(f: CaseForm): CaseInputs {
   return {
     ...rest,
     requirements: {
+      ...restReq, // fields the form does not edit (cooling, insulation class, ...) stay as stored
       peak_power_w: conv(r.peakPowerKw, restReq.peak_power_w, "kW"),
       peak_torque_nm: conv(r.peakTorqueNm, restReq.peak_torque_nm),
       base_speed_rpm: conv(r.baseSpeedRpm, restReq.base_speed_rpm),
