@@ -1269,6 +1269,37 @@ export interface components {
              */
             v_switch: number;
         };
+        /** CoolingSetup */
+        CoolingSetup: {
+            /**
+             * Ambient C
+             * @default 40
+             */
+            ambient_c: number;
+            /** Contact Gap */
+            contact_gap?: number | null;
+            end_spray?: components["schemas"]["EndSpray"] | null;
+            /**
+             * Housing Thickness
+             * @default 0.008
+             */
+            housing_thickness: number;
+            /** Impregnation Conductivity */
+            impregnation_conductivity?: number | null;
+            /**
+             * @default {
+             *       "channel_height": 0.004,
+             *       "channel_width": 0.02,
+             *       "coolant": "water_glycol_50",
+             *       "flow_m3s": 0.00015,
+             *       "inlet_c": 65,
+             *       "passes": 4
+             *     }
+             */
+            jacket: components["schemas"]["Jacket"] | null;
+            shaft_oil?: components["schemas"]["ShaftOil"] | null;
+            slot_oil?: components["schemas"]["SlotOil"] | null;
+        };
         /** Design */
         Design: {
             machine: components["schemas"]["RadialSRMParams"];
@@ -1328,6 +1359,19 @@ export interface components {
             origin: "edit";
             /** Parent Case Id */
             parent_case_id: string;
+        };
+        /** EndSpray */
+        EndSpray: {
+            /** Flow M3S */
+            flow_m3s: number;
+            /** Inlet C */
+            inlet_c: number;
+            /**
+             * Rig
+             * @default nozzle_hairpin
+             * @enum {string}
+             */
+            rig: "nozzle_hairpin" | "shaft_spray";
         };
         /** EnvelopeOut */
         EnvelopeOut: {
@@ -1816,6 +1860,42 @@ export interface components {
             /** Warnings */
             warnings: components["schemas"]["IssueOut"][];
         };
+        /**
+         * Jacket
+         * @description Water jacket. Defaults are the owner placeholders of docs/r5-sources.md section 7.
+         */
+        Jacket: {
+            /**
+             * Channel Height
+             * @default 0.004
+             */
+            channel_height: number;
+            /**
+             * Channel Width
+             * @default 0.02
+             */
+            channel_width: number;
+            /**
+             * Coolant
+             * @default water_glycol_50
+             */
+            coolant: string;
+            /**
+             * Flow M3S
+             * @default 0.00015
+             */
+            flow_m3s: number;
+            /**
+             * Inlet C
+             * @default 65
+             */
+            inlet_c: number;
+            /**
+             * Passes
+             * @default 4
+             */
+            passes: number;
+        };
         /** JobCreated */
         JobCreated: {
             /** Job Id */
@@ -2271,12 +2351,35 @@ export interface components {
              * @default 400
              */
             bus_voltage_v: number;
+            /** Continuous Power W */
+            continuous_power_w?: number | null;
+            /**
+             * @default {
+             *       "ambient_c": 40,
+             *       "housing_thickness": 0.008,
+             *       "jacket": {
+             *         "channel_height": 0.004,
+             *         "channel_width": 0.02,
+             *         "coolant": "water_glycol_50",
+             *         "flow_m3s": 0.00015,
+             *         "inlet_c": 65,
+             *         "passes": 4
+             *       }
+             *     }
+             */
+            cooling: components["schemas"]["CoolingSetup"];
             /**
              * Cut Process
              * @default unspecified
              * @enum {string}
              */
             cut_process: "unspecified" | "wedm" | "punching" | "laser";
+            /**
+             * Insulation Class
+             * @default H
+             * @enum {string}
+             */
+            insulation_class: "B" | "F" | "H";
             /** Max Mass Kg */
             max_mass_kg?: number | null;
             /** Max Outer Diameter M */
@@ -2288,6 +2391,11 @@ export interface components {
             max_slot_fill: number;
             /** Max Speed Rpm */
             max_speed_rpm: number;
+            /**
+             * Peak Duration S
+             * @default 30
+             */
+            peak_duration_s: number;
             /** Peak Power W */
             peak_power_w: number;
             /** Peak Torque Nm */
@@ -2630,6 +2738,34 @@ export interface components {
              */
             version: 1;
             winding?: components["schemas"]["WindingSection"] | null;
+        };
+        /** ShaftOil */
+        ShaftOil: {
+            /**
+             * Coolant
+             * @default atf
+             */
+            coolant: string;
+            /** Flow M3S */
+            flow_m3s: number;
+            /** Inlet C */
+            inlet_c: number;
+        };
+        /** SlotOil */
+        SlotOil: {
+            /** Channel Height */
+            channel_height: number;
+            /** Channel Width */
+            channel_width: number;
+            /**
+             * Coolant
+             * @default water_glycol_50
+             */
+            coolant: string;
+            /** Flow M3S */
+            flow_m3s: number;
+            /** Inlet C */
+            inlet_c: number;
         };
         /** TargetCheckIn */
         TargetCheckIn: {

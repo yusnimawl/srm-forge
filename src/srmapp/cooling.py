@@ -92,8 +92,11 @@ class CoolingSetup(_Frozen):
 
     @property
     def placeholder(self) -> bool:
-        """True while the owner placeholder jacket or housing is in use."""
-        return self.jacket == Jacket() or self.housing_thickness == 8e-3
+        """True while an owner placeholder (ambient, housing, or a jacket dimension or flow) is in use."""
+        d, j = CoolingSetup(), self.jacket
+        return (self.ambient_c == d.ambient_c or self.housing_thickness == d.housing_thickness
+                or (j is not None and any(getattr(j, f) == getattr(Jacket(), f)
+                                          for f in ("channel_height", "channel_width", "passes", "flow_m3s"))))
 
 
 @dataclass(frozen=True)
@@ -147,7 +150,9 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     u = lambda row: row in unfavourable  # noqa: E731
     notes = ["air-gap correlation has no cited scatter", "end-space correlation has no cited scatter "
              "(Boglietti's routes need an air speed no source gives); air properties at a 60 degC film",
-             "thermal_mesh and end_winding_model: not yet measured (R5e)"]
+             "thermal_mesh and end_winding_model: not yet measured (R5e)",
+             f"end-frame and end-face h are taken at an assumed surface temperature of {2 * AIR_FILM_C - setup.ambient_c:g} degC "
+             "(an assumption, not cited)"]
     fill = machine.fill_factor if fill is None else fill
 
     if setup.shaft_oil is not None:
@@ -158,15 +163,16 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
         min(setup.impregnation_conductivity, K_RESIN[1]) if u("liner") else setup.impregnation_conductivity)
     t_mm = machine.slot_liner_thickness * 1e3
     if not NOMEX_MM[0] <= t_mm <= NOMEX_MM[-1]:
-        notes.append(f"liner thickness {t_mm:.3g} mm is outside DuPont Table IV; the end row is used")
+        notes.append(f"liner thickness {t_mm:.3g} mm is outside DuPont Table IV; the nearest end value of Table IV is used")
     k_liner = K_LINER_LOW if u("liner") else float(np.interp(t_mm, NOMEX_MM, NOMEX_K))
     k_cu = load_material("copper").thermal.conductivity     # 2: library value, 391.1
-    if u("cross_wire") or fill not in MILTON_XI:
+    xi = next((v for k, v in MILTON_XI.items() if math.isclose(k, fill, abs_tol=1e-9)), None)
+    if u("cross_wire") or xi is None:
         k_wire = hashin_shtrikman_lower(fill, k_cu, resin)
         if not u("cross_wire"):
             notes.append(f"cross-wire: xi is cited at fill 0.37 only, Hashin-Shtrikman used at {fill:.3g}")
     else:
-        k_wire = milton_k(fill, k_cu, resin, MILTON_XI[fill])
+        k_wire = milton_k(fill, k_cu, resin, xi)
 
     nominal_gap = GAP_MM[0] * 1e-3 if setup.contact_gap is None else setup.contact_gap
     gap = max(nominal_gap, GAP_MM[1] * 1e-3) if u("contact") else nominal_gap

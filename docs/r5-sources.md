@@ -318,7 +318,7 @@ One row for each budget row of spec §7 that needs a band. "Nominal" is what the
 | `impregnation` (resin, in the same spec row as the liner) | 1.0 W/(m K), the value the authors simulated (Milton 2.41 at fill 0.37) | 0.6 W/(m K) | Marquez-Fernandez 2018 p. 8 | band found, grade B |
 | `contact` | 0.03 mm equivalent air gap | 0.08 mm | 6.5; Boglietti et al. 2009 Sec. VI-E, a survey on industrial induction motors, frame material not stated | band found, grade C, transfer to an SRM in an aluminium jacket assumed |
 | `air_gap` | Romanazzi and Howey, Nu = 0.181 Ta_m^0.207, 1e2 < Ta_m < 3e4 (not codable until A is defined) | by the controller's rule: the lowest of the cited correlations at the same conditions, among Romanazzi and Howey and Faiz Eq. (6) (about 65 W/(m2 K) at the Faiz geometry); the pure-conduction value k_air / g is a second candidate floor but the Romanazzi CFD sits below it near Ta_m = 100 | 6.2 | **band defined by rule, not by a stated scatter**; Romanazzi cannot be evaluated, so only the Faiz route has a number; the plan must choose |
-| `cooling_h` jacket (water-glycol) | Gnielinski (6.1) with the 50 wt % properties at 65 degC; Re 4000 to 1e6; a laminar jacket is refused (6.1) | h at minus 10 % (Shah and Sekulic via Jacimovic et al.) | 6.1, 6.7 | band found, grade C |
+| `cooling_h` jacket (water-glycol) | Gnielinski (6.1) with the 50 wt % properties at 65 degC; Re 1e4 to 1e6 (the friction factor of Eq. 7 starts at 1e4); a laminar or transition jacket is refused (6.1) | h at minus 10 % (Shah and Sekulic via Jacimovic et al.) | 6.1, 6.7 | band found, grade C |
 | `cooling_h` end space | Churchill and Chu on the external faces (Faiz Eq. 1 to 5, Table III, 20 to 60 degC only); inside the endcaps h_C = 6.22 v of Boglietti et al. Eq. 9 needs an air speed that no source gives for a given machine | the lowest of the cited routes at the same conditions: Churchill and Chu, Boglietti Eq. 9 and Eq. 10, and the 12 to 14 W/(m2 degC) external figure, per the controller's rule | 6.3 | **band defined by rule**; no stated accuracy for any route; the air speed v is an input nobody cites |
 | `cooling_h` end spray | the measured range of the chosen rig: nozzle spray on a hairpin 190 to 910 W/(m2 K), or shaft spray 3500 to 4800 W/(m2 K) | the low end of that range, or for the shaft spray inside a sump 1100 W/(m2 K); the Hoffmann model adds minus 25 % | 6.4; neither rig is the owner's geometry | measured ranges found, two disjoint rigs, selection is the plan's |
 | `cooling_h` shaft oil | none | none | 6.4 | **not found**, option refused |
@@ -341,6 +341,8 @@ These are the default cooling setup of spec §2 decision 5, labelled "placeholde
 | Number of passes | 4 |
 | Flow | 9 L/min = 1.5e-4 m3/s |
 | Housing thickness | 8 mm |
+| Ambient | 40 degC (owner placeholder) |
+| Natural-convection surface temperature | 80 degC, i.e. 2 x 60 - ambient (an assumption, not cited; sets the end-frame and end-face h at the 60 degC air film) |
 
 Check of the flow regime this gives (arithmetic only, with the 65 degC properties interpolated from section 6.7): hydraulic diameter 2 h w / (h + w) = 6.67 mm, section 80 mm2, mean speed 1.875 m/s, Re about 1.1e4, inside the Gnielinski range (Re above 1e4). The flow was raised from 8 L/min (Re about 9800, below 1e4, so refused) to 9 L/min so the default jacket is in range.
 

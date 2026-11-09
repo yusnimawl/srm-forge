@@ -89,3 +89,10 @@ def test_uncited_option_refused():
 
 def test_airgap_h_depends_on_rpm():
     assert co(rpm=6000.0).h_air_gap > co(rpm=3000.0).h_air_gap > 0
+
+
+def test_placeholder_flag():
+    assert CoolingSetup(jacket=Jacket(flow_m3s=1.6e-4)).placeholder     # ambient etc. still default
+    s = CoolingSetup(jacket=Jacket(channel_height=5e-3, channel_width=25e-3, passes=3, flow_m3s=2e-4),
+                     housing_thickness=9e-3, ambient_c=30.0)
+    assert not s.placeholder
