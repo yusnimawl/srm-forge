@@ -2,6 +2,17 @@
 
 This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V0, V2, V3, V4 and V5 are pending.
 
+## V1: solver against closed forms (tests/thermal)
+
+| Case | Test | Measured error | Gate |
+|---|---|---|---|
+| Slab, uniform heat, Robin ends | `test_slab_uniform_heat_robin_ends` | 2.7e-15 of the rise on the centre row (all nodes 2.0e-3, the diagonal split tilts the end columns) | 1e-9 on the centre row |
+| Annulus, uniform heat | `test_annulus_uniform_heat` | 9.0e-4 of the rise | 1e-3 |
+| Manufactured solution, order | `test_manufactured_solution_second_order` | L2 7.64e-3 (8 x 8) and 1.91e-3 (16 x 16), ratio 3.99 | ratio over 3 |
+| Lumped RC step, 200 steps over one time constant | `test_lumped_rc_step` | 9.2e-4 of the final rise | 5e-3 |
+| Time step order (first) | `test_time_step_is_first_order` | error ratio 1.99 for 50 against 100 steps | 1.8 to 2.2 |
+| Adiabatic element heating | `test_adiabatic_element_heating` | node balance to 1e-9 relative, stored energy to 1e-9 | 1e-9 |
+
 ## V6: analytic rotor stress against a 2D elastic FE
 
 Verdict: PASS on the box of docs/r5-sources.md section 5, commit 92b3fcc, constants unchanged since 55ac728. The held-out list (1447 designs: every corner of the box, the corners of its taper 0 plane, rays from the centre to every face and joint limit, face points and interior points) was committed at 37303cd before any FE on it, and its FE at 82e32a1 with no change to box or constants. Pass rule, unchanged: FE converged to under 2 % over the last two levels, bore and root within 15 % of the FE, analytic peak not more than 5 % below the FE peak. Tip growth is held to the same 15 %.
@@ -116,3 +127,15 @@ FE convergence, `full` to `reference`: 8/6 bore 0.9 %, root 3.0 %; 12/8 bore 1.2
 The FE peak sits at the pole root fillet in every case (root peak above bore peak). The bore peak is on the shaft bore.
 
 Verdict of that run: FAIL. Bore and tip growth pass the 15 % rule. The root stress fails it by a wide margin, the analytic peak is 36 to 47 % below the FE peak, and the root FE value is not converged to 2 %. The analytic root stress, the nominal pole stress times Kt, is low against the FE. Nothing in the model, Kt or the limits was changed.
+
+## Open for R5b
+
+- The liner band is 76 % yoke band (t + 2f). Giving the whole band the liner conductivity makes the coil-to-yoke resistance about 5x too high, so R5b sets that band's conductivity explicitly.
+- Liner classification costs 8.5 s (8/6 full) to 79 s (24/16 full). Use a KD-tree prefilter if it runs per candidate.
+- Backward Euler under-predicts a heating rise: 0.9985 of exact at 200 steps over one time constant, 0.972 at 10. The lagged rho(T) load errs the same way, the unsafe sign. R5b needs a step check or a budget row.
+- A temperature-dependent h means rebuilding `ThermalSolver` in R5b's outer loop (links are fixed per solver).
+- `gap_closure` takes a non-optional `MechanicalData`; callers gate `mechanical is None` first.
+- 10JNEX900 has no specific heat, expansion or through-stack conductivity: the transient has no iron capacity and the stator thermal growth is absent until one is sourced.
+- The six FE-derived constants need the owner's yes (spec section 3 bars invented correlations).
+- Search candidates have `rotor_fillet_radius` 0, so they read `no_fillet`: an owner decision before R5c.
+- Kiyota 18/12 V6 is in R5e.

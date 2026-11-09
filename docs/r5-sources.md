@@ -13,7 +13,7 @@ Grades: **A** measured on the owner's lot or a measured table, **B** a test or m
 | 1c | 10JNEX900 thermal conductivity 18.6 W/(m K) | Ou et al. 2021, Table I (p. 2) | C | found, direction not stated |
 | 1d | 10JNEX900 through-stack conductivity, specific heat, expansion | none | - | **not found** |
 | 1e | Test temperature and cutting method of the 570 MPa test | Ou et al. ref. [24] (ICEMS 2019) | - | **not found** (paper not reachable) |
-| 2 | Copper k, c, expansion | National Bronze C11000 data sheet p. 2 (CDA values) | B | found |
+| 2 | Copper k, c, expansion | National Bronze C11000 data sheet p. 2 | B | found |
 | 3 | steel_1010 k, c, expansion, E, Poisson ratio, yield | Elgin Fasteners grade 1010 data sheet pp. 1-3 | C | found, cold-drawn condition |
 | 4 | Kt of a shoulder fillet in tension | AmesWeb calculator page quoting Pilkey 2005 | C | formula found, book page not recorded; its 2h/D = 0 limit is used in the root model (section 5) |
 | 5 | Rotor root and bore model, constants and validity range | derived from a converged 2D elastic FE sweep of this project, `tools/rotor_stress_sweep.py`, `docs/validation/rotor_sweep.json` | C (derived from this FE) | section 5 |
@@ -32,7 +32,7 @@ Source: J. Ou, Y. Liu, P. Breining, T. Gietzelt, T. Wunsch, M. Doppelbauer, "Exp
 
 ## 2. Copper
 
-Source: National Bronze Manufacturing, C11000 (Electrolytic Tough Pitch) data sheet, https://www.nationalbronze.com/pdfs/C11000.pdf, PDF page 2, "Physical Properties" (US customary, the values are those the Copper Development Association publishes for C11000). The CDA page itself (alloys.copper.org) was under maintenance and the CDA fact sheet returned 403, so neither was read.
+Source: National Bronze Manufacturing, C11000 (Electrolytic Tough Pitch) data sheet, https://www.nationalbronze.com/pdfs/C11000.pdf, PDF page 2, "Physical Properties" (US customary). The sheet itself does not say where its values come from; the CDA page (alloys.copper.org) was under maintenance and the CDA fact sheet returned 403, so no CDA source was read.
 
 | Quantity | As printed | SI used |
 |---|---|---|
@@ -40,7 +40,7 @@ Source: National Bronze Manufacturing, C11000 (Electrolytic Tough Pitch) data sh
 | Specific heat | 0.092 Btu/lb/F at 68 F | 385.2 J/(kg K) (x 4186.8) |
 | Expansion | 9.40e-6 per F (68-212 F); 9.60e-6 (68-392 F); 9.80e-6 (68-572 F) | 1.692e-5 per K (x 1.8, the 20-100 degC range) |
 
-Grade B (a manufacturer data sheet quoting CDA, typical values). The library copper is the IEC annealed standard for resistivity; C11000 is the matching commercial grade (101 % IACS). Modulus of elasticity in tension 17000 ksi is on the same page but no copper `mechanical` block is added (not needed for R5a).
+Grade B (a manufacturer data sheet, typical values). The library copper is the IEC annealed standard for resistivity; C11000 is the matching commercial grade (101 % IACS). Modulus of elasticity in tension 17000 ksi is on the same page but no copper `mechanical` block is added (not needed for R5a).
 
 ## 3. steel_1010
 
@@ -59,7 +59,7 @@ Caveats: the library's `steel_1010` is the FEMM magnetic curve, whose condition 
 
 ## 4. Stress concentration factor of a shoulder fillet in tension
 
-Neither Peterson nor Roark was reachable. The formula below was read from the AmesWeb page "Stress Concentration Calculator - Shoulder Fillets in a Flat Bar", https://amesweb.info/stress-concentration-factor-calculator/shoulder-fillets-in-flat-bar.aspx, which gives as its reference Pilkey, W. D. (2005), Formulas for Stress, Strain, and Structural Matrices, 2nd ed., Wiley ). The book page is not recorded: a page number "p. 156" for Peterson's Stress Concentration Factors (2nd ed., Pilkey 1997) is only an inference from the EES page "Rod with shoulder fillets under tension" (https://fchartsoftware.com/ees/mechanical_design/stress_concentration_factors/hs203.htm), which gives no formula, only one example, and says "rod", not flat bar. The source actually read is a calculator page quoting Pilkey 2005. Grade C. The coefficients and the D/d range still need checking against Peterson; gate V6 is the interim check.
+Neither Peterson nor Roark was reachable. The formula below was read from the AmesWeb page "Stress Concentration Calculator - Shoulder Fillets in a Flat Bar", https://amesweb.info/stress-concentration-factor-calculator/shoulder-fillets-in-flat-bar.aspx, which gives as its reference Pilkey, W. D. (2005), Formulas for Stress, Strain, and Structural Matrices, 2nd ed., Wiley. The book page is not recorded: a page number "p. 156" for Peterson's Stress Concentration Factors (2nd ed., Pilkey 1997) is only an inference from the EES page "Rod with shoulder fillets under tension" (https://fchartsoftware.com/ees/mechanical_design/stress_concentration_factors/hs203.htm), which gives no formula, only one example, and says "rod", not flat bar. The source actually read is a calculator page quoting Pilkey 2005. Grade C. The coefficients and the D/d range still need checking against Peterson; gate V6 is the interim check.
 
 Geometry (figure on the page): opposite shoulder fillets in a stepped flat bar; D = width of the wide part, d = width of the narrow part, h = step height = (D - d)/2 (drawn in the figure), r = fillet radius, L = length of the wide part, t = thickness. Load P in tension, nominal stress sigma_nom = P / (t d), sigma_max = Kt sigma_nom.
 
@@ -122,7 +122,7 @@ The 1/2 was rounded from a free fit (0.48 to 0.60).
 | c5 | `_STEM_YOKE_SHARE` | 0.472 | share of t in L |
 | c6 | `_SHOULDER_HEIGHT` | 0.197 | largest shoulder height / d |
 
-Six fitted numbers, with no measured data in them. They come from `tools/rotor_stress_sweep.py fit` (fourth power of the log error, against 1.05 x FE, so errors centre on the high side) on 767 designs of the rounds below at commit 55ac728, when the fillet range still started at 0.01; the same command now gives other digits because it filters on the present box.
+Six fitted numbers, with no measured data in them. They come from `tools/rotor_stress_sweep.py fit` (the residual is the fourth power of the log error, so the cost is the eighth power; against 1.05 x FE, so errors centre on the high side) on 767 designs of the rounds below at commit 55ac728, when the fillet range still started at 0.01; the same command now gives other digits because it filters on the present box.
 
 ### Derivation and held-out rounds
 
@@ -156,7 +156,7 @@ Outside it `root_stress_concentration` returns None and `rotor_stress` gives sta
 |---|---|
 | N_r | one of 4, 6, 8, 12, 16 |
 | shaft diameter / rotor diameter | 0.25 to 0.45 |
-| rotor pole arc / (2 pi / (m N_r)) | 1.0 to 1.7 |
+| rotor pole arc / (2 pi / (q N_r)), q the swept phase count of that pole count (4: 3, 6: 4, 8: 3, 12: 3, 16: 3) | 1.0 to 1.7 |
 | yoke thickness / pole tip chord | 0.55 to 1.15 |
 | taper | -1.5 to +1.5 degrees |
 | fillet radius / pole width at the root | 0.025 to 0.2 |
