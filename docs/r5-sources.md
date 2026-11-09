@@ -72,7 +72,7 @@ Kt = C1 + C2 (2h/D) + C3 (2h/D)^2 + C4 (2h/D)^3, with s = sqrt(h/r) and x = h/r:
 | C3 | 0.245 - 1.006 s - 0.257 x | -3.459 + 1.266 s - 0.016 x |
 | C4 | -0.135 + 0.582 s - 0.017 x | 3.505 - 2.109 s + 0.069 x |
 
-Validity as printed: the h/r ranges above, and L/D > -1.89 (r/d - 0.15) + 5.5 (a long enough wide part). The page gives no range for 2h/D. An h/r outside the printed range (0.1 to 20) is refused, not clamped: status kt_out_of_range. At 2h/D = 0 the fit returns C1, about 1 + sqrt(h/r), the semi-infinite-plate limit (1.32 at h/r = 0.1), a real value. The formula is for a plate in plane stress; a rotor bridge or pole root is not an isolated step, so it is a screening estimate.
+Validity as printed: the h/r ranges above, and L/D > -1.89 (r/d - 0.15) + 5.5 (a long enough wide part). The page gives no range for 2h/D. The code no longer checks this range: only C1 is used (section 5), and inside the section 5 box its argument x = H/r stays between 0.46 and 7.9 on the lattice and held-out designs, inside the printed 0.1 to 20. At 2h/D = 0 the fit returns C1, about 1 + sqrt(h/r), the semi-infinite-plate limit (1.32 at h/r = 0.1), a real value. The formula is for a plate in plane stress; a rotor bridge or pole root is not an isolated step, so it is a screening estimate.
 
 Gate V6 showed the mapping d = pole width, D = pole pitch does not describe the root: nominal stress x Kt is 36 to 47 % below the FE. The full formula with that mapping is no longer used. Only its 2h/D = 0 limit C1 (one free shoulder of height h) is used, in section 5.
 
@@ -126,27 +126,41 @@ Six fitted numbers, with no measured data in them. They come from `tools/rotor_s
 
 ### Derivation and held-out rounds
 
+First box (Latin hypercube rounds, seeds 1 to 7, R 50 mm):
+
 | Round | Seeds, N_r | Role | Outcome |
 |---|---|---|---|
 | 1 | 1; 4, 6, 8, 16 | derivation of the form and the first constants | - |
 | 2 | 2 and 3; 4, 6, 8, 16 and 10, 12 | held out for the first constants | root -4.98 to +13.71 %, bore pass, tip +15.78 %: FAIL on tip. Rim relief added to the growth; rounds 1 and 2 then became the derivation set |
-| 3 | 4 and 5; same | held out for the present constants | root -5.40 %, one design of 337 at r/d 0.014: FAIL. The root error drifts low below r/d 0.015 (median +2.1 % there, +6.7 % at 0.04 to 0.16), so the box was cut to 0.015. Constants unchanged |
-| 4 | 6 and 7; same | held out for the present constants and box | PASS |
+| 3 | 4 and 5; same | held out for the present constants | root -5.40 %, one design of 337 at r/d 0.014: FAIL. The box was cut to r/d 0.015. Constants unchanged |
+| 4 | 6 and 7; same | held out for the present constants | passed, but a Latin hypercube never reaches the corners |
 
-Round 3 is not pure held-out evidence after that cut: its failure shaped the box. Round 4 is. 8/6, 12/8 and 24/16 took no part in any fit; their FE was seen before the fit only for 8/6 and 12/8, in the load split.
+Review of the first box: lattices of its corners gave root -10.9 to +24.8 %, bore -6.1 to +19.2 %, peak -10.9 %, confirmed by an independent NGSolve FE. Low roots came from fillets that nearly meet on the rim and from the smallest fillets, bore out of band from yokes at 0.5 of the tip chord. That review spent the first box.
+
+Present box (commit 92b3fcc, constants unchanged since 55ac728):
+
+| Step | Commit | Designs | Result |
+|---|---|---|---|
+| Lattice over a wider box, R 0.5 m, to choose the box (seen) | - | 16 275 | the limits below |
+| `tools/rotor_stress_sweep.py lattice`: 5 x 6 x 6 x 3 x 7 per pole count, points outside moved along the line to the centre onto a joint limit (seen) | 92b3fcc | 16 338 | root -3.44 to +12.87 %, bore -3.97 to +14.36 %, tip -9.40 to +11.20 % |
+| Held-out list `heldout 11`: 160 corners, 80 taper 0 corners, 300 boundary rays, 300 face points, 607 interior | 37303cd, before any FE on it | 1447 | |
+| FE of that list, no change to box or constants | 82e32a1 | 1447 | PASS: root -3.44 to +11.81 %, bore -3.52 to +13.29 %, tip -7.77 to +10.76 %, peak -3.44 % |
+
+8/6, 12/8 and 24/16 took no part in any fit; their FE was seen before the fit only for 8/6 and 12/8, in the load split.
 
 ### Validity range
 
-Outside it `root_stress_concentration` returns None and `rotor_stress` gives status `kt_out_of_range`, the nominal root stress and no safety factor.
+Outside it `root_stress_concentration` returns None and `rotor_stress` gives status `kt_out_of_range`, the nominal root stress and no safety factor. Each limit, joint ones too, is tested just inside and just outside (tests/post/test_rotor_stress.py).
 
 | Ratio | Range |
 |---|---|
-| N_r | 4 to 16 (swept: 4, 6, 8, 10, 12, 16; odd counts not swept) |
+| N_r | one of 4, 6, 8, 12, 16 |
 | shaft diameter / rotor diameter | 0.25 to 0.45 |
 | rotor pole arc / (2 pi / (m N_r)) | 1.0 to 1.7 |
-| yoke thickness / pole tip chord | 0.5 to 1.15 |
-| taper | -5 to +10 degrees |
-| fillet radius / pole width at the root | 0.015 to 0.3 |
-| free ring half span / half pitch | at least 0.1 |
+| yoke thickness / pole tip chord | 0.55 to 1.15 |
+| taper | -1.5 to +1.5 degrees |
+| fillet radius / pole width at the root | 0.025 to 0.2 |
+| free ring half span gamma / half pitch | at least 0.1 |
+| free ring half arc gamma b / fillet radius | at least 1 (joint limit: the fillets may not nearly meet on the rim) |
 
-This box holds every geometry `srmapp.sizing.generator` samples apart from the fillet: the generator leaves `rotor_fillet_radius` at 0, and those candidates read `no_fillet`.
+Search coverage: of 1200 `sample_candidates` designs (seed 5) given a fillet of 0.03 to 0.05 of the pole width, 980 to 996 (82 to 83 %) read `ok`; 123 fall below the yoke limit and 81 to 97 on the free span. By pole count at 0.03: 4 poles 88 %, 6 poles 89 %, 8 poles 82 %, 16 poles 72 %. The generator itself leaves `rotor_fillet_radius` at 0, so its candidates read `no_fillet`.
