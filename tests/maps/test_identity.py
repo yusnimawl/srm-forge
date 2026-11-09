@@ -1,3 +1,4 @@
+import pytest
 from conftest import make_8_6
 from srmcore.maps.identity import design_hash, material_digest
 from srmcore.model.design import Design, MeshSettings, RegionMaterials
@@ -22,6 +23,18 @@ def test_design_hash_changes_with_geometry_preset_and_material():
     assert design_hash(D.model_copy(update={"mesh": MeshSettings(preset="screening")})) != base
     other = D.machine.model_copy(update={"materials": RegionMaterials(stator="M43", rotor="M43")})
     assert design_hash(D.model_copy(update={"machine": other})) != base
+
+
+@pytest.mark.parametrize("block", ["thermal", "mechanical"])
+def test_data_block_does_not_change_digest(block):
+    import json
+    from srmcore.materials import library
+    raw = (library._data_dir() / "steel_1010.json").read_bytes()
+    record = json.loads(raw)
+    record.pop(block, None)
+    bare = json.dumps(record).encode()
+    record[block] = {"anything": 1}
+    assert material_digest(json.dumps(record).encode()) == material_digest(bare)
 
 
 def test_loss_block_does_not_change_digest():

@@ -70,6 +70,42 @@ class LossData(_Frozen):
         return self
 
 
+class ThermalData(_Frozen):
+    """Thermal properties used by the thermal solver; None marks a value with no cited source."""
+    conductivity: float = Field(gt=0)   # W/(m K), in the lamination plane (or isotropic)
+    conductivity_through_stack: float | None = Field(default=None, gt=0)   # W/(m K), across the stack
+    specific_heat: float | None = Field(default=None, gt=0)   # J/(kg K)
+    expansion: float | None = Field(default=None, gt=0)   # 1/K
+    provenance: Provenance
+    confidence: Literal["A", "B", "C"]
+    temperature_c: float | None = None
+
+
+class MechanicalData(_Frozen):
+    """Elastic and strength data for the rotor stress check. The governing strength is the tensile strength of a
+    brittle material and the yield strength of a ductile one."""
+    youngs_modulus: float = Field(gt=0)   # Pa
+    poisson_ratio: float = Field(gt=0, lt=0.5)
+    yield_strength: float | None = Field(default=None, gt=0)   # Pa
+    tensile_strength: float | None = Field(default=None, gt=0)   # Pa
+    brittle: bool = False
+    provenance: Provenance
+    confidence: Literal["A", "B", "C"]   # of the modulus and Poisson ratio
+    strength_confidence: Literal["A", "B", "C"]
+    temperature_c: float | None = None
+
+    @model_validator(mode="after")
+    def _governing_strength(self) -> "MechanicalData":
+        if self.strength is None:
+            raise ValueError("a brittle material needs tensile_strength" if self.brittle
+                             else "a ductile material needs yield_strength")
+        return self
+
+    @property
+    def strength(self) -> float | None:
+        return self.tensile_strength if self.brittle else self.yield_strength
+
+
 class _Sourced(_Frozen):
     """Every numeric property carries a *_source string; placeholders are listed and say PROVISIONAL."""
     density: float = Field(gt=0)
@@ -78,6 +114,8 @@ class _Sourced(_Frozen):
     cost_per_kg: float | None = Field(default=None, ge=0)
     cost_source: str | None = None
     provisional_fields: tuple[str, ...] = ()
+    thermal: ThermalData | None = None
+    mechanical: MechanicalData | None = None
 
     @model_validator(mode="after")
     def _provisional_sources(self) -> "_Sourced":

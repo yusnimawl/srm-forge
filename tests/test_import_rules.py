@@ -16,6 +16,7 @@ ALLOWED: dict[str, set[str]] = {
     "post": {"model", "materials", "physics", "fields"},
     "maps": {"model", "materials", "fields", "topology", "geometry",
              "mesh", "physics", "solvers", "post"},
+    "thermal": {"model", "materials", "mesh"},
     "project": {"model", "maps"},
 }
 THIRD_PARTY_OWNERS: dict[str, set[str]] = {
