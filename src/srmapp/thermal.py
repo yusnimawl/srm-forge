@@ -75,6 +75,9 @@ def _illinois(f, a, fa, pa, b, fb, span):
 def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: float,
                solver_for: Callable[[], ThermalSolver], load_at: Callable[[float], Callable | None],
                start_nm: float | None = None) -> SpeedRating:
+    """Rate one speed. `n_evaluations` counts torques for which `load_at` gave a load and a solve ran: one per steady
+    torque and one per transient torque (the step-doubling re-solves of a transient are not counted).
+    `transient_steps` is the step count of the final peak torque."""
     solver = solver_for()
     n_eval = 0
     none_spot = HotSpot(float("nan"), "none")
@@ -91,9 +94,11 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
             return BIG_K, None
         return solver.hot_spot(t).temperature_c - limit_c, t
 
-    def result(cont, peak, t_c, t_p, steps, note=""):
+    def result(cont, peak, t_c, t_p, steps, note="", peak_max=None):
         hs_c = solver.hot_spot(t_c) if t_c else none_spot
         hs_p = solver.hot_spot(t_p) if t_p else hs_c
+        if peak_max is not None:
+            hs_p = peak_max
         z = lambda t, k: _kind_mean(solver, t, k) if t else float("nan")
         return SpeedRating(rpm, envelope_nm, cont, peak, hs_c, hs_p, z(t_c, "rotor_iron"), z(t_p or t_c, "rotor_iron"),
                            z(t_c, "stator_iron"), z(t_p or t_c, "stator_iron"), n_eval, steps, note, start_nm)
@@ -118,6 +123,8 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
         _, t_start = steady(max(start_nm, 0.0))
         if t_start is None:
             t_start = t_c
+    else:
+        note = "required continuous torque at or above the rated continuous: the peak starts from the rated continuous state"
 
     def transient(torque):
         nonlocal n_eval
@@ -135,11 +142,16 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
             if (last is not None and abs(end - last) < STEP_TOL_K) or n >= STEPS_MAX:
                 break
             last, n = end, 2 * n
-        return tr.hot_spot_c.max() - limit_c, (tr.final, n)
+        # the trace holds no locations: the maximum is paired with the hot-spot location of the end state
+        top = HotSpot(float(tr.hot_spot_c.max()), solver.hot_spot(tr.final).location)
+        return top.temperature_c - limit_c, (tr.final, n, top)
 
     fp, pe = transient(envelope_nm)
     if fp <= 0:
-        return result(cont, envelope_nm, t_c, pe[0], pe[1], note)
+        return result(cont, envelope_nm, t_c, pe[0], pe[1], note, pe[2])
     fc, pc = transient(cont)   # bracket start: the hot spot at the continuous torque from the start state
-    peak, _, (t_p, steps) = _illinois(transient, cont, min(fc, 0.0), pc, envelope_nm, fp, envelope_nm)
-    return result(cont, peak, t_c, t_p, steps, note)
+    if fc > 0:
+        note = (note + "; " if note else "") + "the continuous torque exceeds the limit from the start state: peak = continuous"
+        return result(cont, cont, t_c, pc[0] if pc else None, pc[1] if pc else 0, note, pc[2] if pc else None)
+    peak, _, (t_p, steps, top) = _illinois(transient, cont, fc, pc, envelope_nm, fp, envelope_nm)
+    return result(cont, peak, t_c, t_p, steps, note, top)

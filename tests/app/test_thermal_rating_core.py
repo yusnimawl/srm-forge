@@ -95,9 +95,12 @@ def test_unreachable_torque():
 
 
 def test_transient_steps_doubled():
-    r = rate(make_solver(cap=1e9), peak_s=2.0)
-    assert r.peak_nm == 20.0 and r.transient_steps >= 50
-    assert r.n_evaluations <= 24
+    solver = make_solver(cap=200.0)
+    r = rate(solver, peak_s=30.0, start_nm=2.0)
+    assert r.peak_nm > r.continuous_nm and r.transient_steps >= 100
+    start = solver.steady(quad(2.0))
+    end = lambda n: solver.transient(start, quad(r.peak_nm), 30.0, n).hot_spot_c[-1]
+    assert abs(end(r.transient_steps) - end(r.transient_steps // 2)) < 0.1
 
 
 def test_zone_temperatures():
@@ -108,7 +111,16 @@ def test_zone_temperatures():
 def test_peak_above_continuous_from_lower_start():
     r = rate(make_solver(cap=200.0), peak_s=30.0, start_nm=2.0)
     assert r.continuous_nm < r.peak_nm <= 20.0 and r.start_nm == 2.0 and r.note == ""
-    assert r.peak_hot_spot.temperature_c <= LIMIT + 0.5   # end state; the trace max is held by the search to the limit
+    assert LIMIT - 0.5 <= r.peak_hot_spot.temperature_c <= LIMIT + 1e-9   # trace maximum, held to the limit
+    # one lump, C dT/dt = P - G (T - Tc), tau = C / G = 100 s, start at 2 N m (P0 = 20 W, T0 = 50 degC), 30 s:
+    # T(30) = Tc + P/G (1 - e) + (T0 - Tc) e = limit, e = exp(-0.3), P = A T^2
+    e = math.exp(-0.3)
+    exact = math.sqrt(G * ((LIMIT - T_COOL - 10 * e) / (1 - e)) / A_LOSS)
+    assert r.peak_nm == pytest.approx(exact, rel=0.005)
+
+
+def test_start_at_or_above_continuous_note():
+    assert "at or above" in rate(make_solver(cap=200.0), start_nm=19.0).note
 
 
 def test_peak_without_requirement_note():
