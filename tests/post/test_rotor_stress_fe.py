@@ -19,7 +19,10 @@ from srmcore.post.rotor_stress import OVERSPEED, _disc_rim_displacement, gap_clo
 RHO, E, NU = 7490.0, 200e9, 0.33
 OMEGA = 2 * math.pi * 12000 / 60
 MECH = load_material("10JNEX900").mechanical
-SWEEP = Path(__file__).parents[2] / "docs" / "validation" / "rotor_sweep.json"
+VALIDATION = Path(__file__).parents[2] / "docs" / "validation"
+SWEEP = VALIDATION / "rotor_sweep.json"
+HELD_OUT = VALIDATION / "rotor_heldout_designs.json"
+HELD_OUT_FE = VALIDATION / "rotor_heldout_results.json"
 
 
 def test_fe_annulus_against_closed_form():
@@ -69,37 +72,47 @@ def _analytic(row):
             gap_closure(machine, fe.RHO, mech, None, None, rpm, 20.0, 20.0).centrifugal)
 
 
-def _assert_pass_rule(row, bore, root, tip, peak):
+def _assert_pass_rule(row, bore, root, tip, peak, label):
     st, growth = _analytic(row)
-    assert st.bore_stress == pytest.approx(bore, rel=0.15), row["set"]
-    assert st.root_stress == pytest.approx(root, rel=0.15), row["set"]
-    assert growth == pytest.approx(tip, rel=0.15), row["set"]
-    assert max(st.bore_stress, st.root_stress) >= 0.95 * peak, row["set"]
+    assert st.status == "ok", label
+    assert st.bore_stress == pytest.approx(bore, rel=0.15), label
+    assert st.root_stress == pytest.approx(root, rel=0.15), label
+    assert growth == pytest.approx(tip, rel=0.15), label
+    assert max(st.bore_stress, st.root_stress) >= 0.95 * peak, label
 
 
-def _in_box(rows):
-    return [row for row in rows if _analytic(row)[0].status == "ok"]
+def _held_out():
+    designs = json.loads(HELD_OUT.read_text())
+    results = json.loads(HELD_OUT_FE.read_text())
+    assert [d["params"] for d in designs] == [r["params"] for r in results]
+    return designs, results
 
 
-def test_model_against_the_recorded_sweep():
-    rows = json.loads(SWEEP.read_text())
-    box = _in_box(rows)
-    assert {"derived", "round3", "held_out", "reference"} == {row["set"] for row in box}
-    assert len(box) > 100
-    for row in box:
-        _assert_pass_rule(row, row["bore"][-1], row["root"][-1], row["tip"][-1], row["peak"])
+def test_model_against_the_recorded_held_out_fe():
+    designs, results = _held_out()
+    assert {d["kind"] for d in designs} == {"corner", "corner_taper0", "boundary", "face", "interior"}
+    for d, r in zip(designs, results):
+        _assert_pass_rule(r, r["bore"][-1], r["root"][-1], r["tip"][-1], r["peak"], d["kind"])
+
+
+def test_model_against_the_first_sweep_inside_the_box():
+    # the LHS rounds of the first box; the designs inside the present box
+    rows = [row for row in json.loads(SWEEP.read_text()) if _analytic(row)[0].status == "ok"]
+    assert len(rows) > 100
+    for row in rows:
+        _assert_pass_rule(row, row["bore"][-1], row["root"][-1], row["tip"][-1], row["peak"], row["set"])
 
 
 @pytest.mark.slow
-def test_fe_convergence_and_pass_rule_on_the_sweep():
-    rows = _in_box(json.loads(SWEEP.read_text()))
+def test_fe_convergence_and_pass_rule_on_the_held_out_designs():
+    designs, _ = _held_out()
     with multiprocessing.get_context("spawn").Pool(os.cpu_count()) as pool:
-        solved = pool.map(fe.sweep_point, [row["params"] for row in rows], chunksize=4)
-    for row, new in zip(rows, solved):
+        solved = pool.map(fe.sweep_point, [d["params"] for d in designs], chunksize=4)
+    for d, new in zip(designs, solved):
         for key in ("bore", "root"):
             assert abs(new[key][-1] / new[key][-2] - 1) < 0.02
         assert new["peak"] <= 1.001 * max(new["bore"][-1], new["root"][-1])   # the peak is on the fillet or the bore
-        _assert_pass_rule(row, new["bore"][-1], new["root"][-1], new["tip"][-1], new["peak"])
+        _assert_pass_rule(new, new["bore"][-1], new["root"][-1], new["tip"][-1], new["peak"], d["kind"])
 
 
 @pytest.mark.slow
