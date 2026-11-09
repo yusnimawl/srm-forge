@@ -339,10 +339,10 @@ These are the default cooling setup of spec §2 decision 5, labelled "placeholde
 | Jacket channel height | 4 mm |
 | Jacket channel width | 20 mm |
 | Number of passes | 4 |
-| Flow | 8 L/min = 1.333e-4 m3/s |
+| Flow | 9 L/min = 1.5e-4 m3/s |
 | Housing thickness | 8 mm |
 
-Check of the flow regime this gives (arithmetic only, with the 65.6 degC properties of section 6.7): hydraulic diameter 2 h w / (h + w) = 6.67 mm, section 80 mm2, mean speed 1.67 m/s, Re about 9800, inside the Gnielinski range.
+Check of the flow regime this gives (arithmetic only, with the 65 degC properties interpolated from section 6.7): hydraulic diameter 2 h w / (h + w) = 6.67 mm, section 80 mm2, mean speed 1.875 m/s, Re about 1.1e4, inside the Gnielinski range (Re above 1e4). The flow was raised from 8 L/min (Re about 9800, below 1e4, so refused) to 9 L/min so the default jacket is in range.
 
 ## 8. V3 record: the winding model against Marquez-Fernandez 2018
 
