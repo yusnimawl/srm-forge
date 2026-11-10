@@ -65,6 +65,7 @@ def test_cooling_h_spray_and_slot_oil():
     n, w = co(s), co(s, u={"cooling_h"})
     assert n.h_end_spray == pytest.approx(550.0) and w.h_end_spray == 190.0
     assert w.h_slot_oil == pytest.approx(0.9 * n.h_slot_oil)
+    assert w.spray_rho_cp == pytest.approx(0.96 * n.spray_rho_cp)
 
 
 def test_iron_row_is_k_iron_hi():

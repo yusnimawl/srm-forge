@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from srmcore.thermal.correlations import Fluid, airgap_h, duct_h, fluid, natural_h
+from srmcore.thermal.correlations import Fluid, airgap_h, duct_h, fluid, natural_h, petroleum_oil_cp
 
 
 def test_fluid_table_point():
@@ -64,3 +64,10 @@ def test_natural_cylinder_point():
     assert natural_h("plate", 0.1, ts, ta) > 0
     with pytest.raises(ValueError):
         natural_h("cylinder", D, 90.0, 50.0)
+
+
+def test_petroleum_oil_cp_matches_cragoe_table_12():
+    # NBS Misc. Pub. 97 p. 28 example: a 30 API oil (d 0.8762) at 100 F has 0.463 cal/(g degC)
+    assert petroleum_oil_cp(0.8762 * 999.0, (100 - 32) / 1.8) == pytest.approx(0.463 * 4186.8, rel=2e-3)
+    with pytest.raises(ValueError, match="Cragoe"):
+        petroleum_oil_cp(1000.0, 60.0)

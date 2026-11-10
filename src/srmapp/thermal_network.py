@@ -18,7 +18,7 @@ from srmcore.thermal.correlations import air_properties
 from srmcore.thermal.domain import ThermalDomain, boundary_edges
 from srmcore.thermal.model import AreaLink, EdgeLink, Lump, LumpLink, ThermalModelError, ThermalProblem
 
-from .cooling import AIR_FILM_C, Coefficients, CoolingSetup, MissingCoolingData
+from .cooling import AIR_FILM_C, Coefficients, CoolingSetup
 from .sizing.estimates import mean_turn_length
 from .sizing.winding import Winding
 
@@ -50,9 +50,6 @@ def _series(*g: float) -> float:
 def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Winding, fill: float,
                   coeffs: Coefficients, setup: CoolingSetup,
                   iron_materials: tuple[str, str] = ("10JNEX900", "10JNEX900")) -> Network:
-    if setup.end_spray is not None:
-        raise MissingCoolingData("end spray: oil properties (specific heat) not cited, "
-                                 "so the oil temperature rise cannot be computed")
     if not coeffs.h_air_gap > 0:
         raise ValueError("air-gap heat transfer coefficient must be positive")
     notes = list(coeffs.notes)
@@ -117,7 +114,12 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     links: list = []
     for name, el in domain.coil_elements.items():
         links.append(AreaLink(el, end_lumps[coil_of_side[name]], g_side))
-    links += [LumpLink(end_lumps[c], "end_space", h_end * end_area) for c in coils]
+    if setup.end_spray is None:
+        links += [LumpLink(end_lumps[c], "end_space", h_end * end_area) for c in coils]
+    else:   # the sprayed end winding gives its heat to the oil, not to the end-space air
+        lumps += [Lump("spray_in", fixed_c=coeffs.spray_inlet_c), Lump("spray_oil")]
+        links += [LumpLink(end_lumps[c], "spray_oil", coeffs.h_end_spray * end_area) for c in coils]
+        links.append(LumpLink("spray_in", "spray_oil", 2 * coeffs.spray_flow_m3s * coeffs.spray_rho_cp))
 
     # end space: the end caps and the air gap's annulus (the lamination end faces are adiabatic)
     cap_area = 2 * math.pi * r_out ** 2

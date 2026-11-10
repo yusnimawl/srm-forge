@@ -50,6 +50,25 @@ def fluid(name: str, temperature_c: float) -> Fluid:
     return Fluid(v["density"], v["specific_heat"], v["conductivity"], v["viscosity"], name)
 
 
+# Shell Diala S4 ZX-I, the owner's spray oil: 805 kg/m3 at 20 degC (Shell TDS v4.3), docs/r5-sources.md 6.7.
+DIALA_DENSITY = 805.0
+CRAGOE_CP_MAX = 0.04     # Cragoe Eq. 5: measured within 4 % at most
+
+
+def petroleum_oil_cp(density_20c: float, temperature_c: float) -> float:
+    """Specific heat of a petroleum oil, J/(kg K), from Cragoe 1929 (NBS Misc. Pub. 97) Eq. 5.
+
+    c = (0.388 + 0.00045 t_F) / sqrt(d) cal/(g degC), d the specific gravity at 60/60 F.
+    docs/r5-sources.md 6.7: 30 oils, d 0.75 to 0.96, 32 to 400 F; within 2 % on average and
+    4 % at most; paraffinic oils read about 2 % above it (the equation errs low for them).
+    The 20 degC density stands in for the 60 F one (cp then reads under 0.2 % high).
+    """
+    d = density_20c / 999.0
+    if not 0.75 <= d <= 0.96 or not 0.0 <= temperature_c <= 204.0:
+        raise ValueError(f"Cragoe Eq. 5 holds for d 0.75 to 0.96 and 0 to 204 degC, got d {d:.3f}, {temperature_c} degC")
+    return (0.388 + 0.00045 * (temperature_c * 1.8 + 32.0)) / math.sqrt(d) * 4186.8
+
+
 def duct_h(fluid: Fluid, hydraulic_diameter: float, velocity: float, length: float) -> float:
     """Turbulent duct h, W/(m2 K): Gnielinski with the Filonenko friction factor.
 
