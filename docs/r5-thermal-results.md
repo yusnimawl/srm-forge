@@ -203,7 +203,7 @@ Owner:
 - Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
 - The six FE-derived rotor-stress constants, and `rotor_fillet_radius` for search candidates (all read `no_fillet` now).
 - Peak start state: decided 2026-11-10 (core spec section 11): the peak starts from the steady state at the required continuous torque (the current reading).
-- Oil choice and the heat exchanger's approach (oil inlet minus water temperature). Until named, ATF is the placeholder oil and the approach a wide band.
+- Oil choice and the heat exchanger's approach (oil inlet minus water temperature). The oil is Shell Diala S4 ZX-I (owner, 2026-11-10); its cp and k still need a cited source. The approach is a wide band until measured.
 
 Unresolved sources:
 - Romanazzi air-gap correlation: recorded, not coded. The air-gap and end-space rows have zero width until a second cited route exists.
