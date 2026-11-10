@@ -49,6 +49,9 @@ stress as a hard constraint.
 6. **Internal oil spray is a full option**, the owner's likely choice (not decided). Spray on the end windings with
    oil inlet temperature and flow as inputs, and optional shaft oil to the rotor. The spray h is a band from cited
    sources. The cooling concept is a new owner-decision tracker item. When it is decided, the search default follows.
+   **Decided 2026-11-10 (owner, core spec §11):** both. High load: end spray plus the jacket, the oil cooled into the
+   water loop by a 3D-printed heat exchanger, so the oil inlet is the water temperature plus the exchanger's approach
+   (an input with a band). Low load: jacket only. The search default stays jacket only until spray has cited oil data.
 7. **Rotor strength comes from a cited source or not at all.** Without a cited strength, the stress result reads
    "no strength data" and the search refuses that rotor material. A material flagged brittle in its data is checked
    by maximum principal stress against tensile strength, every other one by von Mises against 0.2 % yield.
@@ -212,7 +215,8 @@ cheaper iron proxy). The stroke cache makes a re-rate with new cooling cheap (§
 - Steady state: P1 conduction plus the lumped network, one sparse system. The fixed-point loop over ρ(T) and any
   temperature-dependent h ends when the hot spot changes by less than a tolerance set in the plan.
 - Transient: implicit time stepping (backward Euler or BDF2) with capacities from density × specific heat. The peak
-  transient starts from the continuous steady state at that speed.
+  transient starts from the continuous steady state at that speed, at the required continuous torque (owner,
+  2026-11-10).
 - Hot spot: the maximum over coil-side nodes and end-winding nodes, with its location reported.
 
 ## 7. Uncertainty budget (worst-case stack, decision 9)

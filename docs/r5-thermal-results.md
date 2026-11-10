@@ -197,12 +197,13 @@ R6:
 - A re-rate with new cooling needs new strokes. Spec section 10 promised cached strokes and thermal solves only; R5b does not meet that. R6 needs a loss-against-torque reuse design.
 
 Owner:
-- The cooling concept (jacket, spray, shaft oil, slot oil). Defaults are placeholders: ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
+- Cooling concept: decided 2026-11-10 (core spec section 11): oil spray on the end windings plus the jacket at high load, the oil cooled into the water loop by a 3D-printed heat exchanger; jacket only at low load. The search default stays jacket only until spray has cited oil data. Jacket placeholders: ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
 - The contact gap and resin conductivity (cited nominals 0.03 mm and 1.0 W/(m K), unfavourable 0.08 mm and 0.6) and any placeholder in docs/r5-sources.md section 7.
 - Oil property data (specific heat, conductivity, viscosity) for end spray and shaft oil. Both are refused until cited; the spray h band stays recorded. Slot oil runs with water-glycol only.
 - Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
 - The six FE-derived rotor-stress constants, and `rotor_fillet_radius` for search candidates (all read `no_fillet` now).
-- Whether the peak starts from the required continuous torque (the current reading) or from the rated continuous state. The second reading makes the peak about equal to the continuous rating.
+- Peak start state: decided 2026-11-10 (core spec section 11): the peak starts from the steady state at the required continuous torque (the current reading).
+- Oil choice and the heat exchanger's approach (oil inlet minus water temperature). Until named, ATF is the placeholder oil and the approach a wide band.
 
 Unresolved sources:
 - Romanazzi air-gap correlation: recorded, not coded. The air-gap and end-space rows have zero width until a second cited route exists.
