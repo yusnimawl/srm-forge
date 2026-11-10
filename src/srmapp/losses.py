@@ -35,8 +35,8 @@ from .turns import rescale_turns, turns_scale
 
 NAN = float("nan")
 N_ANGLES = DEFAULT_STROKE_ANGLES
-# Largest relative change of the iron loss between the default angle count and twice that. The limit stands in
-# until the slow convergence test has measured it.
+# Iron-loss error at the default angle count, measured on the 8/6 (docs/r3-loss-results.md, angle convergence):
+# full 1.61 % (Richardson from 60, 120, 240 angles), screening at most 1.99 % (not monotone).
 ANGLE_CONVERGENCE_REL = 0.02
 LOSS_GRADE_ALLOWANCE = {"A": 0.0, "B": 0.10, "C": 0.25}   # provisional, as for the B-H grades
 # The envelope and the stroke search compute the same torque with different operation orders.

@@ -141,3 +141,13 @@ def test_no_point_progress_passes_none():
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0), SearchSettings(n_candidates=4, shortlist=1, seed=1))
     assert ev.call_args.kwargs["progress"] is None
+
+
+def test_candidates_carry_the_rotor_root_fillet():
+    from srmapp.sizing.generator import ROTOR_FILLET_SHARE
+    from srmcore.post.rotor_stress import pole_half_width
+    cands, _ = sample_candidates(_req(), 4, seed=0)
+    for c in cands:
+        m = c.design.machine
+        root = 2 * pole_half_width(m, m.rotor_yoke_outer_radius)
+        assert m.rotor_fillet_radius == pytest.approx(ROTOR_FILLET_SHARE * root)

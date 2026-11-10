@@ -174,6 +174,17 @@ shares (8.8 and 9.3 % for punching, against 7.3 % in the stator yoke and 4.6 % i
 loss-weighted, so where the loss sits inside each region adds to that. The spec §3
 estimate for the wide-part Materu 6/4 had the stator yoke highest; that is a different machine. Raw output: `docs/r3-data/materu-cut-screening.json`.
 
+## Angle convergence (`ANGLE_CONVERGENCE_REL`, LattePanda, 2026-11-10)
+
+Total iron loss of the 8/6 (`make_8_6`, 10JNEX900, 1500 r/min, the stroke waveform of `tests/maps/test_stroke_convergence.py`) at 60, 120 and 240 stroke angles. Data: `docs/validation/angle_convergence.json`.
+
+| Preset | 60 angles (W) | 120 angles (W) | 240 angles (W) | Error at 60 angles |
+|---|---|---|---|---|
+| full | 3.4814 | 3.5330 | 3.5379 | 1.61 % against the Richardson limit 3.5384 W (observed order 3.4) |
+| screening | 3.4808 | 3.5516 | 3.5289 | at most 1.99 % (not monotone, so no extrapolation; largest gap to a finer count) |
+
+`ANGLE_CONVERGENCE_REL` stays 0.02, now measured rather than a placeholder (owner, 2026-11-10). The screening values zig-zag, probably because the angles snap to the coarse band pitch. Coverage: one machine, one current waveform, one speed.
+
 ## Preliminary screening run (laptop, 2026-10-19)
 
 Preliminary. Screening mesh, two rows only (T4.1 and T5.5), M19 0.36 mm as the stand-in for Materu's steel. These

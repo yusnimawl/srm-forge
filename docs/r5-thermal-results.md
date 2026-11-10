@@ -197,11 +197,11 @@ R6:
 - A re-rate with new cooling needs new strokes. Spec section 10 promised cached strokes and thermal solves only; R5b does not meet that. R6 needs a loss-against-torque reuse design.
 
 Owner:
-- Cooling concept: decided 2026-11-10 (core spec section 11): oil spray on the end windings plus the jacket at high load, the oil cooled into the water loop by a 3D-printed heat exchanger; jacket only at low load. The search default stays jacket only until spray has cited oil data. Jacket placeholders: ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
+- Cooling concept: decided 2026-11-10 (core spec section 11): oil spray on the end windings plus the jacket at high load, the oil cooled into the water loop by a 3D-printed heat exchanger; jacket only at low load. The search default stays jacket only; end spray is an opt-in setup. The cooling placeholders stay as flagged defaults (owner, 2026-11-10; the UI labels them "placeholder cooling"): ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
 - The contact gap and resin conductivity (cited nominals 0.03 mm and 1.0 W/(m K), unfavourable 0.08 mm and 0.6) and any placeholder in docs/r5-sources.md section 7.
-- Oil property data (specific heat, conductivity, viscosity) for end spray and shaft oil. Both are refused until cited; the spray h band stays recorded. Slot oil runs with water-glycol only.
+- End spray runs with Shell Diala S4 ZX-I since 2026-11-10 (cp from Cragoe 1929, density from the Shell data sheet; docs/r5-sources.md 6.7). Shaft oil stays refused (no cited h). An oil slot channel stays refused: no viscosity curve and no laminar Nu are read. The oil's thermal expansion is not cited, so the spray oil rise reads a few percent low.
 - Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
-- The six FE-derived rotor-stress constants, and `rotor_fillet_radius` for search candidates (all read `no_fillet` now).
+- Rotor stress, decided 2026-11-10 (core spec section 11): the six FE-derived constants are accepted, and search candidates carry a rotor root fillet of 0.05 x the pole width at the root (`generator.ROTOR_FILLET_SHARE`), inside the fit's 0.025 to 0.2 ratio.
 - Peak start state: decided 2026-11-10 (core spec section 11): the peak starts from the steady state at the required continuous torque (the current reading).
 - Oil choice and the heat exchanger's approach (oil inlet minus water temperature). The oil is Shell Diala S4 ZX-I (owner, 2026-11-10); its cp and k still need a cited source. The approach is a wide band until measured.
 

@@ -110,9 +110,21 @@ def test_missing_thermal_block_refused():
         net(iron_materials=("M19", "M19"))
 
 
-def test_end_spray_refused():
+def test_end_spray_takes_end_heat_into_the_oil():
+    plain, _ = net()
+    n, co = net(CoolingSetup(end_spray=EndSpray(inlet_c=60.0, flow_m3s=1e-5)))
+    s0, s = ThermalSolver(plain.problem), ThermalSolver(n.problem)
+    t0, t = s0.steady(coil_load(0)), s.steady(coil_load(0))
+    out = s.heat_to_fixed(t)
+    assert out["spray_in"] > 0
+    assert t.lumps["spray_oil"] - 60.0 == pytest.approx(out["spray_in"] / (2 * 1e-5 * co.spray_rho_cp), rel=1e-9)
+    hot = lambda r: max(r.lumps[e] for e in n.end_lumps.values())  # noqa: E731
+    assert hot(t) < hot(t0)
+
+
+def test_end_spray_out_of_cragoe_range_refused():
     with pytest.raises(MissingCoolingData, match="end spray"):
-        net(CoolingSetup(end_spray=EndSpray(inlet_c=60.0, flow_m3s=1e-5)))
+        net(CoolingSetup(end_spray=EndSpray(inlet_c=250.0, flow_m3s=1e-5)))
 
 
 def test_jacket_wall_refused():

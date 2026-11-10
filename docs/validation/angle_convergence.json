@@ -1,0 +1,18 @@
+{
+ "what": "8/6 (conftest make_8_6), total iron loss W, 10JNEX900, 1500 r/min, tests/maps/test_stroke_convergence.py waveform",
+ "host": "LattePanda Sigma",
+ "date": "2026-11-10",
+ "code": "4a47ee9 plus the uncommitted R5 spray change (no stroke or loss code touched)",
+ "presets": {
+  "screening": {
+   "angles_60": 3.480796091718208,
+   "angles_120": 3.5515506260071157,
+   "angles_240": 3.52893280848545
+  },
+  "full": {
+   "angles_60": 3.481353879094275,
+   "angles_120": 3.532974952958151,
+   "angles_240": 3.5379100737898357
+  }
+ }
+}

@@ -15,7 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
-from srmcore.thermal.correlations import Fluid, airgap_h, duct_h, fluid, natural_h
+from srmcore.thermal.correlations import (CRAGOE_CP_MAX, DIALA_DENSITY, Fluid, airgap_h, duct_h, fluid, natural_h,
+                                          petroleum_oil_cp)
 from srmcore.thermal.homogenise import MILTON_XI, hashin_shtrikman_lower, milton_k
 
 ROWS = ("iron", "em_torque", "cross_wire", "liner", "contact", "air_gap", "cooling_h",
@@ -61,6 +62,7 @@ class Jacket(_Frozen):
 
 
 class EndSpray(_Frozen):
+    # oil spray on the end windings; the oil is Shell Diala S4 ZX-I (docs/r5-sources.md 6.7)
     inlet_c: float
     flow_m3s: float = Field(gt=0)
     rig: Literal["nozzle_hairpin", "shaft_spray"] = "nozzle_hairpin"   # neither rig is the owner's geometry
@@ -120,6 +122,7 @@ class Coefficients:
     h_end_spray: float | None
     spray_inlet_c: float | None
     spray_flow_m3s: float | None
+    spray_rho_cp: float | None     # J/(m3 K), oil at the spray inlet
     h_slot_oil: float | None
     slot_fluid: Fluid | None
     slot_flow_m3s: float | None
@@ -142,7 +145,7 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     """Numbers for the thermal network. A row in `unfavourable` takes its unfavourable end.
 
     `fill` is the winding's copper fill (default `machine.fill_factor`). Raises
-    MissingCoolingData for shaft oil, oil coolants, a laminar jacket or slot channel.
+    MissingCoolingData for shaft oil, oil in a duct, a laminar jacket or slot channel.
     """
     bad = unfavourable - set(ROWS)
     if bad:
@@ -193,11 +196,16 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
         f, h = _duct(j.coolant, j.inlet_c, j.channel_height, j.channel_width, j.flow_m3s, length, "jacket")
         jk = dict(h_jacket=h * (JACKET_SCATTER if u("cooling_h") else 1.0), jacket_fluid=f,
                   jacket_flow_m3s=j.flow_m3s, jacket_inlet_c=j.inlet_c)
-    sp = dict(h_end_spray=None, spray_inlet_c=None, spray_flow_m3s=None)
+    sp = dict(h_end_spray=None, spray_inlet_c=None, spray_flow_m3s=None, spray_rho_cp=None)
     if (s := setup.end_spray) is not None:
         lo, hi = SPRAY_H[s.rig]
         h = lo * (SHAFT_SPRAY_SCATTER if s.rig == "shaft_spray" else 1.0) if u("cooling_h") else 0.5 * (lo + hi)
-        sp = dict(h_end_spray=h, spray_inlet_c=s.inlet_c, spray_flow_m3s=s.flow_m3s)
+        try:
+            cp = petroleum_oil_cp(DIALA_DENSITY, s.inlet_c) * (1 - CRAGOE_CP_MAX if u("cooling_h") else 1.0)
+        except ValueError as e:
+            raise MissingCoolingData(f"end spray: {e}") from e
+        sp = dict(h_end_spray=h, spray_inlet_c=s.inlet_c, spray_flow_m3s=s.flow_m3s, spray_rho_cp=DIALA_DENSITY * cp)
+        notes.append("spray oil density is the 20 degC value: no cited expansion, so the oil rise reads a few % low")
         notes.append(f"end spray h is the {s.rig} rig's measured range; that rig is not this geometry")
     so = dict(h_slot_oil=None, slot_fluid=None, slot_flow_m3s=None, slot_inlet_c=None)
     if (o := setup.slot_oil) is not None:
