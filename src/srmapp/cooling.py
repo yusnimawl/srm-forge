@@ -62,7 +62,7 @@ class Jacket(_Frozen):
 
 
 class EndSpray(_Frozen):
-    """Oil spray on the end windings; the oil is Shell Diala S4 ZX-I (docs/r5-sources.md 6.7)."""
+    # oil spray on the end windings; the oil is Shell Diala S4 ZX-I (docs/r5-sources.md 6.7)
     inlet_c: float
     flow_m3s: float = Field(gt=0)
     rig: Literal["nozzle_hairpin", "shaft_spray"] = "nozzle_hairpin"   # neither rig is the owner's geometry
