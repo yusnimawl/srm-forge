@@ -338,7 +338,7 @@ Rows of spec §7 that this task does not source: iron loss, EM torque, thermal m
 
 ### Placeholders (owner placeholders, no source)
 
-These are the default cooling setup of spec §2 decision 5, labelled "placeholder cooling" in the UI. They are not from any source; the owner sets them. The inlet temperature and the insulation class are fixed by the spec.
+These are the default cooling setup of spec §2 decision 5, labelled "placeholder cooling" in the UI. They are not from any source; the owner sets them. The inlet temperature and the insulation class are fixed by the spec. The owner kept them as flagged defaults on 2026-11-10 (core spec §11).
 
 | Placeholder | Value |
 |---|---|
