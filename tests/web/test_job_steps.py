@@ -276,3 +276,18 @@ def test_eta_computed_in_frames_step(tmp_path, monkeypatch):
     now[0] = 120.0
     rep.progress(step="frames", points_done=10, points_total=20)
     assert rep.snapshot()[1]["eta_s"] == pytest.approx(20.0)
+
+
+def test_last_point_and_step_change_reach_the_store_at_once(tmp_path, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    store = Store(tmp_path / "a.db")
+    job_id = store.create_job("search", {})
+    rep = Reporter(store, job_id, "search")
+    rep.progress(step="designs", points_done=15, points_total=16)
+    rep.progress(points_done=16)                       # inside the store interval, yet the work is complete
+    assert store.get_job(job_id)["progress"]["points_done"] == 16
+    rep.progress(step="pareto")                        # a step change is never held back either
+    assert store.get_job(job_id)["progress"]["step"] == "pareto"
+    rep.progress(points_done=3, points_total=16)       # an ordinary update inside the interval still waits
+    assert store.get_job(job_id)["progress"]["points_done"] == 16

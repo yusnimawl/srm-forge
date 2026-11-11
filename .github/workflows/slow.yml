@@ -13,6 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
+        # Two parts, so that neither comes near the 6 h runner limit (Windows took 5 h 38 min as one job).
+        part:
+          - {name: validation, args: "tests/validation"}
+          - {name: rest, args: "--ignore=tests/validation"}
+    name: slow (${{ matrix.os }}, ${{ matrix.part.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
     steps:
@@ -23,4 +28,4 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1
       - run: python -m pip install -e ".[dev,ngsolve,web]"
-      - run: python -m pytest -m slow --durations=25
+      - run: python -m pytest -m slow --durations=25 ${{ matrix.part.args }}
