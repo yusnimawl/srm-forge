@@ -6,8 +6,8 @@ This is a living list. Every session that does writing work updates it in the sa
 
 | Document | Where | State |
 | --- | --- | --- |
-| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 12 tabs written 2026-10-29 and 2026-10-30, owner review open |
-| Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | Rewrite in place not started |
+| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 13 tabs written (12 on 2026-10-29 and 2026-10-30, End effects on 2026-11-06), Thermal tab open, owner review open |
+| Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | History only; the rewrite was closed 2026-11-11 |
 | Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
 
@@ -29,16 +29,18 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Roadmap: merged items and a drawing of the six items ahead
 - [x] Commands
 - [x] Glossary
+- [x] End effects: the 3D reference model, gate G1 and the measured gap in the budget (added 2026-11-06)
+- [ ] Thermal: the R5a solver and rotor stress, the R5b cooling options and ratings, from the R5 spec and `docs/r5-thermal-results.md`
 - [ ] Owner review of all tabs
 
 ### Project doc rewrite
 
-- [ ] Rewrite in place, one section per edit, with the style rules below. Keep every fact, number, date and decision. Read the doc (`view` since the last rev) first so owner edits are kept.
+Closed 2026-11-11 without the rewrite (owner, tracker review). The doc stays history only, and the report retells the same content in the style rules. A section is fixed only when the report quotes it. New entries still follow the style rules.
 
 ### Academic writing
 
 - [x] Connect the Google Docs and Google Drive connectors (2026-10-29).
-- [ ] Dissertation-style report: abstract, introduction, background on SRMs, method (geometry, mesh, solver, maps), validation, losses, control, results, discussion, references.
+- [ ] Dissertation-style report, with a status per chapter kept here once the chapter list is fixed. Chapters on M1 to M5, R1 to R3 and R8 can start now, and the results chapters wait for R5. Draft outline: abstract, introduction, background on SRMs, method (geometry, mesh, solver, maps), validation, losses, control, results, discussion, references.
 - [ ] Paper: pick the venue, then cut the report down to the venue's format. A journal or conference submission likely needs LaTeX and a `.bib` file.
 
 ## Style rules
