@@ -21,6 +21,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DEPENDENCIES = ("numpy", "scipy", "gmsh", "scikit-fem", "ngsolve", "netgen-mesher", "h5py", "pydantic", "matplotlib")
 STATUS_CELL = {"pass": "pass", "fail": "**FAIL**", "missing": "**missing**", "pending": "pending"}
 SPEED_ITEMS = ("screening", "full", "full_extras")
+# Limits of tests/validation/test_emdlab.py (a test in tests/ checks that they agree).
+EMDLAB_PSI_LIMIT = 0.02
+EMDLAB_ENERGY_LIMIT = 0.03
+EMDLAB_TORQUE_LIMIT = 0.05
+EMDLAB_END_TORQUE_LIMIT = 0.005
 NOT_RUN = "not run (input file missing)\n"
 
 
@@ -239,7 +244,43 @@ def ci_section(data):
     if data is None:
         return head + "**missing**\n", ["missing"]
     s = {"success": "pass", "failure": "fail", "pending": "pending"}.get(data["result"], "fail")
-    return head + f"Tag {data['tag']}, run {data['run_url']}, result {data['result']}: {STATUS_CELL[s]}\n", [s]
+    statuses = [s]
+    line = f"Tag {data['tag']}, run {data['run_url']}, result {data['result']}: {STATUS_CELL[s]}\n"
+    named = str(data["tag"]).removeprefix("v")
+    if _is_stale(named):
+        statuses.append("stale")
+        line = (f"**stale (tag {data['tag']})**: the installed srmcore is {version('srmcore')} and the tag names "
+                f"{named}.\n\n") + line
+    return head + line, statuses
+
+
+def emdlab_section(data):
+    head = "## EMDLAB / Maxwell\n\nGate: every worst error is within its limit.\n\n"
+    if data is None:
+        return head + "**missing**\n", ["missing"]
+    found = data.get("srmcore")
+    rows = data.get("rows") or []
+    worst = data.get("worst") or {}
+    keys = ("psi", "energy", "coenergy", "torque_vs_maxwell", "torque_vs_emdlab")
+    if not rows or any(worst.get(k) is None for k in keys):
+        return head + "**missing** (no rows)\n", ["missing"]
+    peak = max(abs(r["ref"]["torque_maxwell"]) for r in rows)
+    ends = sorted(rows, key=lambda r: r["theta_tab_deg"])
+    end_torque = max(abs(ends[0]["torque_arkkio"]), abs(ends[-1]["torque_arkkio"])) / peak
+    items = [("psi against EMDLAB", worst["psi"], EMDLAB_PSI_LIMIT),
+             ("W against EMDLAB", worst["energy"], EMDLAB_ENERGY_LIMIT),
+             ("W' against EMDLAB", worst["coenergy"], EMDLAB_ENERGY_LIMIT),
+             ("torque against Maxwell (of its peak)", worst["torque_vs_maxwell"], EMDLAB_TORQUE_LIMIT),
+             ("torque against EMDLAB (of its peak)", worst["torque_vs_emdlab"], EMDLAB_TORQUE_LIMIT),
+             ("aligned and unaligned torque", end_torque, EMDLAB_END_TORQUE_LIMIT)]
+    stale = _is_stale(found)
+    out = [f"srmcore {found}, {len(rows)} angles.\n", "| Quantity | Worst | Limit | Status |\n|---|---|---|---|"]
+    statuses = ["stale"] if stale else []
+    for name, value, limit in items:
+        s = "pass" if value <= limit else "fail"
+        statuses.append(s)
+        out.append(f"| {name} | {_pct(value)} | {_pct(limit)} | {_stale_cell(found) if stale else STATUS_CELL[s]} |")
+    return head + "\n".join(out) + "\n", statuses
 
 
 def generate(data_dir: Path, m5a_dir: Path, out_md: Path) -> str:
@@ -252,6 +293,7 @@ def generate(data_dir: Path, m5a_dir: Path, out_md: Path) -> str:
         ("M5c FEMM", femm_section(_load(data_dir / "femm.json"), plot_dir)),
         ("M5d Krishnan 6/4", krishnan_section(_load(data_dir / "krishnan_6_4.json"), plot_dir)),
         ("EM validation (8/6 full)", em_section(_load(data_dir / "em_validate_8_6.json"), plot_dir)),
+        ("EMDLAB / Maxwell", emdlab_section(_load(data_dir / "emdlab.json"))),
         ("Speed", speed_section(_load(data_dir / "speed.json"), _load(data_dir / "speed_budgets.json"))),
         ("CI", ci_section(_load(data_dir / "ci.json"))),
     ]

@@ -138,6 +138,21 @@ Uncertainty budget (worst case, % of the corrected value):
 
 ![budget](validation/budget.png)
 
+## EMDLAB / Maxwell
+
+Gate: every worst error is within its limit.
+
+srmcore 0.7.0, 30 angles.
+
+| Quantity | Worst | Limit | Status |
+|---|---|---|---|
+| psi against EMDLAB | 1.57 % | 2.00 % | pass |
+| W against EMDLAB | 1.25 % | 3.00 % | pass |
+| W' against EMDLAB | 2.55 % | 3.00 % | pass |
+| torque against Maxwell (of its peak) | 2.99 % | 5.00 % | pass |
+| torque against EMDLAB (of its peak) | 3.78 % | 5.00 % | pass |
+| aligned and unaligned torque | 0.00 % | 0.50 % | pass |
+
 ## Speed
 
 srmcore 0.7.0, 13th Gen Intel(R) Core(TM) i5-1340P, 16 logical CPUs, 8 workers, 2026-10-31.
