@@ -20,7 +20,7 @@ The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-d
 
 ## Commands
 
-The project needs Python 3.12 or newer. CI runs the fast suite on 3.12 and 3.14 on both Windows and Linux for pushes to main, pull requests and version tags; the slow suite runs on version tags, weekly (Sunday 03:17 UTC) and on manual dispatch. It runs as two jobs per OS (`tests/validation`, and the rest), because one Windows job took 5 h 38 min of the 6 h runner limit; the two real search-job web tests wait up to 3600 s, since the winding scan after the map takes 20 to 30 min. The repository is public (since 2026-10-30), so standard GitHub runners have no minute limit. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
+The project needs Python 3.12 or newer. CI runs the fast suite on 3.12 and 3.14 on both Windows and Linux for pushes to main, pull requests and version tags; the slow suite runs on version tags, weekly (Sunday 03:17 UTC) and on manual dispatch. It runs as three jobs per OS (`tests/validation`, `tests/web`, and the rest), because one Windows job took 5 h 38 min of the 6 h runner limit; the two real search-job web tests wait up to 5400 s, since the winding scan after the map took about 20 min on Linux and 49 to 55 min on Windows (2026-11-12). The repository is public (since 2026-10-30), so standard GitHub runners have no minute limit. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
 
 ```powershell
 .venv\Scripts\Activate.ps1

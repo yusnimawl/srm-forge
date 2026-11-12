@@ -13,10 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        # Two parts, so that neither comes near the 6 h runner limit (Windows took 5 h 38 min as one job).
+        # Three parts, so that none comes near the 6 h runner limit: on Windows the validation tests take about
+        # 2 h 20 min, the web tests about 1 h 50 min and the rest about 3 h 40 min.
         part:
           - {name: validation, args: "tests/validation"}
-          - {name: rest, args: "--ignore=tests/validation"}
+          - {name: web, args: "tests/web"}
+          - {name: rest, args: "--ignore=tests/validation --ignore=tests/web"}
     name: slow (${{ matrix.os }}, ${{ matrix.part.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360

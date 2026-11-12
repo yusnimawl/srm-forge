@@ -214,7 +214,7 @@ def test_real_search_job_in_thread(make, tmp_path):
     SearchRequest.model_validate(req)
     store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("search", req)
-    got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=3600)
+    got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=5400)
     assert got["status"] == "done", got
     json.dumps(store.get_result(j), allow_nan=False)
 

@@ -28,7 +28,7 @@ def test_search_job_end_to_end(tmp_path):
         r = client.post("/api/jobs", json=BODY)
         assert r.status_code == 201, r.text
         job_id = r.json()["id"]
-        end = time.time() + 3600
+        end = time.time() + 5400
         while time.time() < end:
             job = client.get(f"/api/jobs/{job_id}").json()
             if job["status"] in {"done", "failed", "cancelled"}:
