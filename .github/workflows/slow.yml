@@ -12,9 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        # Three parts, so that none comes near the 6 h runner limit: on Windows the validation tests take about
-        # 2 h 20 min, the web tests about 1 h 50 min and the rest about 3 h 40 min.
+        os: [ubuntu-latest]   # Windows is not run (owner, 2026-11-13); its open items are on the tracker backlog
+        # Three parts run side by side: validation about 1 h 45 min, web about 40 min, the rest about 2 h 55 min.
         part:
           - {name: validation, args: "tests/validation"}
           - {name: web, args: "tests/web"}
