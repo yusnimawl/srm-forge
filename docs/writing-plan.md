@@ -6,7 +6,7 @@ This is a living list. Every session that does writing work updates it in the sa
 
 | Document | Where | State |
 | --- | --- | --- |
-| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 12 tabs written 2026-10-29 and 2026-10-30, owner review open |
+| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 12 tabs written 2026-10-29 and 2026-10-30, Thermal tab written 2026-11-17, owner review open |
 | Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | Rewrite in place not started |
 | Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
@@ -26,6 +26,7 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Web tool: cases, jobs and lanes, tabs, export and import, chips, security
 - [x] Losses: iron loss, cut edge, copper loss, efficiency map, the open Materu finding
 - [x] Control: the controller contract, SIL, HIL, the comparison, known limits
+- [x] Thermal: what R5a and R5b do now, gates V1 to V6 and their results, what is open (R5c to R5e) (2026-11-17)
 - [x] Roadmap: merged items and a drawing of the six items ahead
 - [x] Commands
 - [x] Glossary
