@@ -38,6 +38,14 @@ function detailOf(job: JobOut, id: string, active: boolean): string | undefined 
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
+  if (id === "winding" && done !== null && total) {
+    const parts = [`${done} / ${total} drive evaluations`]
+    const elapsed = num(p.step_elapsed_s)
+    if (elapsed !== null) parts.push(`${fmtSpan(elapsed)} elapsed`)
+    const eta = num(p.eta_s)
+    if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
+    return parts.join(" · ")
+  }
   if ((id === "frames" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
   if (id === "designs") {
     const dd = num(p.designs_done)

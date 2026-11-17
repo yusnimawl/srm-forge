@@ -19,7 +19,7 @@ from .sizing.estimates import J_LIMIT, J_PEAK, coil_side_area
 from .sizing.generator import Candidate
 from .sizing.stage1 import Stage1
 from .sizing.winding import DENSITY_MAX_TURNS, Winding
-from .turns import ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
+from .turns import ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
 
 _NAN = float("nan")
 END_IMAGE_FACTOR = 1.5    # midpoint of the free-air (1) and iron-image (2) end-winding bounds
@@ -78,9 +78,13 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
                     progress: Callable[[int, int], None] | None = None,
                     cancel: Callable[[], bool] | None = None, only: Winding | None = None,
-                    i_map: float | None = None, on_scan: Callable[[], None] | None = None) -> Evaluation:
+                    i_map: float | None = None, on_scan: Callable[[], None] | None = None,
+                    scan_workers: int | None = 1,
+                    scan_progress: Callable[[int, int], None] | None = None) -> Evaluation:
     """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max;
-    `on_scan` is called once the map is complete (built or cached), before the winding is chosen."""
+    `on_scan` is called once the map is complete (built or cached), before the winding is chosen. The winding scan
+    runs on `scan_workers` processes (None: half the logical CPUs) and reports `scan_progress(done, total)`;
+    `cancel` also stops it, with status "cancelled"."""
     design = candidate.design
     machine = design.machine
     try:
@@ -96,8 +100,12 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     l_end = end_winding_inductance(machine, image_factor=END_IMAGE_FACTOR)
     result = with_end_winding(result, l_end)
     cap = stage.j_peak_max if j_peak_max is None else j_peak_max
-    choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
-                          margin=margin, max_turns=max_turns, only=only)
+    try:
+        choice = choose_turns(result, machine, req, j_peak=j_peak, j_limit=j_limit, j_peak_max=cap,
+                              margin=margin, max_turns=max_turns, only=only, workers=scan_workers,
+                              progress=scan_progress, cancel=cancel)
+    except ScanCancelled:
+        return _failed(candidate, stage, "cancelled", "winding scan cancelled", j_limit)
     if choice.point is None:
         cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
         return _failed(candidate, stage, "no_winding",

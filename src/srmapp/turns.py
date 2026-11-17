@@ -2,11 +2,13 @@
 other stack lengths."""
 import dataclasses
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 
 from srmcore.maps import MapResult
+from srmcore.maps.pool import default_workers, map_ordered
 from srmcore.model.design import RadialSRMParams
 
 from .drive.envelope import Envelope, envelope
@@ -51,11 +53,15 @@ def speed_grid(req: Requirements, n: int = 12) -> np.ndarray:
     return np.unique(np.concatenate([base * np.array([0.1, 0.25, 0.5]), np.linspace(base, top, n)]))
 
 
+def _ratios(speeds_rpm: np.ndarray, torque: np.ndarray, power: np.ndarray, req: Requirements) -> tuple[float, float]:
+    torque_at_base = float(np.interp(req.base_speed_rpm, speeds_rpm, torque))
+    band = (speeds_rpm >= req.base_speed_rpm) & (speeds_rpm <= req.max_speed_rpm)
+    return torque_at_base / req.peak_torque_nm, float(np.min(power[band])) / req.peak_power_w
+
+
 def requirement_ratios(env: Envelope, req: Requirements) -> tuple[float, float]:
     """(torque at base speed / required torque, lowest power between base and maximum speed / required power)."""
-    torque_at_base = float(np.interp(req.base_speed_rpm, env.speeds_rpm, env.torque))
-    band = (env.speeds_rpm >= req.base_speed_rpm) & (env.speeds_rpm <= req.max_speed_rpm)
-    return torque_at_base / req.peak_torque_nm, float(np.min(env.power[band])) / req.peak_power_w
+    return _ratios(env.speeds_rpm, env.torque, env.power, req)
 
 
 @dataclass(frozen=True)
@@ -91,20 +97,61 @@ def turns_scale(machine: RadialSRMParams, w: Winding) -> float:
     return w.turns / (w.paths * machine.turns_per_pole)
 
 
+class ScanCancelled(Exception):
+    """`choose_turns` stopped because `cancel` returned True."""
+
+
+MIN_PARALLEL_JOBS = 16     # fewer distinct drive evaluations than this run in the calling process
+
+
 def _envelope(result: MapResult, machine: RadialSRMParams, req: Requirements, w: Winding, speeds,
               j_limit: float) -> Envelope:
     return envelope(rescale_turns(result, turns_scale(machine, w)), machine, req.bus_voltage_v, w.resistance,
                     speeds, current_limit=w.current, rms_limit=j_limit * w.paths * w.copper_area)
 
 
+def _drive_key(machine: RadialSRMParams, w: Winding, j_limit: float) -> tuple[float, float, float, float]:
+    """Everything of a winding the drive envelope reads: the turn ratio, resistance, current limit and RMS limit.
+    Windings with equal keys (for example N turns on one path and 2N turns on two) have the same envelope."""
+    return turns_scale(machine, w), w.resistance, w.current, j_limit * w.paths * w.copper_area
+
+
+_SCAN: dict = {}
+
+
+def _scan_init(result: MapResult, machine: RadialSRMParams, bus_voltage: float, band: np.ndarray) -> None:
+    _SCAN.update(result=result, machine=machine, bus_voltage=bus_voltage, band=band)
+
+
+def _drive_summary(result: MapResult, machine: RadialSRMParams, bus_voltage: float, band: np.ndarray,
+                   key: tuple[float, float, float, float]):
+    """(speeds, torque, power, i_rms) of the drive envelope of one `_drive_key` over `band`; no waveforms."""
+    k, resistance, current, rms_limit = key
+    env = envelope(rescale_turns(result, k), machine, bus_voltage, resistance, band, current_limit=current,
+                   rms_limit=rms_limit, waveforms=False)
+    return env.speeds_rpm, env.torque, env.power, env.i_rms
+
+
+def _scan_job(key: tuple[float, float, float, float]):
+    return _drive_summary(_SCAN["result"], _SCAN["machine"], _SCAN["bus_voltage"], _SCAN["band"], key)
+
+
 def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements, *, j_peak: float = J_PEAK,
                  j_limit: float = J_LIMIT, j_peak_max: float | None = None, margin: float = 1.0,
-                 max_turns: int = DENSITY_MAX_TURNS, only: Winding | None = None) -> TurnsChoice:
+                 max_turns: int = DENSITY_MAX_TURNS, only: Winding | None = None, workers: int | None = 1,
+                 progress: Callable[[int, int], None] | None = None,
+                 cancel: Callable[[], bool] | None = None) -> TurnsChoice:
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
     conductor RMS current density, `j_peak_max` (default 2 · `j_limit`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
     resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
-    feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding."""
+    feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding.
+
+    The scan runs one drive envelope per distinct (turn ratio, resistance, current limit, RMS limit), so windings
+    that give the same drive share one. `workers` runs them in a process pool (None: half the logical CPUs; one
+    worker, or fewer than `MIN_PARALLEL_JOBS` distinct evaluations, stays in this process); the result does not
+    depend on it. `progress(done, total)` follows the distinct evaluations; `cancel` is polled between them and
+    raises `ScanCancelled`."""
     cap = 2 * j_limit if j_peak_max is None else j_peak_max
     capped = False
     if only is not None:
@@ -117,13 +164,32 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     grid = speed_grid(req)
     band = grid[grid >= req.base_speed_rpm]
 
-    def scan_point(w: Winding) -> ScanPoint:
-        env = _envelope(result, machine, req, w, band, j_limit)
-        torque_ratio, power_ratio = requirement_ratios(env, req)
-        return ScanPoint(w, torque_ratio, power_ratio, float(np.max(env.i_rms)),
+    keys = [_drive_key(machine, w, j_limit) for w in windings]
+    distinct = list(dict.fromkeys(keys))
+    args = (result, machine, req.bus_voltage_v, band)
+    n_workers = default_workers(workers, len(distinct)) if len(distinct) >= MIN_PARALLEL_JOBS else 1
+    if n_workers > 1:
+        summaries = map_ordered(_scan_job, distinct, workers=n_workers, initializer=_scan_init, initargs=args,
+                                cancel=cancel, progress=progress)
+    else:
+        summaries = []
+        for done, key in enumerate(distinct, start=1):
+            if cancel is not None and cancel():
+                break
+            summaries.append(_drive_summary(*args, key))
+            if progress is not None:
+                progress(done, len(distinct))
+    if len(summaries) < len(distinct) or any(x is None for x in summaries):
+        raise ScanCancelled()
+    by_key = dict(zip(distinct, summaries))
+
+    def scan_point(w: Winding, key) -> ScanPoint:
+        speeds, torque, power, i_rms = by_key[key]
+        torque_ratio, power_ratio = _ratios(speeds, torque, power, req)
+        return ScanPoint(w, torque_ratio, power_ratio, float(np.max(i_rms)),
                          min(torque_ratio, power_ratio) >= margin)
 
-    scan = tuple(scan_point(w) for w in windings)
+    scan = tuple(scan_point(w, key) for w, key in zip(windings, keys))
     if not scan:
         return TurnsChoice(None, False, None, (), capped)
     feasible = [s for s in scan if s.feasible]

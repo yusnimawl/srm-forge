@@ -53,7 +53,8 @@ STEPS: dict[str, tuple[str, ...]] = {
     "hil_flash": ("queued", "build", "flash", "saved"),
 }
 _ETA_MIN_FRACTION = 0.05
-_ETA_STEPS = ("mapping", "frames", "fields")   # the steps whose point counts are the work done
+_ETA_STEPS = ("mapping", "frames", "fields", "winding")   # the steps whose point counts are the work done
+_STEP_PACED = ("winding",)   # the steps whose pace is measured from their own start, not the job's
 
 
 def initial_progress(kind: str) -> dict:
@@ -75,11 +76,13 @@ class Reporter:
         self._cancel = threading.Event()
         self._fields = dict(initial_progress(kind), status="running")
         self._version = 0
-        self._t0 = time.monotonic()
+        self._t0 = self._step_t0 = time.monotonic()
         self._last_write = float("-inf")
 
     def progress(self, **fields) -> None:
         with self._lock:
+            if "step" in fields and fields["step"] != self._fields.get("step"):
+                self._step_t0 = time.monotonic()
             self._fields.update(fields)
             self._version += 1
             due = time.monotonic() - self._last_write >= _STORE_INTERVAL_S
@@ -95,14 +98,18 @@ class Reporter:
     def snapshot(self) -> tuple[int, Progress]:
         with self._lock:
             elapsed = time.monotonic() - self._t0
-            return self._version, dict(self._fields, elapsed_s=elapsed, eta_s=self._eta(elapsed))
+            step_elapsed = time.monotonic() - self._step_t0
+            return self._version, dict(self._fields, elapsed_s=elapsed, step_elapsed_s=step_elapsed,
+                                       eta_s=self._eta(elapsed, step_elapsed))
 
-    def _eta(self, elapsed: float) -> float | None:
-        """Time left at the average pace so far, once 5 % of the points are done; only in the point-counted steps."""
+    def _eta(self, elapsed: float, step_elapsed: float) -> float | None:
+        """Time left at the average pace so far, once 5 % of the points are done; only in the point-counted steps.
+        The pace of the steps in `_STEP_PACED` counts from the start of the step, the others from the job's."""
         done, total = self._fields["points_done"], self._fields["points_total"]
-        if total <= 0 or done < _ETA_MIN_FRACTION * total or self._fields["step"] not in _ETA_STEPS:
+        step = self._fields["step"]
+        if total <= 0 or done < _ETA_MIN_FRACTION * total or step not in _ETA_STEPS:
             return None
-        return elapsed / done * (total - done)
+        return (step_elapsed if step in _STEP_PACED else elapsed) / done * (total - done)
 
     def flush(self) -> None:
         self._last_write = time.monotonic()
@@ -300,12 +307,17 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     def on_scan() -> None:   # the map is complete, built or cached
         nonlocal scan_start
         scan_start = time.monotonic()
-        reporter.progress(step="winding", message="choosing the winding")
+        reporter.progress(step="winding", points_done=0, points_total=0, message="choosing the winding")
+
+    def on_winding(done: int, total: int) -> None:
+        reporter.progress(step="winding", points_done=done, points_total=total,
+                          message=f"choosing the winding, {done} of {total} drive evaluations")
 
     reporter.progress(step="mesh", message="meshing")
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
-                         progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, **grid)
+                         progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, scan_progress=on_winding,
+                         **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
     if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing

@@ -87,7 +87,7 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
             lambda d, t, i=done, n=len(shortlist): point_progress(i, n, d, t))
         evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, j_peak=settings.j_peak,
                                      j_limit=settings.j_limit, j_peak_max=settings.peak_cap,
-                                     margin=margin, solver=solver, workers=workers,
+                                     margin=margin, solver=solver, workers=workers, scan_workers=workers,
                                      cache_dir=cache_dir, progress=on_point, cancel=cancel)
         if evaluation.status == "cancelled":
             cancelled = True
