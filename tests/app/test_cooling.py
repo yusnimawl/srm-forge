@@ -97,3 +97,17 @@ def test_placeholder_flag():
     s = CoolingSetup(jacket=Jacket(channel_height=5e-3, channel_width=25e-3, passes=3, flow_m3s=2e-4),
                      housing_thickness=9e-3, ambient_c=30.0)
     assert not s.placeholder
+
+
+def test_cross_wire_band_at_fill_without_cited_xi():
+    from srmapp.cooling import V3_XI_ERROR
+    from srmcore.thermal.homogenise import hashin_shtrikman_lower, milton_k
+    for fill in (0.37, 0.47):
+        n, w = co(fill=fill), co(u={"cross_wire"}, fill=fill)
+        assert n.k_cross_wire > w.k_cross_wire            # the band has width at every fill
+        assert w.k_cross_wire == pytest.approx(hashin_shtrikman_lower(fill, 391.1, 1.0), rel=0.01)
+    n47 = co(fill=0.47).k_cross_wire
+    assert n47 == pytest.approx(milton_k(0.47, 391.1, 1.0, 0.324))
+    assert n47 / 3.11 - 1 == pytest.approx(V3_XI_ERROR, abs=0.01)    # V3 record: 3.44 against the printed 3.11
+    assert any("xi is cited at fill 0.37 only" in x for x in co(fill=0.47).notes)
+    assert not any("xi is cited" in x for x in co(fill=0.37).notes)

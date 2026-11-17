@@ -137,7 +137,9 @@ Verdict: the Milton formula (Eq. (6), xi 0.324, copper 300 W/(m K), resin 1 W/(m
 | 0.37 | 2.41 | 2.430 | +0.8 % | 0.324 (cited) | 3.0 |
 | 0.47 | 3.11 | 3.439 | +10.6 % | not cited | 3.85 |
 
-The paper gives xi for fill 0.37 only. Solving for xi gives 0.304 (0.37) and 0.195 (0.47); these are derived here, not in the paper. The measured-agreement values are about 24 % above the Milton ones; the paper reports no temperature error as a number. Handling (spec section 8 V3: revise the band, not the measured values): the nominal winding conductivity is Milton where xi is cited (fill 0.37) and the Hashin-Shtrikman lower bound elsewhere; the band's upper end covers 3.0 and 3.85. The measured values only widen the band.
+The paper gives xi for fill 0.37 only. Solving for xi gives 0.304 (0.37) and 0.195 (0.47); these are derived here, not in the paper. The measured-agreement values are about 24 % above the Milton ones; the paper reports no temperature error as a number. Handling (spec section 8 V3: revise the band, not the measured values): no cited xi exists for other fills (search repeated 2026-11-17, docs/r5-sources.md 6.8). The `cross_wire` row of `srmapp.cooling.ROWS` now carries the error: the nominal is Milton with xi 0.324 at every fill (the cited value, carried over; the note in `Coefficients.notes` names the +10.6 % error at fill 0.47) and the unfavourable end is the Hashin-Shtrikman value. Band at fill 0.47, resin 1 W/(m K), copper 300: HS 2.75, nominal 3.44, printed Milton 3.11 (inside the band), measured-agreement 3.85. Band at fill 0.37: HS 2.16, nominal 2.43, printed 2.41, measured-agreement 3.0. Before this change the nominal at fill 0.47 was HS and the row had no width there. The measured values only widen the band.
+
+Re-run 2026-11-17 (`milton_k`, `hashin_shtrikman_lower`, python -I): fill 0.37 computed 2.430 against 2.41 (+0.8 %); fill 0.47 computed 3.439 against 3.11 (+10.6 %), unchanged. Tests: `tests/thermal/test_thermal_homogenise.py::test_v3_both_fills_with_the_one_cited_xi`, `tests/app/test_cooling.py::test_cross_wire_band_at_fill_without_cited_xi`. V3 stays "not reproduced exactly" at 0.47; the gap is now stated as a band, not closed.
 
 ## First rating (8/6 screening, test fixture)
 
@@ -208,4 +210,4 @@ Owner:
 Unresolved sources:
 - Romanazzi air-gap correlation: recorded, not coded. The air-gap and end-space rows have zero width until a second cited route exists.
 - Jacket Re below 1e4 (laminar or transitional): refused; the laminar Nu source is not read.
-- Idoughi 2011 (xi against fill factor): not read; Milton stays at fill 0.37 only.
+- Idoughi 2011 (xi against fill factor): not read (unreachable again 2026-11-17); the cited xi is carried to other fills inside the `cross_wire` band.
