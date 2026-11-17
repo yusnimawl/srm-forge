@@ -120,3 +120,15 @@ def test_preconditioner_options_agree(iron_model):
         assert sol.converged
         energies.append(ngsolve.Integrate(ngsolve.InnerProduct(sol.a, sol.a), sol.a.space.mesh))
     assert energies[1] == pytest.approx(energies[0], rel=1e-6)
+
+
+def test_oversize_model_raises_before_assembly():
+    """A model above max_dofs is refused with the DOF count; nothing is assembled or solved."""
+    from end3d.solve import ModelTooLarge
+    mesh = _sheet_pair_mesh()
+    model = Model3D(mesh, {"air": LinearLaw(), "coil_a": LinearLaw(), "coil_b": LinearLaw()},
+                    coils=("coil_a", "coil_b"), dirichlet="sym_z|end_z|outer")
+    with pytest.raises(ModelTooLarge, match=r"DOFs.*max_dofs") as err:
+        solve3d(model, {"coil_a": 1.0, "coil_b": -1.0}, max_dofs=100)
+    assert err.value.ndof > 100 and err.value.max_dofs == 100
+    assert isinstance(err.value, ValueError)
