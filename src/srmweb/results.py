@@ -186,6 +186,9 @@ class OperatingLossOut(_Out):
     stroke_key: str
     cut_edge_rel: tuple[F, F] | None = None
     cut_edge_factor: dict[str, F] | None = None
+    windage_w: F = None             # None for results made before friction and windage were added
+    friction_w: F = None
+    mechanical_rel: tuple[F, F] | None = None
 
 
 class FindingOut(_Out):
@@ -215,6 +218,7 @@ class LossesOut(_Out):
     srmapp_version: str
     notes: list[str]
     cut_process: str | None = None
+    bearing_placeholder: bool | None = None
 
 
 class BWaveformOut(_Out):

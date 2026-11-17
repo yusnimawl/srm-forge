@@ -12,6 +12,7 @@ from srmcore.thermal.model import Temperatures, ThermalLoad
 from .copper import ac_copper_parts
 from .drive.envelope import StrokeTrace
 from .losses import StrokeLoss, phase_current_samples
+from .mechanical import MechanicalLoss
 from .sizing.winding import Winding
 from .thermal_network import Network, _tri_area
 
@@ -26,11 +27,15 @@ class PointHeat:
     prox_ref_w: float            # W, at t_ref_c
     t_ref_c: float
     notes: tuple[str, ...] = ()
+    windage_w: float = 0.0       # W, heat in the rotor iron (the rotor surface carries the drag)
+    friction_w: float = 0.0      # W, heat in the bearings, given to the end caps
 
 
 def point_heat(stroke: StrokeLoss, trace: StrokeTrace, domain, static, winding: Winding, wire,
-               machine: RadialSRMParams, t_ref_c: float, iron_factor: float, rpm: float) -> PointHeat:
-    """`rpm` is the speed the stroke was solved at (it sets the period of the AC terms)."""
+               machine: RadialSRMParams, t_ref_c: float, iron_factor: float, rpm: float,
+               mechanical: MechanicalLoss | None = None) -> PointHeat:
+    """`rpm` is the speed the stroke was solved at (it sets the period of the AC terms). `mechanical` adds windage to
+    the rotor and bearing friction to the end caps."""
     kinds = np.array([static.region_kind[n] for n in static.region_names])
     em = []
     for part, kind, side in ((static.stator, "stator_iron", stroke.sides[0]), (static.rotor, "rotor_iron", stroke.sides[1])):
@@ -45,7 +50,10 @@ def point_heat(stroke: StrokeLoss, trace: StrokeTrace, domain, static, winding: 
         phase = phase_current_samples(trace.current, f.angles, tau, machine.n_phases)[:, 0]
         skin, prox = ac_copper_parts(winding, wire, phase, tau / (rpm * 2 * math.pi / 60), f.b_coil, f.coil_side,
                                      f.coil_areas, machine, t_ref_c)
-    return PointHeat(iron, trace.i_rms, skin, prox, t_ref_c, () if wire is not None else (DENSITY_NOTE,))
+    notes = () if wire is not None else (DENSITY_NOTE,)
+    if mechanical is None:
+        return PointHeat(iron, trace.i_rms, skin, prox, t_ref_c, notes)
+    return PointHeat(iron, trace.i_rms, skin, prox, t_ref_c, notes, mechanical.windage_w, mechanical.friction_w)
 
 
 def load_fn(heat: PointHeat, network: Network, machine: RadialSRMParams,
@@ -61,10 +69,14 @@ def load_fn(heat: PointHeat, network: Network, machine: RadialSRMParams,
     p_ref = machine.n_phases * heat.i_rms ** 2 * winding.resistance   # W, DC loss of all phases at t_ref
     a = network.active_share
     prox_area = sum(area[e].sum() for e in domain.coil_elements.values())
+    rotor = np.flatnonzero(domain.element_kind == "rotor_iron")
+    rotor_volume = float(area[rotor].sum()) * depth
+    windage = heat.windage_w / rotor_volume if heat.windage_w and rotor_volume > 0 else 0.0
 
     def load(t: Temperatures | None) -> ThermalLoad:
         w = heat.iron_w_per_m3.copy()
-        lump_w = {}
+        w[rotor] += windage
+        lump_w = {"end_caps": heat.friction_w} if heat.friction_w else {}
         for side, el in domain.coil_elements.items():
             if t is None:
                 scale = 1.0

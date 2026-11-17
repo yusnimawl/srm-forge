@@ -23,6 +23,7 @@ from .cooling import ROWS, CoolingSetup, K_IRON_HI, coefficients
 from .drive.envelope import envelope, min_copper_stroke
 from .evaluate import END_IMAGE_FACTOR, Evaluation
 from .losses import N_ANGLES, _capped, check_loss_data, phase_current_samples, stroke_losses
+from .mechanical import mechanical_loss
 from .sizing.generator import REFERENCE_TURNS
 from .thermal_load import load_fn, point_heat
 from .thermal_network import build_network
@@ -290,7 +291,8 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
             if s is None:
                 return None
             trace, sl = s
-            heat = point_heat(sl, trace, domain, static, hot, wire, machine, limit, coeffs.iron_factor, rpm)
+            mech = mechanical_loss(machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+            heat = point_heat(sl, trace, domain, static, hot, wire, machine, limit, coeffs.iron_factor, rpm, mech)
             return load_fn(heat, net, machine, hot)
         return load
 
@@ -298,6 +300,9 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     if setup.placeholder:
         notes.append("cooling uses owner placeholders (ambient, housing or jacket dimensions and flow): ratings are not final")
     notes.append(f"iron loss rated at x{K_IRON_HI:g} (K_IRON_HI band)")
+    probe = mechanical_loss(machine, req.bearing, req.max_speed_rpm)
+    notes.extend(probe.notes)
+    notes.append("windage heats the rotor iron and bearing friction heats the end caps; the rated set takes the high end of both bands")
     notes.append("no measured continuous thermal case: the continuous rating has no measured check (spec §1 item 4)")
     if em_budget is None:
         notes.append("the EM budget was not computed: the EM torque row uses the 10 % floor")

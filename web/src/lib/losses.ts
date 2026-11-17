@@ -29,9 +29,24 @@ export function cutEdgeText(rel: readonly (number | null)[] | null | undefined):
 
 const REGION_ORDER = ["stator_pole", "stator_yoke", "rotor_pole", "rotor_yoke"]
 
+/** True when any reached point carries the friction and windage terms (results made before they were added do not). */
+export function hasMechanical(r: LossesResult): boolean {
+  return r.points.some((p) => p.reached && p.windage_w != null)
+}
+
+/** The band on friction plus windage of an operating point, relative to their sum ("band −35 / +38 %"); a dash where
+ *  there is none. */
+export function mechanicalBandText(rel: readonly (number | null)[] | null | undefined): string {
+  const [lo, hi] = rel ?? []
+  if (lo == null || hi == null || !Number.isFinite(lo) || !Number.isFinite(hi)) return "—"
+  const pct = (v: number) => `${v < 0 ? "−" : "+"}${Math.abs(Math.round(v * 100))}`
+  return `band ${pct(lo)} / ${pct(hi)} %`
+}
+
 export type LossSeries = { name: string; values: (number | null)[]; hover?: string[] }
 
-/** Loss components in W per operating point: copper DC, copper AC (0 where it was not computed) and the iron loss of
+/** Loss components in W per operating point: copper DC, copper AC (0 where it was not computed), windage and bearing
+ *  friction (only for results that have them) and the iron loss of
  *  each region, whose `hover` text gives its hysteresis, classical and excess parts. Unreached points are null in
  *  every series and in `totals`. */
 export function splitBars(r: LossesResult): { series: LossSeries[]; totals: (number | null)[] } {
@@ -42,6 +57,9 @@ export function splitBars(r: LossesResult): { series: LossSeries[]; totals: (num
   const series: LossSeries[] = [
     { name: "Copper DC", values: per((p) => w(p.copper_dc_w)) },
     { name: "Copper AC", values: per((p) => w(p.copper_ac_w)) },
+    ...(hasMechanical(r)
+      ? [{ name: "Windage", values: per((p) => w(p.windage_w)) }, { name: "Bearing friction", values: per((p) => w(p.friction_w)) }]
+      : []),
     ...regions.map((k) => ({
       name: `Iron ${k.replaceAll("_", " ")}`,
       values: per((p) => {

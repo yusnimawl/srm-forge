@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .cooling import CoolingSetup
+from .mechanical import BearingSetup
 from .wire import Wire
 
 # Same plausibility window as the srmcore validator's stator_outer_diameter unit rule.
@@ -31,6 +32,7 @@ class Requirements(BaseModel):
     peak_duration_s: float = Field(default=30.0, gt=0)
     insulation_class: Literal["B", "F", "H"] = "H"
     cooling: CoolingSetup = CoolingSetup()
+    bearing: BearingSetup = BearingSetup()                          # friction and windage; placeholder until chosen
 
     @field_validator("max_outer_diameter_m")
     @classmethod

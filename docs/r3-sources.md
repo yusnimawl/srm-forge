@@ -15,6 +15,8 @@ Grades: **A** measured table, **B** measured or manufacturer figure, read off or
 | 3 | DC-bias hysteresis factor | Urgera thesis 2024 Tables 5.3 and 5.4 (measured); Zhu et al. 2019 Fig. 18 | A (thesis), B (Zhu) | found, but the exponent is not 2 (see below) |
 | 4 | Materu measured core and copper loss, 6/4 | Materu dissertation 1989, Tables 4 and 5 pp. 97 and 98 | A | found, gate passed with caveats |
 | 5 | Cross-check candidates | see the last section | not graded | 4 candidates, 3 full texts not retrievable |
+| 6 | Air-gap windage of a smooth rotor cylinder, drag coefficient against Re | Gorland, Kempke and Lumannick, NASA TM X-52851, 1970, Eq. (4) to (6) and Tables I and II | A (measured tables, one rig, smooth rotor, torque within 5 %) | found (section 6) |
+| 7 | Bearing friction coefficient by bearing type | JTEKT (Koyo) bearing knowledge, "Frictional coefficient (reference)", Eq. (8-2) and Table 8-1 | B (manufacturer reference values, no accuracy stated) | found (section 7) |
 
 Files downloaded for reading are kept outside the repo (scratchpad `r3dl/`). No PDF was added to the repo: the Materu dissertation (Virginia Tech, vtechworks, no licence statement), the EMERF/AK Steel tables (OCW licence forbids incorporating them in software) and the Newcastle thesis (all rights reserved) are not clearly redistributable. URLs and pages are recorded instead.
 
@@ -204,3 +206,35 @@ Owner pick: pending.
 ## Owner pick: per-region cross-check (2026-10-18)
 
 Yan et al., IET Electr. Power Appl. 14(11), 2020, Table 3 (4-phase 8/6, 50W470, NNNN-SSSS): stator yoke 52.9 %, stator teeth 23.9 %, rotor 23.2 % of the iron loss. Compare region shares only; the paper's dimension labels are inconsistent, so absolute watts are not used.
+
+## 6. Air-gap windage (tracker row 10m, read 2026-11-17)
+
+**Source.** S. H. Gorland, E. E. Kempke Jr. and S. Lumannick, "Experimental windage losses for close clearance rotating cylinders in the turbulent flow regime", NASA TM X-52851, Lewis Research Center, June 1970 (public domain; https://ntrs.nasa.gov/api/citations/19700023755/downloads/19700023755.pdf, 23 pages). The equations and Tables I and II were read from the page images (the text layer lost them), pp. 4 and 6 to 8 of the report.
+
+**Rig.** A cylinder 12.005 in diameter and 5.9 in long, 28 rms surface finish, in a stationary concentric housing of the same length at radial gaps 0.0565, 0.116 and 0.236 in (gap over radius 0.0094 to 0.039), air at ambient pressure, speeds up to 24 000 rpm, Re above 100 000. The housing hung on a reaction-torque device, so the torque has no end-disc part. Torque is "approximately 5 percent accurate" above 5000 rpm (1 to 2 % vibration scatter). Above Re 15 000 the drag coefficients of the three gaps agree within 5 %; below Re 10 000 the gaps differ.
+
+**Equations as printed.** W = lambda rho pi omega^3 R^4 L (Eq. 4), lambda = T / (rho pi omega^2 R^4 L) (Eq. 5), Re = U D / nu with U = omega R and D the radial gap (Eq. 6), W = T omega (Eq. 1a). Lambda is the usual skin-friction coefficient (tau = lambda rho U^2 / 2). The slope of lambda against Re is about -0.5 below Re 5000 to 7000 (vortex flow) and about -0.22 to -0.25 above it (large gap), p. 4.
+
+**Data used.** Table I (gap 0.0565 in, 46 rows, Re 351 to 21 208, lambda 9.209e-3 down to 2.052e-3) is the nominal curve; Table II (gap 0.116 in, 24 rows, Re 802 to 22 221) sets the band. Both are in `srmcore.thermal.windage` as printed. Table III (gap 0.236 in) was not transcribed.
+
+**Model (`srmcore.thermal.windage`, `srmapp.mechanical`).** Smooth cylinder at the rotor outer radius R, active length L, radial gap g: W = lambda(Re) pi rho omega^3 R^4 L, Re = omega R g / nu, lambda log-log interpolated in Table I. Air kinematic viscosity from the cited table of `srmcore.thermal.correlations` at 60 degC (the top of that table, `AIR_FILM_C`); density from the ideal-gas law at 101 325 Pa (not cited, standard). Below Re 351 lambda follows slope -0.5 from the first row, above Re 21 208 slope -0.22 from the last row (the shallower end of the report's range gives the larger loss); the result carries a note when it is outside the rows or outside gap/radius 0.0094 to 0.039.
+
+**Band.** The windage power is given within plus or minus 39.8 %: the largest difference between the Table II and Table I drag coefficients at the Table II rows inside the Table I range (34.8 % at Re 802, 17 to 18 % at Re 1500 to 3700, within 10 % above Re 6000) plus the report's 5 % torque accuracy. It is a measured gap-to-gap spread, not a confidence interval of a salient rotor.
+
+**Check, arithmetic only.** The model with the rig geometry and each Table I row's own air temperature (rows up to 139 degF = 59 degC, 15 rows from 241 to 15 337 rpm) gives the printed windage power +0.7 to +2.2 %. This checks the transcription, the units and the interpolation; it is not an independent validation, because lambda was read from the same table.
+
+**Gaps and cautions.**
+- **Salient rotor: no cited factor.** The data are for a smooth cylinder. Salient poles add windage (Kiyota, Kakishima and Chiba report about 1.3 kW from the poles of a 60 kW SRM at maximum speed; seen in a search result only, the paper was not read), and no factor for a pole count or pole arc was found. The model is a lower bound for an SRM, so its band has no upper end for the salient shape and the sign of the error is unfavourable for the efficiency. Every result carries this note.
+- Rotor end-face (disc) windage is not in the data and not in the model.
+- One rig, one rotor, one surface finish; no radial or axial through-flow; pressure ambient.
+- The air properties table stops at 60 degC, so air in a hotter gap is taken at 60 degC (higher density, so more windage than a hotter gap).
+
+## 7. Bearing friction (tracker row 10m, read 2026-11-17)
+
+**Source.** JTEKT Corporation (Koyo), bearing knowledge, "Frictional coefficient (reference)", https://www.jtekt.co.jp/products/bearing/en/support/bearing-knowledge/8-4000.html (the formula was read from the page's equation images). M = mu P d / 2 (Eq. 8-2), M the frictional moment in mN m, mu the friction coefficient, P the load on the bearing in N, d the nominal bore diameter in mm. Table 8-1 gives reference values of mu "for stable operation under normal operating conditions": deep groove ball 0.0010 to 0.0015, angular contact ball 0.0012 to 0.0020, self-aligning ball 0.0008 to 0.0012, cylindrical roller 0.0008 to 0.0012, full-complement needle roller 0.0025 to 0.0035, needle roller and cage 0.0020 to 0.0030, tapered roller 0.0017 to 0.0025, spherical roller 0.0020 to 0.0025, thrust ball 0.0010 to 0.0015, spherical thrust roller 0.0020 to 0.0025. The page says mu depends greatly on type, load, speed and lubrication and gives no accuracy.
+
+**Model (`srmcore.post.bearing_friction`).** M = mu P d / 2 per bearing, summed over the bearings (the sum of mu P_i d / 2 over bearings of one bore does not depend on the load split), nominal mu the middle of the range, band the printed ends (plus or minus 20 % for deep groove ball). Power is M omega. There is no speed, lubricant, seal or preload term.
+
+**Grade B**, a manufacturer's reference values with no stated accuracy. The SKF frictional-moment model (rolling, sliding, seal and drag terms) was seen in a search result and not read; it would need bearing catalogue constants that are not chosen yet.
+
+**Placeholders (owner row: the bearing is not chosen).** `srmapp.mechanical.BearingSetup` takes the type, the number of bearings, the bore and the load; with nothing set (`placeholder` true) it uses deep groove ball bearings, a bore equal to the shaft diameter and a load equal to the rotor weight (rotor laminations plus the shaft over the stack length, times 9.81 m/s2). Results then say so, in the notes and in the Losses chip. Magnetic pull, unbalance and drive loads are not in the load.

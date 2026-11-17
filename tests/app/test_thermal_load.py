@@ -114,3 +114,16 @@ def test_iron_total_and_ac_scaling(rig, tmp_path):
     skin, prox = ac_copper_parts(w40, WIRE, ph, period, f.b_coil, f.coil_side, f.coil_areas, M, 40.0)
     assert h.skin_ref_w * s == pytest.approx(skin, rel=0.01)
     assert h.prox_ref_w * s == pytest.approx(prox, rel=0.01)
+
+
+def test_windage_heats_the_rotor_and_friction_the_end_caps(rig):
+    _, dom, net = rig
+    rotor = np.flatnonzero(dom.element_kind == "rotor_iron")
+    area = _tri_area(dom.nodes, dom.triangles)
+    base = load_fn(_heat(dom), net, M, W)(None)
+    hot = load_fn(_heat(dom, windage_w=12.0, friction_w=3.0), net, M, W)(None)
+    extra = (hot.element_w_per_m3 - base.element_w_per_m3)
+    assert np.count_nonzero(extra) == len(rotor) and np.all(extra[rotor] > 0)
+    assert float(np.sum(extra * area * M.stack_length)) == pytest.approx(12.0)
+    assert hot.lump_w["end_caps"] == pytest.approx(3.0) and "end_caps" not in base.lump_w
+    assert _total(dom, hot) == pytest.approx(_total(dom, base) + 15.0)
