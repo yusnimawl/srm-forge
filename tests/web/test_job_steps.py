@@ -258,7 +258,7 @@ def test_real_animate_job_steps(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(
     ("kind", "step"),
-    [("evaluate", "winding"), ("search", "designs"), ("search", "pareto"), ("evaluate", "mesh")],
+    [("search", "designs"), ("search", "pareto"), ("evaluate", "mesh")],
 )
 def test_eta_none_outside_point_counted_steps(tmp_path, monkeypatch, kind, step):
     now = [100.0]
@@ -276,6 +276,43 @@ def test_eta_computed_in_frames_step(tmp_path, monkeypatch):
     now[0] = 120.0
     rep.progress(step="frames", points_done=10, points_total=20)
     assert rep.snapshot()[1]["eta_s"] == pytest.approx(20.0)
+
+
+def test_eta_in_the_winding_step_counts_from_the_start_of_the_step(tmp_path, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    rep = Reporter(Store(tmp_path / "a.db"), "j", "evaluate")
+    now[0] = 700.0                      # ten minutes of mapping first
+    rep.progress(step="winding", points_done=0, points_total=0)
+    now[0] = 730.0
+    rep.progress(points_done=10, points_total=100)
+    snap = rep.snapshot()[1]
+    assert snap["step_elapsed_s"] == pytest.approx(30.0) and snap["elapsed_s"] == pytest.approx(630.0)
+    assert snap["eta_s"] == pytest.approx(30.0 / 10 * 90)
+    rep.progress(points_done=2)
+    assert rep.snapshot()[1]["eta_s"] is None
+
+
+def test_real_evaluate_job_reports_the_winding_scan(tmp_path, monkeypatch):
+    seen = []
+
+    def fake(inputs, *, progress, on_scan, scan_progress, **kw):
+        progress(3, 3)
+        on_scan()
+        seen.append(rep.snapshot()[1])
+        scan_progress(5, 40)
+        seen.append(rep.snapshot()[1])
+        return _ns(status="ok")
+
+    monkeypatch.setattr(jobs, "evaluate_design", fake)
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
+    rep = _Recorder(tmp_path)
+    req = _ns(case_id="c", grid=None, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
+    started, running = seen
+    assert (started["step"], started["points_done"], started["points_total"]) == ("winding", 0, 0)
+    assert (running["step"], running["points_done"], running["points_total"]) == ("winding", 5, 40)
+    assert "5 of 40" in running["message"]
 
 
 def test_last_point_and_step_change_reach_the_store_at_once(tmp_path, monkeypatch):

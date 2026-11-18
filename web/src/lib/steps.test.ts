@@ -53,6 +53,14 @@ describe("stepStates", () => {
     const r = stepStates(job({}, { points_done: 412, points_total: 960, elapsed_s: 420, eta_s: 540 }))[2]
     expect(r.detail).toBe("412 / 960 points · 7 min elapsed · about 9 min left")
   })
+  it("winding detail counts drive evaluations from the start of the step", () => {
+    const r = stepStates(job({}, { step: "winding", points_done: 120, points_total: 750, elapsed_s: 900, step_elapsed_s: 125, eta_s: 650 }))[3]
+    expect(r.detail).toBe("120 / 750 drive evaluations · 2 min elapsed · about 11 min left")
+  })
+  it("winding detail without counts yet shows the job's elapsed time", () => {
+    const r = stepStates(job({}, { step: "winding", points_done: 0, points_total: 0, elapsed_s: 125 }))[3]
+    expect(r.detail).toBe("2 min elapsed")
+  })
   it("mapping detail leaves out the time left when eta is null", () => {
     const r = stepStates(job({}, { points_done: 10, points_total: 960, elapsed_s: 30, eta_s: null }))[2]
     expect(r.detail).toBe("10 / 960 points · 30 s elapsed")
