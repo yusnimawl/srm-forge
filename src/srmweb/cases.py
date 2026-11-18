@@ -15,7 +15,7 @@ from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
-SCAN_BUDGET_S = {"auto": 450.0, "fixed": 15.0}    # winding-choice time when none has been timed
+SCAN_BUDGET_S = {"auto": 72.0, "fixed": 1.0}    # winding-choice time when none has been timed: LattePanda x 1.25
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 
 

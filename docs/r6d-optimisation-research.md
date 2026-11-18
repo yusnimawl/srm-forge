@@ -140,7 +140,12 @@ The version to build:
 6. **Decision rule.** The winner has the highest median hypervolume at 150 maps on both requirement sets. Arms within the replay spread of each other count as a tie, and a tie goes to the simpler arm (A, D, C, B in rising complexity). Quick mode is judged separately at 30 maps and may use a different arm.
 7. **End-to-end check.** The winner, one overnight run on all 4 pole sets, finalists at `full`: about 11 to 12 h.
 
-Total LattePanda time: about 60 h, about 6 nights. Code in the cloud: the harness (one ask/tell interface, the run log, hypervolume), the four arms, the emulator, with fast tests on an analytic stand-in objective.
+Total LattePanda time: about 60 h, about 6 nights. The 60 h counts maps only. Every design also runs the winding scan after its map. Measured on
+the LattePanda 2026-11-18 (`docs/winding-scan-profile.md`): 57 s in density mode at 8 workers and 4 s in wire mode,
+against about 120 s per `screening` map (40 h / 1200 maps). In density mode the real runs grow from about 40 h to
+about 59 h and the confirmation by about 0.6 h; the end-to-end check is one night either way, so it holds fewer
+designs. Total in density mode: about 80 h, about 8 nights. In wire mode the scan adds under 2 h, so about 62 h.
+R5c makes the rating, not `j_limit`, decide feasibility in the scan; time the scan again after R5c, before the spike. Code in the cloud: the harness (one ask/tell interface, the run log, hypervolume), the four arms, the emulator, with fast tests on an analytic stand-in objective.
 
 ## Sources
 

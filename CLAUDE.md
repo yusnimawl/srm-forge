@@ -48,6 +48,7 @@ $env:PYTHONPATH="src;tests;tests/sil"; python examples\control_hil.py [--case SE
 $env:PYTHONPATH="src;tests;tests/sil"; python examples\hil_emu_selftest.py [COM4]   # Teensy emulator alone on its software gate pattern, against the PC model
 $env:PYTHONPATH="tests"; python examples\materu_losses_check.py [--preset screening|full|reference] [--rows 4:0 5:2] [--skip-yan] [--json PATH]   # R3 iron-loss check against Materu's measured 6/4 losses and the Yan region shares (hours at reference)
 $env:PYTHONPATH="tests"; python examples\speed_budget.py [--json PATH]   # time screening and full maps for the speed budgets
+python examples\scan_timing.py [--cache-dir DIR] [--json PATH]   # time the winding choice (density, wire; auto, fixed; 1 and default workers) for SCAN_BUDGET_S
 python tools\validation_report.py                   # write docs/validation-report.md from docs/validation/ (verdict PASS/PENDING/FAIL, exit 1 on FAIL); the CI row is stale unless ci.json's tag is v + the installed srmcore version, and the EMDLAB / Maxwell row is gated on the limits of tests/validation/test_emdlab.py
 python tools\engine_digest.py [--update]            # digest of the engine code behind map numbers against its pin (see Map pipeline 3)
 python tools\digitise_bh.py                         # reproduce the traced/read library B-H curves (needs the dev extra, PyMuPDF)
