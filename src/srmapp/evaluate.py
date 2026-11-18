@@ -156,6 +156,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
             return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
         except ValueError as exc:   # MissingLossData, MissingCoolingData and a design without thermal data
             notes.append(f"{exc}; {NOT_RATED}")
+        except Exception as exc:  # batch boundary, as for the map: a failed stroke solve must not lose the search
+            return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
     w = point.winding
     chosen = machine.model_copy(update={"turns_per_pole": w.turns,
                                         "fill_factor": w.turns * w.copper_area / coil_side_area(machine)})

@@ -294,3 +294,17 @@ def test_refusal_keeps_em_choice(monkeypatch):
 def test_cancel_during_checks(monkeypatch):
     e, _, checks = _ranked_eval(monkeypatch, [False, False, False], cancel=lambda checks: len(checks) >= 1)
     assert e.status == "cancelled" and len(checks) == 1
+
+
+@pytest.mark.parametrize("exc", [MapFailed(["1 of 60 strokes failed"], 1), WorkerCrashed([3])])
+def test_failed_stroke_solve_is_an_evaluation_not_a_raise(monkeypatch, exc):
+    import srmapp.thermal as th
+
+    def boom(*a, **k):
+        raise exc
+    monkeypatch.setattr(th, "thermal_context", lambda *a, **k: None)
+    monkeypatch.setattr(th, "check_requirement", boom)
+    stage = stage1(_req(), make_8_6())
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
+        e = evaluate_stage2(_cand(), _req(), stage, max_turns=30)
+    assert isinstance(e, Evaluation) and e.status == type(exc).__name__ and not e.feasible
