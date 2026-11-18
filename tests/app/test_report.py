@@ -80,6 +80,13 @@ def test_losses_rules():
     assert f["loss_split"].value == pytest.approx(100 * 5 / 20)
 
 
+def test_loss_split_names_friction_and_windage_when_present():
+    pts = [dict(pt(1, 1), windage_w=2.0, friction_w=3.0)]
+    f = by_id(run(losses=dict(points=pts, speeds_rpm=[1], torque_fractions=[1.0], srmapp_version="0.7.0")))
+    assert f["loss_split"].value == pytest.approx(100 * 5 / 25)     # iron 5 W of 10 + 5 + 5 + 5
+    assert "friction and windage 20 %" in f["loss_split"].text
+
+
 def check(name, status):
     return dict(name=name, status=status, value=1.5, limit=1.0, detail="why")
 

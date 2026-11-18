@@ -4,7 +4,8 @@ that stroke on the reference-turns design, and from it the iron loss and the AC 
 The map, the end-winding inductance and the turns rescaling are those of the evaluation, so the torque levels (k/n
 of the envelope torque at each speed) are torques the evaluated winding delivers. Stroke solves run on the
 reference-turns design with coil current = phase current x turns / (paths x REFERENCE_TURNS), so the ampere-turns
-are the physical ones and the field needs no rescaling. Friction and windage are not included."""
+are the physical ones and the field needs no rescaling. Bearing friction and air-gap windage (`srmapp.mechanical`)
+are added to the losses at every speed."""
 import dataclasses
 import math
 from collections.abc import Callable
@@ -30,6 +31,7 @@ from .case import CaseInputs, map_request
 from .copper import ac_copper_loss
 from .drive.envelope import N_CURRENT, envelope, min_copper_stroke
 from .evaluate import END_IMAGE_FACTOR, Evaluation
+from .mechanical import mechanical_loss
 from .sizing.generator import REFERENCE_TURNS
 from .turns import rescale_turns, turns_scale
 
@@ -78,6 +80,9 @@ class OperatingLoss:
     stroke_key: str                        # file stem of the cached fields under <cache_dir>/strokes/
     cut_edge_rel: tuple[float, float] = (NAN, NAN)    # iron loss at the low and high end of the cut range, relative to iron_w, minus 1
     cut_edge_factor: dict[str, float] = dataclasses.field(default_factory=dict)   # per region: hysteresis + excess with over without
+    windage_w: float = NAN                 # air-gap windage of the rotor, W (nominal)
+    friction_w: float = NAN                # bearing friction, W (nominal)
+    mechanical_rel: tuple[float, float] = (NAN, NAN)   # windage + friction at the low and high end of their bands, relative to their sum, minus 1
 
 
 @dataclass(frozen=True)
@@ -91,6 +96,7 @@ class LossResult:
     srmapp_version: str
     notes: tuple[str, ...]
     cut_process: str = "unspecified"
+    bearing_placeholder: bool | None = None   # the bearing input was the unchosen default; None for results made before friction and windage
 
 
 def range_notes(sides: list["_Side"]) -> list[str]:
@@ -316,11 +322,12 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
 
     wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
     points, side_flags, band = [], [], {}
+    mech_notes: list[str] = []
     for done, ((i, f), trace) in enumerate(zip(grid, strokes), 1):
         rpm, torque = float(speeds[i]), f * float(env.torque[i])
         if trace is None:
             points.append(OperatingLoss(rpm, torque, False, NAN, NAN, NAN if wire else None, {}, NAN, NAN, NAN,
-                                        False, NAN, NAN, NAN, "", (NAN, NAN), {}))
+                                        False, NAN, NAN, NAN, "", (NAN, NAN), {}, NAN, NAN, (NAN, NAN)))
             continue
         phase = phase_current_samples(trace.current, angles, tau, q)
         coil = phase * scale
@@ -334,11 +341,14 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
                                                       fields.coil_side, fields.coil_areas, machine,
                                                       req.winding_temperature_c)
         power = trace.torque_avg * omega
+        mech = mechanical_loss(machine, req.bearing, rpm)
+        mech_notes.extend(mech.notes)
         points.append(OperatingLoss(
             rpm, torque, True, power, trace.copper_dc_w, ac, iron, iron_w,
-            power / (power + trace.copper_dc_w + (ac or 0.0) + iron_w), iron_uncertainty(sides),
+            power / (power + trace.copper_dc_w + (ac or 0.0) + iron_w + mech.total_w), iron_uncertainty(sides),
             any(s.beyond for s in sides), trace.theta_on, trace.theta_off, trace.current_limit,
-            stroke_key(ref, angles, coil, solver), sl.cut_edge_rel, sl.cut_edge_factor))
+            stroke_key(ref, angles, coil, solver), sl.cut_edge_rel, sl.cut_edge_factor,
+            mech.windage_w, mech.friction_w, mech.total_rel()))
         side_flags.extend(sides)
         _progress(progress, "losses", done, len(grid))
     _progress(progress, "losses", len(grid), len(grid))
@@ -347,10 +357,12 @@ def efficiency_map(inputs: CaseInputs, evaluation: Evaluation, *, n_speeds: int 
     notes.extend(range_notes(side_flags))
     notes.extend(thickness_notes)
     notes.append(CUT_EDGE_NOTE)
+    notes.extend(dict.fromkeys(mech_notes))
     if wire is None:
         notes.append("density mode: no wire, so the AC copper loss is not computed")
     return LossResult(tuple(points), tuple(float(s) for s in speeds), fractions, req.winding_temperature_c,
-                      len(angles), ANGLE_CONVERGENCE_REL, __version__, tuple(notes), req.cut_process)
+                      len(angles), ANGLE_CONVERGENCE_REL, __version__, tuple(notes), req.cut_process,
+                      req.bearing.placeholder)
 
 
 def locate(tri_nodes: np.ndarray, point: np.ndarray) -> tuple[int, bool]:

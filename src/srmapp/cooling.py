@@ -20,7 +20,7 @@ from srmcore.thermal.correlations import (CRAGOE_CP_MAX, DIALA_DENSITY, Fluid, a
 from srmcore.thermal.homogenise import MILTON_XI, hashin_shtrikman_lower, milton_k
 
 ROWS = ("iron", "em_torque", "cross_wire", "liner", "contact", "air_gap", "cooling_h",
-        "lamination_k", "thermal_mesh", "end_winding_model")
+        "lamination_k", "thermal_mesh", "end_winding_model", "mechanical_loss")
 
 K_IRON_HI = 2.0                    # section 7 / spec §7: iron loss factor at the unfavourable end
 TORQUE_FLOOR = 0.10                # spec §7: EM torque factor 1 + max(0.10, R4 total)

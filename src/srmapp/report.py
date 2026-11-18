@@ -117,16 +117,18 @@ def _losses(out, l):
         p = pts[rated * nt + nt - 1]
         cdc, cac = _num(p.get("copper_dc_w")), _num(p.get("copper_ac_w")) or 0.0
         iron = _num(p.get("iron_w"))
+        mech = (_num(p.get("windage_w")) or 0.0) + (_num(p.get("friction_w")) or 0.0)
         terms = {(r, t): _num(w) for r, d in (p.get("iron") or {}).items() for t, w in d.items()}
         terms = {k: w for k, w in terms.items() if w is not None}
         if iron is None and terms:
             iron = sum(terms.values())
         rpm = f" ({r:.0f} rpm)" if (r := _num(p.get("speed_rpm"))) is not None else ""
         if cdc is not None and iron is not None and cdc + cac + iron > 0:
-            tot = cdc + cac + iron
+            tot = cdc + cac + iron + mech
             out.append(Finding("loss_split", "note", "losses",
                                f"At the rated point{rpm} copper DC {_pct(cdc / tot)}, "
-                               f"copper AC {_pct(cac / tot)}, iron {_pct(iron / tot)} of the loss",
+                               f"copper AC {_pct(cac / tot)}, iron {_pct(iron / tot)}"
+                               + (f", friction and windage {_pct(mech / tot)}" if mech else "") + " of the loss",
                                100 * iron / tot, "%"))
         if terms:
             (region, term), w = max(terms.items(), key=lambda kv: kv[1])

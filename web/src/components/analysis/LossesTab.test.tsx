@@ -94,6 +94,20 @@ describe("LossesTab", () => {
     expect(t).toContain("AC not computed (no wire chosen)")
   })
 
+  it("replaces the exclusion chip with the placeholder-bearing chip and shows windage and friction", async () => {
+    const r = losses(2)
+    r.points = r.points.map((p) => ({ ...p, windage_w: 1.5, friction_w: 0.25, mechanical_rel: [-0.3, 0.4] }))
+    ;(r as Record<string, unknown>).bearing_placeholder = true
+    const m = mount({ "/losses": () => json(r), "/api/geometry": () => json(geometry), "/api/cases/c": () => json(caseBody) })
+    await m.render()
+    const t = m.host.textContent ?? ""
+    expect(t).not.toContain("Excludes friction and windage")
+    expect(t).toContain("Bearing is a placeholder · windage of a smooth rotor")
+    expect(t).toContain("Windage")
+    expect(t).toContain("1.5 W")
+    expect(t).toContain("band −30 / +40 % with windage")
+  })
+
   it("shows the iron uncertainty, the beyond-range marker with its reason and the angle convergence", async () => {
     const r = losses(2)
     r.points = r.points.map((p) => ({ ...p, beyond_fit_range: true }))

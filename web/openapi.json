@@ -162,6 +162,61 @@
         "title": "BWaveformOut",
         "type": "object"
       },
+      "BearingSetup": {
+        "additionalProperties": false,
+        "description": "Bearings of the rotor. Every field has a default, which is a placeholder until the bearing is chosen.",
+        "properties": {
+          "bore_diameter_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bore Diameter M"
+          },
+          "count": {
+            "default": 2,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "radial_load_n": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radial Load N"
+          },
+          "type": {
+            "default": "deep_groove_ball",
+            "enum": [
+              "deep_groove_ball",
+              "angular_contact_ball",
+              "self_aligning_ball",
+              "cylindrical_roller",
+              "needle_full_complement",
+              "needle_cage",
+              "tapered_roller",
+              "spherical_roller",
+              "thrust_ball",
+              "spherical_thrust_roller"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "BearingSetup",
+        "type": "object"
+      },
       "Body_dxf_import_api_cases__case_id__dxf_post": {
         "properties": {
           "file": {
@@ -3328,6 +3383,17 @@
             ],
             "title": "Angle Convergence Rel"
           },
+          "bearing_placeholder": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bearing Placeholder"
+          },
           "cut_process": {
             "anyOf": [
               {
@@ -3870,6 +3936,17 @@
             ],
             "title": "Efficiency"
           },
+          "friction_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friction W"
+          },
           "iron": {
             "additionalProperties": {
               "$ref": "#/components/schemas/RegionLossOut"
@@ -3898,6 +3975,41 @@
               }
             ],
             "title": "Iron W"
+          },
+          "mechanical_rel": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mechanical Rel"
           },
           "power_w": {
             "anyOf": [
@@ -3961,6 +4073,17 @@
               }
             ],
             "title": "Torque Nm"
+          },
+          "windage_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windage W"
           }
         },
         "required": [
@@ -4390,6 +4513,13 @@
             "exclusiveMinimum": 0.0,
             "title": "Base Speed Rpm",
             "type": "number"
+          },
+          "bearing": {
+            "$ref": "#/components/schemas/BearingSetup",
+            "default": {
+              "count": 2,
+              "type": "deep_groove_ball"
+            }
           },
           "bus_voltage_v": {
             "default": 400.0,

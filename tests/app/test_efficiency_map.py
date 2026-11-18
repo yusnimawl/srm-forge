@@ -10,6 +10,7 @@ from map_fixtures import synthetic_map
 import srmapp.losses as losses
 from srmapp.case import CaseInputs, FixedWinding, evaluate_design
 from srmapp.losses import check_loss_data, efficiency_map, phase_current_samples
+from srmapp.mechanical import BearingSetup, mechanical_loss
 from srmapp.requirements import Requirements
 from srmcore.maps.point import solve_point
 from srmcore.materials import MissingLossData
@@ -53,10 +54,21 @@ def test_energy_balance(result):
     assert all(p.reached for p in out.points)
     for p in out.points:
         assert p.power_w > 0 and p.iron_w > 0 and p.copper_ac_w is not None
-        assert p.efficiency == pytest.approx(p.power_w / (p.power_w + p.copper_dc_w + p.copper_ac_w + p.iron_w))
+        assert p.efficiency == pytest.approx(p.power_w / (p.power_w + p.copper_dc_w + p.copper_ac_w + p.iron_w + p.windage_w + p.friction_w))
         assert p.iron_w == pytest.approx(sum(r.hysteresis + r.classical + r.excess for r in p.iron.values()))
         assert p.iron_uncertainty_rel > losses.ANGLE_CONVERGENCE_REL
         assert p.stroke_key
+
+
+def test_mechanical_loss_is_in_the_map(result):
+    out, _ = result
+    pts = sorted(out.points, key=lambda p: p.speed_rpm)
+    assert all(p.windage_w > 0 and p.friction_w > 0 for p in pts)
+    lo, hi = pts[0], pts[-1]
+    assert hi.windage_w > lo.windage_w and hi.friction_w > lo.friction_w
+    assert all(a < 0 < b for a, b in (p.mechanical_rel for p in pts))
+    assert any("placeholder" in n for n in out.notes) and any("salient" in n for n in out.notes)
+    assert hi.windage_w == pytest.approx(mechanical_loss(DESIGN.machine, BearingSetup(), hi.speed_rpm).windage_w)
 
 
 def test_iron_grows_with_speed(result):

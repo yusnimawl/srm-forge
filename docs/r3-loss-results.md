@@ -185,6 +185,37 @@ Total iron loss of the 8/6 (`make_8_6`, 10JNEX900, 1500 r/min, the stroke wavefo
 
 `ANGLE_CONVERGENCE_REL` stays 0.02, now measured rather than a placeholder (owner, 2026-11-10). The screening values zig-zag, probably because the angles snap to the coarse band pitch. Coverage: one machine, one current waveform, one speed.
 
+## Friction and windage (tracker row 10m, 2026-11-17)
+
+The efficiency map and the R5 heat input now include air-gap windage and bearing friction (`srmapp.mechanical`;
+sources, grades and bands in `docs/r3-sources.md` sections 6 and 7). Efficiency is output power over output power
+plus copper, iron, windage and friction loss.
+
+Reference 8/6 (`make_8_6`: rotor radius 40 mm, gap 0.4 mm, stack 100 mm, shaft 20 mm; placeholder bearing: two
+deep groove ball bearings, 20 mm bore, 23.6 N rotor weight), nominal values and the band on their sum:
+
+| Speed (rpm) | Re | lambda (1e-3) | Windage (W) | Friction (W) | Sum (W) | Band on the sum |
+|---|---|---|---|---|---|---|
+| 1000 | 89 | 18.3 | 0.018 | 0.031 | 0.049 | -27 / +27 % |
+| 3000 | 266 | 10.6 | 0.28 | 0.093 | 0.37 | -35 / +35 % |
+| 6000 | 532 | 6.93 | 1.47 | 0.185 | 1.65 | -38 / +38 % |
+| 10000 | 887 | 5.29 | 5.17 | 0.309 | 5.48 | -39 / +39 % |
+| 15000 | 1330 | 4.60 | 15.2 | 0.463 | 15.7 | -39 / +39 % |
+
+- Re is 89 to 1330 here, so this machine runs at the low end of the measured table. Below Re 351 (up to about
+  4000 rpm) lambda follows the report's -0.5 slope and the result carries a note; the windage there is under 0.5 W.
+- Windage grows about as speed to the power 2.4 and passes the bearing friction between 1000 and 3000 rpm; friction is
+  constant torque.
+- Check of the implementation against its own source: the NASA rig (12 in cylinder) with each Table I row's air
+  temperature reproduces the printed windage power within +0.7 to +2.2 % for 15 rows between 241 and 15 337 rpm
+  (`tests/thermal/test_thermal_windage.py` checks two of them against the 39.8 % band). This is a transcription check, not a
+  validation: lambda was read from the same table.
+- Not validated against a motor measurement: no measured windage of an SRM was found. The smooth-cylinder value is a
+  lower bound for a salient rotor (no cited factor), so efficiencies read high by an unknown amount at high speed.
+- Thermal: windage heats the rotor iron and friction the end caps; the rated set of the rating takes both at the
+  top of their bands (budget row `mechanical_loss`). The rating's torque is not reduced by friction and windage
+  (they take shaft torque, not winding heat).
+
 ## Preliminary screening run (laptop, 2026-10-19)
 
 Preliminary. Screening mesh, two rows only (T4.1 and T5.5), M19 0.36 mm as the stand-in for Materu's steel. These

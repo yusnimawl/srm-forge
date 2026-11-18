@@ -333,6 +333,9 @@ One row for each budget row of spec §7 that needs a band. "Nominal" is what the
 | `cooling_h` shaft oil | none | none | 6.4 | **not found**, option refused |
 | `cooling_h` slot oil | water-glycol: as the jacket row; oil: none | water-glycol: minus 10 % | 6.4 | oil **not found**, option refused with oil |
 | `lamination_k` | 18.6 W/(m K) | 13.95 W/(m K) = 18.6 x (1 - 0.25), the grade-C allowance of `LOSS_GRADE_ALLOWANCE["C"]` | the plan's rule applied to Ou et al. Table I (6.9) | rule, grade C |
+| `mechanical_loss` | windage at the Table I curve of NASA TM X-52851 and bearing friction at the middle of the JTEKT Table 8-1 range (`docs/r3-sources.md` sections 6 and 7), both added to the heat load | windage at plus 39.8 % (the gap-to-gap spread of Tables I and II plus the 5 % torque accuracy) and friction at the high end of Table 8-1 (plus 20 % for deep groove ball) | `docs/r3-sources.md` sections 6 and 7 | band found, windage grade A (smooth rotor only, a lower bound for a salient rotor, no cited factor), friction grade B |
+
+Where the heat goes (tracker row 10m): windage is spread over the rotor iron elements as a uniform volumetric source (the rotor surface carries the drag, and the rotor is the part with no cooling path but the air gap), bearing friction goes to the `end_caps` lump (the bearings sit in the end shields). Both are assumptions, not cited; the losses are the ones of `docs/r3-sources.md` sections 6 and 7.
 
 Rows of spec §7 that this task does not source: iron loss, EM torque, thermal mesh, end-winding model (they come from R3, R4 and the V4 and V5 gates).
 
@@ -352,6 +355,7 @@ These are the default cooling setup of spec §2 decision 5, labelled "placeholde
 | Housing thickness | 8 mm |
 | Ambient | 40 degC (owner placeholder) |
 | Natural-convection surface temperature | 80 degC, i.e. 2 x 60 - ambient (an assumption, not cited; sets the end-frame and end-face h at the 60 degC air film) |
+| Bearing | deep groove ball bearings, two of them, bore equal to the shaft diameter, load equal to the rotor weight (the bearing is not chosen; `srmapp.mechanical.BearingSetup`, `docs/r3-sources.md` section 7) |
 
 Check of the flow regime this gives (arithmetic only, with the 65 degC properties interpolated from section 6.7): hydraulic diameter 2 h w / (h + w) = 6.67 mm, section 80 mm2, mean speed 1.875 m/s, Re about 1.1e4, inside the Gnielinski range (Re above 1e4). The flow was raised from 8 L/min (Re about 9800, below 1e4, so refused) to 9 L/min so the default jacket is in range.
 

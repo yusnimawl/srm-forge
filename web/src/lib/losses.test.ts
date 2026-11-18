@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { components } from "@/api/schema"
-import { bestPoint, contourData, envelopeEdge, cutEdgeText, lossKeyNumbers, ratedPoint, splitBars, svgToMetres } from "./losses"
+import { bestPoint, contourData, envelopeEdge, cutEdgeText, hasMechanical, lossKeyNumbers, mechanicalBandText, ratedPoint, splitBars, svgToMetres } from "./losses"
 
 type R = components["schemas"]["LossesOut"]
 type P = components["schemas"]["OperatingLossOut"]
@@ -52,6 +52,20 @@ describe("splitBars", () => {
       expect(sum).toBeCloseTo(b.totals[k]!, 12)
       expect(b.totals[k]).toBeCloseTo(p.copper_dc_w! + p.copper_ac_w! + p.iron_w!, 9)
     })
+  })
+  it("adds windage and bearing friction when the result has them, and they sum into the total", () => {
+    const r = result()
+    expect(hasMechanical(r)).toBe(false)
+    r.points = r.points.map((p) => (p.reached ? { ...p, windage_w: 0.5, friction_w: 0.25 } : p))
+    expect(hasMechanical(r)).toBe(true)
+    const b = splitBars(r)
+    expect(b.series.map((s) => s.name)).toEqual(["Copper DC", "Copper AC", "Windage", "Bearing friction", "Iron stator pole", "Iron stator yoke"])
+    expect(b.totals[0]).toBeCloseTo(10 + 2 + 2.3 + 0.75, 9)
+  })
+  it("writes the band of friction plus windage", () => {
+    expect(mechanicalBandText([-0.35, 0.38])).toBe("band −35 / +38 %")
+    expect(mechanicalBandText(null)).toBe("—")
+    expect(mechanicalBandText([null, 0.1])).toBe("—")
   })
   it("keeps the hysteresis, classical and excess split as hover text", () => {
     const h = splitBars(result()).series[2].hover!

@@ -17,13 +17,27 @@ export function jLimitChip(jLimit: number | null | undefined): { text: string; t
   return { text: `Peak only · ${tail}`, tone: "warn" }
 }
 
-/** The chips of a losses result: the winding temperature the copper loss assumes, what the loss leaves out, and the
- *  label (losses are never validated). */
-export function lossChips(windingTemperatureC: number | null | undefined): { text: string; tone: ChipTone }[] {
+/** What a losses result says about friction and windage: `none` for a result made before they were added, else
+ *  whether the bearing input was the unchosen default (`placeholder`) or was set (`set`). */
+export type MechanicalState = "none" | "placeholder" | "set"
+
+export function mechanicalState(windageIncluded: boolean, bearingPlaceholder: boolean | null | undefined): MechanicalState {
+  return !windageIncluded ? "none" : bearingPlaceholder === false ? "set" : "placeholder"
+}
+
+const MECHANICAL_CHIP: Record<MechanicalState, string> = {
+  none: "Excludes friction and windage",
+  placeholder: "Bearing is a placeholder · windage of a smooth rotor",
+  set: "Windage of a smooth rotor (lower bound)",
+}
+
+/** The chips of a losses result: the winding temperature the copper loss assumes, what the friction and windage
+ *  terms are (or that the result has none), and the label (losses are never validated). */
+export function lossChips(windingTemperatureC: number | null | undefined, mechanical: MechanicalState = "none"): { text: string; tone: ChipTone }[] {
   const known = windingTemperatureC != null && Number.isFinite(windingTemperatureC)
   return [
     { text: known ? `Winding ${windingTemperatureC} °C` : "Winding temperature not recorded", tone: "warn" },
-    { text: "Excludes friction and windage", tone: "warn" },
+    { text: MECHANICAL_CHIP[mechanical], tone: "warn" },
     verifiedChip(null),
   ]
 }

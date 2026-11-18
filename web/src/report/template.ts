@@ -1,12 +1,12 @@
 import type { Layout } from "plotly.js-dist-min"
 import type { Evaluation, MapArrays } from "@/api/types"
 import { caseLine, designFactorTraces, inductanceCurves, performanceSeries, torqueCurves, type Trace } from "@/lib/analysis"
-import { jLimitChip, lossChips, madeWithText, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
+import { jLimitChip, lossChips, madeWithText, mechanicalState, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
 import { compareRows } from "@/lib/compare"
 import { MACHINE_FIELDS, POLE_KEYS } from "@/lib/caseForm"
 import { fmt, fmtSI } from "@/lib/format"
 import { INFERNO_SCALE } from "@/lib/inferno"
-import { contourData, lossKeyNumbers, pointLabel, ratedPoint, splitBars, type LossesResult } from "@/lib/losses"
+import { contourData, hasMechanical, lossKeyNumbers, pointLabel, ratedPoint, splitBars, type LossesResult } from "@/lib/losses"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
 import { lineLayout, plotTheme, toPlotData, type PlotColors } from "@/lib/plotSpec"
 import { SPEEDS } from "@/lib/playback"
@@ -367,7 +367,7 @@ ${kv([
     }))
     const k = lossKeyNumbers(r)
     const rated = ratedPoint(r)
-    return `<div class="chips" role="note">${lossChips(r.winding_temperature_c).map(chip).join("")}</div>
+    return `<div class="chips" role="note">${lossChips(r.winding_temperature_c, mechanicalState(hasMechanical(r), r.bearing_placeholder)).map(chip).join("")}</div>
 ${kv([
   ["Best efficiency", k.best ? `${fmt(k.best.efficiency * 100, 3)} % at ${k.best.label}` : "—"],
   ["Total loss at the rated point", k.rated ? `${fmt(k.rated.totalW, 3)} W at ${k.rated.label}` : rated < 0 ? "— (no rated point reached)" : "—"],

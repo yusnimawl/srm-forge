@@ -937,6 +937,27 @@ export interface components {
             /** T */
             t: (number | null)[];
         };
+        /**
+         * BearingSetup
+         * @description Bearings of the rotor. Every field has a default, which is a placeholder until the bearing is chosen.
+         */
+        BearingSetup: {
+            /** Bore Diameter M */
+            bore_diameter_m?: number | null;
+            /**
+             * Count
+             * @default 2
+             */
+            count: number;
+            /** Radial Load N */
+            radial_load_n?: number | null;
+            /**
+             * Type
+             * @default deep_groove_ball
+             * @enum {string}
+             */
+            type: "deep_groove_ball" | "angular_contact_ball" | "self_aligning_ball" | "cylindrical_roller" | "needle_full_complement" | "needle_cage" | "tapered_roller" | "spherical_roller" | "thrust_ball" | "spherical_thrust_roller";
+        };
         /** Body_dxf_import_api_cases__case_id__dxf_post */
         Body_dxf_import_api_cases__case_id__dxf_post: {
             /** File */
@@ -2007,6 +2028,8 @@ export interface components {
         LossesOut: {
             /** Angle Convergence Rel */
             angle_convergence_rel: number | null;
+            /** Bearing Placeholder */
+            bearing_placeholder?: boolean | null;
             /** Cut Process */
             cut_process?: string | null;
             /** N Angles */
@@ -2139,6 +2162,8 @@ export interface components {
             ] | null;
             /** Efficiency */
             efficiency: number | null;
+            /** Friction W */
+            friction_w?: number | null;
             /** Iron */
             iron: {
                 [key: string]: components["schemas"]["RegionLossOut"];
@@ -2147,6 +2172,11 @@ export interface components {
             iron_uncertainty_rel: number | null;
             /** Iron W */
             iron_w: number | null;
+            /** Mechanical Rel */
+            mechanical_rel?: [
+                number | null,
+                number | null
+            ] | null;
             /** Power W */
             power_w: number | null;
             /** Reached */
@@ -2161,6 +2191,8 @@ export interface components {
             theta_on: number | null;
             /** Torque Nm */
             torque_nm: number | null;
+            /** Windage W */
+            windage_w?: number | null;
         };
         /**
          * ParamStep
@@ -2346,6 +2378,13 @@ export interface components {
         Requirements: {
             /** Base Speed Rpm */
             base_speed_rpm: number;
+            /**
+             * @default {
+             *       "count": 2,
+             *       "type": "deep_groove_ball"
+             *     }
+             */
+            bearing: components["schemas"]["BearingSetup"];
             /**
              * Bus Voltage V
              * @default 400

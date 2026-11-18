@@ -14,10 +14,10 @@ import { Label } from "@/components/ui/label"
 import { SELECT_CLASS } from "@/components/case/fields"
 import { LINE_COLORS } from "@/lib/analysis"
 import { CUT_PROCESSES } from "@/lib/caseForm"
-import { lossChips } from "@/lib/chips"
+import { lossChips, mechanicalState } from "@/lib/chips"
 import { fmt } from "@/lib/format"
 import { INFERNO_SCALE } from "@/lib/inferno"
-import { bestPoint, contourData, cutEdgeText, envelopeEdge, pointLabel, splitBars, svgToMetres, type LossesResult } from "@/lib/losses"
+import { bestPoint, contourData, cutEdgeText, envelopeEdge, hasMechanical, mechanicalBandText, pointLabel, splitBars, svgToMetres, type LossesResult } from "@/lib/losses"
 import { parseNum } from "@/lib/searchForm"
 import { fmtAbout } from "@/lib/steps"
 
@@ -100,7 +100,7 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
   return (
     <div className="space-y-6 pt-2">
       <div role="note" className="flex flex-wrap gap-2">
-        {lossChips(r.winding_temperature_c).map((ch) => <Chip key={ch.text} {...ch} />)}
+        {lossChips(r.winding_temperature_c, mechanicalState(hasMechanical(r), r.bearing_placeholder)).map((ch) => <Chip key={ch.text} {...ch} />)}
       </div>
       {r.notes.length > 0 && (
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
@@ -155,6 +155,14 @@ function Results({ caseId, r, machine }: { caseId: string; r: LossesResult; mach
               {sp.iron_uncertainty_rel != null && <> ± {fmt(sp.iron_uncertainty_rel * 100, 2)} %</>}
               {sp.cut_edge_rel != null && <>, {cutEdgeText(sp.cut_edge_rel)}</>}
             </dd>
+            {sp.windage_w != null && (
+              <>
+                <dt className="text-muted-foreground">Windage</dt>
+                <dd className="num">{fmt(sp.windage_w, 3)} W</dd>
+                <dt className="text-muted-foreground">Bearing friction</dt>
+                <dd className="num">{fmt(sp.friction_w, 3)} W, {mechanicalBandText(sp.mechanical_rel)} with windage</dd>
+              </>
+            )}
           </dl>
         )}
         {r.cut_process != null && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { jLimitChip, lossChips, madeWithText, verifiedChip } from "./chips"
+import { jLimitChip, lossChips, madeWithText, mechanicalState, verifiedChip } from "./chips"
 
 describe("verifiedChip", () => {
   it("names the engine version when verified", () => {
@@ -26,10 +26,21 @@ describe("jLimitChip", () => {
 })
 
 describe("lossChips", () => {
-  it("shows the winding temperature, the friction exclusion and the label", () => {
+  it("says friction and windage are excluded for results made before they were added", () => {
     expect(lossChips(120).map((c) => c.text)).toEqual(["Winding 120 °C", "Excludes friction and windage", "Unvalidated"])
     expect(lossChips(87.5)[0].text).toBe("Winding 87.5 °C")
     expect(lossChips(null)[0].text).toBe("Winding temperature not recorded")
+  })
+  it("names the placeholder bearing and the smooth-rotor windage instead of the exclusion", () => {
+    expect(lossChips(120, "placeholder").map((c) => c.text)).toEqual(["Winding 120 °C", "Bearing is a placeholder · windage of a smooth rotor", "Unvalidated"])
+    expect(lossChips(120, "set")[1].text).toBe("Windage of a smooth rotor (lower bound)")
+    expect(lossChips(120, "set").map((c) => c.text).join(" ")).not.toContain("Excludes")
+  })
+  it("derives the state from the result", () => {
+    expect(mechanicalState(false, null)).toBe("none")
+    expect(mechanicalState(true, true)).toBe("placeholder")
+    expect(mechanicalState(true, false)).toBe("set")
+    expect(mechanicalState(true, null)).toBe("placeholder")
   })
 })
 
