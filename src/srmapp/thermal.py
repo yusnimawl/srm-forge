@@ -9,6 +9,7 @@ import numpy as np
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.stroke import stroke_angles
+from srmcore.model.design import Design
 from srmcore.maps.validation import MEASURED_GAP, UncertaintyBudget
 from srmcore.materials.library import load_material
 from srmcore.mesh import build_machine_mesh
@@ -24,7 +25,10 @@ from .drive.envelope import envelope, min_copper_stroke
 from .evaluate import END_IMAGE_FACTOR, Evaluation
 from .losses import N_ANGLES, _capped, check_loss_data, phase_current_samples, stroke_losses
 from .mechanical import mechanical_loss
+from .requirements import Requirements
+from .sizing.estimates import coil_side_area
 from .sizing.generator import REFERENCE_TURNS
+from .sizing.winding import Winding
 from .thermal_load import load_fn, point_heat
 from .thermal_network import build_network
 from .turns import rescale_turns, turns_scale
@@ -94,6 +98,20 @@ def _illinois(f, a, fa, pa, b, fb, span):
     return a, fa, pa
 
 
+def peak_transient(solver: ThermalSolver, start: Temperatures, load: Callable, duration_s: float):
+    """Transient from `start` under `load`, step count doubled until the end hot spot moves under STEP_TOL_K.
+    Returns (final state, steps, hot spot at the maximum over the trace); raises ThermalRunaway."""
+    n, last = STEPS0, None
+    while True:
+        tr = solver.transient(start, load, duration_s, n)
+        end = tr.hot_spot_c[-1]
+        if (last is not None and abs(end - last) < STEP_TOL_K) or n >= STEPS_MAX:
+            break
+        last, n = end, 2 * n
+    # the trace holds no locations: the maximum is paired with the hot-spot location of the end state
+    return tr.final, n, HotSpot(float(tr.hot_spot_c.max()), solver.hot_spot(tr.final).location)
+
+
 def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: float,
                solver_for: Callable[[], ThermalSolver], load_at: Callable[[float], Callable | None],
                start_nm: float | None = None) -> SpeedRating:
@@ -154,19 +172,11 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
         if load is None:
             return BIG_K, None
         n_eval += 1
-        n, last = STEPS0, None
-        while True:
-            try:
-                tr = solver.transient(t_start, load, peak_duration_s, n)
-            except ThermalRunaway:
-                return BIG_K, None
-            end = tr.hot_spot_c[-1]
-            if (last is not None and abs(end - last) < STEP_TOL_K) or n >= STEPS_MAX:
-                break
-            last, n = end, 2 * n
-        # the trace holds no locations: the maximum is paired with the hot-spot location of the end state
-        top = HotSpot(float(tr.hot_spot_c.max()), solver.hot_spot(tr.final).location)
-        return top.temperature_c - limit_c, (tr.final, n, top)
+        try:
+            final, n, top = peak_transient(solver, t_start, load, peak_duration_s)
+        except ThermalRunaway:
+            return BIG_K, None
+        return top.temperature_c - limit_c, (final, n, top)
 
     fp, pe = transient(envelope_nm)
     if fp <= 0:
@@ -200,6 +210,175 @@ class Rating:
     srmapp_version: str
 
 
+def required_torques(req: Requirements, rpm: float) -> tuple[float | None, float]:
+    """(continuous torque or None, peak torque) in N·m the requirements ask for at `rpm`."""
+    omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
+    cont = None if req.continuous_power_w is None else req.continuous_power_w / omega
+    return cont, req.peak_torque_nm if rpm <= req.base_speed_rpm else req.peak_power_w / omega
+
+
+def rating_speeds(req: Requirements, n_speeds: int = 6) -> list[float]:
+    """The base speed and linspace(max/n_speeds, max, n_speeds), ascending."""
+    return sorted({req.base_speed_rpm} | {round(float(x), 6) for x in
+                                          np.linspace(req.max_speed_rpm / n_speeds, req.max_speed_rpm, n_speeds)})
+
+
+class ThermalContext:
+    """Everything a rating needs before the speed loop: hot winding, meshes, the coefficient and network cache, the
+    rescaled map, the stroke cache, `load_at` and `solver_for`. `result_ref` is the reference-turns map with the end
+    winding added, or a callable returning it (called after the refusal probe, so a refusal costs no map)."""
+
+    def __init__(self, req: Requirements, ref: Design, result_ref, w: Winding, *, em_budget: UncertaintyBudget | None = None,
+                 n_angles: int = N_ANGLES, solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
+                 cancel: Callable[[], bool] | None = None, progress: Callable[[str, int, int], None] | None = None):
+        self.req, self.ref, self.w = req, ref, w
+        self.solver_name, self.workers, self.cache_dir, self.cancel, self.progress = solver, workers, cache_dir, cancel, progress
+        # the machine with the chosen winding's turns and fill (what the evaluation's design holds)
+        self.machine = machine = ref.machine.model_copy(update={
+            "turns_per_pole": w.turns, "fill_factor": w.turns * w.copper_area / coil_side_area(ref.machine)})
+        self.setup, self.limit = req.cooling, req.hot_spot_limit_c
+        self.fill = machine.fill_factor
+        self.q, self.tau = machine.n_phases, 2 * math.pi / machine.n_rotor_poles
+        rho = load_material(machine.materials.coil).resistivity_at
+        self.hot = dataclasses.replace(w, resistance=w.resistance * rho(self.limit) / rho(req.winding_temperature_c))
+        self.static = build_machine_mesh(ref)
+        self.domain = thermal_domain(self.static, ref.machine)
+        g = MEASURED_GAP["peak_torque"]
+        self.em_total = None if em_budget is None else em_budget.total["peak_torque"] - g / (1 - g)
+        self.iron = (machine.materials.stator, machine.materials.rotor)
+        self.cache: dict = {}
+        self.strokes: dict = {}
+        self.band: dict = {}
+        self.at(rating_speeds(req)[0], frozenset())     # refusals before any map or stroke solve
+        if callable(result_ref):
+            result_ref = result_ref()
+        self.result = rescale_turns(result_ref, turns_scale(ref.machine, w))
+        self.angles = stroke_angles(self.static, self.tau, n_angles)
+        self.capped = _capped(self.result, w.current)
+        self.scale = w.turns / (w.paths * REFERENCE_TURNS)
+        self.wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
+        self._env: dict = {}
+
+    def check(self) -> None:
+        if self.cancel is not None and self.cancel():
+            raise InterruptedError("rating cancelled")
+
+    def envelope_at(self, speeds: list[float]) -> dict[float, float]:
+        """Peak torque of the envelope (winding current limit, no j_limit) per speed."""
+        key = tuple(speeds)
+        if key not in self._env:
+            env = envelope(self.result, self.ref.machine, self.req.bus_voltage_v, self.hot.resistance, speeds,
+                           current_limit=self.w.current)
+            self._env[key] = {rpm: float(env.torque[k]) for k, rpm in enumerate(speeds)}
+        return self._env[key]
+
+    def at(self, rpm: float, rows: frozenset):
+        if (rpm, rows) not in self.cache:
+            c = coefficients(self.setup, self.machine, rpm, rows, self.em_total, fill=self.fill)
+            self.cache[rpm, rows] = (c, build_network(self.domain, self.machine, self.hot, self.fill, c, self.setup,
+                                                      iron_materials=self.iron))
+        return self.cache[rpm, rows]
+
+    def stroke(self, rpm: float, torque: float):
+        key = (rpm, torque)
+        if key not in self.strokes:
+            self.check()
+            req = self.req
+            trace = min_copper_stroke(self.capped, self.ref.machine, req.bus_voltage_v, self.hot.resistance, rpm,
+                                      torque * (1.0 - _TORQUE_TOL))
+            sl = None
+            if trace is not None:
+                coil = phase_current_samples(trace.current, self.angles, self.tau, self.q) * self.scale
+                sl = stroke_losses(self.static, self.ref, self.angles, coil, rpm, solver=self.solver_name,
+                                   workers=self.workers, cache_dir=self.cache_dir, cancel=self.cancel,
+                                   cut_process=req.cut_process, fractions=self.band)
+            self.strokes[key] = None if sl is None else (trace, sl)
+            if self.progress is not None:
+                self.progress("strokes", len(self.strokes), len(self.strokes))
+        return self.strokes[key]
+
+    def solver_for(self, rpm, rows):
+        return lambda: ThermalSolver(self.at(rpm, rows)[1].problem)
+
+    def load_at(self, rpm, rows):
+        coeffs, net = self.at(rpm, rows)
+        domain, req = self.domain, self.req
+
+        def load(torque: float):
+            if torque <= 0:
+                zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
+                return lambda t: zero
+            s = self.stroke(rpm, torque * coeffs.torque_factor)
+            if s is None:
+                return None
+            trace, sl = s
+            mech = mechanical_loss(self.machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+            heat = point_heat(sl, trace, domain, self.static, self.hot, self.wire, self.machine, self.limit,
+                              coeffs.iron_factor, rpm, mech)
+            return load_fn(heat, net, self.machine, self.hot)
+        return load
+
+
+def thermal_context(req: Requirements, ref: Design, result_ref, w: Winding, *, em_budget: UncertaintyBudget | None = None,
+                    n_angles: int = N_ANGLES, solver: str = "ngsolve", workers: int | None = None, cache_dir=None,
+                    cancel: Callable[[], bool] | None = None,
+                    progress: Callable[[str, int, int], None] | None = None) -> ThermalContext:
+    """Raises MissingLossData, MissingCoolingData and ValueError (no thermal data) before any solve."""
+    check_loss_data(ref)
+    return ThermalContext(req, ref, result_ref, w, em_budget=em_budget, n_angles=n_angles, solver=solver, workers=workers,
+                          cache_dir=cache_dir, cancel=cancel, progress=progress)
+
+
+@dataclass(frozen=True)
+class RequirementCheck:
+    holds: bool
+    rpm: float | None                      # first failing speed
+    continuous_hot_c: tuple[float, ...]    # per checked speed; nan where no continuous torque is required
+    peak_hot_c: tuple[float, ...]
+    notes: tuple[str, ...]
+
+
+def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementCheck:
+    """Whether the rated set (every row of ROWS at its unfavourable end) holds the required continuous torque in
+    steady state and the required peak torque for `peak_duration_s` (from that steady state) under the hot-spot
+    limit at every rating speed. Stops at the first failing speed; a torque no stroke reaches fails."""
+    req, rows = ctx.req, frozenset(ROWS)
+    cont_hot, peak_hot, notes = [], [], []
+    for rpm in rating_speeds(req, n_speeds):
+        cont, peak = required_torques(req, rpm)
+        solver = ctx.solver_for(rpm, rows)()
+        load_at = ctx.load_at(rpm, rows)
+        fail = False
+        try:
+            start = load_at(0.0)
+            if cont is not None:
+                load = load_at(cont)
+                if load is None:
+                    fail, state = True, None
+                else:
+                    state = solver.steady(load)
+                    cont_hot.append(solver.hot_spot(state).temperature_c)
+                    fail = cont_hot[-1] > ctx.limit
+                start = None if fail else state
+            else:
+                cont_hot.append(float("nan"))
+                start = solver.steady(start)
+            if not fail:
+                load = load_at(peak)
+                if load is None:
+                    fail = True
+                else:
+                    top = peak_transient(solver, start, load, req.peak_duration_s)[2]
+                    peak_hot.append(top.temperature_c)
+                    fail = top.temperature_c > ctx.limit
+        except ThermalRunaway:
+            fail = True
+        if fail:
+            notes.append(f"{rpm:.0f} rpm: the required torque is not held within the limit (or no stroke reaches it)")
+            return RequirementCheck(False, rpm, tuple(cont_hot), tuple(peak_hot), tuple(notes))
+    return RequirementCheck(True, None, tuple(cont_hot), tuple(peak_hot), tuple(notes))
+
+
 def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBudget | None = None,
          n_speeds: int = 6, n_angles: int = N_ANGLES, solver: str = "ngsolve", workers: int | None = None,
          cache_dir=None, progress: Callable[[str, int, int], None] | None = None,
@@ -210,91 +389,31 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     thermal data) before any stroke solve, and InterruptedError when `cancel` fires. `progress(step, done, total)`:
     "strokes" (each distinct stroke solved; the count is not known up front, so total = done) and "thermal" (speeds
     done of all)."""
-    req, design = inputs.requirements, inputs.design
-    check_loss_data(design)
     w = evaluation.winding
     if evaluation.status != "ok" or w is None:
         raise ValueError(f"the evaluation has no winding (status {evaluation.status!r})")
-    setup, limit = req.cooling, req.hot_spot_limit_c
+    req = inputs.requirements
     ref, i_map, _ = map_request(inputs)
-    machine = evaluation.design.machine
-    fill = machine.fill_factor
-    q, tau = machine.n_phases, 2 * math.pi / machine.n_rotor_poles
-    rho = load_material(machine.materials.coil).resistivity_at
-    hot = dataclasses.replace(w, resistance=w.resistance * rho(limit) / rho(req.winding_temperature_c))
-    speeds = sorted({req.base_speed_rpm} | {round(float(x), 6) for x in
-                                            np.linspace(req.max_speed_rpm / n_speeds, req.max_speed_rpm, n_speeds)})
 
-    def check() -> None:
-        if cancel is not None and cancel():
-            raise InterruptedError("rating cancelled")
+    def reference_map():
+        result = build_map(ref, i_map, solver=solver, workers=workers, cache_dir=cache_dir, cancel=cancel)
+        if not result.complete:
+            raise InterruptedError("map cancelled")
+        return with_end_winding(result, end_winding_inductance(ref.machine, image_factor=END_IMAGE_FACTOR))
 
-    static = build_machine_mesh(ref)
-    domain = thermal_domain(static, ref.machine)
-    g = MEASURED_GAP["peak_torque"]
-    em_total = None if em_budget is None else em_budget.total["peak_torque"] - g / (1 - g)
-    iron = (machine.materials.stator, machine.materials.rotor)
+    ctx = thermal_context(req, ref, reference_map, w, em_budget=em_budget, n_angles=n_angles, solver=solver,
+                          workers=workers, cache_dir=cache_dir, cancel=cancel, progress=progress)
+    return rate_context(ctx, em_budget=em_budget, n_speeds=n_speeds, progress=progress)
 
-    def parts(rpm: float, rows: frozenset):
-        c = coefficients(setup, machine, rpm, rows, em_total, fill=fill)
-        return c, build_network(domain, machine, hot, fill, c, setup, iron_materials=iron)
 
-    parts(speeds[0], frozenset())     # refusals before any map or stroke solve
-
-    result = build_map(ref, i_map, solver=solver, workers=workers, cache_dir=cache_dir, cancel=cancel)
-    if not result.complete:
-        raise InterruptedError("map cancelled")
-    result = rescale_turns(with_end_winding(result, end_winding_inductance(ref.machine, image_factor=END_IMAGE_FACTOR)),
-                           turns_scale(ref.machine, w))
-    env = envelope(result, ref.machine, req.bus_voltage_v, hot.resistance, speeds, current_limit=w.current)
-    capped = _capped(result, w.current)
-    angles = stroke_angles(static, tau, n_angles)
-    scale = w.turns / (w.paths * REFERENCE_TURNS)
-    wire = req.wires[w.wire] if w.wire is not None and req.wire_mode else None
-    strokes: dict = {}
-    band: dict = {}
-
-    def stroke(rpm: float, torque: float):
-        key = (rpm, torque)
-        if key not in strokes:
-            check()
-            trace = min_copper_stroke(capped, ref.machine, req.bus_voltage_v, hot.resistance, rpm,
-                                      torque * (1.0 - _TORQUE_TOL))
-            sl = None
-            if trace is not None:
-                coil = phase_current_samples(trace.current, angles, tau, q) * scale
-                sl = stroke_losses(static, ref, angles, coil, rpm, solver=solver, workers=workers, cache_dir=cache_dir,
-                                   cancel=cancel, cut_process=req.cut_process, fractions=band)
-            strokes[key] = None if sl is None else (trace, sl)
-            if progress is not None:
-                progress("strokes", len(strokes), len(strokes))
-        return strokes[key]
-
-    cache: dict = {}
-
-    def at(rpm: float, rows: frozenset):
-        if (rpm, rows) not in cache:
-            cache[rpm, rows] = parts(rpm, rows)
-        return cache[rpm, rows]
-
-    def solver_for(rpm, rows):
-        return lambda: ThermalSolver(at(rpm, rows)[1].problem)
-
-    def load_at(rpm, rows):
-        coeffs, net = at(rpm, rows)
-
-        def load(torque: float):
-            if torque <= 0:
-                zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
-                return lambda t: zero
-            s = stroke(rpm, torque * coeffs.torque_factor)
-            if s is None:
-                return None
-            trace, sl = s
-            mech = mechanical_loss(machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)
-            heat = point_heat(sl, trace, domain, static, hot, wire, machine, limit, coeffs.iron_factor, rpm, mech)
-            return load_fn(heat, net, machine, hot)
-        return load
+def rate_context(ctx: ThermalContext, *, em_budget: UncertaintyBudget | None = None, n_speeds: int = 6,
+                 progress: Callable[[str, int, int], None] | None = None) -> Rating:
+    """The rating of `rate` from the speed loop on, for a prepared context."""
+    req, machine, limit, setup = ctx.req, ctx.machine, ctx.limit, ctx.setup
+    speeds = rating_speeds(req, n_speeds)
+    env = ctx.envelope_at(speeds)
+    at, strokes, check = ctx.at, ctx.strokes, ctx.check
+    solver_for, load_at, domain = ctx.solver_for, ctx.load_at, ctx.domain
 
     notes: list[str] = []
     if setup.placeholder:
@@ -312,7 +431,7 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     for k, rpm in enumerate(speeds):
         omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
         start = None if req.continuous_power_w is None else req.continuous_power_w / omega
-        top = float(env.torque[k])
+        top = env[rpm]
         ratings = [rate_speed(rpm, top / at(rpm, rows)[0].torque_factor, limit, req.peak_duration_s,
                               solver_for(rpm, rows), load_at(rpm, rows), start)
                    for rows in (frozenset(), frozenset(ROWS))]   # the rated set's deliverable envelope is top / torque factor
