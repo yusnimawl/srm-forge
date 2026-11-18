@@ -344,6 +344,8 @@ def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementChec
     limit at every rating speed. Stops at the first failing speed; a torque no stroke reaches fails."""
     req, rows = ctx.req, frozenset(ROWS)
     cont_hot, peak_hot, notes = [], [], []
+    if req.continuous_power_w is None:
+        notes.append("no continuous power required: continuous not checked")
     for rpm in rating_speeds(req, n_speeds):
         cont, peak = required_torques(req, rpm)
         solver = ctx.solver_for(rpm, rows)()

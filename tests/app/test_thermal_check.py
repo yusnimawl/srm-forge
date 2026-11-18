@@ -6,6 +6,10 @@ from conftest import make_8_6
 from srmapp.case import CaseInputs, FixedWinding, evaluate_design, map_request
 from srmapp.evaluate import END_IMAGE_FACTOR
 from srmapp.requirements import Requirements
+import types
+
+import numpy as np
+
 from srmapp.thermal import rate, rating_speeds, required_torques, thermal_context, check_requirement
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
@@ -61,3 +65,23 @@ def test_check_matches_rating_8_6(tmp_path):
     assert check(0.9).holds
     out = check(1.1)
     assert not out.holds and out.rpm in {x.rpm for x in rating.rated}
+
+
+def _fake_ctx(req, hot_c):
+    hs = lambda t: types.SimpleNamespace(temperature_c=t, location="coil")  # noqa: E731
+    solver = types.SimpleNamespace(
+        steady=lambda load: hot_c, hot_spot=lambda t: hs(t),
+        transient=lambda start, load, dur, n: types.SimpleNamespace(hot_spot_c=np.full(n, hot_c), final=hot_c))
+    return types.SimpleNamespace(req=req, limit=160.0, solver_for=lambda rpm, rows: (lambda: solver),
+                                 load_at=lambda rpm, rows: (lambda torque: (lambda t: None)))
+
+
+def test_no_continuous_requirement_is_noted_and_skipped():
+    req = Requirements(peak_power_w=30_000.0, peak_torque_nm=95.5, base_speed_rpm=3000.0, max_speed_rpm=9000.0)
+    out = check_requirement(_fake_ctx(req, 100.0), n_speeds=2)
+    assert out.holds and out.rpm is None
+    assert out.notes == ("no continuous power required: continuous not checked",)
+    assert all(math.isnan(x) for x in out.continuous_hot_c) and len(out.peak_hot_c) == 3
+    with_cont = req.model_copy(update=dict(continuous_power_w=15_000.0))
+    assert check_requirement(_fake_ctx(with_cont, 100.0), n_speeds=2).notes == ()
+    assert not check_requirement(_fake_ctx(req, 170.0), n_speeds=2).holds
