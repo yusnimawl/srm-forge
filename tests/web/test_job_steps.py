@@ -212,7 +212,7 @@ def test_real_evaluate_job_steps(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "evaluate_design", fake)
     monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
     rep = _Recorder(tmp_path)
-    req = _ns(case_id="c", grid=None,
+    req = _ns(case_id="c", grid=None, thermal=True,
               inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
     jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
     assert rep.seen == ["queued", "mesh", "mapping", "winding", "strokes", "thermal"]
@@ -309,7 +309,7 @@ def test_real_evaluate_job_reports_the_winding_scan(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "evaluate_design", fake)
     monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
     rep = _Recorder(tmp_path)
-    req = _ns(case_id="c", grid=None, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    req = _ns(case_id="c", grid=None, thermal=True, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
     jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
     started, running = seen
     assert (started["step"], started["points_done"], started["points_total"]) == ("winding", 0, 0)
@@ -355,6 +355,37 @@ def test_failed_winding_check_keeps_the_current_step(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "evaluate_design", fake)
     monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
     rep = _Recorder(tmp_path)
-    req = _ns(case_id="c", grid=None, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    req = _ns(case_id="c", grid=None, thermal=True, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
     jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
     assert rep.seen == ["queued", "mesh", "strokes"]
+
+
+@pytest.mark.parametrize("rated", [True, False])
+def test_scan_time_stops_at_the_rating_and_thermal_reaches_the_evaluation(tmp_path, monkeypatch, rated):
+    now = [0.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    seen = {}
+
+    def fake(inputs, *, progress, on_scan, thermal_progress, thermal, **kw):
+        seen["thermal"] = thermal
+        progress(3, 3)
+        now[0] = 10.0
+        on_scan()
+        now[0] = 40.0                       # the scan takes 30 s
+        if rated:
+            thermal_progress("strokes", 1, 1)
+            now[0] = 600.0                  # the rating takes the rest
+            thermal_progress("thermal", 6, 6)
+        now[0] = 700.0
+        return _ns(status="ok")
+
+    times = []
+    monkeypatch.setattr(jobs, "evaluate_design", fake)
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
+    rep = _Recorder(tmp_path)
+    monkeypatch.setattr(rep.store, "add_scan_time", lambda mode, s: times.append((mode, s)))
+    req = _ns(case_id="c", grid=None, thermal=rated,
+              inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
+    assert seen["thermal"] is rated
+    assert times == [("auto", 30.0 if rated else 690.0)]

@@ -10,7 +10,8 @@ import types
 
 import numpy as np
 
-from srmapp.thermal import rate, rating_speeds, required_torques, thermal_context, check_requirement
+from srmapp.thermal import (HOT_SPOT_ABOVE, NO_STROKE, rate, rating_speeds, required_torques, thermal_context,
+                            check_requirement)
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.model.design import Design, MeshSettings, RegionMaterials
@@ -85,3 +86,15 @@ def test_no_continuous_requirement_is_noted_and_skipped():
     with_cont = req.model_copy(update=dict(continuous_power_w=15_000.0))
     assert check_requirement(_fake_ctx(with_cont, 100.0), n_speeds=2).notes == ()
     assert not check_requirement(_fake_ctx(req, 170.0), n_speeds=2).holds
+
+
+def test_failing_check_names_its_reason():
+    req = Requirements(peak_power_w=30_000.0, peak_torque_nm=95.5, base_speed_rpm=3000.0, max_speed_rpm=9000.0)
+    hot = check_requirement(_fake_ctx(req, 170.0), n_speeds=2)
+    assert not hot.holds and hot.reason == HOT_SPOT_ABOVE == "hot spot above the limit"
+    ctx = _fake_ctx(req, 100.0)
+    ctx.load_at = lambda rpm, rows: (lambda torque: None if torque > 0 else (lambda t: None))
+    none = check_requirement(ctx, n_speeds=2)
+    assert not none.holds and none.reason == NO_STROKE == "no stroke reaches the required torque"
+    assert none.rpm == rating_speeds(req, 2)[0] and NO_STROKE in none.notes[-1]
+    assert check_requirement(_fake_ctx(req, 100.0), n_speeds=2).reason == ""

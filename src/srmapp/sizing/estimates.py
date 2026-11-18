@@ -15,6 +15,12 @@ J_PEAK = 20e6
 # Default cooling limit on the conductor current density in wire mode, A/m². Provisional: a thermal model replaces it.
 J_LIMIT = 20e6
 J_SCREEN = 2 * J_LIMIT   # A/m², wide RMS screen of the EM winding scan; the thermal rating is the real limit
+J_PEAK_SCREEN = 2 * J_SCREEN   # A/m², wide peak screen of the wire-mode windings (map range and scan) without a user cap
+
+
+def peak_cap_text(cap: float) -> str:
+    """How a note names the wire-mode peak current-density cap: the screen, or the user's `j_peak_max`."""
+    return f"{'peak screen' if cap == J_PEAK_SCREEN else 'j_peak_max'} {cap / 1e6:.0f} A/mm2"
 
 
 @dataclass(frozen=True)

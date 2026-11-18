@@ -1447,6 +1447,11 @@ export interface components {
                 number,
                 number
             ] | null;
+            /**
+             * Thermal
+             * @default true
+             */
+            thermal: boolean;
         };
         /** EvaluateJobIn */
         EvaluateJobIn: {
@@ -1467,6 +1472,11 @@ export interface components {
                 number
             ] | null;
             inputs: components["schemas"]["CaseInputs"];
+            /**
+             * Thermal
+             * @default true
+             */
+            thermal: boolean;
         };
         /** EvaluationOut */
         EvaluationOut: {

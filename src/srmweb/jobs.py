@@ -300,7 +300,7 @@ def run_search_job(req: SearchRequest, reporter: Reporter, ctx: JobContext) -> d
 def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) -> dict:
     settings = ctx.settings
     t0 = time.monotonic()
-    last = scan_start = None
+    last = scan_start = scan_end = None
     counts = (0, 0)
 
     def on_point(done: int, total: int) -> None:
@@ -319,6 +319,9 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
                           message=f"choosing the winding, {done} of {total} drive evaluations")
 
     def on_thermal(step: str, done: int, total: int) -> None:
+        nonlocal scan_end
+        if scan_end is None:   # the scan time leaves out the rating
+            scan_end = time.monotonic()
         if step == "strokes":   # the stroke count is not known up front, so total = done
             reporter.progress(step="strokes", points_done=done, points_total=total,
                               message=f"rating: {done} stroke solves")
@@ -332,14 +335,14 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
                          progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, scan_progress=on_winding,
-                         thermal_progress=on_thermal, **grid)
+                         thermal_progress=on_thermal, thermal=req.thermal, **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
     if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
         reporter.store.add_map_time(req.inputs.design.mesh.preset, last - t0)
     if scan_start is not None:
         mode = "auto" if req.inputs.winding == "auto" else "fixed"
-        reporter.store.add_scan_time(mode, time.monotonic() - scan_start)
+        reporter.store.add_scan_time(mode, (time.monotonic() if scan_end is None else scan_end) - scan_start)
     return evaluation_json(ev)
 
 

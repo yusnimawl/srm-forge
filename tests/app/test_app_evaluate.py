@@ -230,8 +230,10 @@ def test_failed_evaluation_has_no_map():
     assert e.map is None
 
 
-def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None):
-    """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order."""
+def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None):
+    """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order (a failing check
+    fails at 3000 rpm on the hot spot). `n_ranked` windings are EM-feasible (0: none is); `error_at` = (k, exc)
+    raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call."""
     import srmapp.thermal as th
     from srmapp.turns import TurnsChoice, choose_turns
     req = _req()
@@ -241,19 +243,26 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None):
 
     def choose(*a, **k):
         c = real(*a, **k)
-        return TurnsChoice(c.scan[0], True, c.envelope, c.scan, c.capped, tuple(c.scan[:3]))
+        assert len(c.scan) >= n_ranked
+        return TurnsChoice(c.scan[0], n_ranked > 0, c.envelope, c.scan, c.capped, tuple(c.scan[:n_ranked]))
 
     answers = iter(holds)
-    rated = mock.Mock(return_value="RATING")
+    rated = mock.Mock(return_value="RATING", side_effect=rate_error)
     checks = []
 
     def check(ctx, n):
         checks.append(ctx)
-        return mock.Mock(holds=next(answers))
+        if error_at is not None and len(checks) == error_at[0]:
+            raise error_at[1]
+        ok = next(answers)
+        return th.RequirementCheck(ok, None if ok else 3000.0, (), (), (), "" if ok else th.HOT_SPOT_ABOVE)
+
+    contexts = []
 
     def context(req_, ref, res, w, **kw):
-        if ctx_error:
-            raise ctx_error
+        contexts.append(w)
+        if ctx_error is not None and len(contexts) == ctx_error[0]:
+            raise ctx_error[1]
         return w
     monkeypatch.setattr(th, "thermal_context", context)
     monkeypatch.setattr(th, "check_requirement", check)
@@ -282,11 +291,45 @@ def test_no_winding_holds(monkeypatch):
     e, rated, checks = _ranked_eval(monkeypatch, [False, False, False])
     assert e.rating is None and not e.feasible and e.winding is checks[0]
     assert "no winding holds the rated hot-spot limit" in e.error and not rated.called
+    assert "3000 rpm" in e.error and "hot spot above the limit" in e.error and "checked" not in e.error
+
+
+def test_thermal_checks_stop_at_the_cap(monkeypatch):
+    from srmapp.evaluate import MAX_THERMAL_CHECKS
+    e, rated, checks = _ranked_eval(monkeypatch, [False] * 10, n_ranked=10)
+    assert MAX_THERMAL_CHECKS == 4 and len(checks) == 4
+    assert not e.feasible and e.rating is None and not rated.called and e.winding is checks[0]
+    assert "4 of 10" in e.error and "3000 rpm" in e.error
+
+
+@pytest.mark.parametrize("at", [1, 2])
+def test_runaway_in_a_check_is_a_failed_evaluation(monkeypatch, at):
+    from srmcore.thermal.model import ThermalRunaway
+    e, _, _ = _ranked_eval(monkeypatch, [False, False, False], error_at=(at, ThermalRunaway("runaway")))
+    assert e.status == "ThermalRunaway" and not e.feasible and e.rating is None
+
+
+def test_runaway_in_the_rating_is_a_failed_evaluation(monkeypatch):
+    from srmcore.thermal.model import ThermalRunaway
+    e, _, _ = _ranked_eval(monkeypatch, [True], rate_error=ThermalRunaway("runaway"))
+    assert e.status == "ThermalRunaway" and not e.feasible
+
+
+def test_model_error_in_a_later_context_is_a_failed_evaluation(monkeypatch):
+    from srmcore.thermal.model import ThermalModelError
+    e, _, checks = _ranked_eval(monkeypatch, [False, False, False], ctx_error=(2, ThermalModelError("no path")))
+    assert e.status == "ThermalModelError" and not e.feasible and len(checks) == 1
+
+
+def test_no_em_feasible_winding_is_not_rated(monkeypatch):
+    e, rated, checks = _ranked_eval(monkeypatch, [], n_ranked=0)
+    assert e.status == "ok" and not e.feasible and e.rating is None and checks == [] and not rated.called
+    assert "no winding is EM-feasible" in e.error and "not thermally rated" in e.error
 
 
 def test_refusal_keeps_em_choice(monkeypatch):
     from srmcore.materials.loss import MissingLossData
-    e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=MissingLossData("no loss table"))
+    e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, MissingLossData("no loss table")))
     assert e.status == "ok" and e.rating is None and e.feasible
     assert "no loss table" in e.error and "not thermally rated" in e.error
 
@@ -308,3 +351,29 @@ def test_failed_stroke_solve_is_an_evaluation_not_a_raise(monkeypatch, exc):
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
         e = evaluate_stage2(_cand(), _req(), stage, max_turns=30)
     assert isinstance(e, Evaluation) and e.status == type(exc).__name__ and not e.feasible
+
+
+def test_rated_kw_per_kg_is_the_lowest_rated_power_from_base_speed_over_mass():
+    from srmapp.evaluate import _rated_kw_per_kg
+    from srmapp.thermal import Rating, SpeedRating
+    from srmcore.thermal.solve import HotSpot
+    hs = HotSpot(100.0, "coil")
+
+    def at(rpm, cont, peak):
+        return SpeedRating(rpm, 2 * peak, cont, peak, hs, hs, 80.0, 90.0, 70.0, 75.0, 3, 10)
+    rated = (at(1500.0, 1.0, 9.0), at(3000.0, 2.0, 4.0), at(4500.0, 1.2, 3.5), at(6000.0, 1.0, 2.5))
+    rating = Rating((), rated, (), 180.0, "H", None, None, {}, 1.1, 5, (), "0")
+    req, mass = _req(), 2.0
+    w = 2 * math.pi / 60
+    assert _rated_kw_per_kg(rating, req, "continuous_nm", mass) == pytest.approx(min(2.0 * 3000, 1.2 * 4500, 6000) * w / 1000 / mass)
+    assert _rated_kw_per_kg(rating, req, "peak_nm", mass) == pytest.approx(min(4.0 * 3000, 3.5 * 4500, 2.5 * 6000) * w / 1000 / mass)
+    assert math.isnan(_rated_kw_per_kg(None, req, "peak_nm", mass))
+
+
+def test_screen_capped_infeasible_result_says_screen():
+    req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
+    e, stage = _evaluate(req, margin=1e6)
+    assert stage.j_peak_max == est.J_PEAK_SCREEN
+    assert e.status == "ok" and not e.feasible
+    assert "peak screen 80 A/mm2" in e.error and "j_peak_max" in e.error
+    assert all(s.winding.current_density <= est.J_PEAK_SCREEN * (1 + 1e-9) for s in e.scan)

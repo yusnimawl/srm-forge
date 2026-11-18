@@ -31,7 +31,7 @@ def test_case_evaluate_end_to_end(tmp_path, monkeypatch):
         r = client.patch(f"/api/cases/{cid}", json={"inputs": inputs})
         assert r.status_code == 200, r.text
 
-        r = client.post(f"/api/cases/{cid}/evaluate", json={"grid": [4, 3]})
+        r = client.post(f"/api/cases/{cid}/evaluate", json={"grid": [4, 3], "thermal": False})
         assert r.status_code == 201, r.text
         job_id = r.json()["job_id"]
         end = time.time() + 1800

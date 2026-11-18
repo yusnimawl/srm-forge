@@ -13,7 +13,7 @@ from srmcore.model.design import RegionMaterials
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
-from .sizing.estimates import J_PEAK, J_SCREEN
+from .sizing.estimates import J_PEAK, J_PEAK_SCREEN, J_SCREEN
 from .sizing.generator import sample_candidates
 from .sizing.stage1 import stage1
 
@@ -29,13 +29,13 @@ class SearchSettings:
     j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max (density mode)
     j_limit: float = J_SCREEN       # A/m², wide RMS screen of the winding scan; the thermal rating is the real limit
     preset: Literal["screening", "full"] = "full"   # mesh and grid fidelity of every candidate
-    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is no cap
+    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None: J_PEAK_SCREEN
     thermal: bool = True            # rate every feasible design (continuous and peak per speed)
     n_speeds: int = 6               # speeds per rating
 
     @property
     def peak_cap(self) -> float:
-        return math.inf if self.j_peak_max is None else self.j_peak_max
+        return J_PEAK_SCREEN if self.j_peak_max is None else self.j_peak_max
 
     @property
     def resolved_margin(self) -> float:

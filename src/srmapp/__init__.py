@@ -1,3 +1,3 @@
-"""srmapp: requirements-driven search over radial SRM designs, built on srmcore. Results are peak-only and unvalidated."""
+"""srmapp: requirements-driven search over radial SRM designs, built on srmcore, ranked on thermally rated continuous and peak power. Results are unvalidated."""
 
 __version__ = "0.8.0"

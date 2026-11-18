@@ -9,7 +9,7 @@ from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
 from srmapp.pipeline import SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
-from srmapp.sizing.estimates import J_SCREEN
+from srmapp.sizing.estimates import J_PEAK_SCREEN, J_SCREEN
 from srmapp.sizing.generator import sample_candidates
 from srmcore.model.design import RegionMaterials
 
@@ -69,7 +69,7 @@ def test_settings_reach_stage_one():
     with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
-    assert seen and set(seen) == {(SearchSettings().resolved_margin, 25e6, math.inf)}
+    assert seen and set(seen) == {(SearchSettings().resolved_margin, 25e6, J_PEAK_SCREEN)}
 
 
 def test_settings_reach_stage_two():
@@ -77,7 +77,7 @@ def test_settings_reach_stage_two():
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
     kw = ev.call_args.kwargs
-    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, math.inf, SearchSettings().resolved_margin)
+    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, J_PEAK_SCREEN, SearchSettings().resolved_margin)
 
 
 def test_explicit_peak_cap_is_used():

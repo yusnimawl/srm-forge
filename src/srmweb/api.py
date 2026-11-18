@@ -418,7 +418,8 @@ def create_app(settings: Settings,
         inputs, errors, warnings = check_case(case["inputs"])
         if inputs is None:
             return _invalid(errors, warnings)
-        request = EvaluateRequest(case_id=case_id, inputs=inputs, grid=body.grid if body else None)
+        request = EvaluateRequest(case_id=case_id, inputs=inputs, grid=body.grid if body else None,
+                                  thermal=body.thermal if body else True)
         return {"job_id": _submit(runner, "evaluate", request.model_dump(mode="json"))["id"]}
 
     @router.post("/cases/{case_id}/validate", status_code=201, response_model=JobCreated)

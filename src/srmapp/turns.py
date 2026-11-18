@@ -13,7 +13,7 @@ from srmcore.model.design import RadialSRMParams
 
 from .drive.envelope import Envelope, envelope
 from .requirements import Requirements
-from .sizing.estimates import J_LIMIT, J_PEAK, J_SCREEN
+from .sizing.estimates import J_LIMIT, J_PEAK, J_PEAK_SCREEN, J_SCREEN
 from .sizing.winding import DENSITY_MAX_TURNS, Winding, density_windings, wire_windings
 
 
@@ -88,7 +88,7 @@ class TurnsChoice:
     feasible: bool
     envelope: Envelope | None      # chosen winding over the full speed grid
     scan: tuple[ScanPoint, ...]    # every winding tried, in scan order
-    capped: bool                   # wire mode: the peak current-density cap left out windings that fit the slot
+    capped: bool                   # wire mode: the peak current-density cap (or screen) left out windings that fit the slot
     ranked: tuple[ScanPoint, ...] = ()   # the feasible windings, best first (`point` is the first)
 
 
@@ -143,7 +143,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
                  progress: Callable[[int, int], None] | None = None,
                  cancel: Callable[[], bool] | None = None) -> TurnsChoice:
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
-    conductor RMS current density, `j_peak_max` (default None: no cap) the peak density in wire mode. A winding is
+    conductor RMS current density, `j_peak_max` (default None: `J_PEAK_SCREEN`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
     resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
     feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding.
@@ -153,7 +153,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     worker, or fewer than `MIN_PARALLEL_JOBS` distinct evaluations, stays in this process); the result does not
     depend on it. `progress(done, total)` follows the distinct evaluations; `cancel` is polled between them and
     raises `ScanCancelled`."""
-    cap = math.inf if j_peak_max is None else j_peak_max
+    cap = J_PEAK_SCREEN if j_peak_max is None else j_peak_max
     capped = False
     if only is not None:
         windings = [only]

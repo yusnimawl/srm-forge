@@ -63,6 +63,7 @@ class EvaluateRequest(BaseModel):
     case_id: str
     inputs: CaseInputs
     grid: Grid | None = None
+    thermal: bool = True   # false skips the rating
 
 
 class AnimateRequest(BaseModel):
@@ -99,6 +100,7 @@ class EvaluateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     grid: Grid | None = None
+    thermal: bool = True   # false skips the rating: the case is then not thermally rated
 
 
 class ValidateIn(BaseModel):

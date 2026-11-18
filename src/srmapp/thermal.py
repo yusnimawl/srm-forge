@@ -329,6 +329,10 @@ def thermal_context(req: Requirements, ref: Design, result_ref, w: Winding, *, e
                           cache_dir=cache_dir, cancel=cancel, progress=progress)
 
 
+NO_STROKE = "no stroke reaches the required torque"   # an EM limit at the rated torque factor
+HOT_SPOT_ABOVE = "hot spot above the limit"             # continuous or peak, or a thermal runaway
+
+
 @dataclass(frozen=True)
 class RequirementCheck:
     holds: bool
@@ -336,6 +340,7 @@ class RequirementCheck:
     continuous_hot_c: tuple[float, ...]    # per checked speed; nan where no continuous torque is required
     peak_hot_c: tuple[float, ...]
     notes: tuple[str, ...]
+    reason: str = ""                       # NO_STROKE or HOT_SPOT_ABOVE at the failing speed; empty when it holds
 
 
 def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementCheck:
@@ -350,34 +355,35 @@ def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementChec
         cont, peak = required_torques(req, rpm)
         solver = ctx.solver_for(rpm, rows)()
         load_at = ctx.load_at(rpm, rows)
-        fail = False
+        reason = ""
         try:
             start = load_at(0.0)
             if cont is not None:
                 load = load_at(cont)
                 if load is None:
-                    fail, state = True, None
+                    reason = NO_STROKE
                 else:
-                    state = solver.steady(load)
-                    cont_hot.append(solver.hot_spot(state).temperature_c)
-                    fail = cont_hot[-1] > ctx.limit
-                start = None if fail else state
+                    start = solver.steady(load)
+                    cont_hot.append(solver.hot_spot(start).temperature_c)
+                    if cont_hot[-1] > ctx.limit:
+                        reason = HOT_SPOT_ABOVE
             else:
                 cont_hot.append(float("nan"))
                 start = solver.steady(start)
-            if not fail:
+            if not reason:
                 load = load_at(peak)
                 if load is None:
-                    fail = True
+                    reason = NO_STROKE
                 else:
                     top = peak_transient(solver, start, load, req.peak_duration_s)[2]
                     peak_hot.append(top.temperature_c)
-                    fail = top.temperature_c > ctx.limit
+                    if top.temperature_c > ctx.limit:
+                        reason = HOT_SPOT_ABOVE
         except ThermalRunaway:
-            fail = True
-        if fail:
-            notes.append(f"{rpm:.0f} rpm: the required torque is not held within the limit (or no stroke reaches it)")
-            return RequirementCheck(False, rpm, tuple(cont_hot), tuple(peak_hot), tuple(notes))
+            reason = HOT_SPOT_ABOVE
+        if reason:
+            notes.append(f"{rpm:.0f} rpm: {reason}")
+            return RequirementCheck(False, rpm, tuple(cont_hot), tuple(peak_hot), tuple(notes), reason)
     return RequirementCheck(True, None, tuple(cont_hot), tuple(peak_hot), tuple(notes))
 
 
