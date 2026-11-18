@@ -1497,6 +1497,11 @@ export interface components {
             power_density_kw_per_kg: number | null;
             /** Power Ratio */
             power_ratio: number | null;
+            /** Rated Continuous Kw Per Kg */
+            rated_continuous_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per Kg */
+            rated_peak_kw_per_kg?: number | null;
+            rating?: components["schemas"]["RatingOut"] | null;
             /**
              * Scan
              * @default []
@@ -1504,6 +1509,8 @@ export interface components {
             scan: components["schemas"]["ScanPointOut"][];
             /** Srmapp Version */
             srmapp_version?: string | null;
+            /** Srmcore Version */
+            srmcore_version?: string | null;
             /** Status */
             status: string;
             /** Torque Ratio */
@@ -2281,6 +2288,21 @@ export interface components {
             /** Turns Per Pole */
             turns_per_pole: number;
         };
+        /** RatingOut */
+        RatingOut: {
+            /** Insulation Class */
+            insulation_class: string;
+            /** Limit C */
+            limit_c: number | null;
+            /** Notes */
+            notes: string[];
+            /** Speeds */
+            speeds: components["schemas"]["SpeedRatingOut"][];
+            /** Stress Safety Factor */
+            stress_safety_factor: number | null;
+            /** Stress Status */
+            stress_status: string;
+        };
         /**
          * RectangularWire
          * @description Corner radius ignored.
@@ -2640,6 +2662,11 @@ export interface components {
              *     }
              */
             settings: components["schemas"]["SearchSettingsIn"];
+            /**
+             * Thermal
+             * @default true
+             */
+            thermal: boolean;
         };
         /** SearchResultOut */
         SearchResultOut: {
@@ -2805,6 +2832,27 @@ export interface components {
             flow_m3s: number;
             /** Inlet C */
             inlet_c: number;
+        };
+        /** SpeedRatingOut */
+        SpeedRatingOut: {
+            /** Hot Spot At */
+            hot_spot_at: string;
+            /** Hot Spot C */
+            hot_spot_c: number | null;
+            /** Nominal Continuous Nm */
+            nominal_continuous_nm: number | null;
+            /** Nominal Peak Nm */
+            nominal_peak_nm: number | null;
+            /** Peak Hot Spot At */
+            peak_hot_spot_at: string;
+            /** Peak Hot Spot C */
+            peak_hot_spot_c: number | null;
+            /** Rated Continuous Nm */
+            rated_continuous_nm: number | null;
+            /** Rated Peak Nm */
+            rated_peak_nm: number | null;
+            /** Rpm */
+            rpm: number | null;
         };
         /** TargetCheckIn */
         TargetCheckIn: {

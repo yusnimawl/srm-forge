@@ -98,6 +98,27 @@ class ScanPointOut(_Out):
     feasible: bool
 
 
+class SpeedRatingOut(_Out):
+    rpm: F
+    nominal_continuous_nm: F
+    nominal_peak_nm: F
+    rated_continuous_nm: F
+    rated_peak_nm: F
+    hot_spot_c: F          # at the rated continuous torque
+    hot_spot_at: str
+    peak_hot_spot_c: F
+    peak_hot_spot_at: str
+
+
+class RatingOut(_Out):
+    speeds: list[SpeedRatingOut]
+    limit_c: F
+    insulation_class: str
+    stress_status: str
+    stress_safety_factor: F
+    notes: list[str]
+
+
 class EvaluationOut(_Out):
     id: str
     design: Design
@@ -118,6 +139,10 @@ class EvaluationOut(_Out):
     j_rms: F = None
     j_limit: F = None
     srmapp_version: str | None = None   # null for evaluations stored before it was recorded
+    rating: RatingOut | None = None   # null when not rated and for evaluations stored before ratings
+    rated_continuous_kw_per_kg: F = None
+    rated_peak_kw_per_kg: F = None
+    srmcore_version: str | None = None
     map: MapArraysOut | None = None
     curves: MapCurvesOut | None = None
 

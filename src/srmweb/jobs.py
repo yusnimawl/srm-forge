@@ -44,7 +44,7 @@ _INITIAL = dict(status="running", designs_done=0, designs_total=0, points_done=0
                 points_total=0, message="")
 
 STEPS: dict[str, tuple[str, ...]] = {
-    "evaluate": ("queued", "mesh", "mapping", "winding", "saved"),
+    "evaluate": ("queued", "mesh", "mapping", "winding", "strokes", "thermal", "saved"),
     "validate": ("queued", "map", "checks", "saved"),
     "animate": ("queued", "frames", "saved"),
     "control": ("queued", "compile", "simulate", "saved"),
@@ -281,7 +281,7 @@ def run_search_job(req: SearchRequest, reporter: Reporter, ctx: JobContext) -> d
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ss = SearchSettings(
         n_candidates=s.n_candidates, seed=s.seed, shortlist=s.shortlist, preset=s.preset,
-        materials=RegionMaterials(stator=s.stator, rotor=s.rotor), **grid, **given)
+        materials=RegionMaterials(stator=s.stator, rotor=s.rotor), thermal=req.thermal, **grid, **given)
 
     def on_design(done: int, total: int) -> None:
         reporter.progress(step="pareto" if done == total else "designs", designs_done=done,
@@ -318,11 +318,21 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
         reporter.progress(step="winding", points_done=done, points_total=total,
                           message=f"choosing the winding, {done} of {total} drive evaluations")
 
+    def on_thermal(step: str, done: int, total: int) -> None:
+        if step == "strokes":   # the stroke count is not known up front, so total = done
+            reporter.progress(step="strokes", points_done=done, points_total=total,
+                              message=f"rating: {done} stroke solves")
+        elif step == "thermal":
+            reporter.progress(step="thermal", points_done=done, points_total=total,
+                              message=f"rating: speed {done} of {total}")
+        else:
+            reporter.progress(step="winding", message=f"rating the windings, {done} of {total}")
+
     reporter.progress(step="mesh", message="meshing")
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
                          progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, scan_progress=on_winding,
-                         thermal=False, **grid)   # rated evaluation is wired in a later R5c step
+                         thermal_progress=on_thermal, **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
     if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing

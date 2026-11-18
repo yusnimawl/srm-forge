@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { JobOut } from "@/api/client"
 import { stepStates } from "./steps"
 
-const EVAL = ["queued", "mesh", "mapping", "winding", "saved"]
+const EVAL = ["queued", "mesh", "mapping", "winding", "strokes", "thermal", "saved"]
 const job = (over: Partial<JobOut> = {}, progress: Record<string, unknown> = {}): JobOut => ({
   id: "j1", kind: "evaluate", status: "running", active: true, resumable: false, created: "2026-10-18T10:00:00",
   lane: "main", queue_position: null,
@@ -13,22 +13,22 @@ const states = (j: JobOut) => stepStates(j).map((r) => r.state)
 
 describe("stepStates", () => {
   it("marks earlier steps done, the current active, later waiting", () => {
-    expect(states(job())).toEqual(["done", "done", "active", "waiting", "waiting"])
+    expect(states(job())).toEqual(["done", "done", "active", "waiting", "waiting", "waiting", "waiting"])
   })
   it("queued job: first step active, rest waiting", () => {
-    expect(states(job({ status: "queued" }, { step: "queued" }))).toEqual(["active", "waiting", "waiting", "waiting", "waiting"])
+    expect(states(job({ status: "queued" }, { step: "queued" }))).toEqual(Array(7).fill("waiting").fill("active", 0, 1))
   })
   it("done job has every step done", () => {
-    expect(states(job({ status: "done", active: false }, { step: "saved" }))).toEqual(Array(5).fill("done"))
+    expect(states(job({ status: "done", active: false }, { step: "saved" }))).toEqual(Array(7).fill("done"))
   })
   it("failed job marks the step it stopped in", () => {
-    expect(states(job({ status: "failed", active: false }))).toEqual(["done", "done", "failed", "waiting", "waiting"])
+    expect(states(job({ status: "failed", active: false }))).toEqual(["done", "done", "failed", "waiting", "waiting", "waiting", "waiting"])
   })
   it("cancelled job marks the step it stopped in", () => {
-    expect(states(job({ status: "cancelled", active: false }, { step: "mesh" }))).toEqual(["done", "cancelled", "waiting", "waiting", "waiting"])
+    expect(states(job({ status: "cancelled", active: false }, { step: "mesh" }))).toEqual(["done", "cancelled", "waiting", "waiting", "waiting", "waiting", "waiting"])
   })
   it("uses the spec labels per kind", () => {
-    expect(stepStates(job()).map((r) => r.label)).toEqual(["Queued", "Mesh built", "Mapping", "Choosing the winding", "Saved"])
+    expect(stepStates(job()).map((r) => r.label)).toEqual(["Queued", "Mesh built", "Mapping", "Choosing the winding", "Stroke solves", "Thermal rating", "Saved"])
     expect(stepStates(job({ kind: "validate" }, { steps: ["queued", "map", "checks", "saved"], step: "map" })).map((r) => r.label)).toEqual([
       "Queued", "Map (cache)", "Checks and budget", "Saved",
     ])
@@ -78,9 +78,9 @@ describe("stepStates", () => {
     expect(stepStates(job({ progress: null }))).toEqual([])
   })
   it("marks no step active or failed when the current step is missing or unknown", () => {
-    expect(states(job({ status: "failed" }, { step: undefined }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
-    expect(states(job({ status: "failed" }, { step: "nope" }))).toEqual(["waiting", "waiting", "waiting", "waiting", "waiting"])
-    expect(states(job({ status: "done" }, { step: undefined }))).toEqual(["done", "done", "done", "done", "done"])
+    expect(states(job({ status: "failed" }, { step: undefined }))).toEqual(Array(7).fill("waiting"))
+    expect(states(job({ status: "failed" }, { step: "nope" }))).toEqual(Array(7).fill("waiting"))
+    expect(states(job({ status: "done" }, { step: undefined }))).toEqual(Array(7).fill("done"))
   })
 })
 

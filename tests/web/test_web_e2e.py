@@ -16,7 +16,7 @@ BODY = {"kind": "search",
         "payload": {"requirements": dict(peak_power_w=630.0, peak_torque_nm=2.0,
                                          base_speed_rpm=3000.0, max_speed_rpm=6000.0),
                     "settings": dict(n_candidates=2, shortlist=1, preset="screening"),
-                    "grid": [4, 3]}}
+                    "grid": [4, 3], "thermal": False}}
 
 
 @pytest.mark.slow
@@ -42,6 +42,7 @@ def test_search_job_end_to_end(tmp_path):
     assert len(result["evaluations"]) == 1
     ok = [e for e in result["evaluations"] if e["status"] == "ok"]
     assert ok, [e["status"] for e in result["evaluations"]]
+    assert result["pareto_ids"] == [] and "not thermally rated" in ok[0]["error"]   # thermal is off, so no rated figure
     # the current grid gains the La current beyond the 3 requested nodes
     assert np.shape(ok[0]["map"]["psi"]) == (4, 4)
     assert "theta_on_el" in ok[0]["envelope"]

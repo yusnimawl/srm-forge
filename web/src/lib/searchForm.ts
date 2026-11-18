@@ -79,6 +79,7 @@ export function wireToSI(w: WireForm): SearchRequest["requirements"]["wires"][nu
 export function toSearchRequest(v: SearchFormValues): SearchRequest {
   const wireMode = v.windingMode === "wires"
   return {
+    thermal: true,
     requirements: {
       peak_power_w: num(v.peakPowerKw, toSI(1, "kW")),
       peak_torque_nm: num(v.peakTorqueNm),

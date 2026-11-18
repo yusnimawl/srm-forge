@@ -54,6 +54,7 @@ class SearchRequest(BaseModel):
     requirements: Requirements
     settings: SearchSettingsIn = SearchSettingsIn()
     grid: Grid | None = None   # overrides the preset grid, for tests
+    thermal: bool = True   # false skips the rating: faster, but the Pareto set is then empty
 
 
 class EvaluateRequest(BaseModel):

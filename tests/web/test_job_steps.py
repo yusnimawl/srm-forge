@@ -12,7 +12,7 @@ from srmweb.jobs import STEPS, JobRunner, Reporter
 from srmweb.store import Store
 
 SEQUENCES = {
-    "evaluate": ["queued", "mesh", "mapping", "winding", "saved"],
+    "evaluate": ["queued", "mesh", "mapping", "winding", "strokes", "thermal", "saved"],
     "validate": ["queued", "map", "checks", "saved"],
     "animate": ["queued", "frames", "saved"],
     "control": ["queued", "compile", "simulate", "saved"],
@@ -201,10 +201,12 @@ def _ctx(tmp_path, quick=None):
 
 
 def test_real_evaluate_job_steps(tmp_path, monkeypatch):
-    def fake(inputs, *, progress, on_scan, **kw):
+    def fake(inputs, *, progress, on_scan, thermal_progress, **kw):
         progress(1, 3)
         progress(3, 3)
         on_scan()
+        thermal_progress("strokes", 4, 4)
+        thermal_progress("thermal", 2, 6)
         return _ns(status="ok")
 
     monkeypatch.setattr(jobs, "evaluate_design", fake)
@@ -213,7 +215,7 @@ def test_real_evaluate_job_steps(tmp_path, monkeypatch):
     req = _ns(case_id="c", grid=None,
               inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
     jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
-    assert rep.seen == ["queued", "mesh", "mapping", "winding"]
+    assert rep.seen == ["queued", "mesh", "mapping", "winding", "strokes", "thermal"]
 
 
 def test_real_validate_job_steps(tmp_path, monkeypatch):
@@ -241,7 +243,7 @@ def test_real_search_job_steps(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "search_result_json", lambda r: {})
     rep = _Recorder(tmp_path)
     settings = _ns(n_candidates=1, seed=0, shortlist=1, preset="screening", stator="a", rotor="a", **{f: None for f in LIMIT_FIELDS})
-    jobs.run_search_job(_ns(requirements=None, settings=settings, grid=None), rep, _ctx(tmp_path))
+    jobs.run_search_job(_ns(requirements=None, settings=settings, grid=None, thermal=True), rep, _ctx(tmp_path))
     assert rep.seen == ["queued", "sampling", "designs", "pareto"]
 
 
