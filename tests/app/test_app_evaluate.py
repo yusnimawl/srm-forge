@@ -84,10 +84,10 @@ def test_map_is_built_over_the_stage_one_range():
 
 def test_stage_two_scans_within_the_stage_one_cap_by_default():
     req = _req(wires=[THICK], phase_current_a=100.0)
-    stage = stage1(req, make_8_6())                    # cap 40 A/mm2
+    stage = stage1(req, make_8_6(), j_peak_max=40e6)
     assert stage.j_peak_max == 40e6
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
-        e = evaluate_stage2(_cand(), req, stage, j_limit=25e6)     # its own 2x would be 50 A/mm2
+        e = evaluate_stage2(_cand(), req, stage, j_limit=25e6)     # an uncapped scan would go beyond 40 A/mm2
     assert e.scan and all(s.winding.current_density <= 40e6 * (1 + 1e-9) for s in e.scan)
 
 
@@ -104,7 +104,7 @@ def test_scan_limit_note_follows_the_equivalent_turns():
 
 def test_no_winding_reasons_name_the_cap_in_wire_mode():
     req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=1e6)
-    s = stage1(req, make_8_6())
+    s = stage1(req, make_8_6(), j_peak_max=40e6)
     assert not s.passes and "no winding" in s.reason and "j_peak_max 40 A/mm2" in s.reason
 
 

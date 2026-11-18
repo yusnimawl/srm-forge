@@ -1,6 +1,7 @@
 """Stage 2: FEM map of one candidate at its reference turns, then the winding chosen on the rescaled map and its
 drive envelope and scores (v0 spec §4.4-4.6, v0a-2 spec §3). Peak-only and unvalidated: no losses beyond copper,
 no thermal limit. ψ includes the analytic end-winding inductance. Parallel paths and the RMS current-density limit: small-cycle spec."""
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -107,7 +108,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     except ScanCancelled:
         return _failed(candidate, stage, "cancelled", "winding scan cancelled", j_limit)
     if choice.point is None:
-        cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode else ""
+        cap_text = f" (j_peak_max {cap / 1e6:.0f} A/mm2)" if req.wire_mode and math.isfinite(cap) else ""
         return _failed(candidate, stage, "no_winding",
                        f"no turn count meets the wire, phase current and current-density limits{cap_text}", j_limit)
     w, env = choice.point.winding, choice.envelope

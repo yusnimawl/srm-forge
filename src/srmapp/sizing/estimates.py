@@ -14,6 +14,7 @@ J_PEAK = 20e6
 
 # Default cooling limit on the conductor current density in wire mode, A/m². Provisional: a thermal model replaces it.
 J_LIMIT = 20e6
+J_SCREEN = 2 * J_LIMIT   # A/m², wide RMS screen of the EM winding scan; the thermal rating is the real limit
 
 
 @dataclass(frozen=True)

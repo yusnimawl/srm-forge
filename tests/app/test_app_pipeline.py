@@ -1,3 +1,4 @@
+import math
 from unittest import mock
 
 import pytest
@@ -67,7 +68,7 @@ def test_settings_reach_stage_one():
     with mock.patch("srmapp.pipeline.stage1", side_effect=spy), mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake):
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
-    assert seen and set(seen) == {(SearchSettings().resolved_margin, 25e6, 60e6)}
+    assert seen and set(seen) == {(SearchSettings().resolved_margin, 25e6, math.inf)}
 
 
 def test_settings_reach_stage_two():
@@ -75,7 +76,7 @@ def test_settings_reach_stage_two():
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
                    SearchSettings(n_candidates=4, shortlist=1, seed=1, j_peak=25e6, j_limit=30e6))
     kw = ev.call_args.kwargs
-    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, 60e6, SearchSettings().resolved_margin)
+    assert (kw["j_peak"], kw["j_limit"], kw["j_peak_max"], kw["margin"]) == (25e6, 30e6, math.inf, SearchSettings().resolved_margin)
 
 
 def test_explicit_peak_cap_is_used():

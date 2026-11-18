@@ -88,7 +88,7 @@ def test_fixed_beyond_the_search_range_extends_the_map():
     assert e.status == "ok" and e.winding.turns == 6
     assert map_request(_inputs(req, j_peak_max=1e6))[1] == pytest.approx(stage.mmf / REFERENCE_TURNS)
     with pytest.raises(ValueError):
-        map_request(_inputs(_req(wires=[THICK], phase_current_a=1e6)))     # no winding fits in Auto mode
+        map_request(_inputs(_req(wires=[THICK], phase_current_a=1e6), j_peak_max=40e6))     # no winding fits in Auto mode
 
 
 def test_stage_one_rejection_is_a_note_not_a_stop():

@@ -69,14 +69,14 @@ def test_wire_mode_range_follows_the_peak_cap():
         assert s.mmf == max(w.turns * w.coil_current for w in wire_windings(p, req, 0, j))
 
 
-def test_stage1_default_cap_is_twice_the_cooling_limit():
+def test_stage1_default_cap_is_none():
     req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
-    assert stage1(req, make_8_6()).mmf == stage1(req, make_8_6(), j_peak_max=40e6).mmf
+    assert stage1(req, make_8_6()).mmf == stage1(req, make_8_6(), j_peak_max=1e12).mmf
 
 
 def test_wire_mode_without_a_possible_winding_fails():
     req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=1e6)
-    s = stage1(req, make_8_6())
+    s = stage1(req, make_8_6(), j_peak_max=40e6)
     assert not s.passes and "no winding" in s.reason and s.mmf == 0.0
 
 

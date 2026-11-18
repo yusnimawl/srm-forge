@@ -1,4 +1,5 @@
 """Requirements to scored candidates: generate, stage-1 filter, stage-2 evaluation, Pareto set (v0 spec §4)."""
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
@@ -28,11 +29,11 @@ class SearchSettings:
     j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max (density mode)
     j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor RMS current density
     preset: Literal["screening", "full"] = "full"   # mesh and grid fidelity of every candidate
-    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is 2 x j_limit
+    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is no cap
 
     @property
     def peak_cap(self) -> float:
-        return 2 * self.j_limit if self.j_peak_max is None else self.j_peak_max
+        return math.inf if self.j_peak_max is None else self.j_peak_max
 
     @property
     def resolved_margin(self) -> float:
