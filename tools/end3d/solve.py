@@ -23,6 +23,17 @@ REGULARISATION = 1e-6
 LINEAR_TOL = 1e-10
 NEWTON_TOL = 1e-8
 LINE_SEARCH_HALVINGS = 8
+# Above the largest model that has been solved (3.20 M DOFs, G1 FINE) and below the one the 8 GB
+# LattePanda could not hold (8.97 M DOFs, killed 2026-11-04).
+MAX_DOFS = 6_000_000
+
+
+class ModelTooLarge(ValueError):
+    """The space has more free DOFs than `max_dofs`; raised before anything is assembled."""
+
+    def __init__(self, ndof: int, max_dofs: int):
+        super().__init__(f"model has {ndof} DOFs, above max_dofs {max_dofs}; coarsen the mesh or raise max_dofs")
+        self.ndof, self.max_dofs = ndof, max_dofs
 
 
 @dataclass(frozen=True)
@@ -83,8 +94,11 @@ def _names(*names: str) -> str:
 
 def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
             initial: ng.GridFunction | None = None, max_iter: int = 30,
-            threads: int | None = None) -> Solution3D:
+            threads: int | None = None, max_dofs: int = MAX_DOFS) -> Solution3D:
     """Minimise the energy for the given coil ampere-turns; non-convergence is reported, never raised.
+
+    A model with more than `max_dofs` free DOFs is a refused input, not a solver outcome: it raises
+    `ModelTooLarge` once the space is numbered and before any matrix or vector is allocated.
 
     The update's energy norm is sqrt(du.K du) with K the current linearisation; the residual is
     measured against the free-dof norm of the load (the gradient at A = 0). Runs inside a
@@ -95,14 +109,14 @@ def solve3d(model: Model3D, ampere_turns: Mapping[str, float],
         ng.SetNumThreads(threads)
     try:
         with ng.TaskManager():
-            return _solve(model, ampere_turns, initial, max_iter)
+            return _solve(model, ampere_turns, initial, max_iter, max_dofs)
     finally:
         if threads is not None:
             ng.SetNumThreads(previous)
 
 
 def _solve(model: Model3D, ampere_turns: Mapping[str, float],
-           initial: ng.GridFunction | None, max_iter: int) -> Solution3D:
+           initial: ng.GridFunction | None, max_iter: int, max_dofs: int) -> Solution3D:
     t0 = time.perf_counter()
     mesh = model.mesh
     materials = list(dict.fromkeys(mesh.GetMaterials()))   # one entry per region index otherwise
@@ -112,6 +126,9 @@ def _solve(model: Model3D, ampere_turns: Mapping[str, float],
     coil_faces = [f"{c}{s}" for c in model.coils for s in ("_in", "_out")]
     fes = ng.HCurl(mesh, order=model.order, nograds=True,
                    dirichlet=_names(*coil_faces) + "|" + model.dirichlet)
+    free_dofs = sum(fes.FreeDofs())
+    if free_dofs > max_dofs:
+        raise ModelTooLarge(free_dofs, max_dofs)
     u = fes.TrialFunction()
     curl_u = ng.curl(u)
     nu0 = 1.0 / MU0
