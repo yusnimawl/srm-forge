@@ -35,7 +35,7 @@ def _map(stage):
 def _evaluate(req, **kw):
     stage = stage1(req, make_8_6())
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
-        return evaluate_stage2(_cand(), req, stage, max_turns=30, **kw), stage
+        return evaluate_stage2(_cand(), req, stage, max_turns=30, **{"thermal": False, **kw}), stage
 
 
 def test_speed_grid_contains_base_and_max_exactly():
@@ -61,7 +61,7 @@ def test_stage_two_grid_defaults_to_the_preset():
 
 def test_failed_map_becomes_an_evaluation_and_does_not_raise():
     with mock.patch("srmapp.evaluate.build_map", side_effect=MapFailed(["3 of 50 points failed"], 3)):
-        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()), thermal=False)
     assert isinstance(e, Evaluation)
     assert e.status == "MapFailed" and "3 of 50" in e.error
     assert not e.feasible and math.isnan(e.torque_ratio) and e.envelope is None and e.winding is None
@@ -71,14 +71,14 @@ def test_failed_map_becomes_an_evaluation_and_does_not_raise():
 def test_cancelled_map_is_reported():
     partial = synthetic_map(complete=False)
     with mock.patch("srmapp.evaluate.build_map", return_value=partial):
-        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()), thermal=False)
     assert e.status == "cancelled" and not e.feasible
 
 
 def test_map_is_built_over_the_stage_one_range():
     stage = stage1(_req(), make_8_6())
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)) as bm:
-        evaluate_stage2(_cand(), _req(), stage, max_turns=5)
+        evaluate_stage2(_cand(), _req(), stage, max_turns=5, thermal=False)
     assert bm.call_args.args[1] == stage.i_map
 
 
@@ -87,7 +87,7 @@ def test_stage_two_scans_within_the_stage_one_cap_by_default():
     stage = stage1(req, make_8_6(), j_peak_max=40e6)
     assert stage.j_peak_max == 40e6
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
-        e = evaluate_stage2(_cand(), req, stage, j_limit=25e6)     # an uncapped scan would go beyond 40 A/mm2
+        e = evaluate_stage2(_cand(), req, stage, j_limit=25e6, thermal=False)     # an uncapped scan would go beyond 40 A/mm2
     assert e.scan and all(s.winding.current_density <= 40e6 * (1 + 1e-9) for s in e.scan)
 
 
@@ -158,7 +158,7 @@ def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
     e, stage = _evaluate(_req(wires=[THICK], phase_current_a=100.0, max_mass_kg=limit))
     assert stage.passes and e.status == "ok" and not e.feasible
     assert "mass" in e.error and f"{limit:.2f} kg limit" in e.error
-    assert free.error == ""
+    assert free.error == "not thermally rated"
 
 
 @pytest.mark.slow
@@ -166,7 +166,7 @@ def test_real_8_6_evaluation():
     pytest.importorskip("ngsolve")
     req = _req(peak_power_w=2000.0, peak_torque_nm=6.4, base_speed_rpm=3000.0, max_speed_rpm=6000.0)
     stage = stage1(req, make_8_6())
-    e = evaluate_stage2(_cand(), req, stage, grid=StageTwoGrid(8, 4), workers=4, max_turns=120)
+    e = evaluate_stage2(_cand(), req, stage, grid=StageTwoGrid(8, 4), workers=4, max_turns=120, thermal=False)
     assert e.status == "ok", e.error
     assert 1.0 < e.envelope.torque[0] < stage.torque_upper
     assert e.key is not None and e.key.peak_torque > 0
@@ -176,14 +176,14 @@ def test_real_8_6_evaluation():
                                  RuntimeError("boom"), ValueError("bad current")])
 def test_any_exception_from_build_map_becomes_a_failed_evaluation(exc):
     with mock.patch("srmapp.evaluate.build_map", side_effect=exc):
-        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()), thermal=False)
     assert e.status == type(exc).__name__ and not e.feasible
     assert math.isnan(e.torque_ratio) and e.envelope is None
 
 
 def test_keyboard_interrupt_is_not_swallowed():
     with mock.patch("srmapp.evaluate.build_map", side_effect=KeyboardInterrupt), pytest.raises(KeyboardInterrupt):
-        evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+        evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()), thermal=False)
 
 
 def test_turns_are_chosen_on_the_end_winding_corrected_map():
@@ -200,7 +200,7 @@ def test_turns_are_chosen_on_the_end_winding_corrected_map():
         return real(result, *a, **kw)
     with mock.patch("srmapp.evaluate.build_map", return_value=raw), \
             mock.patch("srmapp.evaluate.choose_turns", side_effect=spy):
-        evaluate_stage2(_cand(), req, stage, max_turns=30)
+        evaluate_stage2(_cand(), req, stage, max_turns=30, thermal=False)
     l_end = end_winding_inductance(make_8_6(), image_factor=1.5)
     k = raw.circuits.index(raw.excited)
     assert l_end > 0
@@ -213,7 +213,7 @@ def test_evaluation_carries_the_rescaled_map():
     stage = stage1(req, make_8_6())
     raw = _map(stage)
     with mock.patch("srmapp.evaluate.build_map", return_value=raw):
-        e = evaluate_stage2(_cand(), req, stage, max_turns=30)
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30, thermal=False)
     assert e.status == "ok"
     expected = rescale_turns(with_end_winding(raw, end_winding_inductance(make_8_6(), image_factor=1.5)),
                              turns_scale(make_8_6(), e.winding))
@@ -226,5 +226,71 @@ def test_evaluation_carries_the_rescaled_map():
 
 def test_failed_evaluation_has_no_map():
     with mock.patch("srmapp.evaluate.build_map", side_effect=RuntimeError("boom")):
-        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()))
+        e = evaluate_stage2(_cand(), _req(), stage1(_req(), make_8_6()), thermal=False)
     assert e.map is None
+
+
+def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None):
+    """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order."""
+    import srmapp.thermal as th
+    from srmapp.turns import TurnsChoice, choose_turns
+    req = _req()
+    stage = stage1(req, make_8_6())
+    result = _map(stage)
+    real = choose_turns
+
+    def choose(*a, **k):
+        c = real(*a, **k)
+        return TurnsChoice(c.scan[0], True, c.envelope, c.scan, c.capped, tuple(c.scan[:3]))
+
+    answers = iter(holds)
+    rated = mock.Mock(return_value="RATING")
+    checks = []
+
+    def check(ctx, n):
+        checks.append(ctx)
+        return mock.Mock(holds=next(answers))
+
+    def context(req_, ref, res, w, **kw):
+        if ctx_error:
+            raise ctx_error
+        return w
+    monkeypatch.setattr(th, "thermal_context", context)
+    monkeypatch.setattr(th, "check_requirement", check)
+    monkeypatch.setattr(th, "rate_context", rated)
+    # a rating the evaluation can read
+    monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    with mock.patch("srmapp.evaluate.build_map", return_value=result), mock.patch("srmapp.evaluate.choose_turns", choose):
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30, cancel=None if cancel is None else (lambda: cancel(checks)))
+    return e, rated, checks
+
+
+def test_unrated_evaluation_says_so():
+    e, _ = _evaluate(_req(), thermal=False)
+    assert e.rating is None and "not thermally rated" in e.error
+    import srmcore
+    assert e.srmcore_version == srmcore.__version__
+
+
+def test_first_holding_winding_is_chosen(monkeypatch):
+    e, rated, checks = _ranked_eval(monkeypatch, [False, True])
+    assert e.status == "ok" and e.rating == "RATING" and e.winding is checks[1]
+    assert rated.call_count == 1 and len(checks) == 2
+
+
+def test_no_winding_holds(monkeypatch):
+    e, rated, checks = _ranked_eval(monkeypatch, [False, False, False])
+    assert e.rating is None and not e.feasible and e.winding is checks[0]
+    assert "no winding holds the rated hot-spot limit" in e.error and not rated.called
+
+
+def test_refusal_keeps_em_choice(monkeypatch):
+    from srmcore.materials.loss import MissingLossData
+    e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=MissingLossData("no loss table"))
+    assert e.status == "ok" and e.rating is None and e.feasible
+    assert "no loss table" in e.error and "not thermally rated" in e.error
+
+
+def test_cancel_during_checks(monkeypatch):
+    e, _, checks = _ranked_eval(monkeypatch, [False, False, False], cancel=lambda checks: len(checks) >= 1)
+    assert e.status == "cancelled" and len(checks) == 1

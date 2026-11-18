@@ -322,7 +322,7 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
                          progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, scan_progress=on_winding,
-                         **grid)
+                         thermal=False, **grid)   # rated evaluation is wired in a later R5c step
     if ev.status == "cancelled":
         return {"cancelled": True}
     if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing

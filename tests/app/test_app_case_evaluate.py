@@ -32,7 +32,7 @@ def _fake_map(design, i_max, **kw):
 
 def _evaluate(inputs, **kw):
     with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map) as bm:
-        return evaluate_design(inputs, **kw), bm
+        return evaluate_design(inputs, **{"thermal": False, **kw}), bm
 
 
 def test_evaluation_records_j_limit():
@@ -72,7 +72,7 @@ def test_on_scan_is_called_once_when_the_map_is_complete():
     calls = []
     with mock.patch("srmapp.evaluate.build_map", side_effect=lambda *a, **kw: calls.append("map") or _fake_map(*a, **kw)),             mock.patch("srmapp.evaluate.choose_turns",
                        side_effect=lambda *a, **kw: calls.append("scan") or choose_turns(*a, **kw)):
-        e = evaluate_design(_inputs(winding=FixedWinding(turns=10)), on_scan=lambda: calls.append("on_scan"))
+        e = evaluate_design(_inputs(winding=FixedWinding(turns=10)), on_scan=lambda: calls.append("on_scan"), thermal=False)
     assert calls == ["map", "on_scan", "scan"] and e.status == "ok"
 
 

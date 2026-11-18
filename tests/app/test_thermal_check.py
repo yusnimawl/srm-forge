@@ -46,7 +46,7 @@ def test_check_matches_rating_8_6(tmp_path):
     req = Requirements(peak_power_w=628.0, peak_torque_nm=3.0, base_speed_rpm=2000.0, max_speed_rpm=6000.0,
                        wires=[WIRE], phase_current_a=20.0, continuous_power_w=100.0)
     inputs = CaseInputs(requirements=req, design=DESIGN, winding=FixedWinding(turns=24, strands=1, paths=1, wire=0))
-    ev = evaluate_design(inputs, cache_dir=tmp_path)
+    ev = evaluate_design(inputs, cache_dir=tmp_path, thermal=False)
     assert ev.status == "ok"
     rating = rate(inputs, ev, n_angles=12, n_speeds=1, cache_dir=tmp_path)
     base = next(r for r in rating.rated if r.rpm == req.base_speed_rpm)
