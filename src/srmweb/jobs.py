@@ -53,8 +53,8 @@ STEPS: dict[str, tuple[str, ...]] = {
     "hil_flash": ("queued", "build", "flash", "saved"),
 }
 _ETA_MIN_FRACTION = 0.05
-_ETA_STEPS = ("mapping", "frames", "fields", "winding")   # the steps whose point counts are the work done
-_STEP_PACED = ("winding",)   # the steps whose pace is measured from their own start, not the job's
+_ETA_STEPS = ("mapping", "frames", "fields", "winding", "thermal")   # the steps whose point counts are the work done
+_STEP_PACED = ("winding", "thermal")   # the steps whose pace is measured from their own start, not the job's
 
 
 def initial_progress(kind: str) -> dict:
@@ -325,8 +325,8 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
         elif step == "thermal":
             reporter.progress(step="thermal", points_done=done, points_total=total,
                               message=f"rating: speed {done} of {total}")
-        else:
-            reporter.progress(step="winding", message=f"rating the windings, {done} of {total}")
+        else:   # the winding checks run inside whichever step is current; the stepper never moves back
+            reporter.progress(message=f"rating the windings, {done} of {total}")
 
     reporter.progress(step="mesh", message="meshing")
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}

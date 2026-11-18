@@ -84,6 +84,17 @@ describe("stepStates", () => {
   })
 })
 
+describe("evaluate rating steps", () => {
+  it("shows the stroke count without a total", () => {
+    const row = stepStates(job({}, { step: "strokes", points_done: 7, points_total: 7 }))[4]
+    expect(row.detail).toBe("7 stroke solves")
+  })
+  it("shows speeds done and the time left in the thermal step", () => {
+    const row = stepStates(job({}, { step: "thermal", points_done: 2, points_total: 6, step_elapsed_s: 20, eta_s: 80 }))[5]
+    expect(row.detail).toBe("2 / 6 speeds · 20 s elapsed · about 1 min left")
+  })
+})
+
 describe("losses job steps", () => {
   it("labels the five steps", () => {
     const j = job({ kind: "losses" }, { steps: ["queued", "strokes", "fields", "losses", "saved"], step: "fields", points_done: 10, points_total: 60 })

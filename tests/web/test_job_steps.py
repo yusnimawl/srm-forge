@@ -330,3 +330,31 @@ def test_last_point_and_step_change_reach_the_store_at_once(tmp_path, monkeypatc
     assert store.get_job(job_id)["progress"]["step"] == "pareto"
     rep.progress(points_done=3, points_total=16)       # an ordinary update inside the interval still waits
     assert store.get_job(job_id)["progress"]["points_done"] == 16
+
+
+def test_thermal_step_has_an_eta_and_winding_checks_do_not_move_the_step(tmp_path, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    rep = Reporter(Store(tmp_path / "a.db"), "j", "evaluate")
+    rep.progress(step="strokes", points_done=4, points_total=4, message="")
+    assert rep.snapshot()[1]["eta_s"] is None
+    now[0] = 120.0
+    rep.progress(step="thermal", points_done=0, points_total=6)
+    now[0] = 140.0
+    rep.progress(points_done=2)
+    assert rep.snapshot()[1]["eta_s"] == pytest.approx(20.0 / 2 * 4)   # paced from the thermal step's own start
+
+
+def test_failed_winding_check_keeps_the_current_step(tmp_path, monkeypatch):
+    def fake(inputs, *, thermal_progress, **kw):
+        thermal_progress("strokes", 3, 3)
+        thermal_progress("windings", 1, 2)
+        thermal_progress("strokes", 5, 5)
+        return _ns(status="ok")
+
+    monkeypatch.setattr(jobs, "evaluate_design", fake)
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {})
+    rep = _Recorder(tmp_path)
+    req = _ns(case_id="c", grid=None, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto"))
+    jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
+    assert rep.seen == ["queued", "mesh", "strokes"]
