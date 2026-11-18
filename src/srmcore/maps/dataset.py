@@ -15,6 +15,11 @@ from .overlap import OverlapResult
 from .run import MapResult
 from .tables import dpsi_dtheta
 
+# Revision of the engine code that decides map numbers; part of every map, stroke and field cache key. Bump it
+# when a change to that code can alter map numbers. tests/maps/test_engine_revision.py pins a digest of the code
+# and fails until the pin is updated with `python tools/engine_digest.py --update`.
+ENGINE_REVISION = 1
+
 _DIMS = {"angles": ("angle",), "currents": ("current",), "psi": ("angle", "current", "circuit"),
          "torque_arkkio": ("angle", "current"), "torque_virtual_work": ("angle", "current"),
          "energy": ("angle", "current"), "coenergy": ("angle", "current"),
@@ -28,10 +33,11 @@ def provenance(design: Design, angles: np.ndarray, currents: np.ndarray, excited
     """Everything that decides the numbers in a map. The design JSON covers geometry, the mesh preset name and material
     names; the resolved mesh settings cover the numbers `resolve_mesh_settings` produces (region and gap sizes,
     refinement, band divisions and the quality limits), so a change to a preset or to that resolution invalidates
-    cached maps, while a change to the size field or meshing code is covered only by the srmcore version; the
+    cached maps; ENGINE_REVISION covers the engine code (meshing, physics, solvers, post-processing); the
     material files' hashes cover their data, and the versions of the numerical libraries cover the rest."""
     libraries = {d: version(d) for d in ("gmsh", "numpy", "scipy", "h5py")}
-    return {"srmcore": version("srmcore"), "libraries": libraries, **design_parts(design),
+    return {"srmcore": version("srmcore"), "engine_revision": ENGINE_REVISION, "libraries": libraries,
+            **design_parts(design),
             "angles": np.asarray(angles, float).tolist(), "currents": np.asarray(currents, float).tolist(),
             "excited": excited, "solver": solver.name, "solver_version": solver.version}
 

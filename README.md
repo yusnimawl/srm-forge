@@ -4,15 +4,7 @@ Core engine (`srmcore`) of the SRM design tool. Spec: `docs/superpowers/specs/`.
 
 ## Dev setup
 
-Requires Python 3.12+.
-
-Windows (PowerShell):
-```
-py -3.14 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python -m pytest -m "not slow"
-```
+Requires Python 3.12+. Linux is the tested platform (CI runs on Linux only since 2026-11-13).
 
 Linux:
 ```
@@ -22,6 +14,14 @@ python -m pip install -e ".[dev]"
 python -m pytest -m "not slow"
 ```
 Linux needs `libglu1-mesa` for the gmsh wheel.
+
+Windows (PowerShell) is not tested. It worked up to 2026-11-12:
+```
+py -3.14 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+python -m pytest -m "not slow"
+```
 
 ## Web UI
 

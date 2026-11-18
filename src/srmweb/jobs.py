@@ -79,10 +79,15 @@ class Reporter:
         self._last_write = float("-inf")
 
     def progress(self, **fields) -> None:
+        """Record the fields. The store is written at most once per interval, except for a step change and for the
+        last point of a count, which a reader must not miss: a long step without points may follow either."""
         with self._lock:
+            step_changed = "step" in fields and fields["step"] != self._fields["step"]
             self._fields.update(fields)
             self._version += 1
-            due = time.monotonic() - self._last_write >= _STORE_INTERVAL_S
+            done, total = self._fields["points_done"], self._fields["points_total"]
+            complete = "points_done" in fields and total > 0 and done >= total
+            due = step_changed or complete or time.monotonic() - self._last_write >= _STORE_INTERVAL_S
         if due:
             self.flush()
 

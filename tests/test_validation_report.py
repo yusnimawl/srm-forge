@@ -12,7 +12,7 @@ import validation_report as vr  # noqa: E402
 KEYS = ["la", "lu", "peak_torque", "psi_max"]
 
 
-def _write_inputs(d: Path, m5a: Path, *, ci="success", femm_ratio=0.5, team_err=-13.1, drop=None):
+def _write_inputs(d: Path, m5a: Path, *, ci="success", ci_tag=None, femm_ratio=0.5, team_err=-13.1, drop=None):
     d.mkdir(parents=True, exist_ok=True)
     m5a.mkdir(parents=True, exist_ok=True)
     one = {k: 0.01 for k in KEYS}
@@ -34,7 +34,13 @@ def _write_inputs(d: Path, m5a: Path, *, ci="success", femm_ratio=0.5, team_err=
         "speed.json": {"srmcore": v, "cpu": "x", "logical_cpus": 16, "workers": 8, "date": "2026-10-06",
                        "runs": [{"design": "8_6", "item": it, "seconds": 50.0} for it in vr.SPEED_ITEMS]},
         "speed_budgets.json": {"screening": 90.0, "full": 3600.0, "full_extras": 1800.0},
-        "ci.json": {"tag": "v0.4.0", "run_url": "https://example.invalid/run", "result": ci},
+        "ci.json": {"tag": ci_tag if ci_tag is not None else f"v{v}", "run_url": "https://example.invalid/run", "result": ci},
+        "emdlab.json": {"srmcore": v, "nodes": 1, "assumed": {},
+                        "worst": {"psi": 0.0157, "energy": 0.0125, "coenergy": 0.0255,
+                                  "torque_vs_maxwell": 0.0299, "torque_vs_emdlab": 0.0378},
+                        "rows": [{"theta_tab_deg": 0.0, "torque_arkkio": 0.0, "ref": {"torque_maxwell": 0.0006}},
+                                 {"theta_tab_deg": 10.0, "torque_arkkio": 5.0, "ref": {"torque_maxwell": 5.0}},
+                                 {"theta_tab_deg": 30.0, "torque_arkkio": 0.0, "ref": {"torque_maxwell": 0.0}}]},
     }
     for name, data in files.items():
         if name != drop:
@@ -48,7 +54,7 @@ def test_all_gated_rows_passing_is_pass(tmp_path):
     assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "PASS"
     text = (tmp_path / "report.md").read_text(encoding="utf-8")
     for heading in ("## Engine", "## Material library", "## M5a", "## M5b", "## M5c", "## M5d",
-                    "## EM validation", "## Speed", "## CI"):
+                    "## EM validation", "## EMDLAB", "## Speed", "## CI"):
         assert heading in text
 
 
@@ -67,7 +73,7 @@ def test_pending_ci_gives_pending(tmp_path):
     assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "PENDING"
 
 
-@pytest.mark.parametrize("drop", ["ci.json", "speed.json", "femm.json", "em_validate_8_6.json"])
+@pytest.mark.parametrize("drop", ["ci.json", "speed.json", "femm.json", "em_validate_8_6.json", "emdlab.json"])
 def test_missing_gated_input_fails_without_crashing(tmp_path, drop):
     _write_inputs(tmp_path / "v", tmp_path / "m", drop=drop)
     assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
@@ -91,6 +97,8 @@ def _rewrite(tmp_path, name, change):
     ("em_validate_8_6.json", lambda d: d.update(engine_version="0.0.1")),
     ("speed.json", lambda d: d.update(srmcore="0.0.1")),
     ("femm.json", lambda d: d.update(srmcore="0.0.1")),
+    ("emdlab.json", lambda d: d.update(srmcore="0.0.1")),
+    ("ci.json", lambda d: d.update(tag="v0.0.1")),
 ])
 def test_stale_gated_input_fails(tmp_path, name, change):
     _write_inputs(tmp_path / "v", tmp_path / "m")
@@ -164,3 +172,54 @@ def test_null_budget_values_fail_without_crashing(tmp_path):
     p.write_text(json.dumps(data))
     assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
     assert (tmp_path / "report.md").is_file()
+
+
+def test_ci_tag_naming_the_installed_version_passes(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "PASS"
+    assert f"Tag v{version('srmcore')}" in (tmp_path / "report.md").read_text(encoding="utf-8")
+
+
+def test_ci_tag_of_another_version_is_stale_and_named(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m", ci_tag="v0.0.1")
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+    text = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert f"installed srmcore is {version('srmcore')}" in text and "tag names 0.0.1" in text
+
+
+def test_failed_ci_run_fails_even_with_matching_tag(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m", ci="failure")
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+
+
+def test_emdlab_section_shows_worst_errors_against_limits(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md")
+    text = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "## EMDLAB / Maxwell" in text
+    assert "| psi against EMDLAB | 1.57 % | 2.00 % | pass |" in text
+    assert "| aligned and unaligned torque | 0.00 % | 0.50 % | pass |" in text
+
+
+@pytest.mark.parametrize("key, value", [("psi", 0.021), ("energy", 0.031), ("coenergy", 0.031),
+                                        ("torque_vs_maxwell", 0.051), ("torque_vs_emdlab", 0.051)])
+def test_emdlab_error_over_its_limit_fails(tmp_path, key, value):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    _rewrite(tmp_path, "emdlab.json", lambda d: d["worst"].update({key: value}))
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+
+
+def test_emdlab_end_torque_over_its_limit_fails(tmp_path):
+    _write_inputs(tmp_path / "v", tmp_path / "m")
+    _rewrite(tmp_path, "emdlab.json", lambda d: d["rows"][-1].update(torque_arkkio=0.1))
+    assert vr.generate(tmp_path / "v", tmp_path / "m", tmp_path / "report.md") == "FAIL"
+
+
+def test_emdlab_limits_match_the_slow_test():
+    import importlib.util
+    path = Path(__file__).resolve().parent / "validation" / "test_emdlab.py"
+    spec = importlib.util.spec_from_file_location("emdlab_limits_probe", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert (vr.EMDLAB_PSI_LIMIT, vr.EMDLAB_ENERGY_LIMIT, vr.EMDLAB_TORQUE_LIMIT, vr.EMDLAB_END_TORQUE_LIMIT) == (
+        mod.PSI_TOLERANCE, mod.ENERGY_TOLERANCE, mod.TORQUE_TOLERANCE, mod.END_TORQUE)

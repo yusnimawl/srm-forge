@@ -20,7 +20,7 @@ The authoritative design is `docs/superpowers/specs/2026-09-28-srm-core-engine-d
 
 ## Commands
 
-The project needs Python 3.12 or newer. CI runs the fast suite on 3.12 and 3.14 on both Windows and Linux for pushes to main, pull requests and version tags; the slow suite runs on version tags, weekly (Sunday 03:17 UTC) and on manual dispatch. The repository is public (since 2026-10-30), so standard GitHub runners have no minute limit. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
+The project needs Python 3.12 or newer. CI runs on Linux only (owner, 2026-11-13: the tool runs entirely on the LattePanda; Windows is not tested and its known problems are parked on the tracker). It runs the fast suite on 3.12 and 3.14 for pushes to main, pull requests and version tags; the slow suite runs on version tags, weekly (Sunday 03:17 UTC) and on manual dispatch. It runs as three jobs (`tests/validation`, `tests/web`, and the rest; about 1 h 45 min, 40 min and 2 h 55 min); the two real search-job web tests wait up to 5400 s, since the winding scan after the map takes about 20 min. The repository is public (since 2026-10-30), so standard GitHub runners have no minute limit. A `.venv` exists at the repo root. `h5py` (HDF5 map datasets) is a required dependency.
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -48,7 +48,8 @@ $env:PYTHONPATH="src;tests;tests/sil"; python examples\control_hil.py [--case SE
 $env:PYTHONPATH="src;tests;tests/sil"; python examples\hil_emu_selftest.py [COM4]   # Teensy emulator alone on its software gate pattern, against the PC model
 $env:PYTHONPATH="tests"; python examples\materu_losses_check.py [--preset screening|full|reference] [--rows 4:0 5:2] [--skip-yan] [--json PATH]   # R3 iron-loss check against Materu's measured 6/4 losses and the Yan region shares (hours at reference)
 $env:PYTHONPATH="tests"; python examples\speed_budget.py [--json PATH]   # time screening and full maps for the speed budgets
-python tools\validation_report.py                   # write docs/validation-report.md from docs/validation/ (verdict PASS/PENDING/FAIL, exit 1 on FAIL)
+python tools\validation_report.py                   # write docs/validation-report.md from docs/validation/ (verdict PASS/PENDING/FAIL, exit 1 on FAIL); the CI row is stale unless ci.json's tag is v + the installed srmcore version, and the EMDLAB / Maxwell row is gated on the limits of tests/validation/test_emdlab.py
+python tools\engine_digest.py [--update]            # digest of the engine code behind map numbers against its pin (see Map pipeline 3)
 python tools\digitise_bh.py                         # reproduce the traced/read library B-H curves (needs the dev extra, PyMuPDF)
 $env:PYTHONPATH="tests"; python tools\femm_fixtures.py <machine> [--level F]   # regenerate a FEMM fixture (Windows, FEMM 4.2, pyfemm; hours)
 $env:PYTHONPATH="tests"; python examples\femm_check.py [machine ...] [--json PATH]   # FEMM cross-tool comparison tables
@@ -121,7 +122,7 @@ On Linux, the gmsh wheel needs `libglu1-mesa` (CI also installs `libxcursor1 lib
 
 1. **`maps/grids.py`**: `angle_grid` (dense at the pole corners, snapped to the band pitch, one rotor pole pitch) and `current_grid` (power law, dense at low current); `GRID_SIZES` gives the default (angles, currents) per fidelity preset: screening 40 × 8, full 48 × 20, reference 120 × 40.
 2. **`maps/run.py` `run_map(static, design, angles, currents, solver_name, excited="A", workers=1, ...)`**: one job per point (each solved from A = 0, highest current first), then `apply_failure_policy` (isolated non-converged points are PCHIP-filled along current and flagged; the map fails with `MapFailed` above 2 % failed points or on a failure at the aligned angle, at zero current or at I_max). It validates `excited` (any phase of the machine; `aligned_angle` validates the letter) and the currents before making a solver. Cancellation returns a partial, unfilled result with `complete=False`.
-3. **`maps/dataset.py`**: `provenance` hashes the design, the resolved mesh settings, grids, excitation, solver and srmcore version plus the material JSON bytes; `write_map`/`read_map` use HDF5; `cached_map`/`store_map` serve and store complete maps only, and treat foreign-schema files as misses.
+3. **`maps/dataset.py`**: `provenance` hashes the design, the resolved mesh settings, grids, excitation, solver and srmcore version plus the material JSON bytes; `write_map`/`read_map` use HDF5; `cached_map`/`store_map` serve and store complete maps only, and treat foreign-schema files as misses. `provenance` also holds `ENGINE_REVISION` (`maps/dataset.py`), the revision of the engine code that decides map numbers; the map, overlap, stroke and field cache keys all follow it. `tests/maps/test_engine_revision.py` pins a digest of that code (the file set is `INCLUDED_*`/`EXCLUDED` in `tools/engine_digest.py`, the pin is `tests/maps/engine_digest_pin.json`) and fails on any change to it: if the change can alter map numbers, bump `ENGINE_REVISION`, then run `python tools/engine_digest.py --update`.
 4. **`maps/pool.py` `map_ordered`**: spawn `ProcessPoolExecutor`, results in item order, one retry of the unfinished items after a worker crash, then `WorkerCrashed`. `workers <= 1` runs in-process, through the same `_init_worker`. Workers run single-threaded numerics (`OMP/OPENBLAS/MKL_NUM_THREADS=1`, `make_solver(name, threads=1)`).
 5. **`maps/api.py` `build_map(design, i_max, solver="ngsolve", excited="A", workers=None, n_angles, n_currents, cache_dir, progress, cancel)`**: grids, provenance, cache lookup, mesh built once in the parent, `run_map`, cache store. `workers=None` means half the logical CPUs.
 
@@ -143,7 +144,7 @@ Analytic test problems (the current-sheet toroid and MMS on the unit square) liv
 
 - `tests/conftest.py` provides the reference designs as factories `make_8_6`, `make_12_8` and `make_24_16`. Each accepts `**overrides`. The same designs are available as fixtures (`srm_8_6`, …, and the parametrized `reference_design`). `pythonpath = ["tests"]`, so tests can `from conftest import make_8_6`.
 - Property tests use hypothesis over a bounded valid-design box. Keep the fast-suite variants deterministic and small, and mark long-running ones `@pytest.mark.slow`.
-- The spec sets the CI budget for the fast suite at under 30 minutes (raised from 10 on 2026-10-06; the CI job timeout is 60 min on Linux (raised from 40 on 2026-10-29 because runner speed varies) and 90 min on Windows, which took 59 min on 2026-10-30; tests/hil are marked slow in tests/conftest.py).
+- The spec sets the CI budget for the fast suite at under 30 minutes (raised from 10 on 2026-10-06; the CI job timeout is 60 min (raised from 40 on 2026-10-29 because runner speed varies); tests/hil are marked slow in tests/conftest.py).
 
 ## Conventions
 
