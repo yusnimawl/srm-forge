@@ -1,7 +1,8 @@
 """Cross-wire conductivity of a potted winding (docs/r5-sources.md section 6.8, check in section 8)."""
 
 # Milton xi by copper volume fraction. Marquez-Fernandez 2018 gives it for 0.37 only
-# (docs/r5-sources.md 6.8); no other fill has a cited value.
+# (docs/r5-sources.md 6.8); no other fill has a cited value. srmapp.cooling carries it to other fills
+# and states the V3 error as the cross_wire band.
 MILTON_XI = {0.37: 0.324}
 
 # Copper along the wire as used by Marquez-Fernandez 2018 (docs/r5-sources.md 6.6 and 8).
