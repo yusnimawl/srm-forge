@@ -17,11 +17,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]   # Windows is not run (owner, 2026-11-13); its open items are on the tracker backlog
         python-version: ["3.12", "3.14"]
     runs-on: ${{ matrix.os }}
-    # Windows runs the fast suite in about 59 min, Linux in about 44 min (2026-10-30).
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 90 || 60 }}
+    # Linux runs the fast suite in about 44 min (2026-10-30).
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

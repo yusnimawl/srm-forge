@@ -313,3 +313,18 @@ def test_real_evaluate_job_reports_the_winding_scan(tmp_path, monkeypatch):
     assert (started["step"], started["points_done"], started["points_total"]) == ("winding", 0, 0)
     assert (running["step"], running["points_done"], running["points_total"]) == ("winding", 5, 40)
     assert "5 of 40" in running["message"]
+
+
+def test_last_point_and_step_change_reach_the_store_at_once(tmp_path, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(jobs.time, "monotonic", lambda: now[0])
+    store = Store(tmp_path / "a.db")
+    job_id = store.create_job("search", {})
+    rep = Reporter(store, job_id, "search")
+    rep.progress(step="designs", points_done=15, points_total=16)
+    rep.progress(points_done=16)                       # inside the store interval, yet the work is complete
+    assert store.get_job(job_id)["progress"]["points_done"] == 16
+    rep.progress(step="pareto")                        # a step change is never held back either
+    assert store.get_job(job_id)["progress"]["step"] == "pareto"
+    rep.progress(points_done=3, points_total=16)       # an ordinary update inside the interval still waits
+    assert store.get_job(job_id)["progress"]["points_done"] == 16

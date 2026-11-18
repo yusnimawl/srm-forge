@@ -40,6 +40,8 @@ SPRAY_H = {                        # 6.4: measured h range (low, high), W/(m2 K)
     "shaft_spray": (3500.0, 4800.0),     # Hoffmann et al., Fig. 4 and 5, off the sump
 }
 AIR_FILM_C = 60.0                  # 6.3: top of the cited air table (Faiz Table III)
+MILTON_XI_REFERENCE = MILTON_XI[0.37]   # 6.8: the one cited xi, carried to fills without a cited value
+V3_XI_ERROR = 0.106                # 8: Milton with that xi at fill 0.47, 3.44 against the printed 3.11 (one point)
 RE_MIN = 1e4                       # 6.1: Gnielinski in duct_h; below this no cited correlation
 
 
@@ -170,12 +172,14 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     k_liner = K_LINER_LOW if u("liner") else float(np.interp(t_mm, NOMEX_MM, NOMEX_K))
     k_cu = load_material("copper").thermal.conductivity     # 2: library value, 391.1
     xi = next((v for k, v in MILTON_XI.items() if math.isclose(k, fill, abs_tol=1e-9)), None)
-    if u("cross_wire") or xi is None:
-        k_wire = hashin_shtrikman_lower(fill, k_cu, resin)
-        if not u("cross_wire"):
-            notes.append(f"cross-wire: xi is cited at fill 0.37 only, Hashin-Shtrikman used at {fill:.3g}")
-    else:
-        k_wire = milton_k(fill, k_cu, resin, xi)
+    if xi is None:
+        # No cited xi at this fill (docs/r5-sources.md 6.8 and 8): the cited 0.37 value is carried over and
+        # the recorded V3 error at 0.47 (+10.6 % against the printed Milton value) is the stated error of
+        # that step. It sits inside the cross_wire band, whose unfavourable end is the Hashin-Shtrikman value.
+        xi = MILTON_XI_REFERENCE
+        notes.append(f"cross-wire: xi is cited at fill 0.37 only; xi {xi:g} carried to fill {fill:.3g} "
+                     f"(V3 error {V3_XI_ERROR:+.1%} at fill 0.47); the cross_wire band runs down to Hashin-Shtrikman")
+    k_wire = hashin_shtrikman_lower(fill, k_cu, resin) if u("cross_wire") else milton_k(fill, k_cu, resin, xi)
 
     nominal_gap = GAP_MM[0] * 1e-3 if setup.contact_gap is None else setup.contact_gap
     gap = max(nominal_gap, GAP_MM[1] * 1e-3) if u("contact") else nominal_gap
