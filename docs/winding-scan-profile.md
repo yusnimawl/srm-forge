@@ -2,8 +2,8 @@
 
 `srmapp.turns.choose_turns` scans every allowed winding with the drive envelope. Profiled 2026-11-17 on the 8/6
 screening case of `tests/conftest.make_8_6` (1 kW, 3.2 N·m, 3000 to 6000 rpm; density mode, or wire mode with one
-6 mm round wire at 100 A), cloud container with 4 cores, map from the cache. Not the LattePanda: those times are
-the open part of the row.
+6 mm round wire at 100 A), cloud container with 4 cores, map from the cache. The LattePanda times are in the last
+section.
 
 ## Where the time went
 
@@ -50,4 +50,24 @@ frozen copy of the old code, `tests/app/envelope_reference.py`).
 
 - A further cut is possible by sharing the pulse phase between strokes with the same turn-on (the state before
   turn-off is the same for every turn-off). Left out: more code for a smaller gain than 1 to 5.
-- The 450 s `SCAN_BUDGET_S["auto"]` default is unchanged. It needs the LattePanda times per winding mode first.
+
+## LattePanda (i5-1340P, 16 logical CPUs), 2026-11-18
+
+`python examples/scan_timing.py` times the span the web evaluate job records in `scan_times`: from the complete map
+to the chosen winding, through `srmapp.case.evaluate_design`, on the same case. Winding "fixed" is the winding that
+"auto" chose. The default worker count is half the logical CPUs, 8 here (the web layer's default too).
+
+| Mode | Winding | Windings scanned | 1 worker | 8 workers |
+|---|---|---|---|---|
+| density | auto | 1000 (750 distinct drives) | 239 s | 57.2 s |
+| density | fixed | 1 | 0.8 s | 0.8 s |
+| wire | auto | 12 | 3.8 s | 3.8 s |
+| wire | fixed | 1 | 0.8 s | 0.8 s |
+
+A drive envelope costs 0.32 s in both modes. The wire case scans 12 windings, not the 159 of the cloud run above:
+one 6 mm wire at 100 A gives 12 windings on this machine with the peak-density cap and without it, so the cloud
+run used a setup this page does not fully state. Fewer than `MIN_PARALLEL_JOBS` (16) evaluations stay in process,
+so its 8-worker time equals the 1-worker time. Density 1 worker ran 239 s, 246 s and 257 s over three runs.
+
+`SCAN_BUDGET_S` in `srmweb/cases.py` (the estimate before any scan was timed) is the measured time x 1.25, the rule
+of the M5e2 speed budgets: "auto" 72 s from density mode at 8 workers (the slower mode), "fixed" 1 s.
