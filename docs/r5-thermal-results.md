@@ -211,3 +211,7 @@ Unresolved sources:
 - Romanazzi air-gap correlation: recorded, not coded. The air-gap and end-space rows have zero width until a second cited route exists.
 - Jacket Re below 1e4 (laminar or transitional): refused; the laminar Nu source is not read.
 - Idoughi 2011 (xi against fill factor): not read (unreachable again 2026-11-17); the cited xi is carried to other fills inside the `cross_wire` band.
+
+## R5c
+
+Merged (srmcore and srmapp 0.8.0, srmweb and `web/` 0.11.0): stage 2 checks the EM-feasible windings best-first against the rated hot-spot limit at the required torques, rates the first that holds, and the Pareto front is rated continuous and peak kW/kg. A rated evaluation of the 8/6 screening case took 629 s on the LattePanda. Open: validation campaign for srmcore 0.8.0; the evaluate estimate does not count rating time (R5d).
