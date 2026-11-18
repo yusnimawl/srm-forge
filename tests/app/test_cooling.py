@@ -1,7 +1,7 @@
 import pytest
 
 from conftest import make_8_6
-from srmapp.cooling import (K_IRON_HI, ROWS, CoolingSetup, EndSpray, Jacket, MissingCoolingData, ShaftOil,
+from srmapp.cooling import (k_iron_hi, ROWS, CoolingSetup, EndSpray, Jacket, MissingCoolingData, ShaftOil,
                             SlotOil, coefficients)
 from srmapp.requirements import Requirements
 
@@ -68,8 +68,13 @@ def test_cooling_h_spray_and_slot_oil():
     assert w.spray_rho_cp == pytest.approx(0.96 * n.spray_rho_cp)
 
 
-def test_iron_row_is_k_iron_hi():
-    assert co().iron_factor == 1.0 and co(u={"iron"}).iron_factor == K_IRON_HI == 2.0
+def test_iron_row_follows_frequency():
+    assert k_iron_hi(500.0) == 3.2 and k_iron_hi(1500.0) == 3.2 and k_iron_hi(2780.0) == 7.0
+    assert k_iron_hi(2140.0) == pytest.approx(5.1) and k_iron_hi(10_000.0) == 7.0
+    f = M.n_rotor_poles * 3000.0 / 60
+    assert co().iron_factor == 1.0 and co(u={"iron"}).iron_factor == pytest.approx(k_iron_hi(f))
+    high = co(rpm=60 * 3000.0 / M.n_rotor_poles, u={"iron"})
+    assert high.iron_factor == 7.0 and any("no measurement above" in n for n in high.notes)
 
 
 def test_em_torque_floor():

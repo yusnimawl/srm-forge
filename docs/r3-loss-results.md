@@ -1,4 +1,4 @@
-# R3 loss results: Materu 6/4 check and Yan region shares
+# R3 loss results: Materu 6/4 check, Kiyota 18/12 check and Yan region shares
 
 Status: run 2026-10-19 on the laptop at the `full` preset, 6 workers, about 3 h
 (`$env:PYTHONPATH="tests"; python examples\materu_losses_check.py --preset full --workers 6 --json docs\r3-data\materu.json`;
@@ -215,6 +215,46 @@ deep groove ball bearings, 20 mm bore, 23.6 N rotor weight), nominal values and 
 - Thermal: windage heats the rotor iron and friction the end caps; the rated set of the rating takes both at the
   top of their bands (budget row `mechanical_loss`). The rating's torque is not reduced by friction and windage
   (they take shaft torque, not winding heat).
+
+## Kiyota 18/12, 10JNEX900 (tracker row 10a, LattePanda, 2026-11-18)
+
+`examples/kiyota_losses_check.py` at `full`; machine `tests/kiyota_18_12.py`, readings `tools/digitise_kiyota.py`
+(Kiyota and Chiba 2012 Fig. 7; Kiyota, Kakishima and Chiba 2014 Table III and Fig. 16; plan
+`docs/superpowers/plans/2026-11-18-kiyota-iron-check.md`). The model's material is the laminations' own grade, so
+this is the first check without a stand-in steel. Inductance at 10 A (2D plus end winding at image factor 1.5):
+unaligned 1.02 mH against 1.2 measured, aligned 9.31 against 9.1.
+
+Ratio = measured "iron and other losses" over the model's nominal iron loss, cut process `unspecified`. Stroke
+"current" is the least-copper stroke whose RMS current equals the measured one; "torque" the one at the measured
+torque (the Fig. 16 points have no measured current). Stator yoke 16.3 mm (Fig. 7) and 15.5 mm (2012 design study).
+
+| Point | r/min | f_e | Stroke | RMS meas / model (A) | Measured (W) | Model (W) | Ratio, yoke 16.3 | Ratio, yoke 15.5 |
+|---|---|---|---|---|---|---|---|---|
+| III (a) knee, 209 N·m | 2768 | 554 Hz | current | 137 / 137 | 700 | 227 | 3.08 | 3.01 |
+| III (c) max efficiency, 36 N·m | 7500 | 1.50 kHz | current | 35.4 / 35.6 | 600 | 218 | 2.76 | 2.72 |
+| Fig. 16, 14.7 kW | 13 900 | 2.78 kHz | torque | - / 18.4 | 823 | 162 | 5.07 | 4.95 |
+| Fig. 16, 17.2 kW | 13 900 | 2.78 kHz | torque | - / 21.0 | 944 | 170 | 5.55 | 5.30 |
+| Fig. 16, 21.9 kW | 13 900 | 2.78 kHz | torque | - / 24.9 | 1123 | 208 | 5.40 | 5.53 |
+| Fig. 16, 22.4 kW | 13 900 | 2.78 kHz | torque | - / 25.4 | 1260 | 207 | 6.08 | 5.90 |
+| Fig. 16, 30.0 kW | 13 900 | 2.78 kHz | torque | - / 33.3 | 1564 | 225 | 6.96 | no stroke |
+
+The torque stroke at (a) and (c) gives ratios within 6 % of the current stroke (3.17 and 2.91 at yoke 16.3). The
+model's iron uncertainty (`iron_uncertainty`) is 27 to 39 %, the cut-edge range -4 to +39 % of the nominal.
+
+Findings:
+
+1. **The gap grows with frequency**: about 3 below 1.5 kHz, 5 to 7 at 2.78 kHz. Kiyota 2014 Fig. 14 shows the same
+   trend for their own model (correction factor 4 at 1 kHz, 10 at 2.78 kHz) and names coefficient error at high
+   frequency, additional losses and skin effect in the winding. The measurement holds stray and extra copper losses
+   too, so the ratio over-states the iron error; it is the pessimistic side.
+2. **Continuous conduction is not modelled.** Table III (b) (113 N·m at 8700 r/min, 103 kW) and the Fig. 16 points
+   at 59 and 99 kW have no stroke in the model: its best at (b) is 55 N·m (50 kW, 57 A RMS against 130 A measured).
+   Kiyota 2012 states that these outputs use continuous current, and that discontinuous current alone limits the
+   output to 57 kW; the 2014 Fig. 17 current never returns to zero at 100 kW. `srmapp.drive.envelope` requires the
+   flux to die away before the next stroke, so high-speed power above the single-pulse limit is under-predicted.
+   These three points are left out of the ratios.
+3. Stator yoke 16.3 or 15.5 mm changes the ratios by at most 5 %; at 15.5 mm the 30 kW point at 13 900 r/min also
+   has no single-pulse stroke.
 
 ## Preliminary screening run (laptop, 2026-10-19)
 
