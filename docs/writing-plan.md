@@ -1,17 +1,17 @@
 # Writing plan: wiki, project doc rewrite, academic writing
 
-This is a living list. Every session that does writing work updates it in the same session: tick what is done, add what is new, and keep the Claude Docs wiki's "Open work" list the same as this one.
+This is a living list. Every session that does writing work updates it in the same session: tick what is done, add what is new, and keep the Notion wiki's "Open work" list the same as this one.
 
 ## Documents
 
 | Document | Where | State |
 | --- | --- | --- |
-| Wiki | Claude Doc "srm-forge wiki", https://claude.ai/artifact/W18pUfnse2MuR1brNdM2VR | 13 tabs written (12 on 2026-10-29 and 2026-10-30, End effects on 2026-11-06, Thermal on 2026-11-17; the Progress and Roadmap tabs moved to the Notion page "srm-forge progress" on 2026-11-18), owner review open |
+| Wiki | Notion page "srm-forge wiki", https://app.notion.com/p/41c7b4b6b24e810391f0e009e0b0abdb | 12 pages plus the hub (written in Claude Docs on 2026-10-29 and 2026-10-30, End effects on 2026-11-06, Thermal on 2026-11-17; moved to Notion on 2026-11-18, with the Progress and Roadmap tabs as the "srm-forge progress" page under it); owner review open |
 | Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | History only; the rewrite was closed 2026-11-11 |
 | Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
 
-The wiki explains the tool as it is now. The project doc keeps the history (what was decided, when, and why). The specs in `docs/superpowers/specs/` stay authoritative. When a wiki tab and a spec disagree, the spec wins and the tab gets fixed.
+The wiki explains the tool as it is now. The project doc keeps the history (what was decided, when, and why). The specs in `docs/superpowers/specs/` stay authoritative. When a wiki page and a spec disagree, the spec wins and the page gets fixed.
 
 ## Open work
 
@@ -31,7 +31,8 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Commands
 - [x] Glossary
 - [x] End effects: the 3D reference model, gate G1 and the measured gap in the budget (added 2026-11-06)
-- [ ] Owner review of all tabs
+- [x] Move the wiki from Claude Docs to Notion (2026-11-18)
+- [ ] Owner review of all pages
 
 ### Project doc rewrite
 
