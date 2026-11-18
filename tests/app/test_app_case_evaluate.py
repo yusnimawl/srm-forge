@@ -7,7 +7,7 @@ from map_fixtures import synthetic_map
 
 from srmapp.case import CaseInputs, FixedWinding, evaluate_design, map_cache_hit, map_request, validate_case
 from srmapp.requirements import Requirements
-from srmapp.sizing.estimates import J_LIMIT
+from srmapp.sizing.estimates import J_SCREEN
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmcore.maps import build_map
 from srmcore.model.design import Design, MeshSettings
@@ -32,7 +32,7 @@ def _fake_map(design, i_max, **kw):
 
 def _evaluate(inputs, **kw):
     with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map) as bm:
-        return evaluate_design(inputs, **kw), bm
+        return evaluate_design(inputs, **{"thermal": False, **kw}), bm
 
 
 def test_evaluation_records_j_limit():
@@ -41,7 +41,7 @@ def test_evaluation_records_j_limit():
     default = _evaluate(_inputs(winding=fixed))[0]
     assert custom.status == "ok" and default.status == "ok"
     assert custom.j_limit == 12e6
-    assert default.j_limit == J_LIMIT
+    assert default.j_limit == J_SCREEN
 
 
 def test_fixed_with_the_auto_winding_reproduces_auto():
@@ -72,7 +72,7 @@ def test_on_scan_is_called_once_when_the_map_is_complete():
     calls = []
     with mock.patch("srmapp.evaluate.build_map", side_effect=lambda *a, **kw: calls.append("map") or _fake_map(*a, **kw)),             mock.patch("srmapp.evaluate.choose_turns",
                        side_effect=lambda *a, **kw: calls.append("scan") or choose_turns(*a, **kw)):
-        e = evaluate_design(_inputs(winding=FixedWinding(turns=10)), on_scan=lambda: calls.append("on_scan"))
+        e = evaluate_design(_inputs(winding=FixedWinding(turns=10)), on_scan=lambda: calls.append("on_scan"), thermal=False)
     assert calls == ["map", "on_scan", "scan"] and e.status == "ok"
 
 
@@ -88,7 +88,7 @@ def test_fixed_beyond_the_search_range_extends_the_map():
     assert e.status == "ok" and e.winding.turns == 6
     assert map_request(_inputs(req, j_peak_max=1e6))[1] == pytest.approx(stage.mmf / REFERENCE_TURNS)
     with pytest.raises(ValueError):
-        map_request(_inputs(_req(wires=[THICK], phase_current_a=1e6)))     # no winding fits in Auto mode
+        map_request(_inputs(_req(wires=[THICK], phase_current_a=1e6), j_peak_max=40e6))     # no winding fits in Auto mode
 
 
 def test_stage_one_rejection_is_a_note_not_a_stop():

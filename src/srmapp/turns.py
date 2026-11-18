@@ -13,7 +13,7 @@ from srmcore.model.design import RadialSRMParams
 
 from .drive.envelope import Envelope, envelope
 from .requirements import Requirements
-from .sizing.estimates import J_LIMIT, J_PEAK
+from .sizing.estimates import J_LIMIT, J_PEAK, J_PEAK_SCREEN, J_SCREEN
 from .sizing.winding import DENSITY_MAX_TURNS, Winding, density_windings, wire_windings
 
 
@@ -88,7 +88,8 @@ class TurnsChoice:
     feasible: bool
     envelope: Envelope | None      # chosen winding over the full speed grid
     scan: tuple[ScanPoint, ...]    # every winding tried, in scan order
-    capped: bool                   # wire mode: the peak current-density cap left out windings that fit the slot
+    capped: bool                   # wire mode: the peak current-density cap (or screen) left out windings that fit the slot
+    ranked: tuple[ScanPoint, ...] = ()   # the feasible windings, best first (`point` is the first)
 
 
 def turns_scale(machine: RadialSRMParams, w: Winding) -> float:
@@ -137,12 +138,12 @@ def _scan_job(key: tuple[float, float, float, float]):
 
 
 def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements, *, j_peak: float = J_PEAK,
-                 j_limit: float = J_LIMIT, j_peak_max: float | None = None, margin: float = 1.0,
+                 j_limit: float = J_SCREEN, j_peak_max: float | None = None, margin: float = 1.0,
                  max_turns: int = DENSITY_MAX_TURNS, only: Winding | None = None, workers: int | None = 1,
                  progress: Callable[[int, int], None] | None = None,
                  cancel: Callable[[], bool] | None = None) -> TurnsChoice:
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
-    conductor RMS current density, `j_peak_max` (default 2 · `j_limit`) the peak density in wire mode. A winding is
+    conductor RMS current density, `j_peak_max` (default None: `J_PEAK_SCREEN`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
     resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
     feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding.
@@ -152,7 +153,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     worker, or fewer than `MIN_PARALLEL_JOBS` distinct evaluations, stays in this process); the result does not
     depend on it. `progress(done, total)` follows the distinct evaluations; `cancel` is polled between them and
     raises `ScanCancelled`."""
-    cap = 2 * j_limit if j_peak_max is None else j_peak_max
+    cap = J_PEAK_SCREEN if j_peak_max is None else j_peak_max
     capped = False
     if only is not None:
         windings = [only]
@@ -193,11 +194,14 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     if not scan:
         return TurnsChoice(None, False, None, (), capped)
     feasible = [s for s in scan if s.feasible]
+    ranked = []
     if not feasible:
         point = max(scan, key=lambda s: (s.worst, -s.winding.resistance))
     elif req.wire_mode:
-        point = min(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
+        ranked = sorted(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
     else:
-        point = max(feasible, key=lambda s: (s.winding.turns / s.winding.paths, -s.winding.paths))
+        ranked = sorted(feasible, key=lambda s: (-s.winding.turns / s.winding.paths, s.winding.paths))
+    if feasible:
+        point = ranked[0]
     return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid, j_limit), scan,
-                       capped)
+                       capped, tuple(ranked))

@@ -60,10 +60,10 @@ def test_evaluation_carries_curves_only_when_ok():
     cand = Candidate("c0", Design(machine=MACHINE, mesh=MeshSettings(preset="screening")))
     raw = synthetic_map(n_angles=24, currents=np.linspace(0.0, stage.i_map, 9))
     with mock.patch("srmapp.evaluate.build_map", return_value=raw):
-        e = evaluate_stage2(cand, req, stage, max_turns=30)
+        e = evaluate_stage2(cand, req, stage, max_turns=30, thermal=False)
     assert e.status == "ok" and len(e.curves.currents) == len(raw.currents) - 1
     with mock.patch("srmapp.evaluate.build_map", side_effect=MapFailed(["1 of 50 points failed"], 1)):
-        assert evaluate_stage2(cand, req, stage).curves is None
+        assert evaluate_stage2(cand, req, stage, thermal=False).curves is None
 
 
 def test_evaluation_leaves_the_end_winding_out_of_b_sp():
@@ -72,7 +72,7 @@ def test_evaluation_leaves_the_end_winding_out_of_b_sp():
     cand = Candidate("c0", Design(machine=MACHINE, mesh=MeshSettings(preset="screening")))
     raw = synthetic_map(n_angles=24, currents=np.linspace(0.0, stage.i_map, 9))
     with mock.patch("srmapp.evaluate.build_map", return_value=raw):
-        e = evaluate_stage2(cand, req, stage, max_turns=30)
+        e = evaluate_stage2(cand, req, stage, max_turns=30, thermal=False)
     w, m = e.winding, e.design.machine
     l_end = end_winding_inductance(MACHINE, image_factor=1.5) * turns_scale(MACHINE, w) ** 2
     n_series = w.turns * (m.n_stator_poles // m.n_phases) / w.paths

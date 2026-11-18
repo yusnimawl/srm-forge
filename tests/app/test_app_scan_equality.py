@@ -96,7 +96,7 @@ def _reference_scan(result, req, every, **kw):
 
 @pytest.mark.parametrize("req", [WIRE, DENSITY], ids=["wire", "density"])
 def test_scan_matches_the_reference_winding_by_winding(req):
-    kw = dict(j_peak_max=40e6, max_turns=24)
+    kw = dict(j_limit=turns.J_LIMIT, j_peak_max=40e6, max_turns=24)
     choice, reference = _reference_scan(_map(req), req, 5, **kw)
     assert len(choice.scan) > 20
     got = [(s.torque_ratio, s.power_ratio, s.i_rms) for s in choice.scan[::5]]

@@ -4,7 +4,7 @@ export type StepState = "done" | "active" | "waiting" | "failed" | "cancelled"
 export type StepRow = { id: string; label: string; state: StepState; detail?: string }
 
 const LABELS: Record<string, Record<string, string>> = {
-  evaluate: { queued: "Queued", mesh: "Mesh built", mapping: "Mapping", winding: "Choosing the winding", saved: "Saved" },
+  evaluate: { queued: "Queued", mesh: "Mesh built", mapping: "Mapping", winding: "Choosing the winding", strokes: "Stroke solves", thermal: "Thermal rating", saved: "Saved" },
   validate: { queued: "Queued", map: "Map (cache)", checks: "Checks and budget", saved: "Saved" },
   animate: { queued: "Queued", frames: "Frames", saved: "Saved" },
   control: { queued: "Queued", compile: "Compiling the controller", simulate: "Simulating", saved: "Saved" },
@@ -38,14 +38,15 @@ function detailOf(job: JobOut, id: string, active: boolean): string | undefined 
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
-  if (id === "winding" && done !== null && total) {
-    const parts = [`${done} / ${total} drive evaluations`]
+  if ((id === "winding" || id === "thermal") && done !== null && total) {
+    const parts = [`${done} / ${total} ${id === "thermal" ? "speeds" : "drive evaluations"}`]
     const elapsed = num(p.step_elapsed_s)
     if (elapsed !== null) parts.push(`${fmtSpan(elapsed)} elapsed`)
     const eta = num(p.eta_s)
     if (eta !== null) parts.push(`${fmtAbout(eta)} left`)
     return parts.join(" · ")
   }
+  if (job.kind === "evaluate" && id === "strokes" && done !== null) return `${done} stroke solves`   // the total is not known up front
   if ((id === "frames" || id === "strokes" || id === "losses") && done !== null && total) return `${done} / ${total}`
   if (id === "designs") {
     const dd = num(p.designs_done)

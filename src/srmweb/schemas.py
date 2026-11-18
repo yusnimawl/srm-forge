@@ -54,6 +54,7 @@ class SearchRequest(BaseModel):
     requirements: Requirements
     settings: SearchSettingsIn = SearchSettingsIn()
     grid: Grid | None = None   # overrides the preset grid, for tests
+    thermal: bool = True   # false skips the rating: faster, but the Pareto set is then empty
 
 
 class EvaluateRequest(BaseModel):
@@ -62,6 +63,7 @@ class EvaluateRequest(BaseModel):
     case_id: str
     inputs: CaseInputs
     grid: Grid | None = None
+    thermal: bool = True   # false skips the rating
 
 
 class AnimateRequest(BaseModel):
@@ -98,6 +100,7 @@ class EvaluateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     grid: Grid | None = None
+    thermal: bool = True   # false skips the rating: the case is then not thermally rated
 
 
 class ValidateIn(BaseModel):

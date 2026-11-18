@@ -33,8 +33,21 @@ def electrical_deg_from_unaligned(theta_mech: float, n_rotor_poles: int) -> floa
     return math.degrees((theta_mech - math.pi / n_rotor_poles) * n_rotor_poles)
 
 
+def rating_summary(r) -> dict:
+    """Per speed: nominal and rated torques and the hot spots, plus the limit and the rotor stress verdict."""
+    speeds = [{"rpm": n.rpm, "nominal_continuous_nm": n.continuous_nm, "nominal_peak_nm": n.peak_nm,
+               "rated_continuous_nm": q.continuous_nm, "rated_peak_nm": q.peak_nm,
+               "hot_spot_c": q.continuous_hot_spot.temperature_c, "hot_spot_at": q.continuous_hot_spot.location,
+               "peak_hot_spot_c": q.peak_hot_spot.temperature_c, "peak_hot_spot_at": q.peak_hot_spot.location}
+              for n, q in zip(r.nominal, r.rated)]
+    return to_json({"speeds": speeds, "limit_c": r.limit_c, "insulation_class": r.insulation_class,
+                    "stress_status": r.stress.status, "stress_safety_factor": r.stress.safety_factor,
+                    "notes": list(r.notes)})
+
+
 def evaluation_json(ev, *, waveforms: bool = True) -> dict:
-    out = to_json(ev)
+    out = to_json(dataclasses.replace(ev, rating=None))
+    out["rating"] = None if ev.rating is None else rating_summary(ev.rating)
     if ev.envelope is not None:
         nr = ev.design.machine.n_rotor_poles
         env = out["envelope"]

@@ -210,13 +210,16 @@ def test_real_search_job_in_thread(make, tmp_path):
     req = {"requirements": dict(peak_power_w=630.0, peak_torque_nm=2.0, base_speed_rpm=3000.0,
                                 max_speed_rpm=6000.0),
            "settings": dict(n_candidates=2, shortlist=1, preset="screening"),
-           "grid": [4, 3]}
+           "grid": [4, 3], "thermal": False}
     SearchRequest.model_validate(req)
     store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("search", req)
     got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=5400)
     assert got["status"] == "done", got
-    json.dumps(store.get_result(j), allow_nan=False)
+    result = store.get_result(j)
+    json.dumps(result, allow_nan=False)
+    assert result["evaluations"] and result["pareto_ids"] == []   # unrated, so nothing to rank on
+    assert all("not thermally rated" in e["error"] for e in result["evaluations"] if e["status"] == "ok")
 
 
 def _inputs() -> dict:

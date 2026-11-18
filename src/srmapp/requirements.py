@@ -1,4 +1,4 @@
-"""Vehicle-motor requirements (v0 spec §3, v0a-2 spec §3.2). Peak-only: no continuous rating. Wire mode when wires are given, density mode otherwise."""
+"""Vehicle-motor requirements (v0 spec §3, v0a-2 spec §3.2): peak and, optionally, continuous power, cooling and the hot-spot limit. Wire mode when wires are given, density mode otherwise."""
 import math
 from typing import Literal
 

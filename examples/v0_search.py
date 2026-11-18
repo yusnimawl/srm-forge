@@ -41,4 +41,4 @@ if __name__ == "__main__":
         print(f"{e.id:14}{m.n_stator_poles:>4}/{m.n_rotor_poles:<2}{m.stator_outer_diameter * 1e3:7.0f}{wire:>12}{wind}"
               f"{e.mass_kg:9.2f}{e.torque_ratio:9.2f}{e.power_ratio:9.2f}{e.power_density_kw_per_kg:7.2f}"
               f"{e.efficiency_base:6.2f}  {e.status}{' *' if e.id in front else ''}")
-    print("* = Pareto front (feasible designs; mass down, kW/kg up, copper-only efficiency up)")
+    print("* = Pareto front (feasible rated designs; rated continuous and peak kW/kg up)")

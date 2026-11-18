@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pytest
 from conftest import make_8_6
@@ -5,7 +6,9 @@ from map_fixtures import synthetic_map
 
 from srmapp.drive.envelope import envelope
 from srmapp.requirements import Requirements
-from srmapp.sizing.winding import max_mmf
+from srmapp.sizing.estimates import J_PEAK_SCREEN
+from srmapp.sizing.stage1 import stage1
+from srmapp.sizing.winding import max_mmf, wire_windings
 from srmapp.turns import choose_turns, requirement_ratios, rescale_turns, speed_grid
 
 MACHINE = make_8_6()
@@ -127,7 +130,7 @@ def test_infeasible_requirement_reports_the_closest_winding():
 
 def test_no_winding_when_nothing_fits():
     req = _req(wires=[THICK], phase_current_a=1e6)
-    c = choose_turns(synthetic_map(n_angles=24), MACHINE, req)
+    c = choose_turns(synthetic_map(n_angles=24), MACHINE, req, j_peak_max=40e6)
     assert c.point is None and not c.feasible and c.envelope is None and c.scan == ()
 
 
@@ -174,3 +177,38 @@ def test_capped_flag_reports_windings_left_out_by_the_peak_cap():
     req = _req(wires=[THICK], phase_current_a=800.0)       # one THICK strand at 800 A is about 28 A/mm²
     assert choose_turns(_map_for(req, j_peak_max=20e6), MACHINE, req, j_peak_max=20e6).capped
     assert not choose_turns(_map_for(req, j_peak_max=1e12), MACHINE, req, j_peak_max=1e12).capped
+
+
+def test_ranked_is_best_first_wire():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    choice = choose_turns(_map_for(req, j_peak_max=40e6), MACHINE, req, j_peak_max=40e6)
+    res = [s.winding.resistance for s in choice.ranked]
+    assert len(res) > 1 and res == sorted(res)
+    assert choice.point is choice.ranked[0] and all(s.feasible for s in choice.ranked)
+
+
+def test_ranked_is_best_first_density():
+    req = _req()
+    choice = choose_turns(_map_for(req), MACHINE, req, max_turns=20)
+    eq = [s.winding.turns / s.winding.paths for s in choice.ranked]
+    assert len(eq) > 1 and eq == sorted(eq, reverse=True)
+    assert choice.point is choice.ranked[0]
+
+
+THIN = dict(kind="round", diameter=1.0e-3, outer_diameter=1.08e-3)
+
+
+def test_default_peak_cap_is_the_screen():
+    req = _req(wires=[THIN], phase_current_a=100.0)
+    choice = choose_turns(_map_for(req, j_peak_max=1e12), MACHINE, req)
+    assert len(choice.scan) == len(wire_windings(MACHINE, req, 0, J_PEAK_SCREEN)) and choice.capped
+    assert max(s.winding.current_density for s in choice.scan) <= J_PEAK_SCREEN * (1 + 1e-9)
+    free = choose_turns(_map_for(req, j_peak_max=1e12), MACHINE, req, j_peak_max=1e12)   # an explicit cap overrides it
+    assert len(free.scan) == len(wire_windings(MACHINE, req, 0, math.inf)) > len(choice.scan) and not free.capped
+
+
+def test_stage1_default_cap_is_the_screen():
+    req = _req(wires=[THIN], phase_current_a=100.0)
+    s = stage1(req, MACHINE)
+    assert s.j_peak_max == J_PEAK_SCREEN == 80e6 and math.isfinite(s.i_map)
+    assert s.mmf == max_mmf(MACHINE, req, 20e6, J_PEAK_SCREEN) < stage1(req, MACHINE, j_peak_max=1e12).mmf

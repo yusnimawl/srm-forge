@@ -61,3 +61,41 @@ def test_result_route_serves_search_jobs_only(client):
     job_id = store.create_job("evaluate", {"case_id": "x"})
     store.put_result(job_id, {"cancelled": True}, kind="evaluate")
     assert client.get(f"/api/jobs/{job_id}/result").status_code == 404
+
+
+def _rated_evaluation():
+    from srmapp.cooling import CoolingSetup
+    from srmapp.thermal import Rating, SpeedRating
+    from srmcore.post.rotor_stress import RotorStress
+    from srmcore.thermal.solve import HotSpot
+
+    def sr(rpm, k):
+        return SpeedRating(rpm, 5.0, 3.0 * k, 4.0 * k, HotSpot(140.0, "coil_A1+"), HotSpot(150.0, "end_winding"),
+                           90.0, 95.0, 80.0, 85.0, 7, 60)
+
+    stress = RotorStress("ok", "", 7200.0, 1e8, 2e8, 1.5, "pole_root", "von_mises", 5e8, 2.4, 9000.0)
+    rating = Rating((sr(3000.0, 1.0), sr(6000.0, 1.0)), (sr(3000.0, 0.8), sr(6000.0, 0.8)), (), 155.0, "F",
+                    CoolingSetup(), stress, {}, 1.0, 12, ("a note",), "0.7.0")
+    return dataclasses.replace(evaluation("c0"), rating=rating, rated_continuous_kw_per_kg=0.7, srmcore_version="0.7.0")
+
+
+def test_rating_summary_reaches_the_evaluation_json():
+    out = results.EvaluationOut.model_validate(evaluation_json(_rated_evaluation()))
+    json.dumps(out.model_dump(), allow_nan=False)
+    r = out.rating
+    assert r.limit_c == 155.0 and r.insulation_class == "F" and r.notes == ["a note"]
+    assert r.stress_status == "ok" and r.stress_safety_factor == 2.4
+    assert [s.rpm for s in r.speeds] == [3000.0, 6000.0]
+    s = r.speeds[0]
+    assert (s.nominal_continuous_nm, s.rated_continuous_nm, s.rated_peak_nm) == pytest.approx((3.0, 2.4, 3.2))
+    assert (s.hot_spot_c, s.hot_spot_at) == (140.0, "coil_A1+")
+    assert out.rated_continuous_kw_per_kg == 0.7 and out.srmcore_version == "0.7.0"
+
+
+def test_unrated_and_older_evaluations_have_no_rating():
+    assert evaluation_json(evaluation("c0"))["rating"] is None
+    old = evaluation_json(evaluation("c0"))
+    for k in ("rating", "rated_continuous_kw_per_kg", "rated_peak_kw_per_kg", "srmcore_version"):
+        old.pop(k)
+    out = results.EvaluationOut.model_validate(old)
+    assert out.rating is None and out.srmcore_version is None

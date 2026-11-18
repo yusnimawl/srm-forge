@@ -1,4 +1,5 @@
 """Requirements to scored candidates: generate, stage-1 filter, stage-2 evaluation, Pareto set (v0 spec §4)."""
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
@@ -12,7 +13,7 @@ from srmcore.model.design import RegionMaterials
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
-from .sizing.estimates import J_LIMIT, J_PEAK
+from .sizing.estimates import J_PEAK, J_PEAK_SCREEN, J_SCREEN
 from .sizing.generator import sample_candidates
 from .sizing.stage1 import stage1
 
@@ -26,13 +27,15 @@ class SearchSettings:
     materials: RegionMaterials = RegionMaterials(stator="10JNEX900", rotor="10JNEX900")
     margin: float | None = None     # feasible when the worst of torque and power ratio is at least this; None: by grade
     j_peak: float = J_PEAK          # A/m², peak current density that sets each design's I_max (density mode)
-    j_limit: float = J_LIMIT        # A/m², cooling limit on the conductor RMS current density
+    j_limit: float = J_SCREEN       # A/m², wide RMS screen of the winding scan; the thermal rating is the real limit
     preset: Literal["screening", "full"] = "full"   # mesh and grid fidelity of every candidate
-    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None is 2 x j_limit
+    j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None: J_PEAK_SCREEN
+    thermal: bool = True            # rate every feasible design (continuous and peak per speed)
+    n_speeds: int = 6               # speeds per rating
 
     @property
     def peak_cap(self) -> float:
-        return 2 * self.j_limit if self.j_peak_max is None else self.j_peak_max
+        return J_PEAK_SCREEN if self.j_peak_max is None else self.j_peak_max
 
     @property
     def resolved_margin(self) -> float:
@@ -53,12 +56,13 @@ class SearchResult:
     evaluations: tuple[Evaluation, ...]
     cancelled: bool
 
-    def pareto(self, maximize=(False, True, True)) -> tuple[Evaluation, ...]:
-        """Non-dominated feasible designs over (mass, power density, copper-only efficiency at base speed)."""
-        ok = [e for e in self.evaluations if e.feasible]
+    def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
+        """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""
+        ok = [e for e in self.evaluations if e.feasible and math.isfinite(e.rated_continuous_kw_per_kg)
+              and math.isfinite(e.rated_peak_kw_per_kg)]
         if not ok:
             return ()
-        values = np.array([[e.mass_kg, e.power_density_kw_per_kg, e.efficiency_base] for e in ok])
+        values = np.array([[e.rated_continuous_kw_per_kg, e.rated_peak_kw_per_kg] for e in ok])
         return tuple(e for e, keep in zip(ok, pareto_mask(values, maximize)) if keep)
 
 
@@ -88,7 +92,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
         evaluation = evaluate_stage2(candidate, req, stage, grid=settings.grid, j_peak=settings.j_peak,
                                      j_limit=settings.j_limit, j_peak_max=settings.peak_cap,
                                      margin=margin, solver=solver, workers=workers, scan_workers=workers,
-                                     cache_dir=cache_dir, progress=on_point, cancel=cancel)
+                                     cache_dir=cache_dir, progress=on_point, cancel=cancel,
+                                     thermal=settings.thermal, n_speeds=settings.n_speeds)
         if evaluation.status == "cancelled":
             cancelled = True
             break

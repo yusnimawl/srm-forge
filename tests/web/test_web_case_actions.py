@@ -157,7 +157,14 @@ def test_evaluate_submits_the_cases_inputs(client):
 def test_evaluate_without_body(client):
     r = client.post(f"/api/cases/{_draft(client)}/evaluate")
     assert r.status_code == 201
-    assert client.app.state.store.get_job(r.json()["job_id"])["request"]["grid"] is None
+    request = client.app.state.store.get_job(r.json()["job_id"])["request"]
+    assert request["grid"] is None and request["thermal"] is True
+
+
+def test_evaluate_without_the_rating(client):
+    r = client.post(f"/api/cases/{_draft(client)}/evaluate", json={"thermal": False})
+    assert r.status_code == 201
+    assert client.app.state.store.get_job(r.json()["job_id"])["request"]["thermal"] is False
 
 
 @pytest.mark.parametrize("grid", [[1, 4], [4, 201]])

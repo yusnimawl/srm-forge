@@ -34,7 +34,7 @@ def case():
                        wires=[WIRE], phase_current_a=15.0)
     inputs = CaseInputs(requirements=req, design=DESIGN, winding=FixedWinding(turns=8, strands=1, paths=1, wire=0))
     with mock.patch("srmapp.evaluate.build_map", side_effect=_fake_map):
-        evaluation = evaluate_design(inputs)
+        evaluation = evaluate_design(inputs, thermal=False)
     assert evaluation.status == "ok"
     return inputs, evaluation
 
