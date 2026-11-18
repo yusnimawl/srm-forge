@@ -7,7 +7,7 @@ from map_fixtures import synthetic_map
 
 from srmapp.case import CaseInputs, FixedWinding, evaluate_design, map_cache_hit, map_request, validate_case
 from srmapp.requirements import Requirements
-from srmapp.sizing.estimates import J_LIMIT
+from srmapp.sizing.estimates import J_SCREEN
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmcore.maps import build_map
 from srmcore.model.design import Design, MeshSettings
@@ -41,7 +41,7 @@ def test_evaluation_records_j_limit():
     default = _evaluate(_inputs(winding=fixed))[0]
     assert custom.status == "ok" and default.status == "ok"
     assert custom.j_limit == 12e6
-    assert default.j_limit == J_LIMIT
+    assert default.j_limit == J_SCREEN
 
 
 def test_fixed_with_the_auto_winding_reproduces_auto():

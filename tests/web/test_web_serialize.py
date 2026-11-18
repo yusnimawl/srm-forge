@@ -51,7 +51,8 @@ def _eval(ok):
     env = Envelope(a, a, a, a, a, np.array([0.0, NAN]), a, a, a, None, a, a, a)
     m = MapArrays(a, a, np.zeros((2, 2)), np.full((2, 2), NAN))
     return Evaluation("good", design, "ok", "", 1.0, Winding(10, 1, 1e-6, 5.0, 0.1, 0.2, 0), 1.1, 1.1,
-                      1000.0, 2.0, 0.9, True, env, None, map=m)
+                      1000.0, 2.0, 0.9, True, env, None, map=m,
+                      rated_continuous_kw_per_kg=1.0, rated_peak_kw_per_kg=2.0)
 
 
 def test_search_result_json_is_strict():

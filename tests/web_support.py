@@ -42,7 +42,8 @@ def evaluation(ident: str, ok: bool = True) -> Evaluation:
     key = KeyNumbers(0.01, 0.002, 5.0, 30.0, 0.5, 20.0, 0.0, 0.5)
     curves = MapCurves(a, np.ones((2, 2)), a, a, 0.01, a, a, a, np.array([NAN, 1.0]))
     return Evaluation(ident, design, "ok", "", 1.0, Winding(10, 1, 1e-6, 5.0, 0.1, 0.2, None), 1.1, 1.2, 1000.0,
-                      2.0, 0.9, True, env, key, i_rms_a=3.0, j_rms=NAN, map=m, curves=curves)
+                      2.0, 0.9, True, env, key, i_rms_a=3.0, j_rms=NAN, map=m, curves=curves,
+                      rated_continuous_kw_per_kg=1.0, rated_peak_kw_per_kg=2.0)
 
 
 def analytic_evaluation(ident: str) -> Evaluation:

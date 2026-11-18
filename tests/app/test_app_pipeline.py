@@ -9,6 +9,7 @@ from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
 from srmapp.pipeline import SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
+from srmapp.sizing.estimates import J_SCREEN
 from srmapp.sizing.generator import sample_candidates
 from srmcore.model.design import RegionMaterials
 
@@ -94,17 +95,26 @@ def test_progress_counts_designs():
     assert seen[-1] == (3, 3) and [d for d, _ in seen] == [1, 2, 3]
 
 
-def test_pareto_uses_feasible_designs_only():
+def test_pareto_uses_rated_values():
     cands, _ = sample_candidates(_req(), 4, seed=0)
 
-    def ev(i, feasible, mass, density, eff):
+    def ev(i, feasible, cont, peak):
         c = cands[i]
-        return Evaluation(c.id, c.design, "ok", "", mass, None, 1.1, 1.1, 1000.0, density, eff, feasible, None, None)
-    evals = (ev(0, True, 10.0, 3.0, 0.9), ev(1, True, 12.0, 2.0, 0.8), ev(2, False, 5.0, 9.0, 0.99),
-             ev(3, True, 8.0, 3.5, 0.85))
+        return Evaluation(c.id, c.design, "ok", "", 10.0, None, 1.1, 1.1, 1000.0, 3.0, 0.9, feasible, None, None,
+                          rated_continuous_kw_per_kg=cont, rated_peak_kw_per_kg=peak)
+    nan = float("nan")
+    evals = (ev(0, True, 1.0, 3.0), ev(1, True, 2.0, 2.0), ev(2, True, 1.0, 1.0), ev(3, True, nan, nan),
+             ev(0, False, 9.0, 9.0))
     res = SearchResult(_req(), 4, {}, 0, evals, False)
-    ids = {e.id for e in res.pareto()}
-    assert ids == {evals[0].id, evals[3].id}
+    assert {e.id for e in res.pareto()} == {evals[0].id, evals[1].id}
+
+
+def test_search_is_rated_by_default_and_settings_reach_stage_two():
+    assert SearchSettings().j_limit == J_SCREEN and SearchSettings().thermal and SearchSettings().n_speeds == 6
+    with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
+        run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, thermal=False, n_speeds=3))
+    assert (ev.call_args.kwargs["thermal"], ev.call_args.kwargs["n_speeds"]) == (False, 3)
 
 
 def test_margin_follows_the_worst_material_grade():
