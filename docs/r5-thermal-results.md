@@ -145,7 +145,7 @@ Re-run 2026-11-17 (`milton_k`, `hashin_shtrikman_lower`, python -I): fill 0.37 c
 
 Source: `tests/app/test_thermal_rate.py` (slow), real 8/6 screening map, default placeholder cooling, 160 degC limit (class H). This is a test fixture. It is not a validation: no measured thermal case exists, the cooling is placeholder, and the map is `screening`.
 
-Inputs: peak 3.0 Nm at 628 W, base 2000 rpm, max 6000 rpm, 400 V bus, 24 turns at 20 A, continuous power 100 W, only the base and max speeds rated (`n_speeds=1`), iron loss x2 in the rated set.
+Inputs: peak 3.0 Nm at 628 W, base 2000 rpm, max 6000 rpm, 400 V bus, 24 turns at 20 A, continuous power 100 W, only the base and max speeds rated (`n_speeds=1`), iron loss x2 in the rated set. (Recorded before `K_IRON_HI` became the Kiyota frequency curve on 2026-11-18; at these 200 and 600 Hz the rated factor is now 3.2.)
 
 | Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
 |---|---|---|---|---|---|

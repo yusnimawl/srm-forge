@@ -299,7 +299,8 @@ def rate(inputs: CaseInputs, evaluation: Evaluation, *, em_budget: UncertaintyBu
     notes: list[str] = []
     if setup.placeholder:
         notes.append("cooling uses owner placeholders (ambient, housing or jacket dimensions and flow): ratings are not final")
-    notes.append(f"iron loss rated at x{K_IRON_HI:g} (K_IRON_HI band)")
+    notes.append(f"iron loss rated at x{K_IRON_HI[0][1]:g} up to {K_IRON_HI[0][0]:g} Hz, rising to "
+                 f"x{K_IRON_HI[-1][1]:g} at {K_IRON_HI[-1][0]:g} Hz (K_IRON_HI band)")
     probe = mechanical_loss(machine, req.bearing, req.max_speed_rpm)
     notes.extend(probe.notes)
     notes.append("windage heats the rotor iron and bearing friction heats the end caps; the rated set takes the high end of both bands")

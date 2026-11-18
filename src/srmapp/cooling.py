@@ -22,7 +22,16 @@ from srmcore.thermal.homogenise import MILTON_XI, hashin_shtrikman_lower, milton
 ROWS = ("iron", "em_torque", "cross_wire", "liner", "contact", "air_gap", "cooling_h",
         "lamination_k", "thermal_mesh", "end_winding_model", "mechanical_loss")
 
-K_IRON_HI = 2.0                    # section 7 / spec §7: iron loss factor at the unfavourable end
+# Iron loss factor at the unfavourable end against the stator electrical frequency (Hz): the measured "iron and other"
+# over the model's iron loss on the Kiyota 18/12 (docs/r3-loss-results.md). Flat outside the points; above 2.78 kHz
+# nothing was measured.
+K_IRON_HI = ((1500.0, 3.2), (2780.0, 7.0))
+
+
+def k_iron_hi(f_elec_hz: float) -> float:
+    """Unfavourable iron loss factor at stator electrical frequency `f_elec_hz` (K_IRON_HI, linear between points)."""
+    return float(np.interp(f_elec_hz, *zip(*K_IRON_HI)))
+
 TORQUE_FLOOR = 0.10                # spec §7: EM torque factor 1 + max(0.10, R4 total)
 K_RESIN = (1.0, 0.6)               # 6.6 / 7: impregnation, nominal and unfavourable, W/(m K)
 GAP_MM = (0.03, 0.08)              # 6.5 / 7: contact equivalent air gap, nominal and unfavourable, mm
@@ -194,6 +203,9 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     h_frame = natural_h("cylinder", d, surface, setup.ambient_c)
     h_face = natural_h("plate", 0.886 * d, surface, setup.ambient_c)   # 6.3 Eq. 5
 
+    f_elec = rpm / 60 * machine.n_rotor_poles
+    if u("iron") and f_elec > K_IRON_HI[-1][0]:
+        notes.append(f"iron factor at {f_elec:.0f} Hz held at the {K_IRON_HI[-1][0]:.0f} Hz value: no measurement above it")
     jk = dict(h_jacket=None, jacket_fluid=None, jacket_flow_m3s=None, jacket_inlet_c=None)
     if (j := setup.jacket) is not None:
         length = j.passes * math.pi * (machine.stator_outer_diameter + setup.housing_thickness)
@@ -222,7 +234,7 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
                   slot_flow_m3s=o.flow_m3s, slot_inlet_c=o.inlet_c)
 
     return Coefficients(
-        iron_factor=K_IRON_HI if u("iron") else 1.0,
+        iron_factor=k_iron_hi(f_elec) if u("iron") else 1.0,
         torque_factor=1.0 + max(TORQUE_FLOOR, em_torque_total or 0.0) if u("em_torque") else 1.0,
         k_cross_wire=k_wire, k_liner=k_liner, liner_thickness=machine.slot_liner_thickness,
         k_impregnation=resin, contact_gap=gap, k_housing=K_HOUSING,
