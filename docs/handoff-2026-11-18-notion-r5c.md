@@ -1,5 +1,7 @@
 # Handoff 2026-11-18: Notion move, R5c in progress
 
+**Done 2026-11-19:** the Notion items are current (R5c Done, rows 10q and the estimate row added), the project doc moved to Notion, and CLAUDE.md points to Notion for all three documents.
+
 For the next session. Read this, then the wiki Progress tab, then act.
 
 ## 1. Notion (the owner is moving every doc there)

@@ -7,7 +7,7 @@ This is a living list. Every session that does writing work updates it in the sa
 | Document | Where | State |
 | --- | --- | --- |
 | Wiki | Notion page "srm-forge wiki", https://app.notion.com/p/41c7b4b6b24e810391f0e009e0b0abdb | 12 pages plus the hub (written in Claude Docs on 2026-10-29 and 2026-10-30, End effects on 2026-11-06, Thermal on 2026-11-17; moved to Notion on 2026-11-18, with the Progress and Roadmap tabs as the "srm-forge progress" page under it); owner review open |
-| Project history | Claude Doc "SRM design tool — how it was built", https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37 | History only; the rewrite was closed 2026-11-11 |
+| Project history | Notion page "SRM design tool — how it was built", https://app.notion.com/p/41d7b4b6b24e813abe64e25e25d1cae8 | History only; the rewrite was closed 2026-11-11; moved from Claude Docs on 2026-11-19 (the Claude Docs copy, https://claude.ai/code/artifact/7dc85cd6-a7f2-4bfa-8e35-de2604864d37, is a read-only archive with the figures) |
 | Dissertation-style project report | Google Docs | Connectors connected 2026-10-29, not started |
 | Paper | Google Docs, or LaTeX later for submission | After the report |
 
@@ -32,6 +32,7 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Glossary
 - [x] End effects: the 3D reference model, gate G1 and the measured gap in the budget (added 2026-11-06)
 - [x] Move the wiki from Claude Docs to Notion (2026-11-18)
+- [x] Move the project doc from Claude Docs to Notion (2026-11-19)
 - [ ] Owner review of all pages
 
 ### Project doc rewrite
