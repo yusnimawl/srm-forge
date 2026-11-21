@@ -7,8 +7,8 @@ from dataclasses import asdict, dataclass
 
 from srmapp.cooling import K_IRON_HI
 from srmapp.requirements import Requirements
-from srmapp.thermal import (_TORQUE_TOL, BIG_K, HOT_SPOT_ABOVE, NO_STROKE, Rating, RequirementCheck, SpeedRating,
-                            rating_speeds, required_torques)
+from srmapp.thermal import (_TORQUE_TOL, BIG_K, HOT_SPOT_ABOVE, Rating, RequirementCheck, SpeedRating,
+                            required_torques)
 
 BINDS_HEAT = "heat"
 BINDS_EM = "EM"
@@ -84,22 +84,11 @@ def _margins(rating: Rating, req: Requirements):
             yield 100 * (s.peak_nm / peak - 1), s, "peak"
 
 
-def _failing_hot(check: RequirementCheck, req: Requirements) -> tuple[str | None, float | None]:
-    """Which torque failed and its hot spot, read from the check's per-speed lists (None for a runaway)."""
-    k = len([r for r in rating_speeds(req) if r < check.rpm])
-    if len(check.continuous_hot_c) == k + 1 and len(check.peak_hot_c) == k:
-        return "continuous", _finite(check.continuous_hot_c[-1])
-    if len(check.peak_hot_c) == k + 1:
-        return "peak", _finite(check.peak_hot_c[-1])
-    return None, None
-
-
 def verdict(rating: Rating | None, check: RequirementCheck | None, req: Requirements) -> Verdict:
     if check is None:
         return Verdict(None, None, None, None, None, None, None, None, "No thermal check was made for this case.")
     if not check.holds:
-        which, hot = _failing_hot(check, req)
-        why = check.reason
+        which, hot, why = check.which or None, _finite(check.hot_c), check.reason
         text = f"✗ Short at {check.rpm:.0f} r/min: {why}"
         if why == HOT_SPOT_ABOVE and hot is not None:
             text += f" ({hot:.0f} °C of {req.hot_spot_limit_c:.0f} °C)"
@@ -109,7 +98,7 @@ def verdict(rating: Rating | None, check: RequirementCheck | None, req: Requirem
         return Verdict(True, None, None, None, None, None, None, None, "✓ Meets the requirement")
     pct, s, which = margin
     b = binds(s, which)
-    text = f"✓ Meets the requirement · smallest margin {pct:+.0f} % at {s.rpm:.0f} r/min ({which}, binds {b})"
+    text = f"✓ Meets the requirement · smallest margin {pct + 0.0:+.0f} % at {s.rpm:.0f} r/min ({which}, binds {b})"
     return Verdict(True, s.rpm, pct, which, b, None, None, None, text)
 
 

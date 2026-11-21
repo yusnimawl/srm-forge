@@ -29,8 +29,8 @@ def rating(rated, shares=()):
     return Rating(tuple(rated), tuple(rated), tuple(shares), 160.0, "H", CoolingSetup(), stress, {}, 1.0, 1, (), "x")
 
 
-def check(holds=True, rpm=None, cont=(), peak=(), reason=""):
-    return RequirementCheck(holds, rpm, tuple(cont), tuple(peak), (), reason)
+def check(holds=True, rpm=None, cont=(), peak=(), reason="", which="", hot_c=float("nan")):
+    return RequirementCheck(holds, rpm, tuple(cont), tuple(peak), (), reason, which, hot_c)
 
 
 def need(rpm):
@@ -76,19 +76,26 @@ def test_verdict_holds_smallest_margin():
 
 
 def test_verdict_failing_hot_spot():
-    v = ts.verdict(None, check(False, 6000.0, cont=(100.0,) * 5 + (159.0,), peak=(120.0,) * 5, reason=HOT_SPOT_ABOVE), Req)
+    v = ts.verdict(None, check(False, 6000.0, reason=HOT_SPOT_ABOVE, which="continuous", hot_c=159.0), Req)
     assert v.holds is False and v.hot_spot_c == 159.0 and v.which == "continuous"
     assert v.text == "✗ Short at 6000 r/min: hot spot above the limit (159 °C of 160 °C)"
 
 
-def test_verdict_failing_peak_hot_spot():
-    v = ts.verdict(None, check(False, 6000.0, cont=(100.0,) * 6, peak=(120.0,) * 5 + (170.0,), reason=HOT_SPOT_ABOVE), Req)
-    assert v.which == "peak" and v.hot_spot_c == 170.0
+def test_verdict_failing_peak_runaway_has_no_temperature():
+    v = ts.verdict(None, check(False, 6000.0, reason=HOT_SPOT_ABOVE, which="peak"), Req)
+    assert v.which == "peak" and v.hot_spot_c is None
+    assert v.text == "✗ Short at 6000 r/min: hot spot above the limit"
 
 
 def test_verdict_failing_no_stroke():
-    v = ts.verdict(None, check(False, 6000.0, cont=(100.0,) * 5, peak=(120.0,) * 5, reason=NO_STROKE), Req)
-    assert v.text == "✗ Short at 6000 r/min: no stroke reaches the required torque" and v.hot_spot_c is None
+    v = ts.verdict(None, check(False, 6000.0, reason=NO_STROKE, which="peak"), Req)
+    assert v.text == "✗ Short at 6000 r/min: no stroke reaches the required torque"
+    assert v.hot_spot_c is None and v.which == "peak"
+
+
+def test_verdict_failing_without_continuous_requirement():
+    v = ts.verdict(None, check(False, 3000.0, reason=HOT_SPOT_ABOVE, which="peak", hot_c=171.0), Req)
+    assert v.which == "peak" and "171 °C of 160 °C" in v.text
 
 
 def test_verdict_no_check_is_none():

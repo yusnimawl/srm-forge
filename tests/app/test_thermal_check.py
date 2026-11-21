@@ -100,6 +100,24 @@ def test_failing_check_names_its_reason():
     assert check_requirement(_fake_ctx(req, 100.0), n_speeds=2).reason == ""
 
 
+def test_check_records_the_failing_torque():
+    cont = Requirements(peak_power_w=30_000.0, peak_torque_nm=95.5, base_speed_rpm=3000.0, max_speed_rpm=9000.0,
+                        continuous_power_w=15_000.0)
+    ok = check_requirement(_fake_ctx(cont, 100.0), n_speeds=2)
+    assert ok.which == "" and math.isnan(ok.hot_c)
+    out = check_requirement(_fake_ctx(cont, 170.0), n_speeds=2)
+    assert out.which == "continuous" and out.hot_c == 170.0
+    # no continuous power: the peak fails
+    peak = check_requirement(_fake_ctx(cont.model_copy(update=dict(continuous_power_w=None)), 170.0), n_speeds=2)
+    assert peak.which == "peak" and peak.hot_c == 170.0
+    # no stroke at the peak torque: which is peak, no temperature
+    ctx = _fake_ctx(cont, 100.0)
+    peak_nm = required_torques(cont, rating_speeds(cont, 2)[0])[1]
+    ctx.load_at = lambda rpm, rows: (lambda torque: None if torque == peak_nm else (lambda t: None))
+    none = check_requirement(ctx, n_speeds=2)
+    assert none.reason == NO_STROKE and none.which == "peak" and math.isnan(none.hot_c)
+
+
 @pytest.mark.slow
 def test_fields_out_leaves_the_rating_unchanged(tmp_path):
     import dataclasses

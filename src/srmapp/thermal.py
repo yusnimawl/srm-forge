@@ -345,6 +345,8 @@ class RequirementCheck:
     peak_hot_c: tuple[float, ...]
     notes: tuple[str, ...]
     reason: str = ""                       # NO_STROKE or HOT_SPOT_ABOVE at the failing speed; empty when it holds
+    which: str = ""                        # "continuous" or "peak": the torque that failed; empty when it holds
+    hot_c: float = float("nan")            # hot spot at the failing torque; nan for a runaway or no stroke
 
 
 def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementCheck:
@@ -359,10 +361,11 @@ def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementChec
         cont, peak = required_torques(req, rpm)
         solver = ctx.solver_for(rpm, rows)()
         load_at = ctx.load_at(rpm, rows)
-        reason = ""
+        reason, which, hot = "", "", float("nan")
         try:
             start = load_at(0.0)
             if cont is not None:
+                which = "continuous"
                 load = load_at(cont)
                 if load is None:
                     reason = NO_STROKE
@@ -370,11 +373,12 @@ def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementChec
                     start = solver.steady(load)
                     cont_hot.append(solver.hot_spot(start).temperature_c)
                     if cont_hot[-1] > ctx.limit:
-                        reason = HOT_SPOT_ABOVE
+                        reason, hot = HOT_SPOT_ABOVE, cont_hot[-1]
             else:
                 cont_hot.append(float("nan"))
                 start = solver.steady(start)
             if not reason:
+                which = "peak"
                 load = load_at(peak)
                 if load is None:
                     reason = NO_STROKE
@@ -382,12 +386,12 @@ def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementChec
                     top = peak_transient(solver, start, load, req.peak_duration_s)[2]
                     peak_hot.append(top.temperature_c)
                     if top.temperature_c > ctx.limit:
-                        reason = HOT_SPOT_ABOVE
+                        reason, hot = HOT_SPOT_ABOVE, top.temperature_c
         except ThermalRunaway:
             reason = HOT_SPOT_ABOVE
         if reason:
             notes.append(f"{rpm:.0f} rpm: {reason}")
-            return RequirementCheck(False, rpm, tuple(cont_hot), tuple(peak_hot), tuple(notes), reason)
+            return RequirementCheck(False, rpm, tuple(cont_hot), tuple(peak_hot), tuple(notes), reason, which, hot)
     return RequirementCheck(True, None, tuple(cont_hot), tuple(peak_hot), tuple(notes))
 
 
