@@ -358,7 +358,8 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     if scan_start is not None:
         mode = "auto" if req.inputs.winding == "auto" else "fixed"
         reporter.store.add_scan_time(mode, (time.monotonic() if scan_end is None else scan_end) - scan_start)
-    if rating_start is not None and ev.rating is not None:
+    if rating_start is not None and ev.rating is not None and ev.thermal_check is not None \
+            and ev.thermal_check.holds:
         reporter.store.add_rating_time(req.inputs.design.mesh.preset, time.monotonic() - rating_start)
     return evaluation_json(ev, fields_key=key, requirements=req.inputs.requirements)
 

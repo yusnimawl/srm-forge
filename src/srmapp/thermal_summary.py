@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass
 
-from srmapp.cooling import K_IRON_HI
+from srmapp.cooling import k_iron_hi
 from srmapp.requirements import Requirements
 from srmapp.thermal import (_TORQUE_TOL, BIG_K, HOT_SPOT_ABOVE, Rating, RequirementCheck, SpeedRating,
                             required_torques)
@@ -53,9 +53,9 @@ def binds(s: SpeedRating, which: str) -> str:
 def location_text(location: str) -> str:
     if location == "none":
         return "no steady state"
-    if location.startswith("end_"):
-        return f"end winding, {location[4:]}"
-    return f"slot winding, {location}"
+    end = location.startswith("end_")
+    coil = location.removeprefix("end_").removeprefix("coil_").rstrip("+-")
+    return f"{'end' if end else 'slot'} winding, phase {coil[:1]}"
 
 
 @dataclass(frozen=True)
@@ -92,7 +92,8 @@ def verdict(rating: Rating | None, check: RequirementCheck | None, req: Requirem
         text = f"✗ Short at {check.rpm:.0f} r/min: {why}"
         if why == HOT_SPOT_ABOVE and hot is not None:
             text += f" ({hot:.0f} °C of {req.hot_spot_limit_c:.0f} °C)"
-        return Verdict(False, check.rpm, None, which, None, hot, None, why, text)
+        b = BINDS_HEAT if why == HOT_SPOT_ABOVE else BINDS_EM
+        return Verdict(False, check.rpm, None, which, b, hot, None, why, f"{text} · binds {b}")
     margin = min(_margins(rating, req), key=lambda m: m[0], default=None) if rating is not None else None
     if margin is None:
         return Verdict(True, None, None, None, None, None, None, None, "✓ Meets the requirement")
@@ -113,8 +114,10 @@ def _all_shares(rating: Rating) -> list[dict]:
     return [{"rpm": r, "rows": [{**d, "hint": hint(d["row"])} for d in shares_at(rating, r)]} for r in rpms]
 
 
-def iron_band(rating: Rating) -> tuple[float, float]:
-    return K_IRON_HI[0][1], K_IRON_HI[-1][1]
+def iron_band(rating: Rating, n_rotor_poles: int) -> tuple[float, float]:
+    """Lowest and highest unfavourable iron factor over the rated speeds (stator electrical frequency rpm/60 x N_r)."""
+    k = [k_iron_hi(s.rpm / 60 * n_rotor_poles) for s in rating.rated]
+    return min(k, default=1.0), max(k, default=1.0)
 
 
 def _speed(s: SpeedRating, req: Requirements, limit_c: float) -> dict:
@@ -127,10 +130,10 @@ def _speed(s: SpeedRating, req: Requirements, limit_c: float) -> dict:
             "hot_spot_text": text, "headroom_k": limit_c - hot if em and hot is not None else None}
 
 
-def summary(rating: Rating | None, check: RequirementCheck | None, req: Requirements) -> dict:
+def summary(rating: Rating | None, check: RequirementCheck | None, req: Requirements, n_rotor_poles: int) -> dict:
     v = verdict(rating, check, req)
     return {"verdict": asdict(v),
             "speeds": [] if rating is None else [_speed(s, req, rating.limit_c) for s in rating.rated],
             "shares": [] if rating is None else _all_shares(rating),
             "least_margin_rpm": v.rpm,
-            "iron_band": None if rating is None else list(iron_band(rating))}
+            "iron_band": None if rating is None else list(iron_band(rating, n_rotor_poles))}

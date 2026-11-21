@@ -377,7 +377,8 @@ def test_scan_time_stops_at_the_rating_and_thermal_reaches_the_evaluation(tmp_pa
             now[0] = 600.0                  # the rating takes the rest
             thermal_progress("thermal", 6, 6)
         now[0] = 700.0
-        return _ns(status="ok", rating=object() if rated else None)
+        return _ns(status="ok", rating=object() if rated else None,
+                   thermal_check=_ns(holds=True) if rated else None)
 
     times, rated_times = [], []
     monkeypatch.setattr(jobs, "evaluate_design", fake)
@@ -391,3 +392,18 @@ def test_scan_time_stops_at_the_rating_and_thermal_reaches_the_evaluation(tmp_pa
     assert seen["thermal"] is rated
     assert times == [("auto", 30.0 if rated else 690.0)]
     assert rated_times == ([("screening", 660.0)] if rated else [])   # first rating call to the end
+
+
+def test_no_rating_time_when_the_check_fails(tmp_path, monkeypatch):
+    def fake(inputs, *, thermal_progress, **kw):
+        thermal_progress("strokes", 1, 1)
+        return _ns(status="ok", rating=object(), thermal_check=_ns(holds=False))
+
+    rated_times = []
+    monkeypatch.setattr(jobs, "evaluate_design", fake)
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {})
+    rep = _Recorder(tmp_path)
+    monkeypatch.setattr(rep.store, "add_rating_time", lambda preset, s: rated_times.append(s))
+    req = _ns(case_id="c", grid=None, thermal=True, inputs=_ns(design=_ns(mesh=_ns(preset="screening")), winding="auto", requirements=None))
+    jobs.run_evaluate_job(req, rep, _ctx(tmp_path))
+    assert rated_times == []

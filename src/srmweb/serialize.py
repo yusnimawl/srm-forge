@@ -77,7 +77,8 @@ def evaluation_json(ev, *, waveforms: bool = True, fields_key: str | None = None
                      rating_json(ev.rating, ev.design.machine.air_gap))
     out["thermal_fields"] = fields_key
     out["thermal_summary"] = (None if requirements is None
-                              else to_json(thermal_summary(ev.rating, ev.thermal_check, requirements)))
+                              else to_json(thermal_summary(ev.rating, ev.thermal_check, requirements,
+                                                     ev.design.machine.n_rotor_poles)))
     if ev.envelope is not None:
         nr = ev.design.machine.n_rotor_poles
         env = out["envelope"]

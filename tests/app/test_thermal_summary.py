@@ -54,8 +54,9 @@ def test_labels_cover_rows():
 
 
 def test_location_text():
-    assert ts.location_text("end_coil_A1+") == "end winding, coil_A1+"
-    assert ts.location_text("coil_A1+") == "slot winding, coil_A1+"
+    assert ts.location_text("end_coil_A1+") == "end winding, phase A"
+    assert ts.location_text("coil_A1+") == "slot winding, phase A"
+    assert ts.location_text("end_A1") == "end winding, phase A"
     assert ts.location_text("none") == "no steady state"
 
 
@@ -78,18 +79,18 @@ def test_verdict_holds_smallest_margin():
 def test_verdict_failing_hot_spot():
     v = ts.verdict(None, check(False, 6000.0, reason=HOT_SPOT_ABOVE, which="continuous", hot_c=159.0), Req)
     assert v.holds is False and v.hot_spot_c == 159.0 and v.which == "continuous"
-    assert v.text == "✗ Short at 6000 r/min: hot spot above the limit (159 °C of 160 °C)"
+    assert v.text == "✗ Short at 6000 r/min: hot spot above the limit (159 °C of 160 °C) · binds heat"
 
 
 def test_verdict_failing_peak_runaway_has_no_temperature():
     v = ts.verdict(None, check(False, 6000.0, reason=HOT_SPOT_ABOVE, which="peak"), Req)
     assert v.which == "peak" and v.hot_spot_c is None
-    assert v.text == "✗ Short at 6000 r/min: hot spot above the limit"
+    assert v.text == "✗ Short at 6000 r/min: hot spot above the limit · binds heat"
 
 
 def test_verdict_failing_no_stroke():
     v = ts.verdict(None, check(False, 6000.0, reason=NO_STROKE, which="peak"), Req)
-    assert v.text == "✗ Short at 6000 r/min: no stroke reaches the required torque"
+    assert v.text == "✗ Short at 6000 r/min: no stroke reaches the required torque · binds EM"
     assert v.hot_spot_c is None and v.which == "peak"
 
 
@@ -112,7 +113,7 @@ def test_no_continuous_requirement_skips_continuous():
                       env=1e3))
     v = ts.verdict(rating(out), check(), R)
     assert v.which == "peak" and v.binds == "heat"
-    assert ts.summary(rating(out), check(), R)["speeds"][0]["need_continuous_nm"] is None
+    assert ts.summary(rating(out), check(), R, 6)["speeds"][0]["need_continuous_nm"] is None
 
 
 def test_shares_sorted_and_runaway():
@@ -127,17 +128,24 @@ def test_shares_sorted_and_runaway():
 def test_summary_shares_carry_hints():
     shares = [BudgetShare("liner", 2000.0, 5.0), BudgetShare("iron", 2000.0, 9.0), BudgetShare("contact", 6000.0, 1.0),
               BudgetShare("air_gap", 6000.0, 0.5)]
-    out = ts.summary(rating(_rated({2000.0: 1, 6000.0: 1}, {2000.0: 1, 6000.0: 1}), shares), check(), Req)["shares"]
+    out = ts.summary(rating(_rated({2000.0: 1, 6000.0: 1}, {2000.0: 1, 6000.0: 1}), shares), check(), Req, 6)["shares"]
     assert [e["rpm"] for e in out] == [2000.0, 6000.0]
     assert out[0]["rows"][0]["row"] == "iron" and out[0]["rows"][0]["hint"] == ts.HINTS["iron"]
     assert out[1]["rows"][1]["hint"] is None
-    assert ts.summary(None, check(), Req)["shares"] == []
+    assert ts.summary(None, check(), Req, 6)["shares"] == []
 
 
 def test_nan_speed_is_null_safe():
     from srmweb.serialize import to_json
     nan = sr(2000.0, 0.0, 10.0, hot=(float("nan"), "none"))
-    out = ts.summary(rating([nan]), check(False, 2000.0, reason=NO_STROKE), Req)
+    out = ts.summary(rating([nan]), check(False, 2000.0, reason=NO_STROKE), Req, 6)
     assert out["speeds"][0]["hot_spot_text"] == "no steady state"
     json.dumps(to_json(out), allow_nan=False)
     assert dataclasses.is_dataclass(ts.Verdict)
+
+
+def test_iron_band_spans_the_rated_speeds():
+    r = rating(_rated({2000.0: 1, 6000.0: 1}, {2000.0: 1, 6000.0: 1}))
+    assert ts.iron_band(r, 6) == (3.2, 3.2)               # 200 and 600 Hz, under the first measured point
+    assert ts.iron_band(r, 48) == (pytest.approx(3.4969, abs=1e-4), 7.0)   # 1600 Hz and 4800 Hz (held above the last point)
+    assert ts.summary(r, check(), Req, 6)["iron_band"] == [3.2, 3.2]
