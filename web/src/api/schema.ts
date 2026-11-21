@@ -3603,7 +3603,9 @@ export interface operations {
     };
     estimate_api_cases__case_id__estimate_get: {
         parameters: {
-            query?: never;
+            query?: {
+                thermal?: boolean;
+            };
             header?: never;
             path: {
                 case_id: string;

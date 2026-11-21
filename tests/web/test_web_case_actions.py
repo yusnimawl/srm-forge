@@ -232,12 +232,12 @@ def test_running_validate_cannot_be_cancelled_but_queued_one_can(client):
 def test_estimate_without_history_uses_the_budget(client):
     pytest.importorskip("ngsolve")
     case_id = _draft(client, _inputs("full"))
-    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
         "new_map": True, "seconds": 1560.0 + 72.0, "basis": "budget"}
     case_id = _draft(client, _inputs("screening"))
-    assert client.get(f"/api/cases/{case_id}/estimate").json()["seconds"] == 228.0 + 72.0
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()["seconds"] == 228.0 + 72.0
     fixed = _inputs("screening") | {"winding": {"turns": 10}}
-    assert client.get(f"/api/cases/{_draft(client, fixed)}/estimate").json()["seconds"] == 228.0 + 1.0
+    assert client.get(f"/api/cases/{_draft(client, fixed)}/estimate?thermal=false").json()["seconds"] == 228.0 + 1.0
 
 
 def test_estimate_uses_recent_map_and_scan_times(client):
@@ -247,12 +247,12 @@ def test_estimate_uses_recent_map_and_scan_times(client):
     store.add_map_time("full", 200.0)
     store.add_map_time("screening", 5.0)
     case_id = _draft(client, _inputs("full"))
-    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
         "new_map": True, "seconds": 150.0 + 72.0, "basis": "budget"}     # no scan history yet
     store.add_scan_time("auto", 60.0)
     store.add_scan_time("auto", 80.0)
     store.add_scan_time("fixed", 1.0)
-    assert client.get(f"/api/cases/{case_id}/estimate").json() == {
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
         "new_map": True, "seconds": 150.0 + 70.0, "basis": "history"}
 
 
@@ -260,20 +260,20 @@ def test_estimate_of_a_cached_map(client, monkeypatch):
     seen = []
     monkeypatch.setattr(cases, "map_cache_hit", lambda inputs, cache_dir: seen.append(cache_dir) or True)
     case_id = _draft(client, _inputs())
-    out = client.get(f"/api/cases/{case_id}/estimate").json()
+    out = client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()
     assert out == {"new_map": False, "seconds": 72.0, "basis": "budget"}     # only the winding choice remains
     assert seen == [client.app.state.settings.cache_dir]
     client.app.state.store.add_scan_time("auto", 30.0)
-    assert client.get(f"/api/cases/{case_id}/estimate").json() == {"new_map": False, "seconds": 30.0, "basis": "history"}
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {"new_map": False, "seconds": 30.0, "basis": "history"}
 
 
 def test_estimate_of_invalid_inputs_422(client):
-    r = client.get(f"/api/cases/{_draft(client, {'design': {}})}/estimate")
+    r = client.get(f"/api/cases/{_draft(client, {'design': {}})}/estimate?thermal=false")
     assert r.status_code == 422 and r.json()["errors"]
     bad = _inputs() | {"winding": {"turns": 10, "paths": 3}}
-    r = client.get(f"/api/cases/{_draft(client, bad)}/estimate")
+    r = client.get(f"/api/cases/{_draft(client, bad)}/estimate?thermal=false")
     assert [e["loc"] for e in r.json()["errors"]] == [["winding", "paths"]]
-    assert client.get("/api/cases/nope/estimate").status_code == 404
+    assert client.get("/api/cases/nope/estimate?thermal=false").status_code == 404
 
 
 def test_map_mat_round_trip(client):
@@ -314,7 +314,7 @@ def test_bad_material_is_an_error_not_a_500(client, name, message):
     case_id = _draft(client, inputs)
     r = client.post(f"/api/cases/{case_id}/evaluate")
     assert r.status_code == 422 and r.json()["errors"][0]["loc"][-2:] == ["materials", "stator"]
-    assert client.get(f"/api/cases/{case_id}/estimate").status_code == 422
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").status_code == 422
 
 
 def test_unexpected_map_request_failure_is_an_error(client, monkeypatch):

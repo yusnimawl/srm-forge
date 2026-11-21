@@ -15,6 +15,7 @@ from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
+RATING_BUDGET_S = {"screening": 600.0, "full": 2400.0, "reference": 9600.0}   # strokes plus thermal steps when none has been timed
 SCAN_BUDGET_S = {"auto": 72.0, "fixed": 1.0}    # winding-choice time when none has been timed: LattePanda x 1.25
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 
@@ -78,8 +79,9 @@ def resolved_margin(raw) -> float | None:
         return None
 
 
-def estimate(inputs: CaseInputs, store: Store, cache_dir) -> dict:
-    """Seconds an evaluation takes: a new map (if the cache lacks it) plus the winding choice that follows. `basis`
+def estimate(inputs: CaseInputs, store: Store, cache_dir, thermal: bool = False) -> dict:
+    """Seconds an evaluation takes: a new map (if the cache lacks it) plus the winding choice that follows, plus one rating when `thermal` (longer if the design fails the thermal
+    check, which rates up to the next winding). `basis`
     is "history" when every part comes from timed jobs, else "budget"."""
     new_map = not map_cache_hit(inputs, cache_dir)
     seconds, timed = 0.0, True
@@ -88,6 +90,9 @@ def estimate(inputs: CaseInputs, store: Store, cache_dir) -> dict:
     if new_map:
         preset = inputs.design.mesh.preset
         parts.append((store.recent_map_times(preset), BUDGET_S[preset]))
+    if thermal:
+        preset = inputs.design.mesh.preset
+        parts.append((store.recent_rating_times(preset), RATING_BUDGET_S[preset]))
     for times, budget in parts:
         seconds += sum(times) / len(times) if times else budget
         timed &= bool(times)

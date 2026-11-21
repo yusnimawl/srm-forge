@@ -439,11 +439,11 @@ def create_app(settings: Settings,
         return {"job_id": _submit(runner, "validate", request.model_dump(mode="json"))["id"]}
 
     @router.get("/cases/{case_id}/estimate", response_model=EstimateOut)
-    def estimate(case_id: str):
+    def estimate(case_id: str, thermal: bool = True):
         inputs, errors, warnings = check_case(case_or_404(case_id)["inputs"])
         if inputs is None:
             return _invalid(errors, warnings)
-        return estimate_case(inputs, store, settings.cache_dir)
+        return estimate_case(inputs, store, settings.cache_dir, thermal)
 
     def evaluated_inputs(case_id: str) -> CaseInputs | JSONResponse:
         """The inputs of an evaluated case with a winding; 409 for a draft or a stale case, 422 for inputs that fail

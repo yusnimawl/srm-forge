@@ -308,7 +308,7 @@ def run_search_job(req: SearchRequest, reporter: Reporter, ctx: JobContext) -> d
 def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) -> dict:
     settings = ctx.settings
     t0 = time.monotonic()
-    last = scan_start = scan_end = None
+    last = scan_start = scan_end = rating_start = None
     counts = (0, 0)
 
     def on_point(done: int, total: int) -> None:
@@ -327,9 +327,9 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
                           message=f"choosing the winding, {done} of {total} drive evaluations")
 
     def on_thermal(step: str, done: int, total: int) -> None:
-        nonlocal scan_end
+        nonlocal scan_end, rating_start
         if scan_end is None:   # the scan time leaves out the rating
-            scan_end = time.monotonic()
+            scan_end = rating_start = time.monotonic()
         if step == "strokes":   # the stroke count is not known up front, so total = done
             reporter.progress(step="strokes", points_done=done, points_total=total,
                               message=f"rating: {done} stroke solves")
@@ -358,6 +358,8 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     if scan_start is not None:
         mode = "auto" if req.inputs.winding == "auto" else "fixed"
         reporter.store.add_scan_time(mode, (time.monotonic() if scan_end is None else scan_end) - scan_start)
+    if rating_start is not None and ev.rating is not None:
+        reporter.store.add_rating_time(req.inputs.design.mesh.preset, time.monotonic() - rating_start)
     return evaluation_json(ev, fields_key=key, requirements=req.inputs.requirements)
 
 

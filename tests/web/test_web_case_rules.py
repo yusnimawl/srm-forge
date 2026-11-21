@@ -78,3 +78,16 @@ def test_estimate_adds_the_scan_to_a_new_map(tmp_path, monkeypatch):
     assert cases.estimate(fixed, store, tmp_path)["basis"] == "budget"     # no fixed-winding history
     monkeypatch.setattr(cases, "map_cache_hit", lambda i, d: True)
     assert cases.estimate(inputs, store, tmp_path) == {"new_map": False, "seconds": 20.0, "basis": "history"}
+
+
+def test_estimate_adds_rating(tmp_path, monkeypatch):
+    store = Store(tmp_path / "a.db")
+    inputs = CaseInputs.model_validate(_raw())
+    monkeypatch.setattr(cases, "map_cache_hit", lambda i, d: True)
+    store.add_scan_time("auto", 20.0)
+    assert cases.estimate(inputs, store, tmp_path, thermal=False)["seconds"] == 20.0
+    out = cases.estimate(inputs, store, tmp_path, thermal=True)
+    assert out["seconds"] == 20.0 + cases.RATING_BUDGET_S["screening"] and out["basis"] == "budget"
+    store.add_rating_time("screening", 100.0)
+    store.add_rating_time("screening", 200.0)
+    assert cases.estimate(inputs, store, tmp_path, thermal=True) == {"new_map": False, "seconds": 170.0, "basis": "history"}

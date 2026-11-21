@@ -54,10 +54,10 @@ def test_schema_mismatch(tmp_path):
     p = tmp_path / "a.db"
     Store(p)
     con = sqlite3.connect(p)
-    con.execute("PRAGMA user_version = 3")
+    con.execute("PRAGMA user_version = 4")
     con.commit()
     con.close()
-    with pytest.raises(RuntimeError, match="database schema 3 != expected 2"):
+    with pytest.raises(RuntimeError, match="database schema 4 != expected 3"):
         Store(p)
 
 
@@ -97,7 +97,7 @@ def test_v1_database_migrates_and_keeps_runs(tmp_path):
     p = tmp_path / "v1.db"
     _v1_file(p)
     s = Store(p)
-    assert _version(p) == 2
+    assert _version(p) == 3
     assert s.get_job("j1")["request"] == {"n": 1}
     assert s.get_result("j1") == {"x": 1}
     with closing(sqlite3.connect(p)) as con:
@@ -243,3 +243,20 @@ def test_unknown_origin_and_kind_rejected(tmp_path):
         s.create_case(origin="bogus", inputs={}, label="x", stale=True)
     with pytest.raises(ValueError, match="result kind"):
         s.put_result("j", {}, kind="bogus")
+
+
+def test_v2_store_migrates_to_v3(tmp_path):
+    p = tmp_path / "v2.db"
+    s = Store(p)
+    s.add_scan_time("auto", 5.0)
+    with closing(sqlite3.connect(p)) as con:
+        con.execute("DROP TABLE rating_times")
+        con.execute("PRAGMA user_version = 2")
+        con.commit()
+    s = Store(p)
+    assert _version(p) == 3
+    assert s.recent_scan_times("auto") == [5.0]
+    assert s.recent_rating_times("screening") == []
+    s.add_rating_time("screening", 7.0)
+    s.add_rating_time("screening", 9.0)
+    assert s.recent_rating_times("screening") == [9.0, 7.0]
