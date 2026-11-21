@@ -4,15 +4,13 @@ import type { Evaluation } from "@/api/types"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import ThermalMap from "./ThermalMap"
 import { fmt } from "@/lib/format"
-import { coolingText, curveSpec, passedSpeeds, tabState, tornadoSpec, type Rating } from "@/lib/thermal"
+import { coolingText, curveSpec, passedSpeeds, rotorText, tabState, tempText, tornadoSpec, type Rating } from "@/lib/thermal"
 
 const HEADING = "text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground"
 const CFG = { responsive: true, displaylogo: false }
-const SMALL_GAP_M = 0.0003
 // Hidden at 640 px and below; the row expands there instead.
 const WIDE = "max-[640px]:hidden"
 
-const temp = (c: number | null | undefined) => (c == null || !Number.isFinite(c) ? "no steady state" : `${fmt(c, 3)} °C`)
 
 /** Open content at 641 px and wider; a closed disclosure below. */
 function Collapsible({ title, children }: { title: string; children: ReactNode }) {
@@ -52,8 +50,8 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
           {rating.speeds.map((s) => {
             const n = need.get(s.rpm)
             const open = expanded === s.rpm
-            const rotor = temp(s.rated?.rotor_c)
-            const hot = n?.hot_spot_text || temp(s.hot_spot_c)
+            const rotor = tempText(s.rated?.rotor_c)
+            const hot = n?.hot_spot_text || tempText(s.hot_spot_c)
             return (
               <Fragment key={s.rpm}>
                 <tr data-speed={s.rpm} className="cursor-pointer border-t border-border" onClick={() => onToggle(s.rpm as number)}>
@@ -83,23 +81,7 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
 }
 
 function RotorLine({ rating }: { rating: Rating }) {
-  const st = rating.stress
-  const gap = rating.gap
-  const air = gap?.air_gap_m
-  const cases = Object.entries(gap?.cases ?? {}).filter(([, c]) => c.closure != null)
-  const mm = (m: number) => fmt(m * 1000, 2)
-  return (
-    <p className="text-sm">
-      Rotor:{" "}
-      {st?.status === "ok" || st?.status == null
-        ? <>SF {fmt(st?.safety_factor ?? rating.stress_safety_factor, 2)} at {fmt(st?.check_speed_rpm)} r/min · speed limit {fmt(st?.speed_limit_rpm)} r/min</>
-        : <>stress {st.status.replaceAll("_", " ")}</>}
-      {air != null && cases.length > 0 && (
-        <> · gap closure {cases.map(([k, c]) => `${k.replaceAll("_", " ")} ${mm(c.closure as number)}`).join(", ")} mm of {mm(air)} mm
-          (against {mm(SMALL_GAP_M)} mm: {cases.map(([k, c]) => `${k.replaceAll("_", " ")} ${fmt(((c.closure as number) / SMALL_GAP_M) * 100, 2)} %`).join(", ")})</>
-      )}
-    </p>
-  )
+  return <p className="text-sm">{rotorText(rating)}</p>
 }
 
 function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {

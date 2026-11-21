@@ -1,5 +1,6 @@
-import { boundsOf, buildScene, createGlRenderer, draw2d, viewMatrix } from "@/lib/fieldGl"
+import { boundsOf, buildScalarScene, buildScene, createGlRenderer, draw2d, viewMatrix, type Scene } from "@/lib/fieldGl"
 import type { FieldFrameData, FieldMeshData } from "@/lib/fieldWire"
+import type { ThermalFieldsData } from "@/lib/thermalWire"
 
 const LAYERS = { bmap: true, flux: false, mesh: false, outlines: true }
 
@@ -9,14 +10,8 @@ const canvasOf = (size: number) => {
   return c
 }
 
-/** Renders each frame offscreen (the |B| map on the colour scale `bMax`) and returns data URIs: WebP where the browser encodes it, else PNG. */
-export async function renderFrames(
-  mesh: FieldMeshData,
-  frames: FieldFrameData[],
-  bMax: number,
-  onFrame: (k: number, n: number) => void,
-  size = 640,
-): Promise<string[]> {
+/** Draws each scene offscreen, WebGL where available else 2D, and returns data URIs: WebP where the browser encodes it, else PNG. */
+async function renderScenes(scenes: Iterable<Scene>, count: number, onFrame: (k: number, n: number) => void, size: number): Promise<string[]> {
   let canvas = canvasOf(size)
   const gl = createGlRenderer(canvas)
   let ctx: CanvasRenderingContext2D | null = null
@@ -26,21 +21,37 @@ export async function renderFrames(
     ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("no canvas renderer")
   }
-  const m = viewMatrix(boundsOf(mesh.nodes), size, size, 1, [0, 0])
   const out: string[] = []
   try {
-    for (const [k, frame] of frames.entries()) {
-      const scene = buildScene(mesh, frame, LAYERS, bMax)
+    for (const scene of scenes) {
+      const m = viewMatrix(boundsOf(scene.xy), size, size, 1, [0, 0])
       if (gl) gl.draw(scene, m, true)
       else draw2d(ctx!, scene, m, size, size, true)
       let uri = canvas.toDataURL("image/webp", 0.85)
       if (!uri.startsWith("data:image/webp")) uri = canvas.toDataURL("image/png")
       out.push(uri)
-      onFrame(k + 1, frames.length)
+      onFrame(out.length, count)
       await new Promise((r) => setTimeout(r)) // let the progress toast repaint
     }
   } finally {
     gl?.dispose()
   }
   return out
+}
+
+/** Renders each frame offscreen (the |B| map on the colour scale `bMax`). */
+export function renderFrames(
+  mesh: FieldMeshData,
+  frames: FieldFrameData[],
+  bMax: number,
+  onFrame: (k: number, n: number) => void,
+  size = 640,
+): Promise<string[]> {
+  return renderScenes((function* () { for (const f of frames) yield buildScene(mesh, f, LAYERS, bMax) })(), frames.length, onFrame, size)
+}
+
+/** One temperature map (inferno between `lo` and `hi`) as a data URI. */
+export async function renderThermalMap(data: ThermalFieldsData, values: Float32Array, lo: number, hi: number, size = 640): Promise<string> {
+  const [uri] = await renderScenes([buildScalarScene(data.nodes, data.triangles, data.kind, values, lo, hi)], 1, () => {}, size)
+  return uri
 }

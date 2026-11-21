@@ -1,6 +1,7 @@
 import type { Data } from "plotly.js-dist-min"
 import type { Evaluation } from "@/api/types"
 import { LINE_COLORS } from "@/lib/analysis"
+import { fmt } from "@/lib/format"
 
 export type Rating = NonNullable<Evaluation["rating"]>
 export type ThermalSummary = NonNullable<Evaluation["thermal_summary"]>
@@ -72,4 +73,26 @@ export function coolingText(c: Cooling): string {
   if (j?.inlet_c != null) parts.push(`inlet ${j.inlet_c} °C`)
   if (c.ambient_c != null) parts.push(`ambient ${c.ambient_c} °C`)
   return parts.join(", ") + (c.placeholder ? " (placeholder)" : "")
+}
+
+const SMALL_GAP_M = 0.0003
+
+/** A hot-spot temperature, or "no steady state" when it is not finite. */
+export const tempText = (c: number | null | undefined) => (c == null || !Number.isFinite(c) ? "no steady state" : `${fmt(c, 3)} °C`)
+
+/** The rotor stress and air-gap closure in one line. */
+export function rotorText(rating: Rating): string {
+  const st = rating.stress
+  const gap = rating.gap
+  const air = gap?.air_gap_m
+  const cases = Object.entries(gap?.cases ?? {}).filter(([, c]) => c.closure != null)
+  const mm = (m: number) => fmt(m * 1000, 2)
+  const name = (k: string) => k.replaceAll("_", " ")
+  const stress = st?.status === "ok" || st?.status == null
+    ? `SF ${fmt(st?.safety_factor ?? rating.stress_safety_factor, 2)} at ${fmt(st?.check_speed_rpm)} r/min · speed limit ${fmt(st?.speed_limit_rpm)} r/min`
+    : `stress ${st.status.replaceAll("_", " ")}`
+  const closure = air != null && cases.length > 0
+    ? ` · gap closure ${cases.map(([k, c]) => `${name(k)} ${mm(c.closure as number)}`).join(", ")} mm of ${mm(air)} mm (against ${mm(SMALL_GAP_M)} mm: ${cases.map(([k, c]) => `${name(k)} ${fmt(((c.closure as number) / SMALL_GAP_M) * 100, 2)} %`).join(", ")})`
+    : ""
+  return `Rotor: ${stress}${closure}`
 }
