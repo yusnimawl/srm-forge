@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState, type ReactNode } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
 import type { Evaluation } from "@/api/types"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
+import ThermalMap from "./ThermalMap"
 import { fmt } from "@/lib/format"
 import { coolingText, curveSpec, passedSpeeds, tabState, tornadoSpec, type Rating } from "@/lib/thermal"
 
@@ -101,12 +102,13 @@ function RotorLine({ rating }: { rating: Rating }) {
   )
 }
 
-function Rated({ ev }: { ev: Evaluation }) {
+function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
   const rating = ev.rating!
   const summary = ev.thermal_summary
   const full = tabState(ev) === "full"
   const [expanded, setExpanded] = useState<number | null>(null)
-  const [picked] = useState<number | null>(null)
+  const [picked, setPicked] = useState<number | null>(null)
+  const [state, setState] = useState<"steady" | "peak">("steady")
   const rpm = picked ?? summary?.least_margin_rpm ?? rating.speeds[0]?.rpm
   const colors = useColors()
   const theme = plotTheme(colors)
@@ -117,6 +119,11 @@ function Rated({ ev }: { ev: Evaluation }) {
   const axis = (text: string) => ({ ...theme.xaxis, title: { text } })
   const runaway = rows.filter((r) => r.runaway)
   const top = rows[0]
+  const at = rating.speeds.find((s) => s.rpm === rpm)
+  const sumSpeed = summary?.speeds.find((s) => s.rpm === rpm)
+  const endHot = state === "steady" ? sumSpeed?.hot_spot_text?.startsWith("end winding") : at?.peak_hot_spot_at?.startsWith("end_")
+  const endC = state === "steady" ? at?.hot_spot_c : at?.peak_hot_spot_c
+  const endNote = endHot ? `hot spot: end winding (lumped, not in this section)${endC != null && Number.isFinite(endC) ? ` ${fmt(endC, 3)} °C` : ""}` : null
   return (
     <div className="@container space-y-4 pt-2">
       <h2 className={HEADING}>Thermal · rated (every input at its unfavourable end) · class {rating.insulation_class}, limit {fmt(rating.limit_c, 3)} °C</h2>
@@ -129,7 +136,26 @@ function Rated({ ev }: { ev: Evaluation }) {
       />
       {full ? (
         <div className="grid gap-6 @3xl:grid-cols-2">
-          <div data-testid="thermal-map-slot" />
+          <section data-testid="thermal-map-slot" className="space-y-2">
+            <h3 className={HEADING}>Temperature at {fmt(rpm)} r/min</h3>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <label className="flex items-center gap-2">Speed
+                <select className="rounded border border-border bg-card px-2 py-1" value={rpm ?? ""} onChange={(e) => setPicked(Number(e.target.value))}>
+                  {rating.speeds.map((s) => <option key={s.rpm} value={s.rpm ?? ""}>{fmt(s.rpm)} r/min</option>)}
+                </select>
+              </label>
+              <div role="group" aria-label="Thermal state" className="flex gap-1">
+                {(["steady", "peak"] as const).map((k) => (
+                  <button key={k} type="button" aria-pressed={state === k} onClick={() => setState(k)}
+                    className={`rounded border border-border px-2 py-1 ${state === k ? "bg-muted font-medium" : ""}`}>
+                    {k === "steady" ? "Steady" : "Peak end"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {caseId && rpm != null && <ThermalMap caseId={caseId} rpm={rpm} state={state} />}
+            {endNote && <p className="text-sm">{endNote}</p>}
+          </section>
           <section className="space-y-2">
             <h3 className={HEADING}>Biggest uncertainties at {fmt(rpm)} r/min, K</h3>
             <Plot
@@ -172,7 +198,7 @@ function FailedCheck({ ev }: { ev: Evaluation }) {
   )
 }
 
-export default function ThermalTab({ evaluation }: { evaluation: Evaluation; caseId?: string }) {
+export default function ThermalTab({ evaluation, caseId }: { evaluation: Evaluation; caseId?: string }) {
   const state = tabState(evaluation)
   if (state === "unrated") return <p className="pt-2 text-sm text-muted-foreground">{evaluation.error || "Not thermally rated."}</p>
   if (state === "check-only") {
@@ -185,5 +211,5 @@ export default function ThermalTab({ evaluation }: { evaluation: Evaluation; cas
       </div>
     )
   }
-  return <Rated ev={evaluation} />
+  return <Rated ev={evaluation} caseId={caseId} />
 }

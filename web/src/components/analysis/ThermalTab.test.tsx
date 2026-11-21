@@ -12,6 +12,8 @@ vi.mock("@/components/PlotlyPlot", () => ({
 
 import ThermalTab from "./ThermalTab"
 
+vi.mock("@/lib/thermalWire", () => ({ fetchThermalFields: vi.fn(async () => "gone") }))
+
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const speed = (rpm: number, hot: number | null) => ({
@@ -101,5 +103,15 @@ describe("ThermalTab", () => {
     const h = mount(full())
     expect(h.textContent).toContain("Contact gap")
     expect(h.textContent).toContain("runaway")
+  })
+  it("says so when the map file is gone, table still shown", async () => {
+    const h = mount(full())
+    await act(async () => { await Promise.resolve() })
+    expect(h.textContent).toContain("Re-evaluate to see the map")
+    expect(h.querySelectorAll("tbody tr[data-speed]")).toHaveLength(2)
+  })
+  it("captions a lumped end-winding hot spot", () => {
+    const h = mount(full(150, "end winding, A1"))
+    expect(h.textContent).toContain("hot spot: end winding (lumped, not in this section)")
   })
 })

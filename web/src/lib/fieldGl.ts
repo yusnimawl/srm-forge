@@ -95,6 +95,28 @@ export function buildScene(mesh: FieldMeshData, frame: FieldFrameData, layers: L
   return { xy, tris, triPos, triRgb, lines, bounds: boundsOf(xy), bMax }
 }
 
+// Nodes without a value (no steady state) take the canvas background.
+const NO_VALUE: [number, number, number] = [0.1, 0.1, 0.1]
+
+/** A per-node scalar on a triangle mesh: inferno from `lo` to `hi`, outlines between triangles of different `region` and on the boundary. */
+export function buildScalarScene(xy: Float32Array, tris: Uint32Array, region: Uint8Array, values: Float32Array, lo: number, hi: number): Scene {
+  const nt = tris.length / 3
+  const triPos = new Float32Array(nt * 6)
+  const triRgb = new Float32Array(nt * 9)
+  for (let t = 0; t < nt; t++) {
+    for (let k = 0; k < 3; k++) {
+      const n = tris[3 * t + k]
+      triPos[6 * t + 2 * k] = xy[2 * n]
+      triPos[6 * t + 2 * k + 1] = xy[2 * n + 1]
+      const v = values[n]
+      const c = Number.isFinite(v) ? inferno((v - lo) / (hi - lo)).map((x) => x / 255) : NO_VALUE
+      triRgb.set(c, 9 * t + 3 * k)
+    }
+  }
+  const lines = [{ xy: edgeCoords(xy, regionEdges(tris, region)), color: OUTLINE }]
+  return { xy, tris, triPos, triRgb, lines, bounds: boundsOf(xy), bMax: hi }
+}
+
 /** The 2D fallback: the same colours and lines on a CanvasRenderingContext2D. */
 export function draw2d(ctx: CanvasRenderingContext2D, s: Scene, m: Float32Array, w: number, h: number, bmap: boolean) {
   ctx.clearRect(0, 0, w, h)
