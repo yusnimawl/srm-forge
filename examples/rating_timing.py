@@ -41,7 +41,7 @@ def main() -> None:
     # a cached map reaches the scan almost at once; a built one takes minutes
     out = dict(preset=args.preset, rating_s=end - marks["rating"] if "rating" in marks else None,
                total_s=end - t0, map_cache_hit=("scan" in marks and marks["scan"] - t0 < 10.0), rated=rated,
-               status=ev.status, notes=list(ev.notes), srmapp=srmapp.__version__)
+               status=ev.status, notes=ev.error, srmapp=srmapp.__version__)
     print(json.dumps(out, indent=2))
     if args.json:
         args.json.write_text(json.dumps(out, indent=2))
