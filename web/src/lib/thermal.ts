@@ -1,0 +1,55 @@
+import type { Data } from "plotly.js-dist-min"
+import type { Evaluation } from "@/api/types"
+import { LINE_COLORS } from "@/lib/analysis"
+
+export type Rating = NonNullable<Evaluation["rating"]>
+export type ThermalSummary = NonNullable<Evaluation["thermal_summary"]>
+export type ShareRow = ThermalSummary["shares"][number]["rows"][number]
+
+export type TabState = "unrated" | "summary-only" | "check-only" | "full"
+
+/** Which parts of the tab an evaluation can fill: a pre-R5d rating has no shares, a failed search candidate only a check. */
+export function tabState(ev: Evaluation): TabState {
+  if (ev.rating) return ev.rating.shares.length > 0 ? "full" : "summary-only"
+  return ev.thermal_check ? "check-only" : "unrated"
+}
+
+const finite = (v: number | null | undefined): v is number => v != null && Number.isFinite(v)
+
+/** Continuous and peak torque against speed: nominal and rated lines with the band between them, requirement dashed. */
+export function curveSpec(rating: Rating, summary: ThermalSummary | null | undefined): Data[] {
+  const x = rating.speeds.map((s) => s.rpm)
+  const line = (name: string, y: (number | null)[], color: string, extra: object = {}) =>
+    ({ type: "scatter", mode: "lines+markers", name, x, y, line: { color, width: 2 }, marker: { size: 5 }, ...extra }) as Data
+  const need = (key: "need_continuous_nm" | "need_peak_nm", name: string, color: string): Data[] => {
+    const pts = (summary?.speeds ?? []).filter((s) => finite(s[key]))
+    return pts.length === 0 ? [] : [{
+      type: "scatter", mode: "lines", name, x: pts.map((s) => s.rpm), y: pts.map((s) => s[key]),
+      line: { color, width: 1.5, dash: "dash" },
+    } as Data]
+  }
+  const band = { fill: "tonexty", fillcolor: "rgba(237,237,237,0.10)" }
+  return [
+    line("Continuous, rated", rating.speeds.map((s) => s.rated_continuous_nm), LINE_COLORS[0]),
+    line("Continuous, nominal", rating.speeds.map((s) => s.nominal_continuous_nm), LINE_COLORS[0], { ...band, line: { color: LINE_COLORS[0], width: 1, dash: "dot" } }),
+    line("Peak, rated", rating.speeds.map((s) => s.rated_peak_nm), LINE_COLORS[1]),
+    line("Peak, nominal", rating.speeds.map((s) => s.nominal_peak_nm), LINE_COLORS[1], { ...band, fillcolor: "rgba(232,176,74,0.12)", line: { color: LINE_COLORS[1], width: 1, dash: "dot" } }),
+    ...need("need_continuous_nm", "Required continuous", LINE_COLORS[2]),
+    ...need("need_peak_nm", "Required peak", LINE_COLORS[3]),
+  ]
+}
+
+/** Horizontal bars, largest on top; a runaway bar is drawn at 1.2 x the largest finite value and labelled. */
+export function tornadoSpec(rows: ShareRow[]): Data[] {
+  const finiteMax = Math.max(0, ...rows.filter((r) => !r.runaway && finite(r.k)).map((r) => r.k as number))
+  const cap = (finiteMax || 1) * 1.2
+  const shown = rows.filter((r) => r.runaway || (finite(r.k) && (r.k as number) > 0))
+  const v = (r: ShareRow) => (r.runaway ? cap : (r.k as number))
+  return [{
+    type: "bar", orientation: "h",
+    y: shown.map((r) => r.label), x: shown.map(v),
+    text: shown.map((r) => (r.runaway ? "runaway" : `${(r.k as number).toFixed(1)} K`)),
+    textposition: "outside", cliponaxis: false, hoverinfo: "text+y",
+    marker: { color: shown.map((r) => (r.runaway ? LINE_COLORS[4] : LINE_COLORS[1])) },
+  } as Data]
+}
