@@ -44,7 +44,7 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
             const hot = n?.hot_spot_text || temp(s.hot_spot_c)
             return (
               <>
-                <tr key={s.rpm} data-speed={s.rpm} className="cursor-pointer border-t border-border" onClick={() => onToggle(s.rpm)}>
+                <tr key={s.rpm} data-speed={s.rpm} className="cursor-pointer border-t border-border" onClick={() => onToggle(s.rpm as number)}>
                   <td className="px-2 py-1 font-mono">{fmt(s.rpm)}</td>
                   <td className={`px-2 py-1 font-mono ${WIDE}`}>{n?.need_continuous_nm != null ? fmt(n.need_continuous_nm) : "–"} / {n?.need_peak_nm != null ? fmt(n.need_peak_nm) : "–"}</td>
                   <td className="px-2 py-1 font-mono">{fmt(s.rated_continuous_nm ?? null)}</td>
