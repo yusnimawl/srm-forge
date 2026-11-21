@@ -2,7 +2,7 @@
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -16,6 +16,9 @@ from .requirements import Requirements
 from .sizing.estimates import J_PEAK, J_PEAK_SCREEN, J_SCREEN
 from .sizing.generator import sample_candidates
 from .sizing.stage1 import stage1
+
+if TYPE_CHECKING:
+    from .thermal_fields import ThermalFields
 
 
 @dataclass(frozen=True)
@@ -70,7 +73,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                workers: int | None = None, cache_dir=None,
                progress: Callable[[int, int], None] | None = None,
                point_progress: Callable[[int, int, int, int], None] | None = None,
-               cancel: Callable[[], bool] | None = None) -> SearchResult:
+               cancel: Callable[[], bool] | None = None,
+               on_fields: "Callable[[str, ThermalFields], None] | None" = None) -> SearchResult:
     """`progress(done, total)` after each stage-2 design; `point_progress(design, designs, points_done, points)`
     while each design's map is built."""
     candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed,
@@ -93,7 +97,8 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                                      j_limit=settings.j_limit, j_peak_max=settings.peak_cap,
                                      margin=margin, solver=solver, workers=workers, scan_workers=workers,
                                      cache_dir=cache_dir, progress=on_point, cancel=cancel,
-                                     thermal=settings.thermal, n_speeds=settings.n_speeds)
+                                     thermal=settings.thermal, n_speeds=settings.n_speeds,
+                                     fields_out=None if on_fields is None else (lambda f, c=candidate: on_fields(c.id, f)))
         if evaluation.status == "cancelled":
             cancelled = True
             break

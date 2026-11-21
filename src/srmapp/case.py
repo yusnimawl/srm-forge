@@ -90,7 +90,7 @@ def map_request(inputs: CaseInputs) -> tuple[Design, float, Stage1]:
 def evaluate_design(inputs: CaseInputs, *, case_id: str = "case", grid: StageTwoGrid = StageTwoGrid(),
                     solver: str = "ngsolve", workers: int | None = None, cache_dir=None, progress=None,
                     cancel=None, on_scan=None, scan_progress=None, thermal: bool = True, n_speeds: int = 6,
-                    thermal_progress=None) -> Evaluation:
+                    thermal_progress=None, fields_out=None) -> Evaluation:
     """Stage 2 on this one design. A stage-1 rejection is a note ("stage 1: <reason>"), not a stop.
     `on_scan()` is called when the map is complete and the winding choice begins; `scan_progress(done, total)`
     follows the winding scan, which runs on `workers` processes."""
@@ -101,7 +101,7 @@ def evaluate_design(inputs: CaseInputs, *, case_id: str = "case", grid: StageTwo
                         workers=workers, cache_dir=cache_dir, progress=progress, cancel=cancel,
                         only=_fixed(inputs), i_map=i_map, on_scan=on_scan, scan_workers=workers,
                         scan_progress=scan_progress, thermal=thermal, n_speeds=n_speeds,
-                        thermal_progress=thermal_progress)
+                        thermal_progress=thermal_progress, rate_failed=True, fields_out=fields_out)
     if stage.passes:
         return e
     note = f"stage 1: {stage.reason}"

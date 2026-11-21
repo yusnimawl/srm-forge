@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 
 from srmcore.materials.library import load_material
+from srmcore.maps.end_winding import coil_geometry
 from srmcore.model.design import RadialSRMParams
 from srmcore.topology.imported import iron_areas, parametric_iron
 
@@ -96,6 +97,11 @@ def active_mass(p: RadialSRMParams) -> Mass:
     return Mass(stator_iron=stator_mat.density * stator_mat.stacking_factor * stator_area * p.stack_length,
                 rotor_iron=rotor_mat.density * rotor_mat.stacking_factor * rotor_area * p.stack_length,
                 copper=copper_mass(p, p.turns_per_pole, conductor_area(p)))
+
+
+def active_volume(p: RadialSRMParams) -> float:
+    """m3: the stator outer cylinder over the stack plus both end windings (coil build and slot liner each end)."""
+    return math.pi / 4 * p.stator_outer_diameter**2 * (p.stack_length + 2 * (coil_geometry(p).build + p.slot_liner_thickness))
 
 
 def phase_resistance(p: RadialSRMParams, temperature_c: float = 100.0) -> float:
