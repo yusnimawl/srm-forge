@@ -633,6 +633,50 @@
             ],
             "title": "Preset"
           },
+          "rated_continuous_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Continuous Kw Per Kg"
+          },
+          "rated_continuous_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Continuous Kw Per L"
+          },
+          "rated_peak_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Peak Kw Per Kg"
+          },
+          "rated_peak_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Peak Kw Per L"
+          },
           "show_in_graphs": {
             "title": "Show In Graphs",
             "type": "boolean"
@@ -919,6 +963,50 @@
               }
             ],
             "title": "Preset"
+          },
+          "rated_continuous_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Continuous Kw Per Kg"
+          },
+          "rated_continuous_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Continuous Kw Per L"
+          },
+          "rated_peak_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Peak Kw Per Kg"
+          },
+          "rated_peak_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Peak Kw Per L"
           },
           "show_in_graphs": {
             "title": "Show In Graphs",

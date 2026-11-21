@@ -22,6 +22,10 @@ export type CaseRow = {
   mass_kg: number | null
   power_density: number | null
   efficiency_base: number | null
+  rated_continuous_kw_per_kg: number | null
+  rated_peak_kw_per_kg: number | null
+  rated_continuous_kw_per_l: number | null
+  rated_peak_kw_per_l: number | null
 }
 
 export function caseStatus(c: Pick<CaseSummary, "stale" | "status" | "validated">): CaseStatus {
@@ -51,6 +55,10 @@ export function toCaseRows(list: CaseSummary[]): CaseRow[] {
       mass_kg: n(c.mass_kg),
       power_density: n(c.power_density_kw_per_kg),
       efficiency_base: n(c.efficiency_base),
+      rated_continuous_kw_per_kg: n(c.rated_continuous_kw_per_kg ?? null),
+      rated_peak_kw_per_kg: n(c.rated_peak_kw_per_kg ?? null),
+      rated_continuous_kw_per_l: n(c.rated_continuous_kw_per_l ?? null),
+      rated_peak_kw_per_l: n(c.rated_peak_kw_per_l ?? null),
     }
   })
 }

@@ -1086,6 +1086,14 @@ export interface components {
             power_ratio: number | null;
             /** Preset */
             preset: string | null;
+            /** Rated Continuous Kw Per Kg */
+            rated_continuous_kw_per_kg?: number | null;
+            /** Rated Continuous Kw Per L */
+            rated_continuous_kw_per_l?: number | null;
+            /** Rated Peak Kw Per Kg */
+            rated_peak_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per L */
+            rated_peak_kw_per_l?: number | null;
             /** Show In Graphs */
             show_in_graphs: boolean;
             /** Stale */
@@ -1148,6 +1156,14 @@ export interface components {
             power_ratio: number | null;
             /** Preset */
             preset: string | null;
+            /** Rated Continuous Kw Per Kg */
+            rated_continuous_kw_per_kg?: number | null;
+            /** Rated Continuous Kw Per L */
+            rated_continuous_kw_per_l?: number | null;
+            /** Rated Peak Kw Per Kg */
+            rated_peak_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per L */
+            rated_peak_kw_per_l?: number | null;
             /** Show In Graphs */
             show_in_graphs: boolean;
             /** Stale */

@@ -177,7 +177,7 @@ const DeleteCell = ({ row, a }: { row: CaseRow; a: CaseActions }) => (
   </Button>
 )
 
-type NumKey = "torque_ratio" | "power_ratio" | "peak_power_kw" | "mass_kg" | "power_density" | "efficiency_base"
+type NumKey = "torque_ratio" | "power_ratio" | "peak_power_kw" | "mass_kg" | "power_density" | "efficiency_base" | "rated_continuous_kw_per_kg" | "rated_peak_kw_per_kg" | "rated_continuous_kw_per_l" | "rated_peak_kw_per_l"
 
 const num = (key: NumKey, header: string): ColumnDef<CaseRow> => ({
   accessorKey: key,
@@ -198,6 +198,10 @@ const columns = (a: CaseActions): ColumnDef<CaseRow>[] => [
   num("peak_power_kw", "Peak power (kW)"),
   num("mass_kg", "Mass (kg)"),
   num("power_density", "kW/kg"),
+  num("rated_continuous_kw_per_kg", "Rated cont. (kW/kg)"),
+  num("rated_peak_kw_per_kg", "Rated peak (kW/kg)"),
+  num("rated_continuous_kw_per_l", "Rated cont. (kW/L)"),
+  num("rated_peak_kw_per_l", "Rated peak (kW/L)"),
   num("efficiency_base", "Efficiency"),
   { id: "comment", header: "Comment", cell: ({ row }) => <CommentCell row={row.original} a={a} /> },
   { id: "show", header: "Show in graphs", cell: ({ row }) => <ShowCell row={row.original} a={a} /> },
@@ -210,6 +214,10 @@ const CARD_FIELDS: [string, NumKey][] = [
   ["Peak power (kW)", "peak_power_kw"],
   ["Mass (kg)", "mass_kg"],
   ["kW/kg", "power_density"],
+  ["Rated continuous (kW/kg)", "rated_continuous_kw_per_kg"],
+  ["Rated peak (kW/kg)", "rated_peak_kw_per_kg"],
+  ["Rated continuous (kW/L)", "rated_continuous_kw_per_l"],
+  ["Rated peak (kW/L)", "rated_peak_kw_per_l"],
   ["Efficiency", "efficiency_base"],
 ]
 

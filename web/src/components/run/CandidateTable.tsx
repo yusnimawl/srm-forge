@@ -24,6 +24,10 @@ const CARD_FIELDS = [
   ["Power ratio", "power_ratio", 3],
   ["Peak power (kW)", "peak_power_kw", 3],
   ["kW/kg", "power_density", 3],
+  ["Rated continuous (kW/kg)", "rated_continuous_kw_per_kg", 3],
+  ["Rated peak (kW/kg)", "rated_peak_kw_per_kg", 3],
+  ["Rated continuous (kW/L)", "rated_continuous_kw_per_l", 3],
+  ["Rated peak (kW/L)", "rated_peak_kw_per_l", 3],
   ["Efficiency", "efficiency_base", 3],
 ] as const
 
@@ -47,6 +51,10 @@ export function CandidateTable({ rows, jobId }: { rows: CandidateRow[]; jobId: s
     num("power_ratio", "Power ratio"),
     num("peak_power_kw", "Peak power (kW)"),
     num("power_density", "kW/kg"),
+    num("rated_continuous_kw_per_kg", "Rated cont. (kW/kg)"),
+    num("rated_peak_kw_per_kg", "Rated peak (kW/kg)"),
+    num("rated_continuous_kw_per_l", "Rated cont. (kW/L)"),
+    num("rated_peak_kw_per_l", "Rated peak (kW/L)"),
     num("efficiency_base", "Efficiency"),
     {
       accessorKey: "status",

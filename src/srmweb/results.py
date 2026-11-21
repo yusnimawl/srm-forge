@@ -407,6 +407,10 @@ class CaseSummaryOut(_Out):
     peak_power_w: F
     mass_kg: F
     power_density_kw_per_kg: F
+    rated_continuous_kw_per_kg: F = None
+    rated_peak_kw_per_kg: F = None
+    rated_continuous_kw_per_l: F = None
+    rated_peak_kw_per_l: F = None
     efficiency_base: F
     feasible: bool | None
     validated: bool

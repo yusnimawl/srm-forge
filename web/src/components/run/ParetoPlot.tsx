@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
-import { AXES, type AxisKey, type CandidateRow } from "@/lib/candidates"
+import { AXES, unratedCount, type AxisKey, type CandidateRow } from "@/lib/candidates"
 import { INFERNO_SCALE } from "@/lib/inferno"
 import { SELECT_CLASS } from "@/components/case/fields"
 import { cn } from "@/lib/utils"
@@ -42,8 +42,8 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
   const navigate = useNavigate()
   const wide = useMedia("(min-width: 1024px)")
   const c = useColors()
-  const [x, setX] = useState<AxisKey>("mass_kg")
-  const [y, setY] = useState<AxisKey>("power_density")
+  const [x, setX] = useState<AxisKey>("rated_peak_kw_per_kg")
+  const [y, setY] = useState<AxisKey>("rated_continuous_kw_per_kg")
   const [z, setZ] = useState<AxisKey>("peak_power_kw")
   const [three, setThree] = useState(false)
   const is3d = three && wide
@@ -51,7 +51,8 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
   const pole = useMemo(() => [...new Set(rows.map((r) => r.poles))].sort(), [rows])
 
   const data = useMemo(() => {
-    const eff = rows.map((r) => r.efficiency_base).filter((v): v is number => v != null)
+    const shown = rows.filter((r) => r[x] != null && r[y] != null && (!is3d || r[z] != null))
+    const eff = shown.map((r) => r.efficiency_base).filter((v): v is number => v != null)
     const cmin = Math.min(...eff)
     const cmax = Math.max(...eff)
     const type = is3d ? "scatter3d" : "scatter"
@@ -67,7 +68,7 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
     let colorbarShown = false
     pole.forEach((p, i) => {
       const symbol = (is3d ? SYMBOLS_3D : SYMBOLS)[i % 4]
-      const group = rows.filter((r) => r.poles === p)
+      const group = shown.filter((r) => r.poles === p)
       const good = group.filter((r) => r.feasible && r.efficiency_base != null)
       const bad = group.filter((r) => !(r.feasible && r.efficiency_base != null))
       if (good.length) {
@@ -108,6 +109,7 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
     })
     return traces
   }, [rows, pole, x, y, z, is3d, c])
+  const unrated = unratedCount(rows, is3d ? [x, y, z] : [x, y])
 
   const theme = plotTheme(c)
   const axis = (k: AxisKey) => ({ ...theme.xaxis, title: { text: AXES[k] } })
@@ -146,6 +148,7 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
         X: {AXES[x]} · Y: {AXES[y]}
         {is3d ? ` · Z: ${AXES[z]}` : ""} · colour: efficiency at base speed · marker: pole set ({pole.join(", ")}) ·
         outlined: Pareto set · grey hollow: infeasible or failed
+        {unrated > 0 && ` · ${unrated} unrated not shown`}
       </p>
     </div>
   )

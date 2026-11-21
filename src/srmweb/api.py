@@ -74,7 +74,8 @@ _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 MAX_SHOWN_CASES = 6
 CaseCreate = Annotated[CandidateCase | ReferenceCase | EditCase | ImportCase, Field(discriminator="origin")]
 _EVALUATED = ("status", "torque_ratio", "power_ratio", "peak_power_w", "mass_kg",
-              "power_density_kw_per_kg", "efficiency_base", "feasible")
+              "power_density_kw_per_kg", "efficiency_base", "feasible", "rated_continuous_kw_per_kg",
+              "rated_peak_kw_per_kg", "rated_continuous_kw_per_l", "rated_peak_kw_per_l")
 
 
 def _dig(obj, *keys):
