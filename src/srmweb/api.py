@@ -33,6 +33,7 @@ from srmapp.case import LIMIT_FIELDS, CaseInputs, reference_design
 from srmapp.losses import N_ANGLES, check_loss_data
 from srmapp.report import findings
 from srmapp.sizing.estimates import active_mass
+from srmapp.thermal_fields import KINDS as THERMAL_KINDS, read_fields
 from srmapp.sizing.generator import REFERENCE_TURNS
 from srmapp.references import REFERENCES
 from srmcore.materials.library import available_materials, load_material
@@ -48,6 +49,7 @@ from srmsil.hil.transport import Transport
 from srmweb.auth import Sessions, auth_router, require_auth
 from srmweb.cases import check_case, estimate as estimate_case, losses_estimate, resolved_margin
 from srmweb.config import Settings, is_loopback
+from srmweb import thermal_files
 from srmweb.frames import FieldContext, b_task, frame_task, mesh_task, pack
 from srmweb.geometry import outline_svg
 from srmweb.hil import POLL_S as HIL_POLL_S, HilManager, check_loopback, serial_transports, sil_t0
@@ -554,6 +556,23 @@ def create_app(settings: Settings,
     def binary(meta: dict, arrays: dict) -> Response:
         return Response(pack(to_json(meta), arrays), media_type="application/octet-stream")
 
+    @router.get("/cases/{case_id}/thermal/fields")
+    def thermal_fields_route(case_id: str):
+        case_or_404(case_id)
+        ev = store.case_result(case_id, "evaluate")
+        key = None if ev is None else ev.get("thermal_fields")
+        if key is None:
+            raise HTTPException(404, "this case has no temperature fields")
+        file = thermal_files.path(settings.cache_dir, key)
+        if not file.is_file():
+            raise HTTPException(410, "the temperature fields were cleared; evaluate the case again")
+        f = read_fields(file)
+        meta = to_json({"rpm": f.rpm, "end_winding_steady_c": f.end_winding_steady_c,
+                        "end_winding_peak_c": f.end_winding_peak_c, "kinds": list(THERMAL_KINDS)})
+        return Response(pack(meta, {"nodes": f.nodes.astype(np.float32), "triangles": f.triangles.astype(np.uint32),
+                                    "kind": f.kind.astype(np.uint8), "steady": f.steady.astype(np.float32),
+                                    "peak": f.peak.astype(np.float32)}), media_type="application/octet-stream")
+
     @router.get("/cases/{case_id}/field/mesh")
     def field_mesh_route(case_id: str):
         ctx = field_context(case_id)
@@ -842,7 +861,7 @@ def create_app(settings: Settings,
             return []
         sil = settings.cache_dir / "sil"
         found = [*settings.cache_dir.glob("*.h5"),
-                 *(f for sub in ("fields", "strokes") for f in (settings.cache_dir / sub).glob("*.npz")),
+                 *(f for sub in ("fields", "strokes", thermal_files.THERMAL_DIR) for f in (settings.cache_dir / sub).glob("*.npz")),
                  *(sil / "runs").glob("*.npz"), *(sil / "runs").glob("*.json"), *(sil / "build").glob("*"),
                  *(sil / "hil").rglob("*")]
         return [f for f in found if f.is_file() and ".tmp." not in f.name]

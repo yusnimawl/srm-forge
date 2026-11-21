@@ -325,6 +325,43 @@
         "title": "BudgetRowOut",
         "type": "object"
       },
+      "BudgetShareOut": {
+        "properties": {
+          "hot_spot_rise_k": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hot Spot Rise K"
+          },
+          "row": {
+            "title": "Row",
+            "type": "string"
+          },
+          "rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpm"
+          }
+        },
+        "required": [
+          "row",
+          "rpm",
+          "hot_spot_rise_k"
+        ],
+        "title": "BudgetShareOut",
+        "type": "object"
+      },
       "CandidateCase": {
         "additionalProperties": false,
         "properties": {
@@ -1307,6 +1344,94 @@
         "title": "ConverterSettings",
         "type": "object"
       },
+      "CoolingOut": {
+        "properties": {
+          "ambient_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ambient C"
+          },
+          "end_spray": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Spray"
+          },
+          "housing_thickness": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Housing Thickness"
+          },
+          "jacket": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jacket"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "placeholder": {
+            "title": "Placeholder",
+            "type": "boolean"
+          },
+          "shaft_oil": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shaft Oil"
+          },
+          "slot_oil": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Oil"
+          }
+        },
+        "required": [
+          "kind",
+          "placeholder"
+        ],
+        "title": "CoolingOut",
+        "type": "object"
+      },
       "CoolingSetup": {
         "additionalProperties": false,
         "properties": {
@@ -1944,6 +2069,17 @@
       },
       "EvaluationOut": {
         "properties": {
+          "active_volume_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Volume L"
+          },
           "curves": {
             "anyOf": [
               {
@@ -2098,6 +2234,17 @@
             ],
             "title": "Rated Continuous Kw Per Kg"
           },
+          "rated_continuous_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Continuous Kw Per L"
+          },
           "rated_peak_kw_per_kg": {
             "anyOf": [
               {
@@ -2108,6 +2255,17 @@
               }
             ],
             "title": "Rated Peak Kw Per Kg"
+          },
+          "rated_peak_kw_per_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rated Peak Kw Per L"
           },
           "rating": {
             "anyOf": [
@@ -2152,6 +2310,37 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "thermal_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThermalCheckOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thermal_fields": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thermal Fields"
+          },
+          "thermal_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThermalSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "torque_ratio": {
             "anyOf": [
@@ -2305,6 +2494,86 @@
           "turns"
         ],
         "title": "FixedWinding",
+        "type": "object"
+      },
+      "GapCaseOut": {
+        "properties": {
+          "centrifugal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Centrifugal"
+          },
+          "closure": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closure"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "rotor_thermal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotor Thermal"
+          },
+          "stator_thermal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stator Thermal"
+          }
+        },
+        "title": "GapCaseOut",
+        "type": "object"
+      },
+      "GapOut": {
+        "properties": {
+          "air_gap_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Air Gap M"
+          },
+          "cases": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/GapCaseOut"
+            },
+            "default": {},
+            "title": "Cases",
+            "type": "object"
+          }
+        },
+        "title": "GapOut",
         "type": "object"
       },
       "GeometrySection": {
@@ -4345,6 +4614,26 @@
       },
       "RatingOut": {
         "properties": {
+          "cooling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoolingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "insulation_class": {
             "title": "Insulation Class",
             "type": "string"
@@ -4367,12 +4656,41 @@
             "title": "Notes",
             "type": "array"
           },
+          "shares": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BudgetShareOut"
+            },
+            "title": "Shares",
+            "type": "array"
+          },
           "speeds": {
             "items": {
               "$ref": "#/components/schemas/SpeedRatingOut"
             },
             "title": "Speeds",
             "type": "array"
+          },
+          "srmapp_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Srmapp Version"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StressOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "stress_safety_factor": {
             "anyOf": [
@@ -4388,6 +4706,17 @@
           "stress_status": {
             "title": "Stress Status",
             "type": "string"
+          },
+          "torque_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Factor"
           }
         },
         "required": [
@@ -5495,6 +5824,137 @@
         "title": "SlotOil",
         "type": "object"
       },
+      "SpeedDetailOut": {
+        "properties": {
+          "bore_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bore C"
+          },
+          "bore_peak_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bore Peak C"
+          },
+          "continuous_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continuous Nm"
+          },
+          "envelope_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Envelope Nm"
+          },
+          "hot_spot_at": {
+            "default": "",
+            "title": "Hot Spot At",
+            "type": "string"
+          },
+          "hot_spot_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hot Spot C"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "peak_hot_spot_at": {
+            "default": "",
+            "title": "Peak Hot Spot At",
+            "type": "string"
+          },
+          "peak_hot_spot_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Hot Spot C"
+          },
+          "peak_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Nm"
+          },
+          "rotor_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotor C"
+          },
+          "rotor_peak_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotor Peak C"
+          },
+          "start_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Nm"
+          }
+        },
+        "title": "SpeedDetailOut",
+        "type": "object"
+      },
       "SpeedRatingOut": {
         "properties": {
           "hot_spot_at": {
@@ -5511,6 +5971,16 @@
               }
             ],
             "title": "Hot Spot C"
+          },
+          "nominal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpeedDetailOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "nominal_continuous_nm": {
             "anyOf": [
@@ -5548,6 +6018,16 @@
               }
             ],
             "title": "Peak Hot Spot C"
+          },
+          "rated": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpeedDetailOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rated_continuous_nm": {
             "anyOf": [
@@ -5597,6 +6077,68 @@
         "title": "SpeedRatingOut",
         "type": "object"
       },
+      "StressOut": {
+        "properties": {
+          "check_speed_rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Speed Rpm"
+          },
+          "governing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Governing"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "safety_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Factor"
+          },
+          "speed_limit_rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Limit Rpm"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StressOut",
+        "type": "object"
+      },
       "TargetCheckIn": {
         "additionalProperties": false,
         "properties": {
@@ -5637,6 +6179,209 @@
           "log"
         ],
         "title": "TargetCheckOut",
+        "type": "object"
+      },
+      "ThermalCheckOut": {
+        "properties": {
+          "continuous_hot_c": {
+            "default": [],
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Continuous Hot C",
+            "type": "array"
+          },
+          "holds": {
+            "title": "Holds",
+            "type": "boolean"
+          },
+          "hot_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hot C"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "peak_hot_c": {
+            "default": [],
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Peak Hot C",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpm"
+          },
+          "which": {
+            "default": "",
+            "title": "Which",
+            "type": "string"
+          }
+        },
+        "required": [
+          "holds"
+        ],
+        "title": "ThermalCheckOut",
+        "type": "object"
+      },
+      "ThermalSpeedOut": {
+        "properties": {
+          "binds_continuous": {
+            "default": "",
+            "title": "Binds Continuous",
+            "type": "string"
+          },
+          "binds_peak": {
+            "default": "",
+            "title": "Binds Peak",
+            "type": "string"
+          },
+          "headroom_k": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headroom K"
+          },
+          "hot_spot_text": {
+            "default": "",
+            "title": "Hot Spot Text",
+            "type": "string"
+          },
+          "need_continuous_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need Continuous Nm"
+          },
+          "need_peak_nm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need Peak Nm"
+          },
+          "rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpm"
+          }
+        },
+        "required": [
+          "rpm"
+        ],
+        "title": "ThermalSpeedOut",
+        "type": "object"
+      },
+      "ThermalSummaryOut": {
+        "properties": {
+          "iron_band": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iron Band"
+          },
+          "least_margin_rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Least Margin Rpm"
+          },
+          "speeds": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ThermalSpeedOut"
+            },
+            "title": "Speeds",
+            "type": "array"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/VerdictOut"
+          }
+        },
+        "required": [
+          "verdict"
+        ],
+        "title": "ThermalSummaryOut",
         "type": "object"
       },
       "ValidateIn": {
@@ -5777,6 +6522,105 @@
           "material_grades"
         ],
         "title": "ValidationOut",
+        "type": "object"
+      },
+      "VerdictOut": {
+        "properties": {
+          "binds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binds"
+          },
+          "holds": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holds"
+          },
+          "hot_spot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hot Spot At"
+          },
+          "hot_spot_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hot Spot C"
+          },
+          "margin_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Pct"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpm"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "which": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Which"
+          }
+        },
+        "title": "VerdictOut",
         "type": "object"
       },
       "WaveformsOut": {
@@ -7092,6 +7936,43 @@
           }
         },
         "summary": "Case Setup"
+      }
+    },
+    "/api/cases/{case_id}/thermal/fields": {
+      "get": {
+        "operationId": "thermal_fields_route_api_cases__case_id__thermal_fields_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Thermal Fields Route"
       }
     },
     "/api/cases/{case_id}/validate": {

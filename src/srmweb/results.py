@@ -98,6 +98,22 @@ class ScanPointOut(_Out):
     feasible: bool
 
 
+class SpeedDetailOut(_Out):
+    envelope_nm: F = None
+    continuous_nm: F = None
+    peak_nm: F = None
+    hot_spot_c: F = None
+    hot_spot_at: str = ""
+    peak_hot_spot_c: F = None
+    peak_hot_spot_at: str = ""
+    rotor_c: F = None
+    rotor_peak_c: F = None
+    bore_c: F = None
+    bore_peak_c: F = None
+    start_nm: F = None
+    note: str = ""
+
+
 class SpeedRatingOut(_Out):
     rpm: F
     nominal_continuous_nm: F
@@ -108,6 +124,47 @@ class SpeedRatingOut(_Out):
     hot_spot_at: str
     peak_hot_spot_c: F
     peak_hot_spot_at: str
+    nominal: SpeedDetailOut | None = None
+    rated: SpeedDetailOut | None = None
+
+
+class BudgetShareOut(_Out):
+    row: str
+    rpm: F
+    hot_spot_rise_k: F
+
+
+class GapCaseOut(_Out):
+    centrifugal: F = None
+    rotor_thermal: F = None
+    stator_thermal: F = None
+    closure: F = None
+    note: str = ""
+
+
+class GapOut(_Out):
+    cases: dict[str, GapCaseOut] = {}
+    air_gap_m: F = None
+
+
+class StressOut(_Out):
+    status: str
+    safety_factor: F = None
+    governing: str | None = None
+    speed_limit_rpm: F = None
+    check_speed_rpm: F = None
+    note: str = ""
+
+
+class CoolingOut(_Out):
+    kind: str
+    placeholder: bool
+    ambient_c: F = None
+    housing_thickness: F = None
+    jacket: dict[str, Any] | None = None
+    end_spray: dict[str, Any] | None = None
+    shaft_oil: dict[str, Any] | None = None
+    slot_oil: dict[str, Any] | None = None
 
 
 class RatingOut(_Out):
@@ -117,6 +174,52 @@ class RatingOut(_Out):
     stress_status: str
     stress_safety_factor: F
     notes: list[str]
+    shares: list[BudgetShareOut] = []
+    gap: GapOut | None = None
+    stress: StressOut | None = None
+    torque_factor: F = None
+    cooling: CoolingOut | None = None
+    srmapp_version: str | None = None
+
+
+class ThermalCheckOut(_Out):
+    holds: bool
+    rpm: F = None
+    continuous_hot_c: Vec = []
+    peak_hot_c: Vec = []
+    notes: list[str] = []
+    reason: str = ""
+    which: str = ""
+    hot_c: F = None
+
+
+class VerdictOut(_Out):
+    holds: bool | None = None
+    rpm: F = None
+    margin_pct: F = None
+    which: str | None = None
+    binds: str | None = None
+    hot_spot_c: F = None
+    hot_spot_at: str | None = None
+    reason: str | None = None
+    text: str = ""
+
+
+class ThermalSpeedOut(_Out):
+    rpm: F
+    need_continuous_nm: F = None
+    need_peak_nm: F = None
+    binds_continuous: str = ""
+    binds_peak: str = ""
+    hot_spot_text: str = ""
+    headroom_k: F = None
+
+
+class ThermalSummaryOut(_Out):
+    verdict: VerdictOut
+    speeds: list[ThermalSpeedOut] = []
+    least_margin_rpm: F = None
+    iron_band: Vec | None = None
 
 
 class EvaluationOut(_Out):
@@ -143,6 +246,12 @@ class EvaluationOut(_Out):
     rated_continuous_kw_per_kg: F = None
     rated_peak_kw_per_kg: F = None
     srmcore_version: str | None = None
+    thermal_check: ThermalCheckOut | None = None
+    thermal_summary: ThermalSummaryOut | None = None
+    thermal_fields: str | None = None   # key of the temperature-field file; null when not rated and before R5d
+    active_volume_l: F = None
+    rated_continuous_kw_per_l: F = None
+    rated_peak_kw_per_l: F = None
     map: MapArraysOut | None = None
     curves: MapCurvesOut | None = None
 

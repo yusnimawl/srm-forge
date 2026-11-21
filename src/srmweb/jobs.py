@@ -32,6 +32,7 @@ from srmweb.quick import QuickLane
 from srmweb.frames import frame_task
 from srmweb.schemas import (AnimateRequest, ControlRequest, EvaluateRequest, HilFlashRequest, LossesRequest, MotorIn,
                              SearchRequest, ValidateRequest)
+from srmweb import thermal_files
 from srmweb.serialize import evaluation_json, search_result_json, to_json
 from srmweb.store import ACTIVE, FINAL, RESUMABLE, Store  # noqa: F401  (status groups are defined in store)
 
@@ -292,9 +293,16 @@ def run_search_job(req: SearchRequest, reporter: Reporter, ctx: JobContext) -> d
                           points_total=total, message=f"design {design}/{designs}")
 
     reporter.progress(step="sampling", message="sampling candidates")
+    keys: dict[str, str] = {}
+
+    def on_fields(candidate_id: str, fields) -> None:
+        keys[candidate_id] = thermal_files.fields_key(reporter.job_id, candidate_id)
+        thermal_files.write(settings.cache_dir, keys[candidate_id], fields)
+
     result = run_search(req.requirements, ss, workers=settings.workers, cache_dir=settings.cache_dir,
-                        progress=on_design, point_progress=on_point, cancel=reporter.cancelled)
-    return search_result_json(result)
+                        progress=on_design, point_progress=on_point, cancel=reporter.cancelled,
+                        on_fields=on_fields)
+    return search_result_json(result, keys)
 
 
 def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) -> dict:
@@ -331,11 +339,18 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
         else:   # the winding checks run inside whichever step is current; the stepper never moves back
             reporter.progress(message=f"rating the windings, {done} of {total}")
 
+    key = None
+
+    def on_fields(fields) -> None:
+        nonlocal key
+        key = thermal_files.fields_key(reporter.job_id, req.case_id)
+        thermal_files.write(settings.cache_dir, key, fields)
+
     reporter.progress(step="mesh", message="meshing")
     grid = {"grid": StageTwoGrid(*req.grid)} if req.grid else {}
     ev = evaluate_design(req.inputs, case_id=req.case_id, workers=settings.workers, cache_dir=settings.cache_dir,
                          progress=on_point, cancel=reporter.cancelled, on_scan=on_scan, scan_progress=on_winding,
-                         thermal_progress=on_thermal, thermal=req.thermal, **grid)
+                         thermal_progress=on_thermal, thermal=req.thermal, fields_out=on_fields, **grid)
     if ev.status == "cancelled":
         return {"cancelled": True}
     if last is not None and counts[0] == counts[1]:  # a cached or partial map is no timing
@@ -343,7 +358,7 @@ def run_evaluate_job(req: EvaluateRequest, reporter: Reporter, ctx: JobContext) 
     if scan_start is not None:
         mode = "auto" if req.inputs.winding == "auto" else "fixed"
         reporter.store.add_scan_time(mode, (time.monotonic() if scan_end is None else scan_end) - scan_start)
-    return evaluation_json(ev)
+    return evaluation_json(ev, fields_key=key, requirements=req.inputs.requirements)
 
 
 def run_validate_job(req: ValidateRequest, reporter: Reporter, ctx: JobContext) -> dict:
