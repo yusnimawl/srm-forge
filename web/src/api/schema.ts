@@ -2935,6 +2935,22 @@ export interface components {
             /** Inlet C */
             inlet_c: number;
         };
+        /** ShareRowOut */
+        ShareRowOut: {
+            /** Hint */
+            hint?: string | null;
+            /** K */
+            k: number | null;
+            /** Label */
+            label: string;
+            /** Row */
+            row: string;
+            /**
+             * Runaway
+             * @default false
+             */
+            runaway: boolean;
+        };
         /** SlotOil */
         SlotOil: {
             /** Channel Height */
@@ -3009,6 +3025,16 @@ export interface components {
             rated_continuous_nm: number | null;
             /** Rated Peak Nm */
             rated_peak_nm: number | null;
+            /** Rpm */
+            rpm: number | null;
+        };
+        /** SpeedSharesOut */
+        SpeedSharesOut: {
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["ShareRowOut"][];
             /** Rpm */
             rpm: number | null;
         };
@@ -3112,6 +3138,11 @@ export interface components {
             iron_band?: (number | null)[] | null;
             /** Least Margin Rpm */
             least_margin_rpm?: number | null;
+            /**
+             * Shares
+             * @default []
+             */
+            shares: components["schemas"]["SpeedSharesOut"][];
             /**
              * Speeds
              * @default []

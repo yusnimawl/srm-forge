@@ -108,6 +108,11 @@ def shares_at(rating: Rating, rpm: float) -> list[dict]:
              "runaway": s.hot_spot_rise_k >= BIG_K} for s in sorted(rows, key=lambda s: -s.hot_spot_rise_k)]
 
 
+def _all_shares(rating: Rating) -> list[dict]:
+    rpms = sorted({s.rpm for s in rating.shares})
+    return [{"rpm": r, "rows": [{**d, "hint": hint(d["row"])} for d in shares_at(rating, r)]} for r in rpms]
+
+
 def iron_band(rating: Rating) -> tuple[float, float]:
     return K_IRON_HI[0][1], K_IRON_HI[-1][1]
 
@@ -126,5 +131,6 @@ def summary(rating: Rating | None, check: RequirementCheck | None, req: Requirem
     v = verdict(rating, check, req)
     return {"verdict": asdict(v),
             "speeds": [] if rating is None else [_speed(s, req, rating.limit_c) for s in rating.rated],
+            "shares": [] if rating is None else _all_shares(rating),
             "least_margin_rpm": v.rpm,
             "iron_band": None if rating is None else list(iron_band(rating))}

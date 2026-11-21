@@ -5792,6 +5792,52 @@
         "title": "ShaftOil",
         "type": "object"
       },
+      "ShareRowOut": {
+        "properties": {
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "k": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "K"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "row": {
+            "title": "Row",
+            "type": "string"
+          },
+          "runaway": {
+            "default": false,
+            "title": "Runaway",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "row",
+          "label",
+          "k"
+        ],
+        "title": "ShareRowOut",
+        "type": "object"
+      },
       "SlotOil": {
         "additionalProperties": false,
         "properties": {
@@ -6082,6 +6128,34 @@
         "title": "SpeedRatingOut",
         "type": "object"
       },
+      "SpeedSharesOut": {
+        "properties": {
+          "rows": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShareRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "rpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpm"
+          }
+        },
+        "required": [
+          "rpm"
+        ],
+        "title": "SpeedSharesOut",
+        "type": "object"
+      },
       "StressOut": {
         "properties": {
           "check_speed_rpm": {
@@ -6370,6 +6444,14 @@
               }
             ],
             "title": "Least Margin Rpm"
+          },
+          "shares": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SpeedSharesOut"
+            },
+            "title": "Shares",
+            "type": "array"
           },
           "speeds": {
             "default": [],

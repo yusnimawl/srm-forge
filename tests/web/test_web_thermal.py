@@ -71,6 +71,7 @@ def test_evaluation_json_carries_thermal_keys():
     body = evaluation_json(ev, fields_key="j_c0", requirements=Requirements(**REQ))
     out = results.EvaluationOut.model_validate(body)
     assert out.thermal_fields == "j_c0" and out.thermal_check.holds and out.thermal_summary is not None
+    assert isinstance(out.thermal_summary.shares, list)
     assert evaluation_json(evaluation("c0"))["thermal_fields"] is None
     old = evaluation_json(evaluation("c0"))
     for k in ("thermal_check", "thermal_summary", "thermal_fields"):

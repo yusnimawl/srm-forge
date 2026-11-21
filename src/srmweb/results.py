@@ -215,9 +215,23 @@ class ThermalSpeedOut(_Out):
     headroom_k: F = None
 
 
+class ShareRowOut(_Out):
+    row: str
+    label: str
+    k: F
+    runaway: bool = False
+    hint: str | None = None
+
+
+class SpeedSharesOut(_Out):
+    rpm: F
+    rows: list[ShareRowOut] = []
+
+
 class ThermalSummaryOut(_Out):
     verdict: VerdictOut
     speeds: list[ThermalSpeedOut] = []
+    shares: list[SpeedSharesOut] = []
     least_margin_rpm: F = None
     iron_band: Vec | None = None
 

@@ -124,6 +124,16 @@ def test_shares_sorted_and_runaway():
     assert out[0]["runaway"] is True and out[1]["runaway"] is False and out[1]["label"] == ts.ROW_LABELS["iron"]
 
 
+def test_summary_shares_carry_hints():
+    shares = [BudgetShare("liner", 2000.0, 5.0), BudgetShare("iron", 2000.0, 9.0), BudgetShare("contact", 6000.0, 1.0),
+              BudgetShare("air_gap", 6000.0, 0.5)]
+    out = ts.summary(rating(_rated({2000.0: 1, 6000.0: 1}, {2000.0: 1, 6000.0: 1}), shares), check(), Req)["shares"]
+    assert [e["rpm"] for e in out] == [2000.0, 6000.0]
+    assert out[0]["rows"][0]["row"] == "iron" and out[0]["rows"][0]["hint"] == ts.HINTS["iron"]
+    assert out[1]["rows"][1]["hint"] is None
+    assert ts.summary(None, check(), Req)["shares"] == []
+
+
 def test_nan_speed_is_null_safe():
     from srmweb.serialize import to_json
     nan = sr(2000.0, 0.0, 10.0, hot=(float("nan"), "none"))
