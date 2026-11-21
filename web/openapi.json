@@ -1950,6 +1950,11 @@
             "title": "New Map",
             "type": "boolean"
           },
+          "rated": {
+            "default": false,
+            "title": "Rated",
+            "type": "boolean"
+          },
           "seconds": {
             "title": "Seconds",
             "type": "number"

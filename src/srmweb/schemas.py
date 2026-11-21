@@ -122,7 +122,8 @@ class IssuesOut(BaseModel):
 
 class EstimateOut(BaseModel):
     new_map: bool
-    seconds: float      # a new map (when new_map), the winding choice and, when rated, one rating (longer if the design fails the thermal check)
+    seconds: float      # a new map (when new_map), the winding choice and, when rated, one rating
+    rated: bool = False  # the rating time is counted; a design that fails the thermal check takes longer
     basis: Literal["history", "budget"]
 
 

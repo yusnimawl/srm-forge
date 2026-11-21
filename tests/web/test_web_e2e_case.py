@@ -60,4 +60,4 @@ def test_case_evaluate_end_to_end(tmp_path, monkeypatch):
         monkeypatch.setitem(GRID_SIZES, "screening", (4, 3))
         est = client.get(f"/api/cases/{cid}/estimate")
         assert est.status_code == 200, est.text
-        assert est.json() == {"new_map": False, "seconds": pytest.approx(scan_s), "basis": "history"}
+        assert est.json() == {"new_map": False, "seconds": pytest.approx(scan_s), "basis": "history", "rated": True}

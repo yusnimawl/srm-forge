@@ -233,7 +233,7 @@ def test_estimate_without_history_uses_the_budget(client):
     pytest.importorskip("ngsolve")
     case_id = _draft(client, _inputs("full"))
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
-        "new_map": True, "seconds": 1560.0 + 72.0, "basis": "budget"}
+        "new_map": True, "seconds": 1560.0 + 72.0, "basis": "budget", "rated": False}
     case_id = _draft(client, _inputs("screening"))
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()["seconds"] == 228.0 + 72.0
     fixed = _inputs("screening") | {"winding": {"turns": 10}}
@@ -248,12 +248,12 @@ def test_estimate_uses_recent_map_and_scan_times(client):
     store.add_map_time("screening", 5.0)
     case_id = _draft(client, _inputs("full"))
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
-        "new_map": True, "seconds": 150.0 + 72.0, "basis": "budget"}     # no scan history yet
+        "new_map": True, "seconds": 150.0 + 72.0, "basis": "budget", "rated": False}     # no scan history yet
     store.add_scan_time("auto", 60.0)
     store.add_scan_time("auto", 80.0)
     store.add_scan_time("fixed", 1.0)
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
-        "new_map": True, "seconds": 150.0 + 70.0, "basis": "history"}
+        "new_map": True, "seconds": 150.0 + 70.0, "basis": "history", "rated": False}
 
 
 def test_estimate_of_a_cached_map(client, monkeypatch):
@@ -261,10 +261,10 @@ def test_estimate_of_a_cached_map(client, monkeypatch):
     monkeypatch.setattr(cases, "map_cache_hit", lambda inputs, cache_dir: seen.append(cache_dir) or True)
     case_id = _draft(client, _inputs())
     out = client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()
-    assert out == {"new_map": False, "seconds": 72.0, "basis": "budget"}     # only the winding choice remains
+    assert out == {"new_map": False, "seconds": 72.0, "basis": "budget", "rated": False}     # only the winding choice remains
     assert seen == [client.app.state.settings.cache_dir]
     client.app.state.store.add_scan_time("auto", 30.0)
-    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {"new_map": False, "seconds": 30.0, "basis": "history"}
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {"new_map": False, "seconds": 30.0, "basis": "history", "rated": False}
 
 
 def test_estimate_of_invalid_inputs_422(client):
@@ -361,3 +361,9 @@ def test_resume_of_a_job_whose_case_was_deleted_409(client, kind):
 def test_resume_of_a_validate_job_of_an_existing_case(client):
     job_id = _job_for(client, _evaluated(client, "full"), "validate")
     assert client.post(f"/api/jobs/{job_id}/resume").status_code == 201
+
+
+def test_estimate_route_says_whether_the_rating_is_counted(client):
+    case_id = _draft(client, _inputs("screening"))
+    assert client.get(f"/api/cases/{case_id}/estimate").json()["rated"] is True
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()["rated"] is False

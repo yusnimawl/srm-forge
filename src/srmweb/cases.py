@@ -15,7 +15,8 @@ from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
-RATING_BUDGET_S = {"screening": 600.0, "full": 2400.0, "reference": 9600.0}   # strokes plus thermal steps when none has been timed
+# strokes plus thermal steps of one rating, when none has been timed
+RATING_BUDGET_S = {"screening": 600.0, "full": 2400.0, "reference": 9600.0}
 SCAN_BUDGET_S = {"auto": 72.0, "fixed": 1.0}    # winding-choice time when none has been timed: LattePanda x 1.25
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 
@@ -80,9 +81,9 @@ def resolved_margin(raw) -> float | None:
 
 
 def estimate(inputs: CaseInputs, store: Store, cache_dir, thermal: bool = False) -> dict:
-    """Seconds an evaluation takes: a new map (if the cache lacks it) plus the winding choice that follows, plus one rating when `thermal` (longer if the design fails the thermal
-    check, which rates up to the next winding). `basis`
-    is "history" when every part comes from timed jobs, else "budget"."""
+    """Seconds an evaluation takes: a new map (if the cache lacks it) plus the winding choice that follows, plus one
+    rating when `thermal` (a design that fails the thermal check takes longer: the next winding is rated too).
+    `basis` is "history" when every part comes from timed jobs, else "budget"."""
     new_map = not map_cache_hit(inputs, cache_dir)
     seconds, timed = 0.0, True
     mode = "auto" if inputs.winding == "auto" else "fixed"
@@ -96,7 +97,7 @@ def estimate(inputs: CaseInputs, store: Store, cache_dir, thermal: bool = False)
     for times, budget in parts:
         seconds += sum(times) / len(times) if times else budget
         timed &= bool(times)
-    return {"new_map": new_map, "seconds": seconds, "basis": "history" if timed else "budget"}
+    return {"new_map": new_map, "seconds": seconds, "basis": "history" if timed else "budget", "rated": thermal}
 
 
 def losses_estimate(inputs: CaseInputs, store: Store, n_speeds: int, n_torques: int) -> dict:

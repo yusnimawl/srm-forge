@@ -64,5 +64,6 @@ export const canShowMore = (rows: CaseRow[]): boolean => rows.filter((r) => r.sh
 export function estimateText(e: Estimate): string {
   const minutes = Math.max(1, Math.round(e.seconds / 60))
   const time = e.seconds < 90 ? "about a minute" : `about ${minutes} min`
-  return e.new_map ? `1 new map, ${time}` : `No new map — ${time}`
+  const text = e.new_map ? `1 new map, ${time}` : `No new map — ${time}`
+  return e.rated ? `${text} (longer if the design fails the thermal check)` : text
 }

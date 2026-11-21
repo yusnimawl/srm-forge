@@ -80,13 +80,17 @@ describe("canShowMore", () => {
 
 describe("estimateText", () => {
   it("reads the estimate", () => {
-    expect(estimateText({ new_map: false, seconds: 30, basis: "history" })).toBe("No new map — about a minute")
-    expect(estimateText({ new_map: false, seconds: 450, basis: "budget" })).toBe("No new map — about 8 min")
-    expect(estimateText({ new_map: true, seconds: 2010, basis: "budget" })).toBe("1 new map, about 34 min")
-    expect(estimateText({ new_map: true, seconds: 20, basis: "history" })).toBe("1 new map, about a minute")
+    expect(estimateText({ new_map: false, seconds: 30, basis: "history", rated: false })).toBe("No new map — about a minute")
+    expect(estimateText({ new_map: false, seconds: 450, basis: "budget", rated: false })).toBe("No new map — about 8 min")
+    expect(estimateText({ new_map: true, seconds: 2010, basis: "budget", rated: false })).toBe("1 new map, about 34 min")
+    expect(estimateText({ new_map: true, seconds: 20, basis: "history", rated: false })).toBe("1 new map, about a minute")
+  })
+  it("warns that a failing thermal check takes longer", () => {
+    expect(estimateText({ new_map: false, seconds: 450, basis: "budget", rated: true })).toBe(
+      "No new map — about 8 min (longer if the design fails the thermal check)")
   })
   it("says a minute only below 90 s", () => {
-    expect(estimateText({ new_map: false, seconds: 89, basis: "history" })).toBe("No new map — about a minute")
-    expect(estimateText({ new_map: false, seconds: 91, basis: "history" })).toBe("No new map — about 2 min")
+    expect(estimateText({ new_map: false, seconds: 89, basis: "history", rated: false })).toBe("No new map — about a minute")
+    expect(estimateText({ new_map: false, seconds: 91, basis: "history", rated: false })).toBe("No new map — about 2 min")
   })
 })

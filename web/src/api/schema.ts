@@ -1490,6 +1490,11 @@ export interface components {
             basis: "history" | "budget";
             /** New Map */
             new_map: boolean;
+            /**
+             * Rated
+             * @default false
+             */
+            rated: boolean;
             /** Seconds */
             seconds: number;
         };

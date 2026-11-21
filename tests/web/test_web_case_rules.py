@@ -70,14 +70,14 @@ def test_estimate_adds_the_scan_to_a_new_map(tmp_path, monkeypatch):
     inputs = CaseInputs.model_validate(_raw())
     fixed = CaseInputs.model_validate(_raw(winding={"turns": 10}))
     monkeypatch.setattr(cases, "map_cache_hit", lambda i, d: False)
-    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 228.0 + 72.0, "basis": "budget"}
+    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 228.0 + 72.0, "basis": "budget", "rated": False}
     assert cases.estimate(fixed, store, tmp_path)["seconds"] == 228.0 + 1.0
     store.add_map_time("screening", 100.0)
     store.add_scan_time("auto", 20.0)
-    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 120.0, "basis": "history"}
+    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 120.0, "basis": "history", "rated": False}
     assert cases.estimate(fixed, store, tmp_path)["basis"] == "budget"     # no fixed-winding history
     monkeypatch.setattr(cases, "map_cache_hit", lambda i, d: True)
-    assert cases.estimate(inputs, store, tmp_path) == {"new_map": False, "seconds": 20.0, "basis": "history"}
+    assert cases.estimate(inputs, store, tmp_path) == {"new_map": False, "seconds": 20.0, "basis": "history", "rated": False}
 
 
 def test_estimate_adds_rating(tmp_path, monkeypatch):
@@ -90,4 +90,4 @@ def test_estimate_adds_rating(tmp_path, monkeypatch):
     assert out["seconds"] == 20.0 + cases.RATING_BUDGET_S["screening"] and out["basis"] == "budget"
     store.add_rating_time("screening", 100.0)
     store.add_rating_time("screening", 200.0)
-    assert cases.estimate(inputs, store, tmp_path, thermal=True) == {"new_map": False, "seconds": 170.0, "basis": "history"}
+    assert cases.estimate(inputs, store, tmp_path, thermal=True) == {"new_map": False, "seconds": 170.0, "basis": "history", "rated": True}
