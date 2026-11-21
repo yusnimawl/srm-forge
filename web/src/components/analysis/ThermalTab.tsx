@@ -121,7 +121,7 @@ function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
   const top = rows[0]
   const at = rating.speeds.find((s) => s.rpm === rpm)
   const sumSpeed = summary?.speeds.find((s) => s.rpm === rpm)
-  const endHot = state === "steady" ? sumSpeed?.hot_spot_text?.startsWith("end winding") : at?.peak_hot_spot_at?.startsWith("end_")
+  const endHot = state === "steady" ? (sumSpeed?.hot_spot_text?.startsWith("end winding") || at?.hot_spot_at?.startsWith("end_")) : at?.peak_hot_spot_at?.startsWith("end_")
   const endC = state === "steady" ? at?.hot_spot_c : at?.peak_hot_spot_c
   const endNote = endHot ? `hot spot: end winding (lumped, not in this section)${endC != null && Number.isFinite(endC) ? ` ${fmt(endC, 3)} °C` : ""}` : null
   return (

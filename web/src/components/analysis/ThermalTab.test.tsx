@@ -114,4 +114,11 @@ describe("ThermalTab", () => {
     const h = mount(full(150, "end winding, A1"))
     expect(h.textContent).toContain("hot spot: end winding (lumped, not in this section)")
   })
+  it("captions a lumped end-winding hot spot at the peak end", () => {
+    const ev = full()
+    ;(ev.rating!.speeds[1] as { peak_hot_spot_at: string }).peak_hot_spot_at = "end_A1"
+    const h = mount(ev)
+    act(() => { (Array.from(h.querySelectorAll("button")).find((b) => b.textContent === "Peak end") as HTMLElement).click() })
+    expect(h.textContent).toContain("hot spot: end winding (lumped, not in this section) 150 °C")
+  })
 })

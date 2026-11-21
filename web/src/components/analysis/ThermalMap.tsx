@@ -22,33 +22,55 @@ export default function ThermalMap({ caseId, rpm, state, onSpeeds }: {
   return <Map data={data} rpm={rpm} state={state} />
 }
 
+const TOL = 0.5
+
 function Map({ data, rpm, state }: { data: ThermalFieldsData; rpm: number; state: "steady" | "peak" }) {
-  const i = Math.max(0, data.rpm.indexOf(rpm))
+  const i = data.rpm.findIndex((r) => Math.abs(r - rpm) <= TOL)
   const [lo, hi] = useMemo(() => {
     let lo = Infinity, hi = -Infinity
-    for (const v of [...data.steady[i], ...data.peak[i]]) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v) }
+    for (const v of i < 0 ? [] : [...data.steady[i], ...data.peak[i]]) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v) }
     return hi > lo ? [lo, hi] : [0, 1]
   }, [data, i])
   const scene = useMemo(
-    () => buildScalarScene(data.nodes, data.triangles, data.kind, data[state][i], lo, hi),
+    () => (i < 0 ? null : buildScalarScene(data.nodes, data.triangles, data.kind, data[state][i], lo, hi)),
     [data, state, i, lo, hi],
   )
   const ref = useRef<HTMLCanvasElement>(null)
-  const [gl] = useState(() => canRender() === "webgl2")
+  const renderer = useRef<Renderer | null>(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  // A canvas that has held a webgl2 context cannot give a 2d one, so falling back remounts a fresh canvas.
+  const [mode, setMode] = useState<{ gl: boolean; key: number }>(() => ({ gl: canRender() === "webgl2", key: 0 }))
+  const [ready, setReady] = useState(false)
   useEffect(() => {
-    const c = ref.current!
-    const dpr = window.devicePixelRatio || 1
-    c.width = Math.max(1, Math.round(c.clientWidth * dpr))
-    c.height = Math.max(1, Math.round(c.clientHeight * dpr))
-    const m = viewMatrix(scene.bounds, c.width, c.height, 1, [0, 0])
-    const r: Renderer | null = gl ? createGlRenderer(c) : null
-    if (r) { r.draw(scene, m, true); return () => r.dispose() }
-    const ctx = gl ? null : c.getContext("2d")
-    if (ctx) draw2d(ctx, scene, m, c.width, c.height, true)
-  }, [scene, gl])
+    const c = ref.current
+    if (!c) return
+    const fallBack = () => setMode((o) => ({ gl: false, key: o.key + 1 }))
+    renderer.current = mode.gl ? createGlRenderer(c, fallBack) : null
+    if (mode.gl && !renderer.current) fallBack()
+    setReady(true)
+    const ro = new ResizeObserver(() => {
+      const dpr = window.devicePixelRatio || 1
+      c.width = Math.max(1, Math.round(c.clientWidth * dpr))
+      c.height = Math.max(1, Math.round(c.clientHeight * dpr))
+      setSize({ w: c.width, h: c.height })
+    })
+    ro.observe(c)
+    return () => { ro.disconnect(); renderer.current?.dispose(); renderer.current = null; setReady(false) }
+  }, [mode, i < 0])
+  useEffect(() => {
+    const c = ref.current
+    if (!c || !scene || !ready || size.w === 0) return
+    const m = viewMatrix(scene.bounds, size.w, size.h, 1, [0, 0])
+    if (renderer.current) renderer.current.draw(scene, m, true)
+    else {
+      const ctx = c.getContext("2d")
+      if (ctx) draw2d(ctx, scene, m, size.w, size.h, true)
+    }
+  }, [ready, scene, size])
+  if (i < 0) return <p className="text-sm text-muted-foreground">No map for this speed</p>
   return (
     <div className="flex gap-3">
-      <canvas ref={ref} role="img" aria-label={`Temperature of the cross-section at ${rpm} r/min, ${state}`}
+      <canvas key={mode.key} ref={ref} role="img" aria-label={`Temperature of the cross-section at ${rpm} r/min, ${state}`}
         className="aspect-square w-full max-w-md rounded-[10px] border border-border bg-muted/30" />
       <ColorBar bMax={hi} lo={lo} unit="°C" label="Temperature" />
     </div>
