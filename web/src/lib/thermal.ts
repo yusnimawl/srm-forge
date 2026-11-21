@@ -9,9 +9,9 @@ export type ShareRow = ThermalSummary["shares"][number]["rows"][number]
 
 export type TabState = "unrated" | "summary-only" | "check-only" | "full"
 
-/** Which parts of the tab an evaluation can fill: a pre-R5d rating has no shares, a failed search candidate only a check. */
+/** Which parts of the tab an evaluation can fill: a pre-R5d rating has no stress block, a failed search candidate only a check. */
 export function tabState(ev: Evaluation): TabState {
-  if (ev.rating) return ev.rating.shares.length > 0 ? "full" : "summary-only"
+  if (ev.rating) return ev.rating.stress != null ? "full" : "summary-only"
   return ev.thermal_check ? "check-only" : "unrated"
 }
 

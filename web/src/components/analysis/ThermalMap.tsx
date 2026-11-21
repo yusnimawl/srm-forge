@@ -68,6 +68,8 @@ function Map({ data, rpm, state }: { data: ThermalFieldsData; rpm: number; state
     }
   }, [ready, scene, size])
   if (i < 0) return <p className="text-sm text-muted-foreground">No map for this speed</p>
+  if (state === "peak" && data.peak[i].every((v) => Number.isNaN(v)))
+    return <p className="text-sm text-muted-foreground">No peak state at this speed: the continuous torque is EM-bound</p>
   return (
     <div className="flex gap-3">
       <canvas key={mode.key} ref={ref} role="img" aria-label={`Temperature of the cross-section at ${rpm} r/min, ${state}`}

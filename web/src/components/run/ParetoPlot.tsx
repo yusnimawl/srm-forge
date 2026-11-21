@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { useNavigate } from "react-router"
-import { AXES, unratedCount, type AxisKey, type CandidateRow } from "@/lib/candidates"
+import { AXES, defaultAxes, unratedCount, type AxisKey, type CandidateRow } from "@/lib/candidates"
 import { INFERNO_SCALE } from "@/lib/inferno"
 import { SELECT_CLASS } from "@/components/case/fields"
 import { cn } from "@/lib/utils"
@@ -42,8 +42,8 @@ export default function ParetoPlot({ rows }: { rows: CandidateRow[] }) {
   const navigate = useNavigate()
   const wide = useMedia("(min-width: 1024px)")
   const c = useColors()
-  const [x, setX] = useState<AxisKey>("rated_peak_kw_per_kg")
-  const [y, setY] = useState<AxisKey>("rated_continuous_kw_per_kg")
+  const [x, setX] = useState<AxisKey>(() => defaultAxes(rows)[0])
+  const [y, setY] = useState<AxisKey>(() => defaultAxes(rows)[1])
   const [z, setZ] = useState<AxisKey>("peak_power_kw")
   const [three, setThree] = useState(false)
   const is3d = three && wide

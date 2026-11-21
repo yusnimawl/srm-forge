@@ -136,6 +136,13 @@ describe("buildReport", () => {
     expect(section(buildReport(fixture({ caseOut: v }), PLOTLY), "header")).toContain("2D-verified · srmcore 0.4.0")
   })
 
+  it("shows the rated chips, not the j_limit chip, on a rated case", () => {
+    const rated = { ...evaluation, rating: { insulation_class: "F", limit_c: 155, speeds: [], shares: [], notes: [], stress: {} } }
+    const h = section(buildReport(fixture({ caseOut: caseOut({ evaluation: rated }) }), PLOTLY), "header")
+    expect(h).toContain("Rated · class F 155 °C")
+    expect(h).not.toContain("Peak only")
+  })
+
   it("tells an old evaluation to be re-evaluated before running losses", () => {
     const old = caseOut({ evaluation: { ...evaluation, srmapp_version: null } })
     expect(section(buildReport(fixture({ caseOut: old }), PLOTLY), "losses")).toContain("re-evaluate")
@@ -249,7 +256,7 @@ describe("thermal section", () => {
     expect(section(buildReport(fixture({ thermal: null }), PLOTLY), "thermal")).toContain("Not run")
   })
   it("a summary-only rating asks for a new evaluation", () => {
-    const s = section(buildReport(withThermal({ ...rating, shares: [] }, summary, { ...map, mapSrc: null, rpm: null }), PLOTLY), "thermal")
+    const s = section(buildReport(withThermal({ ...rating, shares: [], stress: undefined }, summary, { ...map, mapSrc: null, rpm: null }), PLOTLY), "thermal")
     expect(s).toContain("Edit, then Evaluate, for full detail")
     expect(s).not.toContain("Iron &lt;loss&gt;")
   })

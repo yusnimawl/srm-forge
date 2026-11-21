@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Evaluation } from "@/api/types"
-import { AXES, toRows, unratedCount } from "./candidates"
+import { AXES, defaultAxes, toRows, unratedCount } from "./candidates"
 import { fmt } from "./format"
 
 // Only the fields toRows reads are filled; the full generated design has many more.
@@ -60,5 +60,13 @@ describe("rated axes", () => {
   it("counts rows without a value on the chosen axes", () => {
     expect(unratedCount(rated, ["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"])).toBe(1)
     expect(unratedCount(rated, ["mass_kg", "peak_power_kw"])).toBe(0)
+  })
+})
+
+describe("defaultAxes", () => {
+  const row = (o: object) => o as never
+  it("uses the rated axes only when a row has both values", () => {
+    expect(defaultAxes([row({ rated_peak_kw_per_kg: 2, rated_continuous_kw_per_kg: 1 })])).toEqual(["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"])
+    expect(defaultAxes([row({ rated_peak_kw_per_kg: null, rated_continuous_kw_per_kg: null })])).toEqual(["mass_kg", "power_density"])
   })
 })

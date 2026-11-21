@@ -65,6 +65,9 @@ describe("thermalChips", () => {
       { text: "Iron ×3.2–7 band", tone: "warn" },
     ])
   })
+  it("rounds the limit like the server", () => {
+    expect(thermalChips(rated({ insulation_class: "H", limit_c: 152.5 })).map((c) => c.text)).toEqual(["Rated · class H 153 °C"])
+  })
   it("drops the placeholder note when set", () => {
     const t = thermalChips(rated({ insulation_class: "F", limit_c: 140, cooling: { kind: "end_spray", placeholder: false } }))
     expect(t.map((c) => c.text)).toEqual(["Rated · class F 140 °C", "Cooling: end_spray"])

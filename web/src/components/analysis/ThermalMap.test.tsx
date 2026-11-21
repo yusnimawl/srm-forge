@@ -16,10 +16,10 @@ const data = {
   kind: new Uint8Array([0]), steady: [new Float32Array([20, 60, 40])], peak: [new Float32Array([NaN, NaN, NaN])],
   endWindingSteadyC: [null], endWindingPeakC: [null],
 }
-async function mount(rpm = 1000) {
+async function mount(rpm = 1000, state: "steady" | "peak" = "steady") {
   const host = document.createElement("div")
   document.body.append(host)
-  await act(async () => { createRoot(host).render(<ThermalMap caseId="c" rpm={rpm} state="steady" />) })
+  await act(async () => { createRoot(host).render(<ThermalMap caseId="c" rpm={rpm} state={state} />) })
   return host
 }
 afterEach(() => { document.body.innerHTML = ""; fetchMock.mockReset() })
@@ -34,6 +34,12 @@ describe("ThermalMap", () => {
   it("says so for a speed without a map", async () => {
     fetchMock.mockResolvedValue(data)
     expect((await mount(5000)).textContent).toContain("No map for this speed")
+  })
+  it("says so when the peak state is missing", async () => {
+    fetchMock.mockResolvedValue(data)
+    const h = await mount(1000, "peak")
+    expect(h.textContent).toContain("No peak state at this speed")
+    expect(h.querySelector("canvas")).toBeNull()
   })
   it("shows the error state", async () => {
     fetchMock.mockRejectedValue(new Error("x"))

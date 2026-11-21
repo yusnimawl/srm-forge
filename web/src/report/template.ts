@@ -1,7 +1,7 @@
 import type { Layout } from "plotly.js-dist-min"
 import type { Evaluation, MapArrays } from "@/api/types"
 import { caseLine, designFactorTraces, inductanceCurves, performanceSeries, torqueCurves, type Trace } from "@/lib/analysis"
-import { jLimitChip, lossChips, madeWithText, mechanicalState, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
+import { lossChips, madeWithText, mechanicalState, thermalChips, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
 import { compareRows } from "@/lib/compare"
 import { MACHINE_FIELDS, POLE_KEYS } from "@/lib/caseForm"
 import { fmt, fmtSI } from "@/lib/format"
@@ -133,7 +133,7 @@ export function buildReport(data: ReportData, plotlySource: string): string {
 
   // header
   const validation = caseOut.validation
-  const chips = [verifiedChip(validation?.label ? validation.engine_version : null), ...(ev ? [jLimitChip(ev.j_limit)] : [])]
+  const chips = [verifiedChip(validation?.label ? validation.engine_version : null), ...(ev ? thermalChips(ev) : [])]
   const v = report.versions
   const header = section(
     "header",
@@ -329,7 +329,7 @@ ${kv([
     const verdict = summary ? `<p><strong>${e(summary.verdict.text)}</strong></p>` : ""
     if (!rating || state === "check-only") {
       const hot = summary?.verdict.hot_spot_c ?? ev.thermal_check?.hot_c
-      return `${verdict}${hot != null && Number.isFinite(hot) ? `<p>Hot spot at the required torque: ${e(fmt(hot, 3))} °C</p>` : ""}<p class="muted">Make a case and Evaluate for the full rating</p>`
+      return `${verdict}${hot != null && Number.isFinite(hot) ? `<p>Hot spot at the required torque: ${e(fmt(hot, 3))} °C</p>` : ""}<p class="muted">Edit, then Evaluate, for the full rating</p>`
     }
     const need = new Map((summary?.speeds ?? []).map((s) => [s.rpm, s]))
     const rows = rating.speeds.map((s) => {

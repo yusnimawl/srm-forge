@@ -64,6 +64,12 @@ export function toRows(result: Pick<SearchResult, "evaluations" | "pareto_ids">)
   })
 }
 
+/** The rated axes when any row has both values (a thermal search); else mass against power density. */
+export const defaultAxes = (rows: CandidateRow[]): [AxisKey, AxisKey] =>
+  rows.some((r) => r.rated_peak_kw_per_kg != null && r.rated_continuous_kw_per_kg != null)
+    ? ["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"]
+    : ["mass_kg", "power_density"]
+
 /** Rows that have no value on one of the chosen axes (the plot leaves them out). */
 export const unratedCount = (rows: CandidateRow[], axes: AxisKey[]): number =>
   rows.filter((r) => axes.some((k) => r[k] == null)).length

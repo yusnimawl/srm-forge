@@ -10,7 +10,8 @@ describe("tabState", () => {
     expect(tabState(ev({}))).toBe("unrated")
     expect(tabState(ev({ thermal_check: { holds: false } }))).toBe("check-only")
     expect(tabState(ev({ rating: { shares: [] } }))).toBe("summary-only")
-    expect(tabState(ev({ rating: { shares: [{}] }, thermal_check: {} }))).toBe("full")
+    expect(tabState(ev({ rating: { shares: [], stress: {} } }))).toBe("full")   // a rating with no shares is still R5d
+    expect(tabState(ev({ rating: { shares: [{}], stress: {} }, thermal_check: {} }))).toBe("full")
   })
 })
 

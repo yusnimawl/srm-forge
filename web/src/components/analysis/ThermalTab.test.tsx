@@ -70,7 +70,8 @@ describe("ThermalTab", () => {
   })
   it("renders a pre-R5d summary", () => {
     const ev = full()
-    ;(ev.rating as { shares: unknown[] }).shares = []
+    ;(ev.rating as { shares: unknown[]; stress?: unknown }).shares = []
+    delete (ev.rating as { stress?: unknown }).stress
     ;(ev.thermal_summary as { shares: unknown[] }).shares = []
     const h = mount(ev)
     expect(h.querySelectorAll("tbody tr[data-speed]")).toHaveLength(2)
@@ -84,7 +85,7 @@ describe("ThermalTab", () => {
       thermal_summary: { verdict: { holds: false, hot_spot_c: 171, text: "✗ Short at 6000 r/min: HOT_SPOT_ABOVE" }, speeds: [], shares: [] },
     } as unknown as Evaluation)
     expect(h.textContent).toContain("✗ Short at 6000 r/min")
-    expect(h.textContent).toContain("Make a case and Evaluate for the full rating")
+    expect(h.textContent).toContain("Edit, then Evaluate, for the full rating")
     expect(h.textContent).toContain("171 °C")
     expect(h.textContent).toContain("2 speeds passed")
   })

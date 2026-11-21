@@ -28,7 +28,7 @@ type RatedFields = {
 export function thermalChips(ev: RatedFields): { text: string; tone: ChipTone }[] {
   const r = ev.rating
   if (!r) return [jLimitChip(ev.j_limit), { text: "Not thermally rated", tone: "warn" }]
-  const limit = r.limit_c == null ? "" : ` ${r.limit_c} °C`
+  const limit = r.limit_c == null ? "" : ` ${Math.round(r.limit_c)} °C`
   const [lo, hi] = ev.thermal_summary?.iron_band ?? []
   return [
     { text: `Rated · class ${r.insulation_class}${limit}`, tone: "ok" as ChipTone },

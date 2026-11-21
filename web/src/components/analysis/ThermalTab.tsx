@@ -189,7 +189,7 @@ export default function ThermalTab({ evaluation, caseId }: { evaluation: Evaluat
         <Verdict text={evaluation.thermal_summary?.verdict.text ?? "✗ The thermal check failed"} />
         <FailedCheck ev={evaluation} />
         {(evaluation.thermal_check?.notes ?? []).map((n) => <p key={n} className="text-sm text-muted-foreground">{n}</p>)}
-        <p className="text-sm text-muted-foreground">Make a case and Evaluate for the full rating</p>
+        <p className="text-sm text-muted-foreground">Edit, then Evaluate, for the full rating</p>
       </div>
     )
   }
