@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState, type ReactNode } from "react"
 import type { Data, Layout } from "plotly.js-dist-min"
 import type { Evaluation } from "@/api/types"
 import { Plot, plotTheme, useColors } from "@/components/PlotlyPlot"
 import { fmt } from "@/lib/format"
-import { curveSpec, tabState, tornadoSpec, type Rating } from "@/lib/thermal"
+import { coolingText, curveSpec, passedSpeeds, tabState, tornadoSpec, type Rating } from "@/lib/thermal"
 
 const HEADING = "text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground"
 const CFG = { responsive: true, displaylogo: false }
@@ -12,6 +12,16 @@ const SMALL_GAP_M = 0.0003
 const WIDE = "max-[640px]:hidden"
 
 const temp = (c: number | null | undefined) => (c == null || !Number.isFinite(c) ? "no steady state" : `${fmt(c, 3)} °C`)
+
+/** Open content at 641 px and wider; a closed disclosure below. */
+function Collapsible({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <>
+      <div className="max-[640px]:hidden">{children}</div>
+      <details className="min-[641px]:hidden"><summary className="text-sm text-muted-foreground">{title}</summary>{children}</details>
+    </>
+  )
+}
 
 function Verdict({ text }: { text: string }) {
   const bad = text.startsWith("✗")
@@ -22,12 +32,13 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
   const rating = ev.rating!
   const need = new Map((ev.thermal_summary?.speeds ?? []).map((s) => [s.rpm, s]))
   const th = "px-2 py-1 text-left font-medium"
+  const lock = "sticky left-0 bg-card"
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-muted-foreground">
           <tr>
-            <th className={th}>Speed (r/min)</th>
+            <th className={`${th} ${lock}`}>Speed (r/min)</th>
             <th className={`${th} ${WIDE}`}>Need cont/peak (N·m)</th>
             <th className={th}>Cont</th>
             <th className={th}>Peak</th>
@@ -43,9 +54,9 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
             const rotor = temp(s.rated?.rotor_c)
             const hot = n?.hot_spot_text || temp(s.hot_spot_c)
             return (
-              <>
-                <tr key={s.rpm} data-speed={s.rpm} className="cursor-pointer border-t border-border" onClick={() => onToggle(s.rpm as number)}>
-                  <td className="px-2 py-1 font-mono">{fmt(s.rpm)}</td>
+              <Fragment key={s.rpm}>
+                <tr data-speed={s.rpm} className="cursor-pointer border-t border-border" onClick={() => onToggle(s.rpm as number)}>
+                  <td className={`px-2 py-1 font-mono ${lock}`}>{fmt(s.rpm)}</td>
                   <td className={`px-2 py-1 font-mono ${WIDE}`}>{n?.need_continuous_nm != null ? fmt(n.need_continuous_nm) : "–"} / {n?.need_peak_nm != null ? fmt(n.need_peak_nm) : "–"}</td>
                   <td className="px-2 py-1 font-mono">{fmt(s.rated_continuous_nm ?? null)}</td>
                   <td className="px-2 py-1 font-mono">{fmt(s.rated_peak_nm ?? null)}</td>
@@ -54,14 +65,14 @@ function SpeedTable({ ev, expanded, onToggle }: { ev: Evaluation; expanded: numb
                   <td className={`px-2 py-1 font-mono ${WIDE}`}>{rotor}</td>
                 </tr>
                 {open && (
-                  <tr key={`${s.rpm}-d`} className="min-[641px]:hidden">
+                  <tr className="min-[641px]:hidden">
                     <td colSpan={4} className="px-2 pb-2 text-muted-foreground">
                       Need {n?.need_continuous_nm != null ? fmt(n.need_continuous_nm) : "–"} / {n?.need_peak_nm != null ? fmt(n.need_peak_nm) : "–"} N·m · hot spot {hot}
                       {n?.headroom_k != null && ` (${fmt(n.headroom_k, 2)} K headroom)`} · rotor {rotor}
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             )
           })}
         </tbody>
@@ -84,21 +95,19 @@ function RotorLine({ rating }: { rating: Rating }) {
         : <>stress {st.status.replaceAll("_", " ")}</>}
       {air != null && cases.length > 0 && (
         <> · gap closure {cases.map(([k, c]) => `${k.replaceAll("_", " ")} ${mm(c.closure as number)}`).join(", ")} mm of {mm(air)} mm
-          (against {mm(SMALL_GAP_M)} mm: {cases.map(([, c]) => fmt(((c.closure as number) / SMALL_GAP_M) * 100, 2)).join(", ")} %)</>
+          (against {mm(SMALL_GAP_M)} mm: {cases.map(([k, c]) => `${k.replaceAll("_", " ")} ${fmt(((c.closure as number) / SMALL_GAP_M) * 100, 2)} %`).join(", ")})</>
       )}
     </p>
   )
 }
 
-function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
+function Rated({ ev }: { ev: Evaluation }) {
   const rating = ev.rating!
   const summary = ev.thermal_summary
   const full = tabState(ev) === "full"
   const [expanded, setExpanded] = useState<number | null>(null)
-  const [picked, setPicked] = useState<number | null>(null)
+  const [picked] = useState<number | null>(null)
   const rpm = picked ?? summary?.least_margin_rpm ?? rating.speeds[0]?.rpm
-  void setPicked // the speed picker arrives with the temperature map
-  void caseId
   const colors = useColors()
   const theme = plotTheme(colors)
   const curves = useMemo(() => curveSpec(rating, summary), [rating, summary])
@@ -109,7 +118,7 @@ function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
   const runaway = rows.filter((r) => r.runaway)
   const top = rows[0]
   return (
-    <div className="space-y-4 pt-2">
+    <div className="@container space-y-4 pt-2">
       <h2 className={HEADING}>Thermal · rated (every input at its unfavourable end) · class {rating.insulation_class}, limit {fmt(rating.limit_c, 3)} °C</h2>
       {full && summary && <Verdict text={summary.verdict.text} />}
       <SpeedTable ev={ev} expanded={expanded} onToggle={(r) => setExpanded(expanded === r ? null : r)} />
@@ -136,14 +145,10 @@ function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
         <p className="text-sm text-muted-foreground">Edit, then Evaluate, for full detail</p>
       )}
       {full && (
-        <>
+        <Collapsible title="Rotor and cooling">
           <RotorLine rating={rating} />
-          {rating.cooling && (
-            <p className="text-sm">
-              Cooling: {rating.cooling.kind.replaceAll("_", " ")}, ambient {fmt(rating.cooling.ambient_c)} °C{rating.cooling.placeholder && " (placeholder)"}
-            </p>
-          )}
-        </>
+          {rating.cooling && <p className="text-sm">Cooling: {coolingText(rating.cooling)}</p>}
+        </Collapsible>
       )}
       {rating.notes.length > 0 && (
         <details className="text-sm text-muted-foreground">
@@ -155,17 +160,30 @@ function Rated({ ev, caseId }: { ev: Evaluation; caseId?: string }) {
   )
 }
 
-export default function ThermalTab({ evaluation, caseId }: { evaluation: Evaluation; caseId?: string }) {
+function FailedCheck({ ev }: { ev: Evaluation }) {
+  const c = ev.thermal_check
+  const hot = ev.thermal_summary?.verdict.hot_spot_c ?? c?.hot_c
+  const passed = c ? passedSpeeds(c) : 0
+  return (
+    <>
+      {hot != null && Number.isFinite(hot) && <p className="text-sm">Hot spot at the required torque: {fmt(hot, 3)} °C</p>}
+      <p className="text-sm">{passed} {passed === 1 ? "speed" : "speeds"} passed before the failing speed</p>
+    </>
+  )
+}
+
+export default function ThermalTab({ evaluation }: { evaluation: Evaluation; caseId?: string }) {
   const state = tabState(evaluation)
   if (state === "unrated") return <p className="pt-2 text-sm text-muted-foreground">{evaluation.error || "Not thermally rated."}</p>
   if (state === "check-only") {
     return (
       <div className="space-y-2 pt-2">
         <Verdict text={evaluation.thermal_summary?.verdict.text ?? "✗ The thermal check failed"} />
+        <FailedCheck ev={evaluation} />
         {(evaluation.thermal_check?.notes ?? []).map((n) => <p key={n} className="text-sm text-muted-foreground">{n}</p>)}
         <p className="text-sm text-muted-foreground">Make a case and Evaluate for the full rating</p>
       </div>
     )
   }
-  return <Rated ev={evaluation} caseId={caseId} />
+  return <Rated ev={evaluation} />
 }

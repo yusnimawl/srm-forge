@@ -53,3 +53,23 @@ export function tornadoSpec(rows: ShareRow[]): Data[] {
     marker: { color: shown.map((r) => (r.runaway ? LINE_COLORS[4] : LINE_COLORS[1])) },
   } as Data]
 }
+
+type Check = NonNullable<Evaluation["thermal_check"]>
+type Cooling = NonNullable<Rating["cooling"]>
+
+/** Speeds that held before the failing one. The check stores hot spots per speed, not the speeds themselves. */
+export function passedSpeeds(c: Check): number {
+  const failedAtPeak = c.which === "peak" && c.hot_c != null && Number.isFinite(c.hot_c)
+  return Math.max(0, c.peak_hot_c.length - (failedAtPeak ? 1 : 0))
+}
+
+/** The cooling setup in one line: option kind, jacket flow and coolant where present, inlet and ambient. */
+export function coolingText(c: Cooling): string {
+  const j = c.jacket as { flow_m3s?: number; inlet_c?: number; coolant?: string } | null
+  const parts = [c.kind.replaceAll("_", " ")]
+  if (j?.flow_m3s != null) parts.push(`${(j.flow_m3s * 6e4).toFixed(1)} L/min`)
+  if (j?.coolant) parts.push(j.coolant.replaceAll("_", " "))
+  if (j?.inlet_c != null) parts.push(`inlet ${j.inlet_c} °C`)
+  if (c.ambient_c != null) parts.push(`ambient ${c.ambient_c} °C`)
+  return parts.join(", ") + (c.placeholder ? " (placeholder)" : "")
+}

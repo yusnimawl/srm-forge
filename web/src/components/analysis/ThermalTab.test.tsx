@@ -33,7 +33,7 @@ const full = (hot2: number | null = 150, text2 = "slot winding, A 150 °C", shar
     notes: ["a note"], shares: [{ row: "iron", rpm: 2000, hot_spot_rise_k: 9 }],
     gap: { air_gap_m: 0.0004, cases: { hot: { closure: 0.00009 } } },
     stress: { status: "ok", safety_factor: 1.9, speed_limit_rpm: 13400, check_speed_rpm: 7200 },
-    cooling: { kind: "jacket", placeholder: true, ambient_c: 40 },
+    cooling: { kind: "jacket", placeholder: true, ambient_c: 40, jacket: { flow_m3s: 1.5e-4, inlet_c: 65, coolant: "water_glycol_50" } },
   },
   thermal_check: { holds: true },
   thermal_summary: {
@@ -62,6 +62,9 @@ describe("ThermalTab", () => {
     expect(h.querySelector("[data-testid=thermal-map-slot]")).not.toBeNull()
     expect(h.textContent).toContain("The contact gap is the largest.")
     expect(h.textContent).toMatch(/13\s400/)
+    expect(h.textContent).toContain("9.0 L/min, water glycol 50, inlet 65 °C, ambient 40 °C (placeholder)")
+    expect(h.querySelector(".\\@container")).not.toBeNull()
+    expect(h.textContent).toContain("hot 30 %")
   })
   it("renders a pre-R5d summary", () => {
     const ev = full()
@@ -74,11 +77,14 @@ describe("ThermalTab", () => {
   })
   it("renders check-only", () => {
     const h = mount({
-      status: "ok", error: "", rating: null, thermal_check: { holds: false },
-      thermal_summary: { verdict: { holds: false, text: "✗ Short at 6000 r/min: HOT_SPOT_ABOVE" }, speeds: [], shares: [] },
+      status: "ok", error: "", rating: null,
+      thermal_check: { holds: false, which: "continuous", hot_c: 171, peak_hot_c: [140, 150], continuous_hot_c: [130, 140, 171] },
+      thermal_summary: { verdict: { holds: false, hot_spot_c: 171, text: "✗ Short at 6000 r/min: HOT_SPOT_ABOVE" }, speeds: [], shares: [] },
     } as unknown as Evaluation)
     expect(h.textContent).toContain("✗ Short at 6000 r/min")
     expect(h.textContent).toContain("Make a case and Evaluate for the full rating")
+    expect(h.textContent).toContain("171 °C")
+    expect(h.textContent).toContain("2 speeds passed")
   })
   it("renders unrated", () => {
     const h = mount({ status: "ok", error: "No thermal data for this material", rating: null } as unknown as Evaluation)
@@ -86,7 +92,9 @@ describe("ThermalTab", () => {
     expect(h.querySelector("table")).toBeNull()
   })
   it("nan speed row", () => {
-    const h = mount(full(null, "no steady state"))
+    const ev = full(null, "")
+    ;(ev.rating!.speeds[1] as { rated: unknown }).rated = null
+    const h = mount(ev)
     expect(h.textContent).toContain("no steady state")
   })
   it("runaway share labelled", () => {
