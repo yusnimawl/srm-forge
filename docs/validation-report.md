@@ -1,14 +1,14 @@
 # srmcore validation report
 
-**Verdict: PASS**
+**Verdict: PENDING**
 
-
+- CI: pending
 
 ## Engine
 
 | Package | Version | Licence |
 |---|---|---|
-| srmcore | 0.7.0 | GPL-3.0-or-later |
+| srmcore | 0.8.0 | GPL-3.0-or-later |
 | numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
 | scipy | 1.18.1 | BSD License |
 | gmsh | 4.15.2 | GNU General Public License v2 or later (GPLv2+) |
@@ -61,7 +61,7 @@ Limits: psi 0.50 %, torque 1.70 %, band radius 1.00 %.
 
 Report only (not gated).
 
-srmcore 0.7.0.
+srmcore 0.8.0.
 
 | Quantity | Model | Measured | Error |
 |---|---|---|---|
@@ -73,7 +73,7 @@ srmcore 0.7.0.
 
 Gate: ratio of the worst error to its limit is at most 1.
 
-srmcore 0.7.0.
+srmcore 0.8.0.
 
 | Machine | worst psi | worst torque (rel) | worst torque (of peak) | Ratio | Status |
 |---|---|---|---|---|---|
@@ -87,7 +87,7 @@ srmcore 0.7.0.
 
 Report only (not gated).
 
-srmcore 0.7.0.
+srmcore 0.8.0.
 
 | Quantity | Current | Measured | 2D model | With end winding | Error 2D | Error corrected | Uncertainty |
 |---|---|---|---|---|---|---|---|
@@ -105,11 +105,11 @@ srmcore 0.7.0.
 
 ## EM validation (8/6 full)
 
-Engine 0.7.0, label: 2D-verified, grades {'stator': 'C', 'rotor': 'C'}, map 700 s, validation 287 s.
+Engine 0.8.0, label: 2D-verified, grades {'stator': 'C', 'rotor': 'C'}, map 757 s, validation 329 s.
 
 | Check | Status | Value | Limit | Detail |
 |---|---|---|---|---|
-| engine_version | pass | — | — | srmcore 0.7.0; validated versions: 0.4.0, 0.7.0 |
+| engine_version | pass | — | — | srmcore 0.8.0; validated versions: 0.4.0, 0.7.0, 0.8.0 |
 | preset | pass | — | — | map preset full, design preset full; the label needs full or reference |
 | map_identity | pass | — | — | map design hash 3e236049813f230f, this design 3e236049813f230f |
 | no_filled_points | pass | 0 | 0 | points replaced by interpolation after a non-converged solve |
@@ -142,7 +142,7 @@ Uncertainty budget (worst case, % of the corrected value):
 
 Gate: every worst error is within its limit.
 
-srmcore 0.7.0, 30 angles.
+srmcore 0.8.0, 30 angles.
 
 | Quantity | Worst | Limit | Status |
 |---|---|---|---|
@@ -155,17 +155,17 @@ srmcore 0.7.0, 30 angles.
 
 ## Speed
 
-srmcore 0.7.0, 13th Gen Intel(R) Core(TM) i5-1340P, 16 logical CPUs, 8 workers, 2026-10-31.
+srmcore 0.8.0, 13th Gen Intel(R) Core(TM) i5-1340P, 16 logical CPUs, 8 workers, 2026-11-22.
 
 | Design | Item | Seconds | Budget | Status |
 |---|---|---|---|---|
-| 8_6 | screening | 113.3 | 430.0 | pass |
-| 8_6 | full | 694.2 | 2640.0 | pass |
-| 8_6 | full_extras | 656.4 | 1860.0 | pass |
-| 12_8 | screening | 161.7 | 430.0 | pass |
-| 12_8 | full | 928.3 | 2640.0 | pass |
-| 12_8 | full_extras | 445.7 | 1860.0 | pass |
+| 8_6 | screening | 112.9 | 430.0 | pass |
+| 8_6 | full | 732.9 | 2640.0 | pass |
+| 8_6 | full_extras | 692.1 | 1860.0 | pass |
+| 12_8 | screening | 170.5 | 430.0 | pass |
+| 12_8 | full | 987.1 | 2640.0 | pass |
+| 12_8 | full_extras | 472.4 | 1860.0 | pass |
 
 ## CI
 
-Tag v0.7.0, run https://github.com/yusnimawl/srm-forge/actions/runs/41183063852, result success: pass
+Tag v0.8.0, run , result pending: pending
