@@ -1,0 +1,18 @@
+{
+ "srmcore": "0.8.0",
+ "low_field": "diez_webb",
+ "static_torque": {
+  "model": 3.0755490498594877,
+  "measured": 3.22,
+  "error_pct": -4.486054352189828
+ },
+ "rotor_flux": {
+  "model": 0.0004100513681791158,
+  "measured": 0.000472,
+  "error_pct": -13.124710131543258
+ },
+ "current_rise_max_dev_pct": {
+  "before": 15.310730899513231,
+  "after": 9.726441354341024
+ }
+}

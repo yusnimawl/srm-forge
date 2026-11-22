@@ -38,6 +38,7 @@ class Team24Params:
     coil_mid_y: float = fx.COIL_MID_Y
     search_from_corner: float = fx.SEARCH_COIL_FROM_CORNER
     js: float = fx.ASSUMED_JS
+    low_field: str = "table"         # the steel curve below Table I's first point (fx.LOW_FIELD)
     fillet: float = 0.0              # m; > 0 rounds the pole-root corners (stator pole to yoke, rotor pole to hub)
     end_clearance: float = 2e-3      # axial gap between the stack end face and the coil bridge
     air_radius_factor: float = 1.5   # outer air cylinder radius over r_stator_out
@@ -170,7 +171,7 @@ def team24_model(params: Team24Params = Team24Params()) -> Model3D:
     mesh = ng.Mesh(OCCGeometry(Glue([air, stator, *rotor, shaft, shell, *coils])).GenerateMesh(maxh=p.maxh))
     mesh.Curve(2)
     materials = list(dict.fromkeys(mesh.GetMaterials()))
-    law = fx.steel_law(p.js)
+    law = fx.steel_law(p.js, p.low_field)
     laws = {m: (law if m == "steel" else VACUUM) for m in materials}
     return Model3D(mesh, laws, tuple(m for m in materials if m.startswith("coil_")),
                    dirichlet="sym_z|end_z|outer" if p.slab else "sym_z|outer")
@@ -300,7 +301,7 @@ def team24_swept_model(params: Team24Params, h_gap: float, h_iron: float, h_end:
 
     mesh = swept_mesh(mesh2d, layers, material, faces, bottom, top_name)
     materials = list(dict.fromkeys(mesh.GetMaterials()))
-    law = fx.steel_law(p.js)
+    law = fx.steel_law(p.js, p.low_field)
     laws = {m: (law if m == "steel" else VACUUM) for m in materials}
     return Model3D(mesh, laws, tuple(m for m in materials if m.startswith("coil_")),
                    dirichlet="sym_z|end_z|outer" if p.slab else "sym_z|outer")

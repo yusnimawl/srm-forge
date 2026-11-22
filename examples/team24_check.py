@@ -3,7 +3,8 @@ agreement, static torque, current rise, torque and rotor-pole flux against time 
 current, and the sensitivity of each to R, the voltage waveform, Js and the mesh. The output is the
 source of docs/m5b-team24-results.md.
 
-Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--json PATH]
+Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--json PATH] [--low-field diez_webb]
+--low-field selects the steel curve below Table I's first point (team24_fixture.LOW_FIELD; default "table").
 """
 import json
 import sys
@@ -24,6 +25,13 @@ if "--json" in sys.argv:
     _i = sys.argv.index("--json")
     JSON_PATH = Path(sys.argv[_i + 1])
     del sys.argv[_i:_i + 2]
+LOW_FIELD = "table"
+if "--low-field" in sys.argv:
+    _i = sys.argv.index("--low-field")
+    LOW_FIELD = sys.argv[_i + 1]
+    del sys.argv[_i:_i + 2]
+    if LOW_FIELD not in t24.LOW_FIELD:
+        raise SystemExit(f"--low-field must be one of {t24.LOW_FIELD}")
 
 I_FINAL, T_MEASURED = 7.41, 3.22
 skfem = SkfemReference()
@@ -34,7 +42,7 @@ def pct(model, measured):
 
 
 def static(scale=1.0, js=t24.ASSUMED_JS):
-    p = t24.team24_problem(I_FINAL, scale, js)
+    p = t24.team24_problem(I_FINAL, scale, js, LOW_FIELD)
     s = skfem.solve(p)
     bmax = np.hypot(s.b[:, 0], s.b[:, 1])[p.element_law == 1].max()
     return p, s, bmax
@@ -58,7 +66,7 @@ except ImportError:
     print("NGSolve not installed: solver agreement skipped")
 
 print("--- locked-rotor map")
-m = t24.locked_rotor_map(skfem)
+m = t24.locked_rotor_map(skfem, low_field=LOW_FIELD)
 psi_i = PchipInterpolator(m["current"], m["psi"])
 torque_i = PchipInterpolator(m["current"], m["torque"])
 flux_i = PchipInterpolator(m["current"], m["rotor_flux"])
@@ -105,6 +113,7 @@ if JSON_PATH:
     JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
     JSON_PATH.write_text(json.dumps({
         "srmcore": version("srmcore"),
+        "low_field": LOW_FIELD,
         "static_torque": {"model": float(t_ark), "measured": T_MEASURED, "error_pct": float(pct(t_ark, T_MEASURED))},
         "rotor_flux": {"model": float(flux), "measured": float(t24.TABLE_ROTOR_FLUX[-1]),
                        "error_pct": float(pct(flux, t24.TABLE_ROTOR_FLUX[-1]))},
