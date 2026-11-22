@@ -53,11 +53,11 @@ def test_case_evaluate_end_to_end(tmp_path, monkeypatch):
         store = client.app.state.store
         (map_s,), (scan_s,) = store.recent_map_times("screening"), store.recent_scan_times("fixed")
         # the estimate looks up the preset's default grid: the test-only grid the job used is a miss...
-        miss = client.get(f"/api/cases/{cid}/estimate").json()
+        miss = client.get(f"/api/cases/{cid}/estimate?thermal=false").json()   # the job ran thermal off: no rating time
         assert miss["new_map"] is True and miss["basis"] == "history"
         assert miss["seconds"] == pytest.approx(map_s + scan_s)
         # ...until the lookup is pointed at it
         monkeypatch.setitem(GRID_SIZES, "screening", (4, 3))
-        est = client.get(f"/api/cases/{cid}/estimate")
+        est = client.get(f"/api/cases/{cid}/estimate?thermal=false")
         assert est.status_code == 200, est.text
-        assert est.json() == {"new_map": False, "seconds": pytest.approx(scan_s), "basis": "history", "rated": True}
+        assert est.json() == {"new_map": False, "seconds": pytest.approx(scan_s), "basis": "history", "rated": False}
