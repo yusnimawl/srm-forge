@@ -27,6 +27,7 @@ The wiki explains the tool as it is now. The project doc keeps the history (what
 - [x] Losses: iron loss, cut edge, copper loss, efficiency map, the open Materu finding
 - [x] Control: the controller contract, SIL, HIL, the comparison, known limits
 - [x] Thermal: what R5a and R5b do now, gates V1 to V6 and their results, what is open (R5c to R5e) (2026-11-17)
+- [x] Thermal and Web tool pages and the hub updated for R5c and R5d: the Thermal tab, chips, options graph, evaluate estimate, versions (2026-11-22)
 - [x] Roadmap: merged items and a drawing of the six items ahead (moved to Notion, "srm-forge progress", 2026-11-18)
 - [x] Commands
 - [x] Glossary

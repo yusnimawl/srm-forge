@@ -218,7 +218,7 @@ Merged to main 2026-11-19, PR #34 (srmcore and srmapp 0.8.0, srmweb and `web/` 0
 
 ## R5d
 
-On branch `r5d-thermal-tab`, not yet merged (srmapp 0.9.0, srmweb and `web/` 0.12.0, srmcore unchanged at 0.8.0, rating numbers unchanged). Shipped: the Thermal tab on evaluated cases (verdict, speed table, torque curves, temperature map with a steady or peak end and a speed picker, tornado of the budget rows, rotor stress and cooling lines, notes), the chips for rating, cooling and iron band, a Thermal section in the run report, rated continuous and peak kW/kg axes and columns, and an evaluate estimate that counts the rating time (store schema v3, table `rating_times`).
+Merged to main 2026-11-22, PR #35 (CI green: fast on 3.12 and 3.14, web; srmapp 0.9.0, srmweb and `web/` 0.12.0, srmcore unchanged at 0.8.0, rating numbers unchanged). Shipped: the Thermal tab on evaluated cases (verdict, speed table, torque curves, temperature map with a steady or peak end and a speed picker, tornado of the budget rows, rotor stress and cooling lines, notes), the chips for rating, cooling and iron band, a Thermal section in the run report, rated continuous and peak kW/kg axes and columns, and an evaluate estimate that counts the rating time (store schema v3, table `rating_times`).
 
 Rating time on the LattePanda (i5-1340P), 8/6 reference case, 2026-11-22, `examples/rating_timing.py` (span from the first thermal callback to the return, so it includes the winding checks):
 
