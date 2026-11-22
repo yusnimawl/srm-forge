@@ -1,8 +1,8 @@
 # srmcore validation report
 
-**Verdict: PENDING**
+**Verdict: PASS**
 
-- CI: pending
+
 
 ## Engine
 
@@ -168,4 +168,4 @@ srmcore 0.8.0, 13th Gen Intel(R) Core(TM) i5-1340P, 16 logical CPUs, 8 workers, 
 
 ## CI
 
-Tag v0.8.0, run , result pending: pending
+Tag v0.8.0, run https://github.com/yusnimawl/srm-forge/actions/runs/45065509871, result success: pass
