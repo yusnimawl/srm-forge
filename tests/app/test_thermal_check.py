@@ -98,3 +98,43 @@ def test_failing_check_names_its_reason():
     assert not none.holds and none.reason == NO_STROKE == "no stroke reaches the required torque"
     assert none.rpm == rating_speeds(req, 2)[0] and NO_STROKE in none.notes[-1]
     assert check_requirement(_fake_ctx(req, 100.0), n_speeds=2).reason == ""
+
+
+def test_check_records_the_failing_torque():
+    cont = Requirements(peak_power_w=30_000.0, peak_torque_nm=95.5, base_speed_rpm=3000.0, max_speed_rpm=9000.0,
+                        continuous_power_w=15_000.0)
+    ok = check_requirement(_fake_ctx(cont, 100.0), n_speeds=2)
+    assert ok.which == "" and math.isnan(ok.hot_c)
+    out = check_requirement(_fake_ctx(cont, 170.0), n_speeds=2)
+    assert out.which == "continuous" and out.hot_c == 170.0
+    # no continuous power: the peak fails
+    peak = check_requirement(_fake_ctx(cont.model_copy(update=dict(continuous_power_w=None)), 170.0), n_speeds=2)
+    assert peak.which == "peak" and peak.hot_c == 170.0
+    # no stroke at the peak torque: which is peak, no temperature
+    ctx = _fake_ctx(cont, 100.0)
+    peak_nm = required_torques(cont, rating_speeds(cont, 2)[0])[1]
+    ctx.load_at = lambda rpm, rows: (lambda torque: None if torque == peak_nm else (lambda t: None))
+    none = check_requirement(ctx, n_speeds=2)
+    assert none.reason == NO_STROKE and none.which == "peak" and math.isnan(none.hot_c)
+
+
+@pytest.mark.slow
+def test_fields_out_leaves_the_rating_unchanged(tmp_path):
+    import dataclasses
+    from srmapp.thermal import rate_context
+    from srmapp.thermal_fields import KINDS
+    req = Requirements(peak_power_w=628.0, peak_torque_nm=3.0, base_speed_rpm=2000.0, max_speed_rpm=6000.0,
+                       wires=[WIRE], phase_current_a=20.0, continuous_power_w=100.0)
+    inputs = CaseInputs(requirements=req, design=DESIGN, winding=FixedWinding(turns=24, strands=1, paths=1, wire=0))
+    ev = evaluate_design(inputs, cache_dir=tmp_path, thermal=False)
+    ref, i_map, _ = map_request(inputs)
+    result = with_end_winding(build_map(ref, i_map, cache_dir=tmp_path),
+                              end_winding_inductance(ref.machine, image_factor=END_IMAGE_FACTOR))
+    ctx = thermal_context(req, ref, result, ev.winding, n_angles=12, cache_dir=tmp_path)
+    got = []
+    a = rate_context(ctx, n_speeds=1)
+    b = rate_context(ctx, n_speeds=1, fields_out=got.append)
+    same = lambda x, y: repr(dataclasses.asdict(x)) == repr(dataclasses.asdict(y))  # noqa: E731  (nan repr equal)
+    assert same(a, b) and len(got) == 1
+    assert got[0].steady.shape == (len(got[0].rpm), len(ctx.domain.nodes))
+    assert got[0].kind.max() < len(KINDS)

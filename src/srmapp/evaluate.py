@@ -19,14 +19,15 @@ from . import __version__
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .requirements import Requirements
-from .sizing.estimates import J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
+from .sizing.estimates import active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
 from .sizing.generator import Candidate
 from .sizing.stage1 import Stage1
 from .sizing.winding import DENSITY_MAX_TURNS, Winding
 from .turns import _envelope, ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
 
 if TYPE_CHECKING:
-    from .thermal import Rating
+    from .thermal import Rating, RequirementCheck
+    from .thermal_fields import ThermalFields
 
 _NAN = float("nan")
 NOT_RATED = "not thermally rated"
@@ -78,6 +79,10 @@ class Evaluation:
     rated_continuous_kw_per_kg: float = _NAN   # lowest rated continuous power over base..max speed / mass
     rated_peak_kw_per_kg: float = _NAN         # the same for the rated peak
     srmcore_version: str = srmcore.__version__
+    thermal_check: "RequirementCheck | None" = None   # the chosen winding's check; the first failing one when none holds
+    active_volume_l: float = _NAN              # litres, stator outer cylinder with the end windings (`active_volume`)
+    rated_continuous_kw_per_l: float = _NAN    # as rated_continuous_kw_per_kg, per litre
+    rated_peak_kw_per_l: float = _NAN
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limit: float) -> Evaluation:
@@ -86,7 +91,7 @@ def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limi
 
 
 def _rated_kw_per_kg(rating, req: Requirements, field: str, mass: float) -> float:
-    """Lowest rated power (kW per kg) over the rating speeds from the base speed up."""
+    """Lowest rated power (kW per `mass` unit: kg, or litres) over the rating speeds from the base speed up."""
     if rating is None:
         return _NAN
     return min(getattr(r, field) * r.rpm * 2 * math.pi / 60 for r in rating.rated if r.rpm >= req.base_speed_rpm) / 1000 / mass
@@ -101,14 +106,16 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     i_map: float | None = None, on_scan: Callable[[], None] | None = None,
                     scan_workers: int | None = 1,
                     scan_progress: Callable[[int, int], None] | None = None, thermal: bool = True, n_speeds: int = 6,
-                    thermal_progress: Callable[[str, int, int], None] | None = None) -> Evaluation:
+                    thermal_progress: Callable[[str, int, int], None] | None = None, rate_failed: bool = False,
+                    fields_out: "Callable[[ThermalFields], None] | None" = None) -> Evaluation:
     """`only` evaluates that one winding instead of scanning; `i_map` replaces `stage.i_map` as the map's I_max;
     `on_scan` is called once the map is complete (built or cached), before the winding is chosen. The winding scan
     runs on `scan_workers` processes (None: half the logical CPUs) and reports `scan_progress(done, total)`;
     `cancel` also stops it, with status "cancelled". With `thermal`, up to `MAX_THERMAL_CHECKS` EM-feasible windings
     are checked best-first against the rated hot-spot limit; the first that holds is chosen and rated in full
     (`thermal_progress(step, done, total)`: "windings", "strokes", "thermal"). None holding leaves the best EM winding,
-    infeasible. A refusal (no loss or thermal data) keeps the EM choice, unrated; any later error fails the evaluation."""
+    infeasible; with `rate_failed` that best winding is rated in full anyway. `fields_out` receives the temperature
+    fields of every rating made. A refusal (no loss or thermal data) keeps the EM choice, unrated; any later error fails the evaluation."""
     design = candidate.design
     machine = design.machine
     try:
@@ -134,7 +141,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         cap_text = f" ({peak_cap_text(cap)})" if req.wire_mode and math.isfinite(cap) else ""
         return _failed(candidate, stage, "no_winding",
                        f"no turn count meets the wire, phase current and current-density limits{cap_text}", j_limit)
-    point, env, feasible, rating = choice.point, choice.envelope, choice.feasible, None
+    point, env, feasible, rating, held = choice.point, choice.envelope, choice.feasible, None, None
     notes = []
     if not thermal:
         notes.append(NOT_RATED)
@@ -163,7 +170,9 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                         ctx = context(cand)
                     check = th.check_requirement(ctx, n_speeds)
                     if check.holds:
-                        point, rating = cand, th.rate_context(ctx, n_speeds=n_speeds, progress=thermal_progress)
+                        held = check
+                        point, rating = cand, th.rate_context(ctx, n_speeds=n_speeds, progress=thermal_progress,
+                                                           fields_out=fields_out)
                         env = _envelope(result, machine, req, cand.winding, speed_grid(req), j_limit)
                         break
                     first = first or check
@@ -172,11 +181,15 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     if cancel is not None and cancel():
                         return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
                 else:
-                    feasible = False
+                    feasible, held = False, first
                     left = (f"; checked {len(checks)} of {len(choice.ranked)} EM-feasible windings"
                             if len(choice.ranked) > len(checks) else "")
                     notes.append(f"no winding holds the rated hot-spot limit (best winding: {first.rpm:.0f} rpm, "
                                  f"{first.reason}{left})")
+                    if rate_failed:
+                        if len(checks) > 1:
+                            ctx = context(checks[0])
+                        rating = th.rate_context(ctx, n_speeds=n_speeds, progress=thermal_progress, fields_out=fields_out)
             except InterruptedError:
                 return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
             except Exception as exc:  # batch boundary, as for the map: a failed solve must not lose the search
@@ -199,6 +212,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         notes.append(f"no winding is feasible and the {peak_cap_text(cap)} left out windings that fit the slot; "
                      + ("an explicit j_peak_max above it might allow one" if cap == J_PEAK_SCREEN else
                         "a higher cap might allow one"))
+    litres = active_volume(chosen) * 1000
     over_mass = req.max_mass_kg is not None and mass > req.max_mass_kg
     if over_mass:
         notes.append(f"mass {mass:.2f} kg above the {req.max_mass_kg:.2f} kg limit")
@@ -208,4 +222,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                       i_rms, i_rms / (w.paths * w.copper_area), arrays,
                       map_curves(arrays, chosen, w, key, l_end * k * k), j_limit, rating=rating,
                       rated_continuous_kw_per_kg=_rated_kw_per_kg(rating, req, "continuous_nm", mass),
-                      rated_peak_kw_per_kg=_rated_kw_per_kg(rating, req, "peak_nm", mass))
+                      rated_peak_kw_per_kg=_rated_kw_per_kg(rating, req, "peak_nm", mass),
+                      thermal_check=held, active_volume_l=litres,
+                      rated_continuous_kw_per_l=_rated_kw_per_kg(rating, req, "continuous_nm", litres),
+                      rated_peak_kw_per_l=_rated_kw_per_kg(rating, req, "peak_nm", litres))

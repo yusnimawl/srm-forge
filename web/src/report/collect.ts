@@ -1,15 +1,43 @@
 import { api, ApiError } from "@/api/client"
 import { binary, fetchFrames } from "@/api/field"
-import type { Case } from "@/api/types"
+import type { Case, Evaluation } from "@/api/types"
 import type { Geometry } from "@/components/candidate/MotorDiagram"
 import { errorMessage } from "@/lib/errorMessage"
 import { bMaxOfFrames } from "@/lib/fieldGl"
 import { meshFromWire, type FieldFrameData, type FieldMeshData } from "@/lib/fieldWire"
 import type { LossesResult } from "@/lib/losses"
 import { probeSeries } from "@/lib/playback"
-import type { CompareOut, Part, Report, ReportAnimation, ReportData } from "./types"
+import { tabState } from "@/lib/thermal"
+import { fetchThermalFields, type ThermalFieldsData } from "@/lib/thermalWire"
+import type { CompareOut, Part, Report, ReportAnimation, ReportData, ReportThermal } from "./types"
 
 type RenderFrames = (mesh: FieldMeshData, frames: FieldFrameData[], bMax: number, onFrame: (k: number, n: number) => void) => Promise<string[]>
+
+type RenderMap = (data: ThermalFieldsData, values: Float32Array, lo: number, hi: number) => Promise<string>
+
+const TOL = 0.5
+
+/** The steady map at the speed of least margin; only a full rating has fields. A failed fetch or render leaves the map out. */
+async function thermalOf(caseId: string, ev: Evaluation | null, renderMap: RenderMap): Promise<ReportThermal | null> {
+  if (!ev) return null
+  const state = tabState(ev)
+  const none = { mapSrc: null, mapGone: false, rpm: null, lo: 0, hi: 1 }
+  if (state === "unrated") return null
+  if (state !== "full") return none
+  try {
+    const d = await fetchThermalFields(caseId)
+    if (d === "gone") return { ...none, mapGone: true }
+    const target = ev.thermal_summary?.least_margin_rpm ?? ev.rating?.speeds[0]?.rpm
+    const i = target == null ? -1 : d.rpm.findIndex((r) => Math.abs(r - target) <= TOL)
+    if (i < 0) return none
+    let lo = Infinity, hi = -Infinity
+    for (const v of [...d.steady[i], ...d.peak[i]]) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v) }
+    if (!(hi > lo)) { lo = 0; hi = 1 }
+    return { mapSrc: await renderMap(d, d.steady[i], lo, hi), mapGone: false, rpm: d.rpm[i], lo, hi }
+  } catch {
+    return none
+  }
+}
 
 async function part<T>(run: () => Promise<T>, reasonOf: (e: unknown) => string = errorMessage): Promise<Part<T>> {
   try {
@@ -54,19 +82,20 @@ async function animationOf(
 }
 
 /** Fetches everything the report shows. The case and the findings are required; every other part becomes "unavailable" on failure. Starts no job. */
-export async function collect(caseId: string, onStep: (msg: string) => void, renderFrames: RenderFrames): Promise<ReportData> {
+export async function collect(caseId: string, onStep: (msg: string) => void, renderFrames: RenderFrames, renderMap: RenderMap): Promise<ReportData> {
   onStep("Collecting the results")
   const base = `/api/cases/${caseId}`
   const [caseOut, report] = await Promise.all([api<Case>(base), api<Report>(`${base}/report`)])
   const machine = (caseOut.inputs as { design?: { machine?: object } }).design?.machine
   const missing = report.findings.find((f) => f.id === "animation_missing")?.text
-  const [outline, losses, compare, animation] = await Promise.all([
+  const [outline, losses, compare, animation, thermal] = await Promise.all([
     part(async () => outlineSvg(await api<Geometry>("/api/geometry", { method: "POST", body: JSON.stringify(machine) }))),
     part(() => api<LossesResult>(`${base}/losses`), (e) => (e instanceof ApiError && e.status === 404 ? "not run" : errorMessage(e))),
     caseOut.origin === "dxf" && caseOut.parent_case_id ? part(() => api<CompareOut>(`${base}/compare`)) : Promise.resolve(null),
     report.animation_job_id
       ? part(() => animationOf(caseId, report.animation_job_id!, onStep, renderFrames))
       : Promise.resolve<Part<ReportAnimation>>({ ok: false, reason: missing ?? "no animation was run" }),
+    thermalOf(caseId, caseOut.evaluation, renderMap),
   ])
-  return { caseOut, report, outline, losses, compare, animation }
+  return { caseOut, report, outline, losses, compare, animation, thermal }
 }

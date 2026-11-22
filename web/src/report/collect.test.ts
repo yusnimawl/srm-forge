@@ -32,44 +32,67 @@ const base = (over: Table = {}, parent: string | null = null, job: string | null
   ...over,
 })
 const render = async () => ["data:image/png;base64,AA"]
+const renderMap = async () => "data:image/png;base64,MAP"
+const rated = { rating: { shares: [{}], stress: {}, speeds: [] }, thermal_summary: { least_margin_rpm: 2000 } }
+const withEv = (ev: object): Table => ({ "/api/cases/c": ok({ ...caseBody(null), evaluation: ev }) })
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe("collect", () => {
   it("required parts propagate errors", async () => {
     mockFetch(base({ "/api/cases/c/report": () => ({ status: 409, body: { detail: "not evaluated" } }) }))
-    await expect(collect("c", () => {}, render)).rejects.toThrow()
+    await expect(collect("c", () => {}, render, renderMap)).rejects.toThrow()
   })
   it("missing losses becomes a part", async () => {
     mockFetch(base({ "/api/cases/c/losses": () => ({ status: 404, body: { detail: "x" } }) }))
-    const d = await collect("c", () => {}, render)
+    const d = await collect("c", () => {}, render, renderMap)
     expect(d.losses.ok).toBe(false)
     if (!d.losses.ok) expect(d.losses.reason).toContain("not run")
     expect(d.outline.ok).toBe(true)
   })
   it("frames cleared becomes a part", async () => {
     mockFetch(base({ "/api/jobs/j/frames": () => ({ status: 410, body: { detail: "gone" } }) }, null, "j"))
-    const d = await collect("c", () => {}, render)
+    const d = await collect("c", () => {}, render, renderMap)
     expect(d.animation.ok).toBe(false)
     if (!d.animation.ok) expect(d.animation.reason).toContain("cleared")
   })
   it("no animation job skips frame fetch", async () => {
     const urls = mockFetch(base())
-    const d = await collect("c", () => {}, render)
+    const d = await collect("c", () => {}, render, renderMap)
     expect(urls.some((u) => u.includes("/frames"))).toBe(false)
     expect(d.animation).toEqual({ ok: false, reason: "Animation unavailable: nothing run" })
   })
   it("compare only for child cases", async () => {
     const urls = mockFetch(base())
-    expect((await collect("c", () => {}, render)).compare).toBeNull()
+    expect((await collect("c", () => {}, render, renderMap)).compare).toBeNull()
     expect(urls.some((u) => u.includes("/compare"))).toBe(false)
     const urls2 = mockFetch(base({}, "p"))
-    expect((await collect("c", () => {}, render)).compare?.ok).toBe(true)
+    expect((await collect("c", () => {}, render, renderMap)).compare?.ok).toBe(true)
     expect(urls2.some((u) => u.includes("/compare"))).toBe(true)
   })
   it("no compare for an edit child", async () => {
     const urls = mockFetch(base({ "/api/cases/c": ok(caseBody("p", "edit")) }, "p"))
-    expect((await collect("c", () => {}, render)).compare).toBeNull()
+    expect((await collect("c", () => {}, render, renderMap)).compare).toBeNull()
     expect(urls.some((u) => u.includes("/compare"))).toBe(false)
+  })
+  it("an unrated evaluation has no thermal part", async () => {
+    mockFetch(base(withEv({})))
+    expect((await collect("c", () => {}, render, renderMap)).thermal).toBeNull()
+  })
+  it("a cleared thermal map file is marked gone", async () => {
+    mockFetch(base({ ...withEv(rated), "/api/cases/c/thermal/fields": () => ({ status: 410, body: { detail: "gone" } }) }))
+    const t = (await collect("c", () => {}, render, renderMap)).thermal
+    expect(t).toMatchObject({ mapSrc: null, mapGone: true })
+  })
+  it("another map error leaves the map out without failing the export", async () => {
+    mockFetch(base({ ...withEv(rated), "/api/cases/c/thermal/fields": () => ({ status: 500, body: { detail: "x" } }) }))
+    const t = (await collect("c", () => {}, render, renderMap)).thermal
+    expect(t).toMatchObject({ mapSrc: null, mapGone: false })
+  })
+  it("a summary-only rating fetches no map", async () => {
+    const urls = mockFetch(base(withEv({ ...rated, rating: { shares: [] } })))
+    const t = (await collect("c", () => {}, render, renderMap)).thermal
+    expect(urls.some((u) => u.includes("thermal/fields"))).toBe(false)
+    expect(t).toMatchObject({ mapSrc: null, mapGone: false })
   })
 })

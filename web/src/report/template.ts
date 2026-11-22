@@ -1,10 +1,11 @@
 import type { Layout } from "plotly.js-dist-min"
 import type { Evaluation, MapArrays } from "@/api/types"
 import { caseLine, designFactorTraces, inductanceCurves, performanceSeries, torqueCurves, type Trace } from "@/lib/analysis"
-import { jLimitChip, lossChips, madeWithText, mechanicalState, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
+import { lossChips, madeWithText, mechanicalState, thermalChips, VERIFIED_LABEL, verifiedChip } from "@/lib/chips"
 import { compareRows } from "@/lib/compare"
 import { MACHINE_FIELDS, POLE_KEYS } from "@/lib/caseForm"
 import { fmt, fmtSI } from "@/lib/format"
+import { coolingText, curveSpec, rotorText, tabState, tempText } from "@/lib/thermal"
 import { INFERNO_SCALE } from "@/lib/inferno"
 import { contourData, hasMechanical, lossKeyNumbers, pointLabel, ratedPoint, splitBars, type LossesResult } from "@/lib/losses"
 import { pickAngles, psiCurves, torqueGrid } from "@/lib/mapCurves"
@@ -132,7 +133,7 @@ export function buildReport(data: ReportData, plotlySource: string): string {
 
   // header
   const validation = caseOut.validation
-  const chips = [verifiedChip(validation?.label ? validation.engine_version : null), ...(ev ? [jLimitChip(ev.j_limit)] : [])]
+  const chips = [verifiedChip(validation?.label ? validation.engine_version : null), ...(ev ? thermalChips(ev) : [])]
   const v = report.versions
   const header = section(
     "header",
@@ -318,6 +319,49 @@ ${kv([
   })()
   const performance = section("performance", "Performance and waveforms", perfBody)
 
+  // thermal
+  const thermalBody = (() => {
+    const t = data.thermal
+    if (!ev || !t) return notRun("thermal rating was not run for this case", ev?.error ?? "")
+    const rating = ev.rating
+    const summary = ev.thermal_summary
+    const state = tabState(ev)
+    const verdict = summary ? `<p><strong>${e(summary.verdict.text)}</strong></p>` : ""
+    if (!rating || state === "check-only") {
+      const hot = summary?.verdict.hot_spot_c ?? ev.thermal_check?.hot_c
+      return `${verdict}${hot != null && Number.isFinite(hot) ? `<p>Hot spot at the required torque: ${e(fmt(hot, 3))} °C</p>` : ""}<p class="muted">Edit, then Evaluate, for the full rating</p>`
+    }
+    const need = new Map((summary?.speeds ?? []).map((s) => [s.rpm, s]))
+    const rows = rating.speeds.map((s) => {
+      const n = need.get(s.rpm)
+      const hot = n?.hot_spot_text || tempText(s.hot_spot_c)
+      return [
+        fmt(s.rpm), `${n?.need_continuous_nm != null ? fmt(n.need_continuous_nm) : "–"} / ${n?.need_peak_nm != null ? fmt(n.need_peak_nm) : "–"}`,
+        fmt(s.rated_continuous_nm ?? null), fmt(s.rated_peak_nm ?? null), n ? `${n.binds_continuous} / ${n.binds_peak}` : "–",
+        `${hot}${n?.headroom_k != null ? ` · ${fmt(n.headroom_k, 2)} K headroom` : ""}`, tempText(s.rated?.rotor_c),
+      ]
+    })
+    const speedTable = table(["Speed (r/min)", "Need cont/peak (N·m)", "Cont (N·m)", "Peak (N·m)", "Binds cont/peak", "Hot spot", "Rotor"], rows)
+    const curves = plot(curveSpec(rating, summary), { ...panel, xaxis: axis("Speed (r/min)"), yaxis: axis("Torque (N·m)"), legend: { orientation: "h", y: -0.3 } } as Partial<Layout>)
+    const notes = rating.notes.length ? `<h3>Notes</h3><ul class="muted">${rating.notes.map((n) => `<li>${e(n)}</li>`).join("")}</ul>` : ""
+    const head = `<h3>Rated (every input at its unfavourable end) · class ${e(String(rating.insulation_class))}, limit ${e(fmt(rating.limit_c, 3))} °C</h3>`
+    if (state === "summary-only") {
+      return `${verdict}${head}${speedTable}<div class="fig">${curves}</div><p class="muted">Edit, then Evaluate, for full detail</p>${notes}`
+    }
+    const map = t.mapSrc
+      ? `<img src="${e(t.mapSrc)}" alt="Temperature of the cross-section at ${e(String(t.rpm))} r/min, steady" style="max-width:480px;width:100%"><p class="muted">Steady state at ${e(fmt(t.rpm))} r/min, the speed of least margin; inferno from ${e(fmt(t.lo, 3))} to ${e(fmt(t.hi, 3))} °C.</p>`
+      : `<p class="muted">${t.mapGone ? "Re-evaluate to see the map" : "The temperature map is unavailable"}</p>`
+    const share = summary?.shares.find((s) => s.rpm === summary.least_margin_rpm)
+    const unc = share?.rows.length
+      ? table(["Input at its unfavourable end", "Hot-spot rise (K)"], share.rows.map((r) => [r.label, r.runaway ? "runaway" : r.k == null ? "—" : `${r.k.toFixed(1)} K`]))
+      : ""
+    return `${verdict}${head}${speedTable}<div class="fig">${curves}</div>
+<h3>Temperature map</h3>${map}
+<h3>Biggest uncertainties at ${e(fmt(summary?.least_margin_rpm ?? null))} r/min</h3>${unc}
+<p>${e(rotorText(rating))}</p>${rating.cooling ? `<p>Cooling: ${e(coolingText(rating.cooling))}</p>` : ""}${notes}`
+  })()
+  const thermal = section("thermal", "Thermal", thermalBody)
+
   // losses
   const lossesBody = (() => {
     if (!data.losses.ok) {
@@ -458,7 +502,7 @@ ${table(
   })()
   const animation = section("animation", "Flux animation", animBody)
 
-  const sections = [header, findings, inputsSection, outline, keyNumbers, mapSection, performance, losses, validationSection, beforeAfter, animation]
+  const sections = [header, findings, inputsSection, outline, keyNumbers, mapSection, performance, thermal, losses, validationSection, beforeAfter, animation]
   // The figures JSON is built last: every section above registers its plots while it is rendered.
   const figuresJson = jsonScript(figures)
   return `<!doctype html>

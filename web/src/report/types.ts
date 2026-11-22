@@ -11,6 +11,9 @@ export type CompareOut = components["schemas"]["CompareOut"]
 export type ReportFrame = { src: string; angle: number; currentA: number; psi: number | null; torque: number | null; status: string }
 export type ReportAnimation = { frames: ReportFrame[]; probes: Trace[]; currentA: number; bMax: number }
 
+/** The temperature map of the thermal section: one image at `rpm` (steady), or why there is none. Null on `ReportData` when the case is not thermally rated. */
+export type ReportThermal = { mapSrc: string | null; mapGone: boolean; rpm: number | null; lo: number; hi: number }
+
 export interface ReportData {
   caseOut: Case
   report: Report
@@ -20,4 +23,5 @@ export interface ReportData {
   /** Null when the case has no parent. */
   compare: Part<CompareOut> | null
   animation: Part<ReportAnimation>
+  thermal: ReportThermal | null
 }

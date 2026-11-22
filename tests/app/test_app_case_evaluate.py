@@ -117,3 +117,10 @@ def test_validate_case_8_6_screening_label_none():
     pytest.importorskip("ngsolve")
     v = validate_case(_inputs())
     assert v.label is None
+
+
+def test_single_case_evaluate_rates_failing_windings_and_passes_the_sink():
+    sink = object()
+    with mock.patch("srmapp.case.evaluate_stage2") as ev:
+        evaluate_design(_inputs(), fields_out=sink)
+    assert ev.call_args.kwargs["rate_failed"] is True and ev.call_args.kwargs["fields_out"] is sink

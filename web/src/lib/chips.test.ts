@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { jLimitChip, lossChips, madeWithText, mechanicalState, verifiedChip } from "./chips"
+import { thermalChips, jLimitChip, lossChips, madeWithText, mechanicalState, verifiedChip } from "./chips"
 
 describe("verifiedChip", () => {
   it("names the engine version when verified", () => {
@@ -49,5 +49,36 @@ describe("madeWithText", () => {
     expect(madeWithText("0.6.0")).toBe("made with srmapp 0.6.0")
     expect(madeWithText(null)).toBe("made before 0.6.0")
     expect(madeWithText(undefined)).toBe("made before 0.6.0")
+  })
+})
+
+describe("thermalChips", () => {
+  const rated = (rating: object, extra = {}) => ({ j_limit: 20e6, rating, ...extra }) as never
+  it("describes a full rating", () => {
+    const ev = rated(
+      { insulation_class: "H", limit_c: 160, cooling: { kind: "jacket", placeholder: true } },
+      { thermal_summary: { iron_band: [3.2, 7] } },
+    )
+    expect(thermalChips(ev)).toEqual([
+      { text: "Rated · class H 160 °C", tone: "ok" },
+      { text: "Cooling: jacket (placeholder)", tone: "warn" },
+      { text: "Iron ×3.2–7 band", tone: "warn" },
+    ])
+  })
+  it("rounds the limit like the server", () => {
+    expect(thermalChips(rated({ insulation_class: "H", limit_c: 152.5 })).map((c) => c.text)).toEqual(["Rated · class H 153 °C"])
+  })
+  it("drops the placeholder note when set", () => {
+    const t = thermalChips(rated({ insulation_class: "F", limit_c: 140, cooling: { kind: "end_spray", placeholder: false } }))
+    expect(t.map((c) => c.text)).toEqual(["Rated · class F 140 °C", "Cooling: end_spray"])
+  })
+  it("shows only the rated chip for a pre-R5d summary", () => {
+    expect(thermalChips(rated({ insulation_class: "H", limit_c: 160 })).map((c) => c.text)).toEqual(["Rated · class H 160 °C"])
+  })
+  it("keeps the j_limit chip when unrated", () => {
+    expect(thermalChips({ j_limit: 20e6, rating: null } as never)).toEqual([
+      jLimitChip(20e6),
+      { text: "Not thermally rated", tone: "warn" },
+    ])
   })
 })

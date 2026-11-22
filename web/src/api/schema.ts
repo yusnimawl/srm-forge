@@ -319,6 +319,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/thermal/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thermal Fields Route */
+        get: operations["thermal_fields_route_api_cases__case_id__thermal_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/validate": {
         parameters: {
             query?: never;
@@ -991,6 +1008,15 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** BudgetShareOut */
+        BudgetShareOut: {
+            /** Hot Spot Rise K */
+            hot_spot_rise_k: number | null;
+            /** Row */
+            row: string;
+            /** Rpm */
+            rpm: number | null;
+        };
         /** CandidateCase */
         CandidateCase: {
             /** Candidate Id */
@@ -1060,6 +1086,14 @@ export interface components {
             power_ratio: number | null;
             /** Preset */
             preset: string | null;
+            /** Rated Continuous Kw Per Kg */
+            rated_continuous_kw_per_kg?: number | null;
+            /** Rated Continuous Kw Per L */
+            rated_continuous_kw_per_l?: number | null;
+            /** Rated Peak Kw Per Kg */
+            rated_peak_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per L */
+            rated_peak_kw_per_l?: number | null;
             /** Show In Graphs */
             show_in_graphs: boolean;
             /** Stale */
@@ -1122,6 +1156,14 @@ export interface components {
             power_ratio: number | null;
             /** Preset */
             preset: string | null;
+            /** Rated Continuous Kw Per Kg */
+            rated_continuous_kw_per_kg?: number | null;
+            /** Rated Continuous Kw Per L */
+            rated_continuous_kw_per_l?: number | null;
+            /** Rated Peak Kw Per Kg */
+            rated_peak_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per L */
+            rated_peak_kw_per_l?: number | null;
             /** Show In Graphs */
             show_in_graphs: boolean;
             /** Stale */
@@ -1290,6 +1332,33 @@ export interface components {
              */
             v_switch: number;
         };
+        /** CoolingOut */
+        CoolingOut: {
+            /** Ambient C */
+            ambient_c?: number | null;
+            /** End Spray */
+            end_spray?: {
+                [key: string]: unknown;
+            } | null;
+            /** Housing Thickness */
+            housing_thickness?: number | null;
+            /** Jacket */
+            jacket?: {
+                [key: string]: unknown;
+            } | null;
+            /** Kind */
+            kind: string;
+            /** Placeholder */
+            placeholder: boolean;
+            /** Shaft Oil */
+            shaft_oil?: {
+                [key: string]: unknown;
+            } | null;
+            /** Slot Oil */
+            slot_oil?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** CoolingSetup */
         CoolingSetup: {
             /**
@@ -1437,6 +1506,11 @@ export interface components {
             basis: "history" | "budget";
             /** New Map */
             new_map: boolean;
+            /**
+             * Rated
+             * @default false
+             */
+            rated: boolean;
             /** Seconds */
             seconds: number;
         };
@@ -1480,6 +1554,8 @@ export interface components {
         };
         /** EvaluationOut */
         EvaluationOut: {
+            /** Active Volume L */
+            active_volume_l?: number | null;
             curves?: components["schemas"]["MapCurvesOut"] | null;
             design: components["schemas"]["Design"];
             /** Efficiency Base */
@@ -1509,8 +1585,12 @@ export interface components {
             power_ratio: number | null;
             /** Rated Continuous Kw Per Kg */
             rated_continuous_kw_per_kg?: number | null;
+            /** Rated Continuous Kw Per L */
+            rated_continuous_kw_per_l?: number | null;
             /** Rated Peak Kw Per Kg */
             rated_peak_kw_per_kg?: number | null;
+            /** Rated Peak Kw Per L */
+            rated_peak_kw_per_l?: number | null;
             rating?: components["schemas"]["RatingOut"] | null;
             /**
              * Scan
@@ -1523,6 +1603,10 @@ export interface components {
             srmcore_version?: string | null;
             /** Status */
             status: string;
+            thermal_check?: components["schemas"]["ThermalCheckOut"] | null;
+            /** Thermal Fields */
+            thermal_fields?: string | null;
+            thermal_summary?: components["schemas"]["ThermalSummaryOut"] | null;
             /** Torque Ratio */
             torque_ratio: number | null;
             winding: components["schemas"]["WindingOut"] | null;
@@ -1571,6 +1655,34 @@ export interface components {
             turns: number;
             /** Wire */
             wire?: number | null;
+        };
+        /** GapCaseOut */
+        GapCaseOut: {
+            /** Centrifugal */
+            centrifugal?: number | null;
+            /** Closure */
+            closure?: number | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Rotor Thermal */
+            rotor_thermal?: number | null;
+            /** Stator Thermal */
+            stator_thermal?: number | null;
+        };
+        /** GapOut */
+        GapOut: {
+            /** Air Gap M */
+            air_gap_m?: number | null;
+            /**
+             * Cases
+             * @default {}
+             */
+            cases: {
+                [key: string]: components["schemas"]["GapCaseOut"];
+            };
         };
         /** GeometrySection */
         GeometrySection: {
@@ -2300,18 +2412,30 @@ export interface components {
         };
         /** RatingOut */
         RatingOut: {
+            cooling?: components["schemas"]["CoolingOut"] | null;
+            gap?: components["schemas"]["GapOut"] | null;
             /** Insulation Class */
             insulation_class: string;
             /** Limit C */
             limit_c: number | null;
             /** Notes */
             notes: string[];
+            /**
+             * Shares
+             * @default []
+             */
+            shares: components["schemas"]["BudgetShareOut"][];
             /** Speeds */
             speeds: components["schemas"]["SpeedRatingOut"][];
+            /** Srmapp Version */
+            srmapp_version?: string | null;
+            stress?: components["schemas"]["StressOut"] | null;
             /** Stress Safety Factor */
             stress_safety_factor: number | null;
             /** Stress Status */
             stress_status: string;
+            /** Torque Factor */
+            torque_factor?: number | null;
         };
         /**
          * RectangularWire
@@ -2827,6 +2951,22 @@ export interface components {
             /** Inlet C */
             inlet_c: number;
         };
+        /** ShareRowOut */
+        ShareRowOut: {
+            /** Hint */
+            hint?: string | null;
+            /** K */
+            k: number | null;
+            /** Label */
+            label: string;
+            /** Row */
+            row: string;
+            /**
+             * Runaway
+             * @default false
+             */
+            runaway: boolean;
+        };
         /** SlotOil */
         SlotOil: {
             /** Channel Height */
@@ -2843,12 +2983,51 @@ export interface components {
             /** Inlet C */
             inlet_c: number;
         };
+        /** SpeedDetailOut */
+        SpeedDetailOut: {
+            /** Bore C */
+            bore_c?: number | null;
+            /** Bore Peak C */
+            bore_peak_c?: number | null;
+            /** Continuous Nm */
+            continuous_nm?: number | null;
+            /** Envelope Nm */
+            envelope_nm?: number | null;
+            /**
+             * Hot Spot At
+             * @default
+             */
+            hot_spot_at: string;
+            /** Hot Spot C */
+            hot_spot_c?: number | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Peak Hot Spot At
+             * @default
+             */
+            peak_hot_spot_at: string;
+            /** Peak Hot Spot C */
+            peak_hot_spot_c?: number | null;
+            /** Peak Nm */
+            peak_nm?: number | null;
+            /** Rotor C */
+            rotor_c?: number | null;
+            /** Rotor Peak C */
+            rotor_peak_c?: number | null;
+            /** Start Nm */
+            start_nm?: number | null;
+        };
         /** SpeedRatingOut */
         SpeedRatingOut: {
             /** Hot Spot At */
             hot_spot_at: string;
             /** Hot Spot C */
             hot_spot_c: number | null;
+            nominal?: components["schemas"]["SpeedDetailOut"] | null;
             /** Nominal Continuous Nm */
             nominal_continuous_nm: number | null;
             /** Nominal Peak Nm */
@@ -2857,12 +3036,41 @@ export interface components {
             peak_hot_spot_at: string;
             /** Peak Hot Spot C */
             peak_hot_spot_c: number | null;
+            rated?: components["schemas"]["SpeedDetailOut"] | null;
             /** Rated Continuous Nm */
             rated_continuous_nm: number | null;
             /** Rated Peak Nm */
             rated_peak_nm: number | null;
             /** Rpm */
             rpm: number | null;
+        };
+        /** SpeedSharesOut */
+        SpeedSharesOut: {
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["ShareRowOut"][];
+            /** Rpm */
+            rpm: number | null;
+        };
+        /** StressOut */
+        StressOut: {
+            /** Check Speed Rpm */
+            check_speed_rpm?: number | null;
+            /** Governing */
+            governing?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Safety Factor */
+            safety_factor?: number | null;
+            /** Speed Limit Rpm */
+            speed_limit_rpm?: number | null;
+            /** Status */
+            status: string;
         };
         /** TargetCheckIn */
         TargetCheckIn: {
@@ -2879,6 +3087,84 @@ export interface components {
             log: string;
             /** Ok */
             ok: boolean;
+        };
+        /** ThermalCheckOut */
+        ThermalCheckOut: {
+            /**
+             * Continuous Hot C
+             * @default []
+             */
+            continuous_hot_c: (number | null)[];
+            /** Holds */
+            holds: boolean;
+            /** Hot C */
+            hot_c?: number | null;
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /**
+             * Peak Hot C
+             * @default []
+             */
+            peak_hot_c: (number | null)[];
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Rpm */
+            rpm?: number | null;
+            /**
+             * Which
+             * @default
+             */
+            which: string;
+        };
+        /** ThermalSpeedOut */
+        ThermalSpeedOut: {
+            /**
+             * Binds Continuous
+             * @default
+             */
+            binds_continuous: string;
+            /**
+             * Binds Peak
+             * @default
+             */
+            binds_peak: string;
+            /** Headroom K */
+            headroom_k?: number | null;
+            /**
+             * Hot Spot Text
+             * @default
+             */
+            hot_spot_text: string;
+            /** Need Continuous Nm */
+            need_continuous_nm?: number | null;
+            /** Need Peak Nm */
+            need_peak_nm?: number | null;
+            /** Rpm */
+            rpm: number | null;
+        };
+        /** ThermalSummaryOut */
+        ThermalSummaryOut: {
+            /** Iron Band */
+            iron_band?: (number | null)[] | null;
+            /** Least Margin Rpm */
+            least_margin_rpm?: number | null;
+            /**
+             * Shares
+             * @default []
+             */
+            shares: components["schemas"]["SpeedSharesOut"][];
+            /**
+             * Speeds
+             * @default []
+             */
+            speeds: components["schemas"]["ThermalSpeedOut"][];
+            verdict: components["schemas"]["VerdictOut"];
         };
         /** ValidateIn */
         ValidateIn: {
@@ -2931,6 +3217,30 @@ export interface components {
              * @default 20
              */
             reference_turns: number;
+        };
+        /** VerdictOut */
+        VerdictOut: {
+            /** Binds */
+            binds?: string | null;
+            /** Holds */
+            holds?: boolean | null;
+            /** Hot Spot At */
+            hot_spot_at?: string | null;
+            /** Hot Spot C */
+            hot_spot_c?: number | null;
+            /** Margin Pct */
+            margin_pct?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rpm */
+            rpm?: number | null;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /** Which */
+            which?: string | null;
         };
         /** WaveformsOut */
         WaveformsOut: {
@@ -3345,7 +3655,9 @@ export interface operations {
     };
     estimate_api_cases__case_id__estimate_get: {
         parameters: {
-            query?: never;
+            query?: {
+                thermal?: boolean;
+            };
             header?: never;
             path: {
                 case_id: string;
@@ -3725,6 +4037,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thermal_fields_route_api_cases__case_id__thermal_fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

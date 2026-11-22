@@ -1,4 +1,4 @@
-import { jLimitChip, verifiedChip, type ChipTone } from "@/lib/chips"
+import { thermalChips, verifiedChip, type ChipTone } from "@/lib/chips"
 import { cn } from "@/lib/utils"
 
 const DOT: Record<ChipTone, string> = { ok: "bg-feasible", warn: "bg-warn", none: "" }
@@ -13,7 +13,7 @@ export function Chip({ text, tone }: { text: string; tone: ChipTone }) {
 }
 
 /**
- * Shown under a result header: whether the case is 2D-verified, and, once an evaluation exists, that its numbers are
+ * Shown under a result header: whether the case is 2D-verified, and, once an evaluation exists, its thermal rating, or that its numbers are
  * peak-only at an assumed j_limit (an evaluation stored without the field reads "not recorded").
  */
 export function StatusChips({
@@ -21,12 +21,12 @@ export function StatusChips({
   evaluation,
 }: {
   engineVersion?: string | null
-  evaluation?: { j_limit?: number | null } | null
+  evaluation?: Parameters<typeof thermalChips>[0] | null
 }) {
   return (
     <div role="note" className="flex flex-wrap gap-2">
       <Chip {...verifiedChip(engineVersion)} />
-      {evaluation && <Chip {...jLimitChip(evaluation.j_limit)} />}
+      {evaluation && thermalChips(evaluation).map((c) => <Chip key={c.text} {...c} />)}
     </div>
   )
 }

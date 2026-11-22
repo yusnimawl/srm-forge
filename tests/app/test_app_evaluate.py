@@ -377,3 +377,53 @@ def test_screen_capped_infeasible_result_says_screen():
     assert e.status == "ok" and not e.feasible
     assert "peak screen 80 A/mm2" in e.error and "j_peak_max" in e.error
     assert all(s.winding.current_density <= est.J_PEAK_SCREEN * (1 + 1e-9) for s in e.scan)
+
+
+def _failing_stage2(monkeypatch, rate_failed):
+    import srmapp.thermal as th
+    from srmapp.turns import TurnsChoice, choose_turns
+    req = _req()
+    stage = stage1(req, make_8_6())
+    real = choose_turns
+
+    def choose(*a, **k):
+        c = real(*a, **k)
+        return TurnsChoice(c.scan[0], True, c.envelope, c.scan, c.capped, tuple(c.scan[:2]))
+    fields = []
+
+    def rated(ctx, *, fields_out=None, **kw):
+        if fields_out is not None:
+            fields_out("FIELDS")
+        return "RATING"
+    monkeypatch.setattr(th, "thermal_context", lambda req_, ref, res, w, **kw: w)
+    monkeypatch.setattr(th, "check_requirement",
+                        lambda ctx, n: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
+    monkeypatch.setattr(th, "rate_context", rated)
+    monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), mock.patch("srmapp.evaluate.choose_turns", choose):
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30, rate_failed=rate_failed, fields_out=fields.append)
+    return e, fields
+
+
+def test_failing_case_is_rated_when_asked(monkeypatch):
+    e, _ = _failing_stage2(monkeypatch, True)
+    assert e.feasible is False and e.rating == "RATING" and e.thermal_check.reason == "HOT_SPOT_ABOVE"
+    assert math.isfinite(e.rated_continuous_kw_per_l) and math.isfinite(e.rated_peak_kw_per_l)
+    e, _ = _failing_stage2(monkeypatch, False)
+    assert e.rating is None and e.thermal_check.reason == "HOT_SPOT_ABOVE"
+
+
+def test_fields_reach_the_sink(monkeypatch):
+    _, fields = _failing_stage2(monkeypatch, True)
+    assert fields == ["FIELDS"]
+
+
+def test_rated_infeasible_stays_off_the_front():
+    from srmapp.pipeline import SearchResult
+    c = _cand()
+
+    def ev(feasible, v):
+        return Evaluation(c.id, c.design, "ok", "", 10.0, None, 1.1, 1.1, 1000.0, 3.0, 0.9, feasible, None, None,
+                          rated_continuous_kw_per_kg=v, rated_peak_kw_per_kg=v)
+    res = SearchResult(_req(), 2, {}, 0, (ev(False, 9.0), ev(True, 1.0)), False)
+    assert [e.feasible for e in res.pareto()] == [True]

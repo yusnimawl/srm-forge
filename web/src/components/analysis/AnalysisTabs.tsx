@@ -9,6 +9,7 @@ import PerformanceTab from "./PerformanceTab"
 import WaveformsTab from "./WaveformsTab"
 
 const LossesTab = lazy(() => import("./LossesTab"))
+const ThermalTab = lazy(() => import("./ThermalTab"))
 const FieldTab = lazy(() => import("./FieldTab"))
 const ControlTab = lazy(() => import("./ControlTab"))
 
@@ -43,6 +44,7 @@ export default function AnalysisTabs({
         <TabsTrigger value="map">Map</TabsTrigger>
         <TabsTrigger value="factors">Design factors</TabsTrigger>
         {showField && <TabsTrigger value="losses">Losses</TabsTrigger>}
+        {showField && <TabsTrigger value="thermal">Thermal</TabsTrigger>}
         {showField && <TabsTrigger value="field">Field</TabsTrigger>}
         {showField && <TabsTrigger value="control">Control</TabsTrigger>}
       </TabsList>
@@ -64,6 +66,13 @@ export default function AnalysisTabs({
         <TabsContent value="losses">
           <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
             <LossesTab key={caseId} caseId={caseId} />
+          </Suspense>
+        </TabsContent>
+      )}
+      {showField && (
+        <TabsContent value="thermal">
+          <Suspense fallback={<SrmSpinner className="py-4" label="Loading..." showLabel />}>
+            <ThermalTab key={caseId} evaluation={evaluation} caseId={caseId} />
           </Suspense>
         </TabsContent>
       )}

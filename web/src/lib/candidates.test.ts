@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Evaluation } from "@/api/types"
-import { AXES, toRows } from "./candidates"
+import { AXES, defaultAxes, toRows, unratedCount } from "./candidates"
 import { fmt } from "./format"
 
 // Only the fields toRows reads are filled; the full generated design has many more.
@@ -41,4 +41,32 @@ describe("toRows", () => {
     expect(rows[1].status).toBe("no_winding")
   })
   it("names the axes", () => expect(AXES.mass_kg).toBe("Mass (kg)"))
+})
+
+describe("rated axes", () => {
+  const rated = toRows({
+    evaluations: [
+      ev("a", "ok", { rated_continuous_kw_per_kg: 1.5, rated_peak_kw_per_kg: 2.5, rated_continuous_kw_per_l: 4, rated_peak_kw_per_l: 6 }),
+      ev("b", "ok"),
+    ],
+    pareto_ids: [],
+  })
+  it("names and maps them", () => {
+    expect(AXES.rated_peak_kw_per_l).toBe("Rated peak (kW/L)")
+    expect(AXES.rated_continuous_kw_per_kg).toBe("Rated continuous (kW/kg)")
+    expect(rated[0]).toMatchObject({ rated_continuous_kw_per_kg: 1.5, rated_peak_kw_per_kg: 2.5, rated_continuous_kw_per_l: 4, rated_peak_kw_per_l: 6 })
+    expect(rated[1].rated_peak_kw_per_kg).toBeNull()
+  })
+  it("counts rows without a value on the chosen axes", () => {
+    expect(unratedCount(rated, ["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"])).toBe(1)
+    expect(unratedCount(rated, ["mass_kg", "peak_power_kw"])).toBe(0)
+  })
+})
+
+describe("defaultAxes", () => {
+  const row = (o: object) => o as never
+  it("uses the rated axes only when a row has both values", () => {
+    expect(defaultAxes([row({ rated_peak_kw_per_kg: 2, rated_continuous_kw_per_kg: 1 })])).toEqual(["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"])
+    expect(defaultAxes([row({ rated_peak_kw_per_kg: null, rated_continuous_kw_per_kg: null })])).toEqual(["mass_kg", "power_density"])
+  })
 })

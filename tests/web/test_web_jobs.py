@@ -253,7 +253,7 @@ def test_evaluate_job_records_map_time(make, monkeypatch):
         progress(3, 3)
         return _Ev()
 
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=fake)
     j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
     got = _wait(store, j, {"done", "failed"})
@@ -271,7 +271,7 @@ def test_evaluate_job_records_the_scan_per_winding_mode(make, monkeypatch):
         time.sleep(0.05)
         return _Ev()
 
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=fake)
     j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
     got = _wait(store, j, {"done", "failed"})
@@ -289,7 +289,7 @@ def test_cached_map_records_a_scan_but_no_map_time(make, monkeypatch):
         on_scan()
         return _Ev()
 
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=fake)
     j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
     assert _wait(store, j, {"done", "failed"})["status"] == "done"
@@ -297,7 +297,7 @@ def test_cached_map_records_a_scan_but_no_map_time(make, monkeypatch):
 
 
 def test_evaluation_of_a_deleted_case_is_not_attached(make, monkeypatch):
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=lambda inputs, **kw: _Ev())
     j = runner.submit("evaluate", {"case_id": "gone", "inputs": _inputs()})
     assert _wait(store, j, {"done", "failed"})["status"] == "done"
@@ -311,7 +311,7 @@ def test_partial_map_records_no_time(make, monkeypatch):
         progress(2, 3)
         return _Ev()
 
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=fake)
     j = runner.submit("evaluate", {"case_id": "c1", "inputs": _inputs()})
     assert _wait(store, j, {"done", "failed"})["status"] == "done"
@@ -319,7 +319,7 @@ def test_partial_map_records_no_time(make, monkeypatch):
 
 
 def test_evaluate_job_result_belongs_to_the_case(make, monkeypatch):
-    monkeypatch.setattr(jobs, "evaluation_json", lambda ev: {"status": ev.status})
+    monkeypatch.setattr(jobs, "evaluation_json", lambda ev, **kw: {"status": ev.status})
     store, runner = _real_runner(make, monkeypatch, evaluate=lambda inputs, **kw: _Ev())
     case = store.create_case(origin="edit", inputs={}, label="e", stale=True)
     j = runner.submit("evaluate", {"case_id": case, "inputs": _inputs()})

@@ -17,6 +17,26 @@ export function jLimitChip(jLimit: number | null | undefined): { text: string; t
   return { text: `Peak only · ${tail}`, tone: "warn" }
 }
 
+type RatedFields = {
+  j_limit?: number | null
+  rating?: { insulation_class: string; limit_c: number | null; cooling?: { kind: string; placeholder: boolean } | null } | null
+  thermal_summary?: { iron_band?: (number | null)[] | null } | null
+}
+
+/** The chips of an evaluation: the thermal rating (class and limit, cooling, iron-loss band) once rated; else the
+ *  peak-only chip with "Not thermally rated". A rating stored as the summary only has no cooling or band to show. */
+export function thermalChips(ev: RatedFields): { text: string; tone: ChipTone }[] {
+  const r = ev.rating
+  if (!r) return [jLimitChip(ev.j_limit), { text: "Not thermally rated", tone: "warn" }]
+  const limit = r.limit_c == null ? "" : ` ${Math.round(r.limit_c)} °C`
+  const [lo, hi] = ev.thermal_summary?.iron_band ?? []
+  return [
+    { text: `Rated · class ${r.insulation_class}${limit}`, tone: "ok" as ChipTone },
+    ...(r.cooling ? [{ text: `Cooling: ${r.cooling.kind}${r.cooling.placeholder ? " (placeholder)" : ""}`, tone: (r.cooling.placeholder ? "warn" : "none") as ChipTone }] : []),
+    ...(lo != null && hi != null ? [{ text: `Iron ×${lo}–${hi} band`, tone: "warn" as ChipTone }] : []),
+  ]
+}
+
 /** What a losses result says about friction and windage: `none` for a result made before they were added, else
  *  whether the bearing input was the unchosen default (`placeholder`) or was set (`set`). */
 export type MechanicalState = "none" | "placeholder" | "set"

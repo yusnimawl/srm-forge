@@ -6,6 +6,10 @@ export const AXES = {
   power_density: "Power density (kW/kg)",
   efficiency_base: "Efficiency at base speed",
   torque_ratio: "Torque ratio",
+  rated_continuous_kw_per_kg: "Rated continuous (kW/kg)",
+  rated_peak_kw_per_kg: "Rated peak (kW/kg)",
+  rated_continuous_kw_per_l: "Rated continuous (kW/L)",
+  rated_peak_kw_per_l: "Rated peak (kW/L)",
 } as const
 export type AxisKey = keyof typeof AXES
 
@@ -19,6 +23,10 @@ export type CandidateRow = {
   peak_power_kw: number | null
   power_density: number | null
   efficiency_base: number | null
+  rated_continuous_kw_per_kg: number | null
+  rated_peak_kw_per_kg: number | null
+  rated_continuous_kw_per_l: number | null
+  rated_peak_kw_per_l: number | null
   feasible: boolean
   status: string
   error: string | null
@@ -44,6 +52,10 @@ export function toRows(result: Pick<SearchResult, "evaluations" | "pareto_ids">)
       peak_power_kw: power == null ? null : fromSI(power, "kW"),
       power_density: num(e.power_density_kw_per_kg),
       efficiency_base: num(e.efficiency_base),
+      rated_continuous_kw_per_kg: num(e.rated_continuous_kw_per_kg),
+      rated_peak_kw_per_kg: num(e.rated_peak_kw_per_kg),
+      rated_continuous_kw_per_l: num(e.rated_continuous_kw_per_l),
+      rated_peak_kw_per_l: num(e.rated_peak_kw_per_l),
       feasible: ok && e.feasible === true,
       status: e.status,
       error: e.error ?? null,
@@ -51,3 +63,13 @@ export function toRows(result: Pick<SearchResult, "evaluations" | "pareto_ids">)
     }
   })
 }
+
+/** The rated axes when any row has both values (a thermal search); else mass against power density. */
+export const defaultAxes = (rows: CandidateRow[]): [AxisKey, AxisKey] =>
+  rows.some((r) => r.rated_peak_kw_per_kg != null && r.rated_continuous_kw_per_kg != null)
+    ? ["rated_peak_kw_per_kg", "rated_continuous_kw_per_kg"]
+    : ["mass_kg", "power_density"]
+
+/** Rows that have no value on one of the chosen axes (the plot leaves them out). */
+export const unratedCount = (rows: CandidateRow[], axes: AxisKey[]): number =>
+  rows.filter((r) => axes.some((k) => r[k] == null)).length

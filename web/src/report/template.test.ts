@@ -59,6 +59,7 @@ const fixture = (over: Partial<ReportData> = {}): ReportData => ({
   losses: { ok: false, reason: "why-not" },
   compare: null,
   animation: { ok: false, reason: "why-not" },
+  thermal: null,
   ...over,
 })
 
@@ -96,7 +97,7 @@ describe("buildReport", () => {
   })
 
   it("has every section", () => {
-    const ids = ["header", "findings", "inputs", "outline", "key-numbers", "map", "performance", "losses", "validation", "animation"]
+    const ids = ["header", "findings", "inputs", "outline", "key-numbers", "map", "performance", "thermal", "losses", "validation", "animation"]
     const html = buildReport(fixture(), PLOTLY)
     ids.forEach((id) => expect(html).toContain(`<section id="${id}"`))
     expect(html).not.toContain('id="before-after"')
@@ -133,6 +134,13 @@ describe("buildReport", () => {
     const validation = { label: "2D-verified", engine_version: "0.4.0", checks: [], material_grades: {}, reference_turns: 20, budget: { rows: [], total: {}, values: {}, values_2d: {} } }
     const v = caseOut({ validation })
     expect(section(buildReport(fixture({ caseOut: v }), PLOTLY), "header")).toContain("2D-verified · srmcore 0.4.0")
+  })
+
+  it("shows the rated chips, not the j_limit chip, on a rated case", () => {
+    const rated = { ...evaluation, rating: { insulation_class: "F", limit_c: 155, speeds: [], shares: [], notes: [], stress: {} } }
+    const h = section(buildReport(fixture({ caseOut: caseOut({ evaluation: rated }) }), PLOTLY), "header")
+    expect(h).toContain("Rated · class F 155 °C")
+    expect(h).not.toContain("Peak only")
   })
 
   it("tells an old evaluation to be re-evaluated before running losses", () => {
@@ -212,5 +220,49 @@ describe("escaping helpers", () => {
   it("escapes html", () => expect(escapeHtml(`<a href="x">&'`)).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&#39;"))
   it("neutralises script terminators", () => {
     expect(scriptSafe("a</SCRIPT>b<!--c")).toBe("a<\\/SCRIPT>b<\\!--c")
+  })
+})
+
+describe("thermal section", () => {
+  const speed = (rpm: number) => ({ rpm, nominal_continuous_nm: 10, nominal_peak_nm: 20, rated_continuous_nm: 8, rated_peak_nm: 18, hot_spot_c: 150, rated: { rotor_c: 90 } })
+  const rating = {
+    insulation_class: "F", limit_c: 155, speeds: [speed(1000), speed(2000)], notes: ["a <b> note"],
+    stress: { status: "ok", safety_factor: 2, check_speed_rpm: 5000, speed_limit_rpm: 9000 }, gap: null,
+    cooling: { kind: "jacket", ambient_c: 40, placeholder: false, jacket: null },
+    shares: [{}],
+  }
+  const summary = {
+    verdict: { text: "✓ Holds at every speed", hot_spot_c: 150 }, least_margin_rpm: 2000,
+    speeds: [{ rpm: 1000, need_continuous_nm: 5, need_peak_nm: 9, binds_continuous: "none", binds_peak: "none", hot_spot_text: "stator coil 150 °C", headroom_k: 5 }],
+    shares: [{ rpm: 2000, rows: [{ row: "iron", label: "Iron <loss>", k: 7.5, runaway: false, hint: "" }, { row: "contact", label: "Contact gap", k: 1000, runaway: true, hint: "" }] }],
+  }
+  const withThermal = (r: object | null, sum: object | null, thermal: ReportData["thermal"]) =>
+    fixture({ caseOut: caseOut({ evaluation: { ...evaluation, rating: r, thermal_summary: sum } }), thermal })
+  const map = { mapSrc: "data:image/png;base64,AA", mapGone: false, rpm: 2000, lo: 40, hi: 150 }
+
+  it("shows verdict, table, map and the uncertainties as an HTML table", () => {
+    const s = section(buildReport(withThermal(rating, summary, map), PLOTLY), "thermal")
+    expect(s).toContain("✓ Holds at every speed")
+    expect(s).toContain("<table>")
+    expect(s).toContain("Iron &lt;loss&gt;")
+    expect(s).toContain("7.5 K")
+    expect(s).toContain("runaway")
+    expect(s).toContain('src="data:image/png;base64,AA"')
+    expect(s).toContain("jacket")
+    expect(s).toContain("a &lt;b&gt; note")
+    expect(s).not.toContain("Not run")
+  })
+  it("says Not run when unrated", () => {
+    expect(section(buildReport(fixture({ thermal: null }), PLOTLY), "thermal")).toContain("Not run")
+  })
+  it("a summary-only rating asks for a new evaluation", () => {
+    const s = section(buildReport(withThermal({ ...rating, shares: [], stress: undefined }, summary, { ...map, mapSrc: null, rpm: null }), PLOTLY), "thermal")
+    expect(s).toContain("Edit, then Evaluate, for full detail")
+    expect(s).not.toContain("Iron &lt;loss&gt;")
+  })
+  it("a cleared map file says so", () => {
+    const s = section(buildReport(withThermal(rating, summary, { ...map, mapSrc: null, mapGone: true }), PLOTLY), "thermal")
+    expect(s).toContain("Re-evaluate to see the map")
+    expect(s).toContain("✓ Holds at every speed")
   })
 })

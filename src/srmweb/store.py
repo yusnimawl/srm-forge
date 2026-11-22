@@ -12,7 +12,7 @@ from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 CASE_ORIGINS = ("candidate", "reference", "import", "edit", "dxf")
 RESULT_KINDS = ("search", "evaluate", "validate", "animate", "losses", "control", "hil_flash")
@@ -41,11 +41,19 @@ _SCHEMA = (
     "CREATE TABLE map_times (preset TEXT NOT NULL, seconds REAL NOT NULL,"
     " finished TEXT NOT NULL)",
     "CREATE TABLE scan_times (mode TEXT NOT NULL, seconds REAL NOT NULL, finished TEXT NOT NULL)",
+    "CREATE TABLE rating_times (preset TEXT NOT NULL, seconds REAL NOT NULL, finished TEXT NOT NULL)",
     "CREATE INDEX results_job ON results (job_id)",
     "CREATE INDEX results_case ON results (case_id)",
     "CREATE INDEX cases_job ON cases (job_id)",
     "CREATE INDEX map_times_preset ON map_times (preset)",
     "CREATE INDEX scan_times_mode ON scan_times (mode)",
+    "CREATE INDEX rating_times_preset ON rating_times (preset)",
+)
+
+# v2 -> v3: the rating-time table and its index only.
+_V2_TO_V3 = (
+    "CREATE TABLE rating_times (preset TEXT NOT NULL, seconds REAL NOT NULL, finished TEXT NOT NULL)",
+    "CREATE INDEX rating_times_preset ON rating_times (preset)",
 )
 
 # v1 -> v2: cases and results change shape; search results are kept.
@@ -99,7 +107,7 @@ class Store:
         self.path = Path(path)
         with self._db() as con:
             found = con.execute("PRAGMA user_version").fetchone()[0]
-            if found not in (0, 1, SCHEMA_VERSION):
+            if found not in (0, 1, 2, SCHEMA_VERSION):
                 raise RuntimeError(
                     f"database schema {found} != expected {SCHEMA_VERSION}")
             con.execute("PRAGMA journal_mode = WAL")
@@ -110,7 +118,7 @@ class Store:
             con.execute("BEGIN")
             for sql in _V1_TO_V2_PRE if found == 1 else ():
                 con.execute(sql)
-            for sql in _SCHEMA:
+            for sql in _V2_TO_V3 if found == 2 else _SCHEMA:
                 con.execute(sql)
             for sql in _V1_TO_V2_POST if found == 1 else ():
                 con.execute(sql)
@@ -286,6 +294,19 @@ class Store:
             rows = con.execute(
                 "SELECT seconds FROM scan_times WHERE mode = ?"
                 " ORDER BY finished DESC, rowid DESC LIMIT ?", (mode, n)).fetchall()
+        return [r["seconds"] for r in rows]
+
+    def add_rating_time(self, preset: str, seconds: float):
+        with self._db() as con:
+            con.execute("INSERT INTO rating_times (preset, seconds, finished) VALUES (?, ?, ?)",
+                        (preset, seconds, _now()))
+
+    def recent_rating_times(self, preset: str, n: int = 5) -> list[float]:
+        """Seconds the strokes and thermal steps of a rated evaluation took, per preset; newest first."""
+        with self._db() as con:
+            rows = con.execute(
+                "SELECT seconds FROM rating_times WHERE preset = ?"
+                " ORDER BY finished DESC, rowid DESC LIMIT ?", (preset, n)).fetchall()
         return [r["seconds"] for r in rows]
 
     def mark_running_interrupted(self) -> int:
