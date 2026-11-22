@@ -1,5 +1,5 @@
 {
- "srmcore": "0.7.0",
+ "srmcore": "0.8.0",
  "nodes": 128639,
  "assumed": {
   "slot_liner_thickness": "0.1 mm; EMDLAB's coil touches the tooth flank (no liner)",

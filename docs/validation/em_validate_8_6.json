@@ -1,19 +1,19 @@
 {
- "engine_version": "0.7.0",
+ "engine_version": "0.8.0",
  "label": "2D-verified",
  "material_grades": {
   "stator": "C",
   "rotor": "C"
  },
- "map_s": 699.6402926660012,
- "validate_s": 286.6557346280024,
+ "map_s": 756.8666276189979,
+ "validate_s": 328.7954640980024,
  "checks": [
   {
    "name": "engine_version",
    "status": "pass",
    "value": null,
    "limit": null,
-   "detail": "srmcore 0.7.0; validated versions: 0.4.0, 0.7.0"
+   "detail": "srmcore 0.8.0; validated versions: 0.4.0, 0.7.0, 0.8.0"
   },
   {
    "name": "preset",
