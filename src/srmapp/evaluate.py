@@ -149,7 +149,10 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         notes.append(f"no winding is EM-feasible; {NOT_RATED}")
     else:
         from . import thermal as th   # thermal imports this module
-        checks = choice.ranked[:MAX_THERMAL_CHECKS]
+        from .cooling import TORQUE_FLOOR
+        # The rated set asks for (1 + TORQUE_FLOOR) x the required torque (no em_budget here), so a winding whose EM
+        # ratio is below that can hardly hold; check those last (stable sort: best-first inside each group).
+        checks = sorted(choice.ranked, key=lambda s: s.worst < 1.0 + TORQUE_FLOOR)[:MAX_THERMAL_CHECKS]
 
         def context(cand):
             return th.thermal_context(req, design, result, cand.winding, solver=solver, workers=workers,
@@ -181,7 +184,8 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                     if cancel is not None and cancel():
                         return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
                 else:
-                    feasible, held = False, first
+                    feasible, held, point = False, first, checks[0]   # the winding the note and a failed rating describe
+                    env = _envelope(result, machine, req, point.winding, speed_grid(req), j_limit)
                     left = (f"; checked {len(checks)} of {len(choice.ranked)} EM-feasible windings"
                             if len(choice.ranked) > len(checks) else "")
                     notes.append(f"no winding holds the rated hot-spot limit (best winding: {first.rpm:.0f} rpm, "
