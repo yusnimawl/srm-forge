@@ -215,3 +215,28 @@ Unresolved sources:
 ## R5c
 
 Merged to main 2026-11-19, PR #34 (srmcore and srmapp 0.8.0, srmweb and `web/` 0.11.0): stage 2 checks the EM-feasible windings best-first against the rated hot-spot limit at the required torques, rates the first that holds, and the Pareto front is rated continuous and peak kW/kg. A rated evaluation of the 8/6 screening case took 629 s on the LattePanda (i5-1340P). A rated search rates every EM-feasible design: up to `MAX_THERMAL_CHECKS` (4) requirement checks per design plus one full rating. With no user `j_peak_max`, the wire-mode map range and scan use the 80 A/mm² peak screen `J_PEAK_SCREEN`. `losses.efficiency_map` takes the evaluation's `j_limit` as its RMS limit, so for an evaluation from the search it is now the 40 A/mm² screen `J_SCREEN`. Open: validation campaign for srmcore 0.8.0; the evaluate estimate does not count rating time (R5d).
+
+## R5d
+
+On branch `r5d-thermal-tab`, not yet merged (srmapp 0.9.0, srmweb and `web/` 0.12.0, srmcore unchanged at 0.8.0, rating numbers unchanged). Shipped: the Thermal tab on evaluated cases (verdict, speed table, torque curves, temperature map with a steady or peak end and a speed picker, tornado of the budget rows, rotor stress and cooling lines, notes), the chips for rating, cooling and iron band, a Thermal section in the run report, rated continuous and peak kW/kg axes and columns, and an evaluate estimate that counts the rating time (store schema v3, table `rating_times`).
+
+Rating time on the LattePanda (i5-1340P), 8/6 reference case, 2026-11-22, `examples/rating_timing.py` (span from the first thermal callback to the return, so it includes the winding checks):
+
+| Preset | Rating span | Evaluate total | Budget (x 1.25) |
+|---|---|---|---|
+| screening | 850.0 s | 1070.3 s | 1063 s |
+| full | 1631.0 s | 2738.0 s | 2039 s |
+| reference | not run | not run | 8155 s (4 x full) |
+
+Files: `docs/validation/r5d_rating_screening.json`, `docs/validation/r5d_rating_full.json`. The budgets are `cases.RATING_BUDGET_S`; they apply only when no rating of that preset has been timed.
+
+Browser check (headless Chromium, 1440 px and 375 px, srmweb with the built frontend):
+- Rated 8/6 screening case, 100 W continuous: pass at both widths. Verdict "Meets the requirement", six speed rows, curves, a non-blank temperature map (70 to 99 degC), speed picker changes the map and the tornado, rotor and cooling lines, notes. At 375 px the Speed column stays fixed, a row tap opens its detail and the map renders at 300 x 300 px. The Peak end shows "No peak state at this speed" because every speed is EM-bound; the end toggle changing the map was checked on the failing case.
+- Failing case (620 W, class F, no jacket): pass. It fails with NO_STROKE at 1000 r/min ("no stroke reaches the required torque"), shown in red. The HOT_SPOT_ABOVE text was not reached in the browser (raising power alone left the jacket case passing; ambient 60 degC or more refuses the rating); that text is covered by unit tests only.
+- Pre-R5d evaluation (summary, check and fields removed, flat rating keys): no crash; the table shows, with "Edit, then Evaluate, for full detail". The Rotor column read "no steady state" for every speed; fixed, a missing value now reads "–" (test in `web/src/lib/thermal.test.ts`).
+- Run report exported and opened offline (5 MB, network blocked): Thermal section with verdict, table, curves, temperature map image, uncertainty table, rotor and cooling, notes; no page errors.
+- Cache cleared: the map slot says "Re-evaluate to see the map"; table, verdict and plots still render.
+- Cases table: the rated kW/kg and kW/L columns are present. The options graph and search were not run in the browser.
+- Console: the 404 of the Losses lookup on every case view (existing) and the expected 410 after the cache clear. Not changed: the iron chip reads "Iron x3.2-3.2 band" for a zero-width band.
+
+Fast suite: 1767 passed. Engine digest matches its pin.

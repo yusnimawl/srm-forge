@@ -33,7 +33,7 @@ const base = (over: Table = {}, parent: string | null = null, job: string | null
 })
 const render = async () => ["data:image/png;base64,AA"]
 const renderMap = async () => "data:image/png;base64,MAP"
-const rated = { rating: { shares: [{}], speeds: [] }, thermal_summary: { least_margin_rpm: 2000 } }
+const rated = { rating: { shares: [{}], stress: {}, speeds: [] }, thermal_summary: { least_margin_rpm: 2000 } }
 const withEv = (ev: object): Table => ({ "/api/cases/c": ok({ ...caseBody(null), evaluation: ev }) })
 
 afterEach(() => vi.unstubAllGlobals())

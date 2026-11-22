@@ -77,8 +77,9 @@ export function coolingText(c: Cooling): string {
 
 const SMALL_GAP_M = 0.0003
 
-/** A hot-spot temperature, or "no steady state" when it is not finite. */
-export const tempText = (c: number | null | undefined) => (c == null || !Number.isFinite(c) ? "no steady state" : `${fmt(c, 3)} °C`)
+/** A temperature; "–" when the value is absent (older evaluations), "no steady state" when it is present but null or not finite. */
+export const tempText = (c: number | null | undefined) =>
+  c === undefined ? "–" : c === null || !Number.isFinite(c) ? "no steady state" : `${fmt(c, 3)} °C`
 
 /** The rotor stress and air-gap closure in one line. */
 export function rotorText(rating: Rating): string {

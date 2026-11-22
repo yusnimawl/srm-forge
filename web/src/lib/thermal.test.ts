@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Evaluation } from "@/api/types"
-import { curveSpec, tabState, tornadoSpec, type Rating, type ShareRow } from "./thermal"
+import { curveSpec, tabState, tempText, tornadoSpec, type Rating, type ShareRow } from "./thermal"
 
 const ev = (o: object) => o as Evaluation
 const sp = (rpm: number) => ({ rpm, nominal_continuous_nm: 10, nominal_peak_nm: 20, rated_continuous_nm: 8, rated_peak_nm: 18 })
@@ -37,5 +37,14 @@ describe("tornadoSpec", () => {
     expect(t.y).toEqual(["Contact gap", "Iron loss band"])
     expect(t.x).toEqual([12, 10])
     expect(t.text[0]).toBe("runaway")
+  })
+})
+
+describe("tempText", () => {
+  it("separates an absent value from a missing steady state", () => {
+    expect(tempText(undefined)).toBe("–")
+    expect(tempText(null)).toBe("no steady state")
+    expect(tempText(Number.NaN)).toBe("no steady state")
+    expect(tempText(120)).toContain("120")
   })
 })
