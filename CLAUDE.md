@@ -58,6 +58,7 @@ $env:PYTHONPATH="tests"; python tools\femm_fixtures.py <machine> [--level F]   #
 $env:PYTHONPATH="tests"; python examples\femm_check.py [machine ...] [--json PATH]   # FEMM cross-tool comparison tables
 $env:PYTHONPATH="tests"; python examples\emdlab_check.py [--json PATH]   # EMDLAB / Maxwell 8/6 comparison table (30 solves, about 7 min)
 $env:PYTHONPATH="tests"; python examples\krishnan_6_4_check.py [--json PATH]   # measured Krishnan/Materu 6/4 comparison with end-winding correction (about 17 min)
+$env:PYTHONPATH="tests"; python examples\ieej_srm2_check.py [--preset screening|full|reference] [--workers N] [--currents 50,100,150,200,250] [--stacking K] [--json PATH]   # IEEJ SRM2 18/12 against the IEEJ TR 1589 2D maps (docs/ieej-srm2-results.md)
 ```
 
 Web layer (see "Web layer (v0b)" below):
