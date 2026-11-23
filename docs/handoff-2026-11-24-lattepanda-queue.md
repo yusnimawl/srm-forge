@@ -22,7 +22,9 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
 
 1. **Row 8e memory sampling.** Runs as systemd units `memf-*` from the session "What's the next thing". Wait until
    `systemctl --user list-units 'memf-*'` lists nothing active.
-2. **IEEJ SRM2 and TEAM 24 runs (row 1d), a new LattePanda session.** Follow
+2. **IEEJ SRM2 and TEAM 24 runs (row 1d).** The seeded session for this stayed PENDING (the bridge did not
+   spawn it), so the session "What's the next thing" runs it: unit `ieej-team24` in worktree `../srm-forge-ieej`,
+   queued 2026-11-24 03:04 UTC; it waits until no `memf-*` unit is active, then starts runs 1 to 3. Follow
    `docs/handoff-2026-11-22-lattepanda-ieej-team24.md` on branch `ccr-ae0b0426-2aybo8`, runs 1 to 3 only. Run 4
    (the full 16-run R4 gate, about 4 h, 24 GB) waits for the owner, who decides after seeing run 3. Commit the
    result JSON files to that branch and push. Then send the results to the cloud session "Switched reluctance motor
