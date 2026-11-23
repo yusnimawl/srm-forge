@@ -12,7 +12,7 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
   - PR #38: bench references relabelled to srmcore 0.8.0 (values re-solved unchanged).
   - PR #39, srmsil 0.9.1: the matched SIL runs the rig's float32 inputs (`compare.rig_scenario`). Row 8d is Done.
 - Rows 8b and 8d are Done. A dispatched slow run on main after PR #39 (45102111410) is green 3/3.
-- Row 8e (split the slow suite's rest job) is in progress in the session "What's the next thing": branch
+- Row 8e (split the slow suite's rest job) is in PR #40 (session "What's the next thing"): branch
   `slow-split`, a fourth CI part `app` (`tests/app`). Measured on the LattePanda with 4 pinned cores and
   `PYTHON_CPU_COUNT=4`: `app` 1 h 28 min, cgroup peak 2.4 GB; the rest 2 h 4 min, cgroup peak 16.6 GB (page cache
   included). Per-file anon peaks are in that session; `test_end3d_g2` took 4.9 GB.
@@ -24,7 +24,7 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    `systemctl --user list-units 'memf-*'` lists nothing active.
 2. **IEEJ SRM2 and TEAM 24 runs (row 1d).** The seeded session for this stayed PENDING (the bridge did not
    spawn it), so the session "What's the next thing" runs it: unit `ieej-team24` in worktree `../srm-forge-ieej`,
-   queued 2026-11-24 03:04 UTC; it waits until no `memf-*` unit is active, then starts runs 1 to 3. Follow
+   queued 2026-11-23 20:04 UTC; it waits until no `memf-*` unit is active, then starts runs 1 to 3. Follow
    `docs/handoff-2026-11-22-lattepanda-ieej-team24.md` on branch `ccr-ae0b0426-2aybo8`, runs 1 to 3 only. Run 4
    (the full 16-run R4 gate, about 4 h, 24 GB) waits for the owner, who decides after seeing run 3. Commit the
    result JSON files to that branch and push. Then send the results to the cloud session "Switched reluctance motor
