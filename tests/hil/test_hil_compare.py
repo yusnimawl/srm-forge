@@ -88,6 +88,49 @@ def test_window_matches_a_changing_run(cache):
     assert abs(old.d_torque_pct) + abs(old.d_irms_pct) > 10 * (abs(good.d_torque_pct) + abs(good.d_irms_pct))
 
 
+def _flat(d, pre=""):
+    out = {}
+    for k, v in d.items():
+        out |= _flat(v, pre + k + ".") if isinstance(v, dict) else {pre + k: v}
+    return out
+
+
+def test_matched_sil_runs_the_rigs_float32_inputs(cache, monkeypatch):
+    """The rig gets the scenario as float32 config (the fake decodes it as the emulator does), so the matched SIL
+    rounds the same fields: the fake's SIL and the matched SIL then run the same scenario. At this capture start the
+    float64 scenario flipped a hysteresis decision (ripple -3.5 points; CI hit +6.9 at another start)."""
+    import srmsil.hil.fake as fake
+    start = round(0.205 / EMU_DT) + 13
+    monkeypatch.setattr(fake._Rig, "step_now", lambda self: start if self.started else 0)
+    seen = {}
+    real_fake, real_test = fake.run, run
+    monkeypatch.setattr(fake, "run", lambda m, c, s, **k: (seen.__setitem__("fake", s), real_fake(m, c, s, **k))[1])
+    monkeypatch.setitem(globals(), "run", lambda m, c, s, **k: (seen.__setitem__("match", s), real_test(m, c, s, **k))[1])
+    res = hil_run(cache, R)
+    c = matched(cache, res, res.hil["clock_ratio"])
+    a, b = _flat(seen["fake"].model_dump()), _flat(seen["match"].model_dump())
+    assert a.keys() == b.keys()
+    for k in a:
+        if isinstance(a[k], float) and isinstance(b[k], float):
+            assert a[k] == pytest.approx(b[k], rel=1e-12, abs=1e-15), k
+        else:
+            assert a[k] == b[k], k
+    assert c.passed and abs(c.d_ripple_pts) < 1.0, c
+
+
+def test_rig_scenario_rounds_what_the_emulator_gets_as_float32():
+    from srmsil.hil.compare import RPM, rig_scenario
+    m = analytic_motor()
+    scn = SCN.model_copy(update={"speed_rpm": 1234.567, "theta0": 0.1, "inertia": 1.1e-3})
+    r = rig_scenario(scn, m)
+    f32 = lambda x: float(np.float32(x))  # noqa: E731
+    assert r.speed_rpm * RPM == pytest.approx(f32(1234.567 * RPM), rel=1e-15) and r.theta0 == f32(0.1)
+    assert r.inertia == f32(1.1e-3) and r.converter.dead_time == f32(SCN.converter.dead_time)
+    assert r.bus_voltage == f32(m.bus_voltage)
+    assert rig_scenario(r, m) == r                                    # idempotent
+    assert r.command_value == scn.command_value and r.duration == scn.duration   # not part of the rig config
+
+
 def test_matched_scenario():
     m = analytic_motor()
     scn = matched_scenario(SCN, 8e-6, HilModes(), 1.011, m=m, end_s=0.25)
@@ -250,9 +293,10 @@ def test_match_plan_fixed_starts_settle_before_capture():
     assert plan.reason == "" and plan.t0 == pytest.approx(1.0 - SETTLE_S)
     w = cap.hil["window_s"]
     assert plan.scenario.duration == pytest.approx(w[1] - plan.t0)
-    turn = 600.0 / 60 * plan.t0 * 2 * math.pi
-    assert math.cos(plan.scenario.theta0) == pytest.approx(math.cos(0.3 + turn))
-    assert math.sin(plan.scenario.theta0) == pytest.approx(math.sin(0.3 + turn))
+    # the rotor turns from the rig's float32 angle at its float32 speed (rad/s), as the emulator received them
+    angle = float(np.float32(0.3)) + float(np.float32(600.0 / 60 * 2 * math.pi)) * plan.t0
+    assert math.cos(plan.scenario.theta0) == pytest.approx(math.cos(angle))
+    assert math.sin(plan.scenario.theta0) == pytest.approx(math.sin(angle))
     early = match_plan(captured(scn, t_start=0.1), HilModes(), analytic_motor())
     assert early.t0 == 0.0 and early.scenario.theta0 == pytest.approx(0.3)
 
