@@ -29,7 +29,10 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    (the full 16-run R4 gate, about 4 h, 24 GB) waits for the owner, who decides after seeing run 3. Commit the
    result JSON files to that branch and push. Then send the results to the cloud session "Switched reluctance motor
    validation" (session_01Wzw16YT3vVcHut4teCjihs), which does the docs, the tracker and the PR.
-3. **R5e gate V0 (row 10k), a new session, after step 2 is done.** V0 is read-and-record only: every input of V2 to
+3. **R5e gate V0 (row 10k), a new session, after step 2 is done.** Step 2 is done (8c96db5 on
+   `ccr-ae0b0426-2aybo8`, results sent). Session "R5e gate V0: read and record (row 10k)" was created
+   2026-11-23 21:17 UTC (session_01Wzw16YqYmkmu3jtyuuY69P) and stays PENDING until the bridge spawns it; open it in
+   the app, or start a LattePanda session with this step. V0 is read-and-record only: every input of V2 to
    V4 in `docs/r5-sources.md` with page, figure and digitisation error, and the Kiyota Fig. 7 geometry read off the
    drawing (spec `docs/superpowers/specs/2026-11-05-r5-thermal-stress-design.md` §V0, plan
    `docs/superpowers/plans/2026-11-07-r5a-thermal-stress-core.md` row R5e). No comparison runs before V0 is
