@@ -13,11 +13,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]   # Windows is not run (owner, 2026-11-13); its open items are on the tracker backlog
-        # Three parts run side by side: validation about 1 h 45 min, web about 40 min, the rest about 2 h 55 min.
+        # Four parts run side by side (test time on run 45102111410): validation about 1 h 20 min, web 10 to 40 min,
+        # app (the R5 thermal and rated tests) about 1 h 50 min, the rest about 2 h. The 16 GB runner cannot hold the
+        # full 3D TEAM 24 solve (about 14 GB), so test_end3d_post skips it below 24 GB of RAM; it runs on the LattePanda.
         part:
           - {name: validation, args: "tests/validation"}
           - {name: web, args: "tests/web"}
-          - {name: rest, args: "--ignore=tests/validation --ignore=tests/web"}
+          - {name: app, args: "tests/app"}
+          - {name: rest, args: "--ignore=tests/validation --ignore=tests/web --ignore=tests/app"}
     name: slow (${{ matrix.os }}, ${{ matrix.part.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
