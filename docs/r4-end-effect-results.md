@@ -102,6 +102,31 @@ Run notes:
 - The first run stopped after `hub_minus` (04:47) with no out-of-memory kill. The cause was not found. The rerun reused the 9 finished runs.
 - `yoke_plus` took 3560 s against about 500 s for the same-size runs, with the same 7 Newton steps. The cause was not measured.
 
+### G1 on the filled low-field curve (2026-11-23, nominal and slab only)
+
+Table I of TEAM 24 has no B-H point between 0 and 4000 A/m; read as printed, the first segment is a straight line
+(`docs/m5b-team24-results.md`, "Low-field B-H fill"). The two G1 runs below take the same models on the curve with
+that interval filled by the Diez–Webb form (`g1_team24.py --low-field diez_webb --keys nominal,slab`, LattePanda
+2026-11-23, data `docs/validation/r4_g1_diez_webb.json`). Same mesh level (1.5 / 10 / 2 / 8 mm, 1.71 M DOFs):
+nominal 619 s, 11.5 GB.
+
+| Quantity | Measured | 2D, filled | 3D slab, filled | 3D full, filled | 3D error, filled | 3D error, as printed |
+|---|---|---|---|---|---|---|
+| Torque (N·m) | 3.22 | 3.0755 | 3.0810 | 3.1186 | −3.15 % | −11.72 % |
+| Rotor-pole flux (Wb) | 4.72e-4 | 4.1005e-4 | 4.1186e-4 | 4.5543e-4 | −3.51 % | −8.30 % |
+
+- The fill closes 73 % of the torque gap and 58 % of the flux gap. Most of the G1 miss came from the B-H table, not
+  from the end effects.
+- The 3D slab agrees with the 2D model on the filled curve: torque +0.18 %, flux +0.44 %.
+- End effects are unchanged in size: slab to full adds 1.22 % torque (1.32 % as printed) and 10.6 % flux (10.3 %).
+- Against the budget of the gate as run (torque 1.82 %, flux 2.60 %), both errors are still outside, by 1.3 and
+  0.9 points. The budget rows were not rerun on the filled curve, so this is no verdict: the gate needs all 16 runs
+  (owner decision; about 4 h and 24 GB on the LattePanda).
+- Hook check on the filled curve: ψ(full) − ψ(slab) is 0.1381 Wb-turns against the analytic 0.0728 at image
+  factor 1.5 (as printed: 0.1342).
+- For comparison, mufem's 3D transient of the rig on its own filled curve gives 3.15 N·m at 0.15 s (Raiden
+  Numerics validation case; reproduced in the cloud, 2026-11-22).
+
 ## Measured gap in the budget
 
 Run 2026-11-05 on code 94f5fd7, results committed in 4a74fdb (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache and the check and label code are not changed. srmcore stays 0.7.0.

@@ -145,8 +145,10 @@ point lies in the interval, so the fill is an assumption, not data.
 
 Mesh (scale 0.5) and Js (1.98 to 2.05 T) change the filled static torque by less than 0.02 %. The default stays
 "table": the M5b numbers above, `MEASURED_GAP` and the R4 gate G1 are all on Table I as printed. Whether the fill
-replaces it is an owner decision (tracker row 1d), after the 3D G1 runs on the filled curve
-(`tools/end3d/g1_team24.py --low-field diez_webb`).
+replaces it is an owner decision (tracker row 1d).
+
+In 3D on the filled curve (R4 G1 nominal, 2026-11-23) the torque is 3.1186 N·m (−3.15 %) and the rotor-pole flux
+4.5543e-4 Wb (−3.51 %), against −11.72 % and −8.30 % as printed (`docs/r4-end-effect-results.md`).
 
 ## End-winding correction (M5d)
 

@@ -2,6 +2,7 @@
 
 ## Summary
 
+- `full` on the LattePanda (2026-11-23, 328 072 nodes) moves every number by less than 0.6 points: aligned ψ −4.75 % and +4.37 %, worst torque −6.52 % and +8.06 % of the IEEJ peak, unaligned ψ within 0.32 %. The screening mesh is converged here, so the residual is the iron curve, not the mesh (section "`full` results").
 - srmcore `screening` (NGSolve) on the IEEJ public-use SRM "SRM2" (the 18/12 of Chiba et al. 2015, 10JNEX900), phase A only, at the 16 portal positions from unaligned to aligned and 50 to 250 A, against the 2D FEA maps of IEEJ TR 1589.
 - With the library 10JNEX900 (catalogue curve, stacking factor 0.9), the unaligned flux linkage agrees within 0.19 % at every current. The aligned flux linkage is 4.76 % low from 100 A up, the torque is up to 6.46 % of the IEEJ peak low, and the mean stroke torque at 250 A is 244.6 N m against 260.8 (−6.2 %).
 - With stacking factor 1.0 (same curve, same mesh) the signs change: aligned ψ +4.36 %, torque up to +7.66 % of the peak, mean torque 279.7 N m (+7.2 %). The unaligned ψ stays within 0.18 %.
@@ -60,6 +61,26 @@ All 16 positions are in the evidence JSON files.
 
 The mean torque is W′(aligned) − W′(unaligned) over the 15° stroke, for srmcore from its co-energy and for IEEJ from the co-energy of the flux table (the doubled torque table gives 260.0 N m at 250 A).
 
+## `full` results
+
+LattePanda, 2026-11-23 (`docs/validation/ieej_srm2_full.json`, `ieej_srm2_full_sf1.json`): 328 072 nodes, band 2160
+divisions; stacking 0.9 on 8 workers (mesh 34 s, 80 solves 548 s), stacking 1.0 in one process (mesh 33 s, 48 solves
+1556 s).
+
+| current (A) | SF | worst dψ | dψ unaligned | dψ aligned | peak T (N m) | peak T IEEJ x 2 | worst dT / IEEJ peak | mean T (N m) | mean T IEEJ |
+|---|---|---|---|---|---|---|---|---|---|
+| 50 | 0.9 | −3.24 % | +0.30 % | −1.64 % | 56.5 | 57.5 | −4.70 % | 38.2 | 38.2 |
+| 100 | 0.9 | −4.44 % | +0.30 % | −4.44 % | 146.3 | 152.4 | −5.09 % | 98.9 | 101.8 |
+| 150 | 0.9 | −4.68 % | +0.25 % | −4.68 % | 231.2 | 242.3 | −5.59 % | 155.2 | 162.2 |
+| 200 | 0.9 | −4.75 % | +0.13 % | −4.75 % | 306.3 | 323.5 | −5.93 % | 204.0 | 215.6 |
+| 250 | 0.9 | −4.75 % | −0.07 % | −4.75 % | 374.0 | 396.2 | −6.52 % | 244.5 | 260.8 |
+| 50 | 1.0 | +6.14 % | +0.31 % | +6.14 % | 58.9 | 57.5 | +8.06 % | 40.2 | 38.2 |
+| 150 | 1.0 | +4.54 % | +0.28 % | +4.51 % | 255.9 | 242.3 | +7.37 % | 172.7 | 162.2 |
+| 250 | 1.0 | +4.37 % | +0.32 % | +4.37 % | 422.9 | 396.2 | +7.55 % | 279.6 | 260.8 |
+
+Against `screening`, the largest changes are 0.45 points in worst dT at 50 A (stacking 0.9) and 0.17 points in
+unaligned ψ; aligned ψ and the mean torques move by less than 0.1 %. The slow test stays at `screening`.
+
 ## The B-H curve
 
 The library 10JNEX900 is the JFE catalogue curve (grade B, stacking factor 0.9 from the catalogue's guaranteed minimum space factor). Against the mufem trace of the portal's B-H figure (CC BY-SA 4.0, used here for these numbers only and not copied into the repository), the library curve at stacking factor 1.0 is 1.9 to 3.1 % higher between 30 and 10 000 A/m, and at stacking factor 0.9 it is 7.2 to 8.3 % lower. The portal curve therefore looks like a material curve with no stacking factor applied.
@@ -98,7 +119,6 @@ Three fast tests check the fixture: the two tables share one grid, the torque ta
 
 ## Open
 
-- `full` on the LattePanda for both stacking factors, to separate the mesh error from the curve difference (`docs/validation/ieej_srm2_full.json`, `ieej_srm2_full_sf1.json`).
 - The curve behind the portal maps: ask IEEJ for the table, or carry the bracket in the validation budget.
 - mufem's 3D results for the same machine give ψ and T ratios against 2D with and without end turns; compare them with `tools/end3d` (R4, tracker row 1d).
 - The DXF route: clean `SRM2_CAD.dxf` into closed loops and check that the imported iron gives the same map as the parametric design.
