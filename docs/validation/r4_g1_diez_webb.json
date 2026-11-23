@@ -1,0 +1,97 @@
+{
+  "runs": {
+    "nominal": {
+      "ndof": 1711242,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 619.0703243850148,
+      "peak_gb": 11.516567552,
+      "torque": 3.118602450007081,
+      "flux": 0.0004554292231427429,
+      "psi": 0.5227238056093735,
+      "iterations": 8,
+      "params": {
+        "low_field": "diez_webb"
+      }
+    },
+    "slab": {
+      "ndof": 378380,
+      "layers": 5,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 24.337243510992266,
+      "peak_gb": 1.540206592,
+      "torque": 3.0810327695070936,
+      "flux": 0.00041185694716351385,
+      "psi": 0.38467155827401733,
+      "iterations": 6,
+      "params": {
+        "slab": true,
+        "low_field": "diez_webb"
+      }
+    }
+  },
+  "measured": {
+    "torque": 3.22,
+    "flux": 0.000472
+  },
+  "rows": {
+    "mesh": {
+      "torque": null,
+      "flux": null
+    },
+    "air_box": {
+      "torque": null,
+      "flux": null
+    },
+    "material": {
+      "torque": null,
+      "flux": null
+    },
+    "table_rounding": {
+      "torque": 0.0015527950310559005,
+      "flux": 0.001059322033898305
+    },
+    "fillets": {
+      "torque": null,
+      "flux": null
+    },
+    "hub_radius": {
+      "torque": null,
+      "flux": null
+    },
+    "yoke_thickness": {
+      "torque": null,
+      "flux": null
+    },
+    "search_coil": {
+      "torque": null,
+      "flux": null
+    },
+    "coil_end": {
+      "torque": null,
+      "flux": null
+    }
+  },
+  "verdict": {
+    "pass": false,
+    "reason": "row mesh: a run did not converge, was skipped or is missing"
+  },
+  "hook": {
+    "psi_full_minus_slab": 0.13805224733535615,
+    "analytic_image_1_5": 0.07282406133414922
+  }
+}
