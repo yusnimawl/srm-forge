@@ -12,10 +12,9 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
   - PR #38: bench references relabelled to srmcore 0.8.0 (values re-solved unchanged).
   - PR #39, srmsil 0.9.1: the matched SIL runs the rig's float32 inputs (`compare.rig_scenario`). Row 8d is Done.
 - Rows 8b and 8d are Done. A dispatched slow run on main after PR #39 (45102111410) is green 3/3.
-- Row 8e (split the slow suite's rest job) is in PR #40 (session "What's the next thing"): branch
-  `slow-split`, a fourth CI part `app` (`tests/app`). Measured on the LattePanda with 4 pinned cores and
-  `PYTHON_CPU_COUNT=4`: `app` 1 h 28 min, cgroup peak 2.4 GB; the rest 2 h 4 min, cgroup peak 16.6 GB (page cache
-  included). Per-file anon peaks are in that session; `test_end3d_g2` took 4.9 GB.
+- Row 8e is Done: PR #40 (82cde40), four slow jobs (validation, web, app, rest), each under 2 h on main run
+  45277283558. The full-model 3D TEAM 24 test needs about 14 GB per solve, so it skips below 24 GB of RAM and runs
+  on the LattePanda only.
 - Scheduled slow runs start hours after their 03:17 UTC slot (11:20 UTC on 2026-11-22).
 
 ## 2. LattePanda queue (one heavy job at a time)
