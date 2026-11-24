@@ -21,6 +21,25 @@ def test_bh_table_reading():
     t24.steel_law()          # process_bh accepts the table
 
 
+def test_low_field_fill():
+    assert t24.bh_table("table") == (t24.H_TABLE, t24.B_TABLE)
+    h, b = (np.array(v) for v in t24.bh_table("diez_webb"))
+    # the fill sits strictly inside Table I's first interval, the rest of the table is unchanged
+    n = len(t24.FILL_H)
+    assert np.all((h[1:n + 1] > 0) & (h[1:n + 1] < t24.H_TABLE[1]))
+    assert tuple(h[n + 1:]) == t24.H_TABLE[1:] and tuple(b[n + 1:]) == t24.B_TABLE[1:]
+    j = b - MU0 * h
+    assert np.all(np.diff(h) > 0) and np.all(np.diff(j) > 0)
+    # the fill passes through point 1 (scaled) and is softer than the straight first segment below it
+    a, bb, k = t24.diez_webb_fill()
+    assert k * t24._diez_webb(t24.H_TABLE[1], a, bb) == pytest.approx(t24.B_TABLE[1], rel=1e-12)
+    assert np.all(b[1:n + 1] > t24.B_TABLE[1] * h[1:n + 1] / t24.H_TABLE[1])
+    assert b[3] / (MU0 * h[3]) == pytest.approx(989, rel=0.01)          # mu_r at 100 A/m
+    t24.steel_law(low_field="diez_webb")
+    with pytest.raises(ValueError):
+        t24.bh_table("linear")
+
+
 def test_table_ii_voltage():
     assert t24.table_ii_voltage(0.0) == 0.0
     assert t24.table_ii_voltage(0.0002) == pytest.approx(23.60)
@@ -49,12 +68,13 @@ def test_current_rise_callable_voltage():
 
 I_FINAL = 7.41
 MEASURED_TORQUE = 3.22
-# 2D results at 7.41 A on the default mesh (docs/m5b-team24-results.md); regression pins.
-TORQUE_2D = 2.7996
-PSI_2D = 0.3676
-ROTOR_FLUX_2D = 3.9069e-4
-CURRENT_20MS_2D = 5.308
-CURRENT_20MS_END = 4.822     # 20 ms current with the end-winding inductance (midpoint of image factors 1 and 2)
+# 2D results at 7.41 A on the default mesh and the default steel curve (Table I with the low-field interval
+# filled; docs/m5b-team24-results.md); regression pins.
+TORQUE_2D = 3.0755
+PSI_2D = 0.3834
+ROTOR_FLUX_2D = 4.1005e-4
+CURRENT_20MS_2D = 5.177
+CURRENT_20MS_END = 4.699     # 20 ms current with the end-winding inductance (midpoint of image factors 1 and 2)
 
 
 def _rel(x, y):

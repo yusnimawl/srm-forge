@@ -2,6 +2,8 @@
 
 ## Summary
 
+Since 2026-11-24 the default steel curve fills Table I's low-field interval: torque −4.5 %, rotor-pole flux −13.1 % (section "Low-field B-H fill"). The bullets below are the 2026-10-04 results on Table I as printed.
+
 - The 2D static torque at 7.41 A is 2.7996 N·m against 3.22 measured: -13.1 %.
 - The rotor-pole flux is 3.9069e-04 Wb against 4.72e-04: -17.2 %.
 - The model current runs ahead of the measurement by up to +18.6 % between 5 and 50 ms (R 3.09 Ω, 23.1 V); across the R and voltage variants the maximum is 18.1 % to 18.9 % (+18.9 % at R 3.12 Ω with the Table II voltage).
@@ -119,8 +121,40 @@ Regression pins in the slow test: torque 2.7996 N·m, ψ 0.3676 Wb-turns (relati
 | Mesh (scale 0.5) | -0.004 % | ψ +0.26 % (affects the current rise) | not computed | computed |
 | Table rounding (2 decimals) | ±0.005/3.22 = ±0.16 % on final torque | ±0.005/i (±0.55 % at 0.91 A) | ±0.005/4.72 = ±0.11 % on the final value | arithmetic |
 | Table I reading / B-H | measured EN9 curve, annealed; no grade or tolerance given | same | same | Table I |
-| Low-field B-H | not quantified | Table I has no point between 0 and 1.413 T (at 4000 A/m); μr ≈ 300–390 along the first segment is interpolated; affects the early current rise | same; affects the early rows | not quantified |
+| Low-field B-H | −13.1 % → −4.5 % with the gap filled (see "Low-field B-H fill") | max \|dev\| 18.6 % → 15.3 % (t ≥ 5 ms) | −17.2 % → −13.1 % | computed 2026-11-22 with an assumed fill (Diez–Webb form); Table I has no point between 0 and 1.413 T (at 4000 A/m), and read as printed the first segment is a straight line (μr ≈ 280 at 4000 A/m) |
 | Search-coil position | not applicable | not applicable | Table V assumed flux per turn; chord 8.7 mm from the corner along the flank | Fig. 1 |
+
+## Low-field B-H fill (2026-11-22)
+
+Table I has no point between H = 0 and its first point (4000 A/m, 1.413 T). Read as printed, `process_bh` puts a
+straight first segment under every field below 1.413 T, about μr 280 at its end, and most of the rig's iron works in
+that interval at 7.41 A. Rüberg, Kielhorn and Zechner, *Mathematics* 9(15) 1804 (2021), note that this changes the
+results; the mufem TEAM 24 validation case (Raiden Numerics) fills the interval and reports a 3D torque of 3.15 N·m
+against the measured 3.18 at 0.15 s. The fill used here is the same method, coded from its description: the rational
+form of Diez and Webb, *IEEE Trans. Magn.* 52(3) (2016), eq. (1) of degree 1, B = H / (a + b H) + μ0 H, fitted by least
+squares to Table I points 1 to 4 (a = 760.8, b = 0.5271) and scaled by 1.0099 to pass through point 1; 13 points at
+25 to 3500 A/m (`team24_fixture.bh_table("diez_webb")`). It gives μr 989 at 100 A/m and 625 at 1000 A/m. No measured
+point lies in the interval, so the fill is an assumption, not data.
+
+`python examples/team24_check.py` (default curve since 2026-11-24; evidence `docs/validation/team24.json`, as printed `team24_table.json`):
+
+| Quantity | Table I as printed | Gap filled | Measured |
+|---|---|---|---|
+| Static torque at 7.41 A (N·m) | 2.7996 (−13.1 %) | 3.0755 (−4.5 %) | 3.22 |
+| Rotor-pole flux (Wb) | 3.9069e-4 (−17.2 %) | 4.1005e-4 (−13.1 %) | 4.72e-4 |
+| ψ at 7.41 A (Wb-turns) | 0.36760 | 0.38339 (+4.3 %) | – |
+| Current rise, max \|dev\| for t ≥ 5 ms (R 3.09 Ω) | 18.6 % | 15.3 % | – |
+
+Mesh (scale 0.5) and Js (1.98 to 2.05 T) change the filled static torque by less than 0.02 %.
+
+**Owner decision, 2026-11-24: the filled curve is the default** (`low_field="diez_webb"` in `team24_fixture`,
+`examples/team24_check.py` and `tools/end3d`). `docs/validation/team24.json` is now the filled run;
+`docs/validation/team24_table.json` keeps the run on Table I as printed. The Summary and Results sections above are
+the as-printed history of 2026-10-04. `MEASURED_GAP` follows (`docs/r4-end-effect-results.md`, "Measured gap in the
+budget").
+
+In 3D on the filled curve (R4 G1 nominal, 2026-11-23) the torque is 3.1186 N·m (−3.15 %) and the rotor-pole flux
+4.5543e-4 Wb (−3.51 %), against −11.72 % and −8.30 % as printed. The full gate on the filled curve still fails, by 1.5 points (torque, budget 1.67 %) and 1.0 point (flux, budget 2.52 %), against 9.9 and 5.7 points as printed (`docs/r4-end-effect-results.md`).
 
 ## End-winding correction (M5d)
 

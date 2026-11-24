@@ -5,8 +5,8 @@
   "stator": "C",
   "rotor": "C"
  },
- "map_s": 756.8666276189979,
- "validate_s": 328.7954640980024,
+ "map_s": 762.1657466969918,
+ "validate_s": 321.261376526003,
  "checks": [
   {
    "name": "engine_version",
@@ -143,12 +143,12 @@
    {
     "source": "end_effect",
     "rel": {
-     "la": 0.20903840514263738,
+     "la": 0.17777952477889772,
      "lu": 0.011616457085768913,
      "peak_torque": 0.2376237623762376,
-     "psi_max": 0.21040485105074497
+     "psi_max": 0.1791459706870053
     },
-    "note": "end winding, image factor 1 to 2; measured gap, not a modelled effect: model low by 19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and \u03c8_max (TEAM 24)"
+    "note": "end winding, image factor 1 to 2; measured gap, not a modelled effect: model low by 19.2 % of measured in peak torque, 15.0 % in La and \u03c8_max (Krishnan 6/4, larger than TEAM 24)"
    },
    {
     "source": "digitisation",
@@ -172,10 +172,10 @@
    }
   ],
   "total": {
-   "la": 0.3098220082262091,
+   "la": 0.2785631278624694,
    "lu": 0.4210519218337374,
    "peak_torque": 0.33881891345197596,
-   "psi_max": 0.3099276188563143
+   "psi_max": 0.2786687384925746
   }
  }
 }

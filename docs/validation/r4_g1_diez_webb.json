@@ -1,0 +1,412 @@
+{
+  "runs": {
+    "nominal": {
+      "ndof": 1711242,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 619.0703243850148,
+      "peak_gb": 11.516567552,
+      "torque": 3.118602450007081,
+      "flux": 0.0004554292231427429,
+      "psi": 0.5227238056093735,
+      "iterations": 8,
+      "params": {
+        "low_field": "diez_webb"
+      }
+    },
+    "slab": {
+      "ndof": 378380,
+      "layers": 5,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 24.337243510992266,
+      "peak_gb": 1.540206592,
+      "torque": 3.0810327695070936,
+      "flux": 0.00041185694716351385,
+      "psi": 0.38467155827401733,
+      "iterations": 6,
+      "params": {
+        "slab": true,
+        "low_field": "diez_webb"
+      }
+    },
+    "mesh_coarse": {
+      "ndof": 1148479,
+      "layers": 17,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.9,
+        12.5,
+        2.5,
+        10.0
+      ],
+      "seconds": 342.53860856598476,
+      "peak_gb": 7.392055296,
+      "torque": 3.119756183306891,
+      "flux": 0.00045537462790324744,
+      "psi": 0.5226707654165801,
+      "iterations": 8,
+      "params": {
+        "low_field": "diez_webb"
+      }
+    },
+    "mesh_fine": {
+      "ndof": 3202278,
+      "layers": 24,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.2,
+        8.0,
+        1.5,
+        6.0
+      ],
+      "seconds": 2574.9842954380147,
+      "peak_gb": 29.047332864,
+      "torque": 3.1169882535312623,
+      "flux": 0.00045534507623140114,
+      "psi": 0.522692148518006,
+      "iterations": 8,
+      "params": {
+        "low_field": "diez_webb"
+      }
+    },
+    "air_radius": {
+      "ndof": 2545008,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 1433.6463736489823,
+      "peak_gb": 21.587513344,
+      "torque": 3.1184172857776953,
+      "flux": 0.00045549087643373,
+      "psi": 0.5227712495976663,
+      "iterations": 8,
+      "params": {
+        "air_radius_factor": 2.25,
+        "low_field": "diez_webb"
+      }
+    },
+    "air_end": {
+      "ndof": 1903004,
+      "layers": 20,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 786.9550472219998,
+      "peak_gb": 13.940789248,
+      "torque": 3.1184070502818644,
+      "flux": 0.0004554054928493709,
+      "psi": 0.5227282653558192,
+      "iterations": 8,
+      "params": {
+        "air_end_factor": 1.5,
+        "low_field": "diez_webb"
+      }
+    },
+    "js_hi": {
+      "ndof": 1711242,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 617.8906897729903,
+      "peak_gb": 11.542212608,
+      "torque": 3.118602336155586,
+      "flux": 0.0004554292950502268,
+      "psi": 0.5227238591302061,
+      "iterations": 8,
+      "params": {
+        "js": 2.04,
+        "low_field": "diez_webb"
+      }
+    },
+    "fillet": {
+      "ndof": 1901714,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 818.8173371220182,
+      "peak_gb": 12.902699008,
+      "torque": 3.125228814567728,
+      "flux": 0.0004559019808334558,
+      "psi": 0.5235441541580558,
+      "iterations": 9,
+      "params": {
+        "fillet": 0.003,
+        "low_field": "diez_webb"
+      }
+    },
+    "hub_plus": {
+      "ndof": 1704674,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 647.1983123440004,
+      "peak_gb": 12.401573888,
+      "torque": 3.1049416619555545,
+      "flux": 0.00045535033253586677,
+      "psi": 0.5243687999809968,
+      "iterations": 8,
+      "params": {
+        "r_hub": 0.038599999999999995,
+        "low_field": "diez_webb"
+      }
+    },
+    "hub_minus": {
+      "ndof": 1706316,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 589.9061308900127,
+      "peak_gb": 11.358769152,
+      "torque": 3.129874472157044,
+      "flux": 0.00045541528889148753,
+      "psi": 0.5211545169510364,
+      "iterations": 8,
+      "params": {
+        "r_hub": 0.037599999999999995,
+        "low_field": "diez_webb"
+      }
+    },
+    "yoke_plus": {
+      "ndof": 1712063,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 3945.617856593977,
+      "peak_gb": 11.132112896,
+      "torque": 3.1283423013597123,
+      "flux": 0.00045608632909584397,
+      "psi": 0.5235749566248332,
+      "iterations": 8,
+      "params": {
+        "r_yoke_in": 0.08259999999999999,
+        "low_field": "diez_webb"
+      }
+    },
+    "yoke_minus": {
+      "ndof": 1720273,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 511.1302532539994,
+      "peak_gb": 11.007397888,
+      "torque": 3.10857971948975,
+      "flux": 0.0004547444727061152,
+      "psi": 0.521856151183079,
+      "iterations": 8,
+      "params": {
+        "r_yoke_in": 0.0836,
+        "low_field": "diez_webb"
+      }
+    },
+    "search_plus": {
+      "ndof": 1697285,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 598.4949180650001,
+      "peak_gb": 11.5852288,
+      "torque": 3.118875016731774,
+      "flux": 0.00046139950016635173,
+      "psi": 0.5227103209846472,
+      "iterations": 8,
+      "params": {
+        "search_from_corner": 0.0097,
+        "low_field": "diez_webb"
+      }
+    },
+    "search_minus": {
+      "ndof": 1707137,
+      "layers": 18,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 618.9586733710021,
+      "peak_gb": 11.685523456,
+      "torque": 3.1186933099290424,
+      "flux": 0.00044846420288351964,
+      "psi": 0.5227075675884123,
+      "iterations": 8,
+      "params": {
+        "search_from_corner": 0.007699999999999999,
+        "low_field": "diez_webb"
+      }
+    },
+    "end_1mm": {
+      "ndof": 1998885,
+      "layers": 21,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 959.7520386510005,
+      "peak_gb": 16.745037824,
+      "torque": 3.1132331230745285,
+      "flux": 0.00045372630936802745,
+      "psi": 0.5203162339652666,
+      "iterations": 8,
+      "params": {
+        "end_clearance": 0.001,
+        "low_field": "diez_webb"
+      }
+    },
+    "end_5mm": {
+      "ndof": 1903004,
+      "layers": 20,
+      "skipped": false,
+      "converged": true,
+      "level_mm": [
+        1.5,
+        10.0,
+        2.0,
+        8.0
+      ],
+      "seconds": 920.5996022180188,
+      "peak_gb": 15.535620096,
+      "torque": 3.1326496031452877,
+      "flux": 0.00046005239744066,
+      "psi": 0.531558381840116,
+      "iterations": 8,
+      "params": {
+        "end_clearance": 0.005,
+        "low_field": "diez_webb"
+      }
+    }
+  },
+  "measured": {
+    "torque": 3.22,
+    "flux": 0.000472
+  },
+  "rows": {
+    "mesh": {
+      "torque": 0.0025880125820703192,
+      "flux": 0.00018476397004372583
+    },
+    "air_box": {
+      "torque": 0.00012203028783022134,
+      "flux": 0.00018747937115220248
+    },
+    "material": {
+      "torque": 3.650721652519053e-08,
+      "flux": 1.5788948143765614e-07
+    },
+    "table_rounding": {
+      "torque": 0.0015527950310559005,
+      "flux": 0.001059322033898305
+    },
+    "fillets": {
+      "torque": 0.0021247865564370852,
+      "flux": 0.0010380486510078043
+    },
+    "hub_radius": {
+      "torque": 0.003997433241520255,
+      "flux": 7.131333730905506e-05
+    },
+    "yoke_thickness": {
+      "torque": 0.0031684997024736474,
+      "flux": 0.0014731777426019196
+    },
+    "search_coil": {
+      "torque": 0.0,
+      "flux": 0.014201215716429594
+    },
+    "coil_end": {
+      "torque": 0.003113009814815473,
+      "flux": 0.006945193403465225
+    }
+  },
+  "verdict": {
+    "torque": {
+      "error_rel": 0.03148992235804943,
+      "budget_rel": 0.016666603723419427,
+      "pass": false
+    },
+    "flux": {
+      "error_rel": 0.03510757808740902,
+      "budget_rel": 0.02516067211538927,
+      "pass": false
+    },
+    "pass": false
+  },
+  "hook": {
+    "psi_full_minus_slab": 0.13805224733535615,
+    "analytic_image_1_5": 0.07282406133414922
+  }
+}

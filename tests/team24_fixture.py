@@ -91,8 +91,45 @@ COIL_SIDES = ("coil_top_right", "coil_top_left", "coil_bottom_right", "coil_bott
 COIL_SIGNS = (1.0, -1.0, 1.0, -1.0)
 
 
-def steel_law(js: float = ASSUMED_JS):
-    return process_bh(BHTable(h=H_TABLE, b=B_TABLE), stacking_factor=1.0, saturation_polarisation=js)[0]
+# Table I has no point between H = 0 and its first point (4000 A/m, 1.413 T), so the table read as it is gives a
+# straight first segment (mu_r about 280) under every field below 1.413 T. Ruberg, Kielhorn and Zechner,
+# Mathematics 9(15) 1804 (2021), note that this changes the results. LOW_FIELD selects the curve below the first
+# point: "table" is Table I as printed; "diez_webb" (the default) fills the interval with the rational form of
+# Diez and Webb, IEEE Trans. Magn. 52(3) (2016), eq. (1) of degree 1, B = H / (a + b H) + mu0 H, fitted by least
+# squares to Table I points 1 to 4 and scaled to pass through point 1. The fill is an assumption (no measured point
+# lies in it).
+LOW_FIELD = ("table", "diez_webb")
+FILL_H = (25.0, 50.0, 100.0, 200.0, 300.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0)
+
+
+def _diez_webb(h, a, b):
+    return h / (a + b * h) + 4e-7 * math.pi * h
+
+
+@functools.cache
+def diez_webb_fill() -> tuple[float, float, float]:
+    """(a, b, scale) of the low-field fill."""
+    from scipy.optimize import curve_fit
+    h, b = np.array(H_TABLE[1:5]), np.array(B_TABLE[1:5])
+    (pa, pb), _ = curve_fit(_diez_webb, h, b, p0=(1e-3, 0.6))
+    return float(pa), float(pb), float(B_TABLE[1] / _diez_webb(H_TABLE[1], pa, pb))
+
+
+def bh_table(low_field: str = "diez_webb") -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """(H, B) of the steel: Table I, with the interval below its first point filled when low_field is
+    "diez_webb"."""
+    if low_field == "table":
+        return H_TABLE, B_TABLE
+    if low_field != "diez_webb":
+        raise ValueError(f"low_field must be one of {LOW_FIELD}, not {low_field!r}")
+    a, b, k = diez_webb_fill()
+    fill = tuple(float(k * _diez_webb(h, a, b)) for h in FILL_H)
+    return (0.0, *FILL_H, *H_TABLE[1:]), (0.0, *fill, *B_TABLE[1:])
+
+
+def steel_law(js: float = ASSUMED_JS, low_field: str = "diez_webb"):
+    h, b = bh_table(low_field)
+    return process_bh(BHTable(h=h, b=b), stacking_factor=1.0, saturation_polarisation=js)[0]
 
 
 @dataclass(frozen=True, eq=False)
@@ -217,11 +254,12 @@ def _triangle_area(nodes, tris):
     return 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1]))
 
 
-def team24_problem(current: float, size_scale: float = 1.0, js: float = ASSUMED_JS) -> Magnetostatic2D:
+def team24_problem(current: float, size_scale: float = 1.0, js: float = ASSUMED_JS,
+                   low_field: str = "diez_webb") -> Magnetostatic2D:
     """TEAM 24 at a given series-circuit current in A (350 turns per coil); `js` is the assumed
-    saturation polarisation in T."""
+    saturation polarisation in T, `low_field` the curve below Table I's first point (see LOW_FIELD)."""
     m = team24_mesh(size_scale)
-    law = steel_law(js)
+    law = steel_law(js, low_field)
     area = _triangle_area(m.nodes, m.triangles)
     n_side = len(COIL_SIDES)
     first_coil = REGIONS.index(COIL_SIDES[0])
@@ -279,13 +317,14 @@ def rotor_pole_flux(problem: Magnetostatic2D, solution, pole: int = 1) -> float:
 MAP_CURRENTS = np.concatenate([np.linspace(0.0, 1.0, 9), np.linspace(1.25, 7.75, 27)])
 
 
-def locked_rotor_map(solver, currents=MAP_CURRENTS, size_scale: float = 1.0, js: float = ASSUMED_JS) -> dict:
+def locked_rotor_map(solver, currents=MAP_CURRENTS, size_scale: float = 1.0, js: float = ASSUMED_JS,
+                     low_field: str = "diez_webb") -> dict:
     """psi (Wb-turns), Arkkio torque (N.m, absolute) and rotor-pole flux (Wb) at each current, each point
     started from the previous solution. Raises if a point does not converge."""
     out = {"current": np.asarray(currents, float), "psi": [], "torque": [], "rotor_flux": []}
     a0 = None
     for i in out["current"]:
-        p = team24_problem(float(i), size_scale, js)
+        p = team24_problem(float(i), size_scale, js, low_field)
         s = solver.solve(p, initial=a0)
         if s.status.value != "OK":
             raise RuntimeError(f"TEAM 24 solve at {i} A: {s.status}")

@@ -112,6 +112,30 @@ def test_resume_reruns_a_changed_run(tmp_path, monkeypatch):
     assert sorted(calls) == ["fillet", "hub_plus"]
 
 
+def test_keys_and_low_field(tmp_path, monkeypatch):
+    path = tmp_path / "g1.json"
+    specs = []
+
+    def fake(spec, max_dofs, dry_run=False):
+        specs.append(spec)
+        return run(3.0, 4e-4)
+
+    monkeypatch.setattr(g1, "_in_child", fake)
+    assert g1.main(["--json", str(path), "--keys", "nominal,slab", "--low-field", "diez_webb"]) == 2
+    assert [s["key"] for s in specs] == ["nominal", "slab"]
+    assert specs[0]["params"] == {"low_field": "diez_webb"}
+    assert specs[1]["params"] == {"slab": True, "low_field": "diez_webb"}
+    stored = json.loads(path.read_text())["runs"]
+    assert set(stored) == {"nominal", "slab"} and stored["slab"]["params"]["low_field"] == "diez_webb"
+    specs.clear()
+    g1.main(["--json", str(path), "--keys", "nominal", "--low-field", "diez_webb"])
+    assert specs == []                               # reused with the same curve
+    g1.main(["--json", str(path), "--keys", "nominal", "--low-field", "table"])
+    assert [s["params"] for s in specs] == [{"low_field": "table"}]     # the other curve is a different run
+    with pytest.raises(SystemExit):
+        g1.main(["--json", str(path), "--keys", "nominal,bogus"])
+
+
 def test_mesh_row_order_floor():
     """A fitted order below 1 is noise between levels: the row stays at the order-1 extrapolation, 5 x |f2 - f3| here."""
     f1, f2, f3 = 2.8440, 2.8425, 2.8410

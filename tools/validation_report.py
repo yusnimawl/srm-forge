@@ -122,7 +122,9 @@ def team24_section(data):
     head = "## M5b TEAM 24\n\nReport only (not gated).\n\n"
     if data is None:
         return head + NOT_RUN, []
-    head += f"srmcore {data.get('srmcore', 'unknown')}.\n\n"
+    curve = {"diez_webb": "Table I with the low-field interval filled (Diez-Webb)",
+             "table": "Table I as printed"}.get(data.get("low_field", "table"), data.get("low_field"))
+    head += f"srmcore {data.get('srmcore', 'unknown')}; steel curve: {curve}.\n\n"
     rows = ["| Quantity | Model | Measured | Error |\n|---|---|---|---|"]
     for key in ("static_torque", "rotor_flux"):
         d = data[key]
