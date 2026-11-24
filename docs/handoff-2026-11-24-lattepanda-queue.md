@@ -32,8 +32,9 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    `ccr-ae0b0426-2aybo8`, results sent). The owner said yes to run 4: all 16 G1 runs ran 2026-11-24 01:47 to
    06:04 UTC (36fff0e; G1 FAIL, torque -3.15 % vs budget 1.67 %, flux -3.51 % vs 2.52 %). Run it at
    `MemoryMax=27G`, not the 22G of the 2026-11-22 handoff: `mesh_fine` reports a 29.0 GB peak. Session "R5e gate V0: read and record (row 10k)" was created
-   2026-11-23 21:17 UTC (session_01Wzw16YqYmkmu3jtyuuY69P) and stays PENDING until the bridge spawns it; open it in
-   the app, or start a LattePanda session with this step. V0 is read-and-record only: every input of V2 to
+   2026-11-23 21:17 UTC (session_01Wzw16YqYmkmu3jtyuuY69P), never spawned and was archived; the session "What's the
+   next thing" did V0 instead: PR #41 (branch `r5e-v0`, worktree `../srm-forge-v0`), record in `docs/r5-sources.md`
+   section 9. V2, V4 and V5 follow after the merge. V0 is read-and-record only: every input of V2 to
    V4 in `docs/r5-sources.md` with page, figure and digitisation error, and the Kiyota Fig. 7 geometry read off the
    drawing (spec `docs/superpowers/specs/2026-11-05-r5-thermal-stress-design.md` §V0, plan
    `docs/superpowers/plans/2026-11-07-r5a-thermal-stress-core.md` row R5e). No comparison runs before V0 is
