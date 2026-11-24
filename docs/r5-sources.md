@@ -409,7 +409,13 @@ geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_ki
 | Input | Value | Where | Error |
 |---|---|---|---|
 | Machine | 4 phases, 8/6; stator OD 125 mm, stator slot-bottom diameter 100 mm; rotor OD 63 mm, rotor slot-bottom diameter 41 mm; air gap 0.35 mm; shaft 21 mm; stack 90 mm; stator and rotor pole arc 21 deg; 124 turns per coil; 0.69 ohm at 20 degC; rated 1500 r/min | Table I, p. 2928 | printed |
-| Not given | pole tapers (`tpr_s`, `tpr_R`), pole-tip tab, slot fillets (`fil_s`), slot liner and slot wedge thickness, frame thickness (Fig. 12(f) varies it 5 to 25 mm, the nominal is not stated) | Fig. 1, Fig. 2, p. 2928 | **gap**: each becomes a V2 input row with a stated range |
+| Slot liner thickness | 0.997 mm on the pole flank (17 px on every row), 0.95 to 1.10 mm at the slot top | Fig. 11(a), p. 2932 | +-0.06 mm (1 px); scale 17.05 px/mm from the 125 mm OD |
+| Slot wedge thickness | 2.205 mm radial, beside both pole flanks | Fig. 11(a), p. 2932 | +-0.06 mm |
+| Slot-top radius | 49.6 to 50.0 mm (the iron line above the coil) | Fig. 11(a), p. 2932 | +-0.06 mm |
+| Pole shape | parallel-sided (taper 0); pole width 11.56 mm, against 11.61 mm from the 21 deg arc (a check on the scale) | Fig. 11(a), p. 2932 | +-0.06 mm |
+| Slot-top fillet | about 1.3 mm in their drawing; the search model has none, which would lower the coil by two fillet radii | Fig. 11(a), p. 2932 | read by eye, no error stated |
+| Frame thickness | most likely 5 mm: Fig. 12(b) to (e) read 52.0 degC at the Table I values, and Fig. 12(f) reads 52.0 only at 5 mm (51.3 at 10 mm). This is an inference; Fig. 11 does not draw the frame | Fig. 12, p. 2932 | inference |
+| Not given | pole-tip tab; the shape of the fillet; the shape of the wedge chord (a straight chord in their drawing, an arc at the bore radius in ours); frame thickness as a printed value | Fig. 1, Fig. 2, Fig. 11, p. 2928 | **gap**: each becomes a V2 input row with a stated range |
 | Thermal properties, k W/(m K), c J/(kg K), density kg/m3 | lamination 20, 438, 7650; copper 401, 385, 8933; slot liner 0.076, 1172, 2150; air 0.0263, 1007, 1.16; frame (aluminium) 177, 875, 2770; slot wedge 0.29, 1172, 2150 | Table II, p. 2928 | printed |
 | Equivalent winding conductivity | 0.83 W/(m K) | p. 2929 | printed |
 | Axial lamination conductivity | 1/30 of the radial value, 3-D only | pp. 2931 and 2932 | printed; not a 2-D input |
@@ -421,7 +427,7 @@ geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_ki
 | Operating point of the losses | 1000 r/min, single pulse, turn-on 10 deg, turn-off 20 deg | p. 2930 | printed |
 | Start and ambient temperature | 20 degC (every transient in Figs. 8 to 10 starts there) | Figs. 8 to 10, p. 2932 | read |
 | Inside-air temperature, h = 30 curve (the V2 boundary input) | 21.1 degC at 1 min, 24.0 at 5, 26.5 at 10, 28.5 at 15, 33.5 at 30, 38.9 at 50, 43.5 at 70, 47.4 at 90, 50.7 at 110, 52.0 at 119 min; 105 points, 1 to 119 min | Fig. 8, p. 2932 | +-0.56 K worst (curves merged below about 30 min), +-0.1 to +-0.2 K above 40 min; time +-0.07 min (cal 0.9 px) |
-| Lumped network that made Fig. 8 | resistances and capacitances | Table V, p. 2931 | printed; not needed when Fig. 8 is the input |
+| Lumped network that made Fig. 8 | R1 0.57 K/W and C1 5298 J/K (Table V, printed). The R1-C1 node of Fig. 3 is the only one with a path to ambient and a large capacity, so it is read as the frame; this reading is an inference | Table V, p. 2931; Fig. 3 | printed; the node reading is an inference |
 
 Comparison targets:
 
@@ -429,6 +435,8 @@ Comparison targets:
 |---|---|---|---|
 | 2-D winding temperature against time | 25.4 degC at 1 min, 31.7 at 5, 35.3 at 10, 37.7 at 15, 42.6 at 30, 46.1 at 50, 48.4 at 70, 50.2 at 90, 51.5 at 110, 52.1 at 119 min; 114 points | Fig. 10 (2D analysis), p. 2932 | +-1.0 K worst, +-0.1 to +-0.5 K typical; the 3-D middle curve touches it below about 30 min |
 | Winding temperature at three points, equivalent conductivity | A (near the laminations) 50.7, B (middle) 51.7, C (far) 52.6 degC; layered model 57.5, 71.9, 76.4 | Table VI and Fig. 11, p. 2932 | printed; **the time is not stated** and the points are not marked by coordinates. Fig. 10 at 119 min (52.1 +- 0.1) lies between B and C, so Table VI is most likely the 120 min state with the variable inside air; this is an inference, recorded as such |
+| 2-D winding temperature, constant inside air (the paper's "constant" case) | 31.6 degC at 5 min, 34.6 at 10, 39.3 at 30; steady 40.7 degC from about 80 min | Fig. 9 (constant curve), p. 2932 | +-0.14 K at the steady state, +-0.5 K at 5 min (curves merge below about 5 min); it does not depend on the Fig. 8 curve |
+| 2-D winding temperature, variable inside air | 31.6 degC at 5 min, 35.3 at 10, 42.6 at 30, 49.2 at 80, 52.1 at 119 min | Fig. 9 (variable curve), p. 2932 | +-0.2 K; agrees with Fig. 10 |
 | What "winding temperature" in Fig. 10 is (maximum, mean or a point) | not stated | p. 2932 | **gap** |
 
 ### 9.2 V4: Kiyota et al. 2014 (IEEE Trans. Ind. Electron. 61(10), pp. 5712-5721) and 2012 (IEEE Trans. Ind. Appl. 48(6), pp. 2303-2309)
