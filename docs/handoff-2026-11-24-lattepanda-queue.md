@@ -40,6 +40,10 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    `docs/superpowers/plans/2026-11-07-r5a-thermal-stress-core.md` row R5e). No comparison runs before V0 is
    complete. The papers are in `docs/sources/papers/` (git-ignored, IEEE copyright: never commit them).
 
+4. **Run 5 of the IEEJ handoff (8/6 budget after the `MEASURED_GAP` change, PR #42).** Done 2026-11-24 08:30 to
+   08:48 UTC (unit `em-validate-86`, 1c9c2a5 on `ccr-ae0b0426-2aybo8`): report PASS, end_effect La 0.2090 to
+   0.1778 and psi_max 0.2104 to 0.1791, nothing else moved. The PR merge is the cloud session's job.
+
 ## 3. Rules for every session
 
 - Long jobs run with `systemd-run --user --unit=NAME ...`; a session restart kills processes the session started.
