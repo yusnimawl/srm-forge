@@ -29,7 +29,9 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    result JSON files to that branch and push. Then send the results to the cloud session "Switched reluctance motor
    validation" (session_01Wzw16YT3vVcHut4teCjihs), which does the docs, the tracker and the PR.
 3. **R5e gate V0 (row 10k), a new session, after step 2 is done.** Step 2 is done (8c96db5 on
-   `ccr-ae0b0426-2aybo8`, results sent). Session "R5e gate V0: read and record (row 10k)" was created
+   `ccr-ae0b0426-2aybo8`, results sent). The owner said yes to run 4: all 16 G1 runs ran 2026-11-24 01:47 to
+   06:04 UTC (36fff0e; G1 FAIL, torque -3.15 % vs budget 1.67 %, flux -3.51 % vs 2.52 %). Run it at
+   `MemoryMax=27G`, not the 22G of the 2026-11-22 handoff: `mesh_fine` reports a 29.0 GB peak. Session "R5e gate V0: read and record (row 10k)" was created
    2026-11-23 21:17 UTC (session_01Wzw16YqYmkmu3jtyuuY69P) and stays PENDING until the bridge spawns it; open it in
    the app, or start a LattePanda session with this step. V0 is read-and-record only: every input of V2 to
    V4 in `docs/r5-sources.md` with page, figure and digitisation error, and the Kiyota Fig. 7 geometry read off the
