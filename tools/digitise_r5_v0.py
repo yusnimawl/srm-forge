@@ -15,7 +15,11 @@ r"""Reproduce the R5 gate V0 figure readings (tracker row 10k): the inputs and t
 Axes are least-squares fits to the frame and every gridline; `cal_px` is the largest fit residual. A reading is the
 centre of the ink run where the curve crosses a 5-px-wide column; its error is the calibration residual plus half
 the run's height, in the axis unit. Where curves overlap (Faiz, early times) the run holds all of them and the
-error covers the merged run.
+error covers the merged run. Where a steep curve crosses the column (Faiz, the first minutes) the run is the whole
+stroke; its centre is within 3 px of the stroke's crossing of the column centre (a line fitted to the five
+one-column centres). Faiz gridlines are not masked out: a run that reaches into a gridline band (GRID_BAND) keeps
+the band rows, gridline ink included, and its error gains the band half-width. A run inside a band is dropped as
+the bare gridline only when it is no taller than a gridline (GRID_PX) or lies among the axis ticks (TICK_PX).
 
 Usage: python tools/digitise_r5_v0.py [--papers DIR] [--json PATH]   (needs the dev extra, PyMuPDF; the PDFs are
        git-ignored, docs/sources/papers/.gitignore, so a fresh checkout passes the folder that holds them)
@@ -66,9 +70,15 @@ def _runs(mask: np.ndarray, gap: int = 3) -> list[tuple[float, int, int]]:
     return [(g.mean(), int(g.min()), int(g.max())) for g in np.split(idx, np.nonzero(np.diff(idx) > gap)[0] + 1)]
 
 
+GRID_BAND = 5   # px either side of a Faiz gridline row; a run that reaches into it holds gridline ink as well
+GRID_PX = 6     # a run inside a band and at most this tall is the bare gridline (2 to 5 px of ink)
+TICK_PX = 16    # columns this close to a side frame line hold the axis ticks (7 to 8 px tall), never a curve alone
+
+
 def _faiz(xref, t_end, y0, y1, ny, legend, pick):
     """One curve of a Faiz 2009 plot (x 0 to t_end min in 6 grid steps, y y0 to y1 degC in ny steps). `legend` is
-    the legend box (col0, col1, row0, row1) in px, masked out; `pick(runs)` chooses the curve's run in a column."""
+    the legend box (col0, col1, row0, row1) in px, masked out; `pick(runs)` chooses the curve's run in a column
+    from (centre, lo, hi, on_grid) tuples in row order, top run first."""
     ink = _image("faiz2009.pdf", xref)[..., 0] > 128            # the 1-bit images store ink as 255
     left, right = _ends(ink.sum(0))
     top, bottom = _ends(ink.sum(1))
@@ -77,21 +87,28 @@ def _faiz(xref, t_end, y0, y1, ny, legend, pick):
     rows = np.arange(int(top) + 6, int(bottom) - 6)
     grid_rows = [(y0 + (y1 - y0) * k / ny - by) / ay for k in range(1, ny)]
     grid_cols = [(t_end * k / 6 - bx) / ax for k in range(1, 6)]
+    band = np.any([np.abs(rows - g) <= GRID_BAND for g in grid_rows], axis=0)
     pts = []
     for t in np.arange(1.0, t_end, 1.0):
         c = int(round((t - bx) / ax))
         if min(abs(c - g) for g in grid_cols) < 6:
             continue
         col = ink[rows, c - 2:c + 3].any(1)
-        keep = np.all([np.abs(rows - g) > 5 for g in grid_rows], axis=0)
         if legend[0] <= c <= legend[1]:
-            keep &= (rows < legend[2]) | (rows > legend[3])
-        run = pick(_runs(col & keep))
+            col &= (rows < legend[2]) | (rows > legend[3])
+        ticks = min(c - left, right - c) < TICK_PX
+        runs = []
+        for centre, lo, hi in _runs(col):
+            if not band[lo:hi + 1].any():
+                runs.append((centre, lo, hi, False))
+            elif (~band[lo:hi + 1] & col[lo:hi + 1]).any() or (hi - lo + 1 > GRID_PX and not ticks):
+                runs.append((centre, lo, hi, True))      # a curve crossing or lying on a gridline; else the bare line
+        run = pick(runs)
         if run is None:
             continue
-        centre, lo, hi = run
+        centre, lo, hi, on_grid = run
         value = ay * (rows[0] + centre) + by
-        err = abs(ay) * (ry + (hi - lo) / 2 + 0.5)
+        err = abs(ay) * (ry + (hi - lo) / 2 + 0.5 + (GRID_BAND if on_grid else 0))
         pts.append((round(float(t), 1), round(float(value), 2), round(float(err), 2)))
     return dict(cal_px=dict(x=round(rx, 2), y=round(ry, 2)), min_per_px=round(ax, 4), k_per_px=round(abs(ay), 4),
                 points=pts)
@@ -188,8 +205,9 @@ KIYOTA_Y = ((474.5, 0.0), (289.0, 100.0), (13.0, 250.0))
 
 def kiyota_fig8() -> dict:
     """Left axis 0 to 250 A and right axis 45 to 120 degC on the same rows (0.3 degC per A). Temperature: the
-    dark-red trace (the lighter dashed 'estimated' extension is left out by the colour limits); the spikes of the
-    logged signal (one-column drops) are removed by a median over 7 columns. RMS current: the light-blue trace."""
+    dark-red trace; 1 to 2 px per column of the lighter dashed 'estimated' extension also pass the colour limits
+    from 15 to 20 s. The median over 7 columns removes them and the spikes of the logged signal (one-column
+    drops). RMS current: the light-blue trace."""
     a = _image("kiyota2014.pdf", 204)[..., :3].astype(float)
     (ax, bx), (ay, by) = (np.polyfit(*zip(*cal), 1) for cal in (KIYOTA_X, KIYOTA_Y))
     rx = max(abs(ax * p + bx - v) for p, v in KIYOTA_X) / ax

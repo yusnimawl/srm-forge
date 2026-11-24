@@ -409,12 +409,13 @@ geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_ki
 | Input | Value | Where | Error |
 |---|---|---|---|
 | Machine | 4 phases, 8/6; stator OD 125 mm, stator slot-bottom diameter 100 mm; rotor OD 63 mm, rotor slot-bottom diameter 41 mm; air gap 0.35 mm; shaft 21 mm; stack 90 mm; stator and rotor pole arc 21 deg; 124 turns per coil; 0.69 ohm at 20 degC; rated 1500 r/min | Table I, p. 2928 | printed |
+| 2-D thermal domain | one stator-pole sector with two half slots and adiabatic symmetry sides: stator, winding, slot liner, slot wedge, frame and an "outside air" layer whose outer boundary is marked "Ambient temperature". The frame's outer surface is marked "Natural and forced convection surfaces", the pole face and the wedge "Forced convection surfaces". There is no rotor in the domain | Fig. 2 and text, p. 2928 | printed; **ambiguity**: the "outside air" layer is not explained, so the frame h may act at the frame surface or through that layer (a V2 input row) |
 | Slot liner thickness | 0.997 mm on the pole flank (17 px on every row), 0.95 to 1.10 mm at the slot top | Fig. 11(a), p. 2932 | +-0.06 mm (1 px); scale 17.05 px/mm from the 125 mm OD |
 | Slot wedge thickness | 2.205 mm radial, beside both pole flanks | Fig. 11(a), p. 2932 | +-0.06 mm |
 | Slot-top radius | 49.6 to 50.0 mm (the iron line above the coil) | Fig. 11(a), p. 2932 | +-0.06 mm |
 | Pole shape | parallel-sided (taper 0); pole width 11.56 mm, against 11.61 mm from the 21 deg arc (a check on the scale) | Fig. 11(a), p. 2932 | +-0.06 mm |
 | Slot-top fillet radius | input row, range 0 to 1.3 mm: about 1.3 mm by eye in their drawing, not measured in code; the search model has none, which would lower the coil by two fillet radii | Fig. 11(a), p. 2932 | by eye only, no error; **gap** inside the stated range |
-| Frame thickness | most likely 5 mm: Fig. 12(b) to (e) read 52.0 degC at the Table I values, and Fig. 12(f) reads 52.0 only at 5 mm (51.3 at 10 mm). This is an inference; Fig. 11 does not draw the frame | Fig. 12, p. 2932 | inference |
+| Frame thickness | most likely 5 mm: Fig. 12(b) to (e) read 52.0 degC at the Table I values, and Fig. 12(f) reads 52.0 only at 5 mm (51.3 at 10 mm). This is an inference; Fig. 11 does not draw the frame. The x axis of Fig. 12(f) reads "Frame diameter [mm]" and its caption "frame thickness": the paper is inconsistent, and the 5 to 25 mm range fits a thickness | Fig. 12, p. 2933 | inference |
 | Not given | pole-tip tab; the shape of the fillet; the shape of the wedge chord (a straight chord in their drawing, an arc at the bore radius in ours); frame thickness as a printed value | Fig. 1, Fig. 2, Fig. 11, p. 2928 | **gap**: each becomes a V2 input row with a stated range |
 | Thermal properties, k W/(m K), c J/(kg K), density kg/m3 | lamination 20, 438, 7650; copper 401, 385, 8933; slot liner 0.076, 1172, 2150; air 0.0263, 1007, 1.16; frame (aluminium) 177, 875, 2770; slot wedge 0.29, 1172, 2150 | Table II, p. 2928 | printed |
 | Equivalent winding conductivity | 0.83 W/(m K) | p. 2929 | printed |
@@ -423,21 +424,21 @@ geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_ki
 | Natural convection, outer surfaces | frame 5.2, lateral (end) surfaces 5 W/(m2 K), from Eq. (1) to (5) | p. 2930 | printed |
 | Forced convection, stator pole and slot-wedge surfaces facing the gap | 70 W/(m2 K) at 1000 r/min, Eq. (6) with the rotor tip speed | p. 2931 | printed |
 | Frame h used for every later result | 30 W/(m2 K) (a 4 m/s fan air speed) | p. 2931 | printed |
-| Losses (the inputs of every result except Figs. 12 and 13) | calculated: stator pole 5.9 W, stator yoke 10 W, rotor pole 2.8 W, rotor core 3.3 W (total 22 W, measured 25.5 W); copper DC 24.96 W (measured 21.32 W), AC 0.04 W | Table IV, p. 2930 | printed; the paper does not say how a part's loss is spread inside the part |
+| Losses (the inputs of every result except Figs. 12 and 13) | calculated: stator pole 5.9 W, stator yoke 10 W, rotor pole 2.8 W, rotor core 3.3 W (total 22 W, measured 25.5 W); copper DC 24.96 W (measured 21.32 W), AC 0.04 W. Fig. 2 has no rotor, so the rotor losses enter the 2-D model only through the inside air (Fig. 8), not as a source in the domain | Table IV, p. 2930; the scope "except Figs. 12 and 13", p. 2931 | printed; the paper does not say how a part's loss is spread inside the part |
 | Operating point of the losses | 1000 r/min, single pulse, turn-on 10 deg, turn-off 20 deg | p. 2930 | printed |
 | Start and ambient temperature | 20 degC (every transient in Figs. 8 to 10 starts there) | Figs. 8 to 10, p. 2932 | read |
-| Inside-air temperature, h = 30 curve (the V2 boundary input) | 21.1 degC at 1 min, 24.0 at 5, 26.5 at 10, 28.5 at 15, 33.5 at 30, 38.9 at 50, 43.5 at 70, 47.4 at 90, 50.7 at 110, 52.0 at 119 min; 105 points, 1 to 119 min | Fig. 8, p. 2932 | +-0.56 K worst (curves merged below about 30 min), +-0.1 to +-0.2 K above 40 min; time +-0.07 min (cal 0.9 px) |
+| Inside-air temperature, h = 30 curve (the V2 boundary input) | 21.1 degC at 1 min, 24.0 at 5, 26.5 at 10, 28.5 at 15, 33.5 at 30, 38.9 at 50, 43.5 at 70, 47.4 at 90, 50.7 at 110, 52.0 at 119 min; 111 points, 1 to 119 min | Fig. 8, p. 2932 | +-0.58 K worst (curves merged below about 30 min), +-0.1 to +-0.23 K above 40 min, +-0.32 to +-0.43 K where the curve crosses a gridline; time +-0.07 min (cal 0.9 px) |
 | Lumped network that made Fig. 8 | R1 0.57 K/W and C1 5298 J/K (Table V, printed). The R1-C1 node of Fig. 3 is the only one with a path to ambient and a large capacity, so it is read as the frame; this reading is an inference | Table V, p. 2931; Fig. 3 | printed; the node reading is an inference |
 
 Comparison targets:
 
 | Target | Value | Where | Error |
 |---|---|---|---|
-| 2-D winding temperature against time | 25.4 degC at 1 min, 31.7 at 5, 35.3 at 10, 37.7 at 15, 42.6 at 30, 46.1 at 50, 48.4 at 70, 50.2 at 90, 51.5 at 110, 52.1 at 119 min; 114 points | Fig. 10 (2D analysis), p. 2932 | +-1.0 K worst, +-0.1 to +-0.5 K typical; the 3-D middle curve touches it below about 30 min |
-| Winding temperature at three points, equivalent conductivity | A (near the laminations) 50.7, B (middle) 51.7, C (far) 52.6 degC; layered model 57.5, 71.9, 76.4 | Table VI and Fig. 11, p. 2932 | printed; **the time is not stated** and the points are not marked by coordinates. Fig. 10 at 119 min (52.1 +- 0.1) lies between B and C, so Table VI is most likely the 120 min state with the variable inside air; this is an inference, recorded as such |
-| 2-D winding temperature, constant inside air (the paper's "constant" case) | 31.6 degC at 5 min, 34.6 at 10, 39.3 at 30; steady 40.7 degC from about 80 min | Fig. 9 (constant curve), p. 2932 | +-0.14 K at the steady state, +-0.5 K at 5 min (curves merge below about 5 min); it does not depend on the Fig. 8 curve |
-| 2-D winding temperature, variable inside air | 31.6 degC at 5 min, 35.3 at 10, 42.6 at 30, 49.2 at 80, 52.1 at 119 min | Fig. 9 (variable curve), p. 2932 | +-0.2 K; agrees with Fig. 10 |
-| What "winding temperature" in Fig. 10 is (maximum, mean or a point) | not stated | p. 2932 | **gap** |
+| 2-D winding temperature against time | 23.8 degC at 1 min, 31.7 at 5, 35.3 at 10, 37.7 at 15, 42.6 at 30, 46.1 at 50, 48.4 at 70, 50.1 at 90, 51.5 at 110, 52.1 at 119 min; 114 points | Fig. 10 (2D analysis), p. 2932 | +-2.0 K at 1 min (the curve is near vertical and merged with the 3-D middle curve), +-0.7 to +-1.0 K from 2 to 4 min, +-0.1 to +-0.53 K after; the 3-D middle curve touches it below about 30 min |
+| Winding temperature at three points, equivalent conductivity | A (near the laminations) 50.7, B (middle) 51.7, C (far) 52.6 degC; layered model 57.5, 71.9, 76.4 | Table VI and Fig. 11, p. 2932 | printed; **the time is not stated** and the points are not marked by coordinates. Fig. 10 at 119 min (52.1 +- 0.15) lies between B and C, so Table VI is most likely the 120 min state with the variable inside air; this is an inference, recorded as such |
+| 2-D winding temperature, constant inside air (the paper's "constant" case) | 31.6 degC at 5 min, 34.6 at 10, 39.3 at 30; steady 40.7 degC from about 80 min | Fig. 9 (constant curve), p. 2932 | +-0.14 K at the steady state, +-0.5 K at 5 min, +-1.7 K at 1 min (curves merge below about 5 min), +-0.3 to +-0.4 K from 36 to 44 min (on the 40 degC gridline); it does not depend on the Fig. 8 curve. The reading at 39 min (44.4 degC, the variable curve) is dropped and recorded in `dropped`: there the dotted curve lies inside the gridline and is no taller than it |
+| 2-D winding temperature, variable inside air | 31.6 degC at 5 min, 35.2 at 10, 42.6 at 30, 49.2 at 80, 52.1 at 119 min | Fig. 9 (variable curve), p. 2932 | +-1.7 K at 1 min, +-0.4 to +-0.9 K from 2 to 10 min, +-0.1 to +-0.45 K after; agrees with Fig. 10 |
+| What "winding temperature" in Fig. 10 is (maximum, mean or a point) | not stated. If Table VI is the 120 min state (the inference above), point C (52.6 degC) is above Fig. 10 at 119 min (52.1 +- 0.15), so Fig. 10 is not the maximum: it is a mean or a point (an inference) | p. 2932 | **gap** |
 
 ### 9.2 V4: Kiyota et al. 2014 (IEEE Trans. Ind. Electron. 61(10), pp. 5712-5721) and 2012 (IEEE Trans. Ind. Appl. 48(6), pp. 2303-2309)
 
@@ -445,20 +446,60 @@ Comparison targets:
 |---|---|---|---|
 | Outer diameter, coil-end length, stack, slot fill | 264 mm; coil end 10.5 mm; iron stack 87 mm (design); slot fill 56 % (Table II), 57 % (text) | 2012 Table II, p. 2306; text p. 2304 | printed; the two fills differ |
 | Rotor outer radius | 91 mm | 2012 p. 2305 (text with Fig. 5) | printed |
-| Stator pole taper | 7.5 deg | 2012 Fig. 6, p. 2305 | printed |
-| Built machine | stator stack 87.25 mm, rotor stack 87.15 mm, axial length 112 mm; air gap 0.5 mm; 0.1 mm 10JNEX900; 0.9 mm wire, 9 parallel, 20 series turns; 650 V | 2014 Tables I and II, pp. 5713 and 5714 | printed |
-| Winding resistance | 97.8 mOhm measured (91.7 predicted); temperature of the measurement not stated | 2014 Table II, p. 5714 | printed; 20 degC is an assumption (`tests/kiyota_18_12.py`) |
+| Stator pole taper | 7.5 deg: the middle of the three sweep markers of Fig. 6 (5.5, 7.5 and 9.5 deg), the torque maximum, at Np = 20 (the built winding has 20 series turns). The text says only "there is an optimum value for torque generation" | 2012 Fig. 6 and text, p. 2305 | read off the figure; **inference**, not printed |
+| Built machine | stator stack 87.25 mm, rotor stack 87.15 mm, axial length 112 mm; air gap 0.5 mm; iron 0.1 mm (Table I), 10JNEX900 (named in the text on p. 5714, for the prediction stage); 0.9 mm wire, 9 parallel, 20 series turns; 650 V | 2014 Tables I and II, pp. 5713 and 5714 | printed |
+| Winding resistance | 97.8 mOhm measured (91.7 predicted); the temperature of the measurement and "per phase" are not printed. Table III supports both: 3 x 130^2 x 0.0978 ohm x 1.216 (copper, 20 to 75 degC) = 6.03 kW against 6.0 kW printed at (b), 6.7 against 6.8 kW at (a), 0.45 against 0.5 kW at (c); the efficiency tests run at a 75 degC coil end (p. 5716) | 2014 Table II, p. 5714; Table III, p. 5718 | printed; per phase at 20 degC is a **supported inference** (`tests/kiyota_18_12.py`) |
 | Pole arcs, rotor taper, rotor yoke, shaft, stator yoke | read off 2012 Fig. 7 | `tools/digitise_kiyota.py`, row 10a | about +-0.3 mm |
-| Test point | maximum power, 7500 r/min; "the maximum output power is 109 kW at the rotational speed of 7500 r/min", so 138.8 N m at 109 kW (computed here) | 2014 p. 5717 | printed; Table III column (b) gives 8700 r/min, 103.4 kW, 130 A for "maximum output power" while the text on p. 5718 calls point (b) "7500 r/min": **the paper is inconsistent**; V4 uses Fig. 8 (7500 r/min) |
-| RMS current against time | ramp 16 A at 0 s, 65 A at 1 s, 140 A at 2 s; hold 140.7 A (s.d. 0.4 A, 2.5 to 11.5 s); fall 130 A at 12 s, 54 A at 13 s, 3 A at 14 s; 0.25 s steps | 2014 Fig. 8, p. 5716 | +-0.5 A/px, cal 0.6 px; the current command is 200 A peak, ramped 0 to 2 s and 11.7 to 14 s |
-| Coil-end temperature against time | 51.1 degC at the start (s.d. 0.13, 0 to 1.5 s); 73.8 at 10 s, 77.1 at 11 s; 86.6 at 14 s; plateau 90.6 degC (s.d. 0.33, 18 to 20 s), reached after the current has stopped | 2014 Fig. 8, p. 5716 | 0.16 K/px, cal 0.6 px; the logged trace is noisy (one-column spikes, median over 7 columns) |
-| Measured rise | **39.5 K** from the trace (90.6 - 51.1, +-0.4 K); the figure's arrow is labelled **41 K** and the text says 41 K for the 10 s test | 2014 Fig. 8 and p. 5716 | the printed 41 K and the read 39.5 K differ by 1.5 K, more than the reading error; V4 must state which it compares with |
+| Test point | maximum power, 7500 r/min; "the maximum output power is 109 kW at the rotational speed of 7500 r/min", so 138.8 N m at 109 kW (computed here). Fig. 8 is labelled "7500 r/min, Maximum power" and prints no power, so the link of the Fig. 8 run to 109 kW is an **inference** | 2014 p. 5717; Fig. 8, p. 5716 | printed; Table III column (b) gives 8700 r/min, 103.4 kW, 130 A for "maximum output power" while the text on p. 5718 calls point (b) "7500 r/min": **the paper is inconsistent**; V4 uses Fig. 8 (7500 r/min) |
+| RMS current against time | ramp 16 A at 0 s, 65 A at 1 s, 140 A at 2 s; hold 140.7 A (s.d. 0.4 A, 2.5 to 11.5 s); fall 130 A at 12 s, 54 A at 13 s, 3 A at 14 s; 0.25 s steps. The hold is above the "Maximum rms current" of 137 A ("short time") in Table I, by 2.7 % (5.5 % in copper loss). The calibration is not the cause: the plateau row 214.8 maps to 140.5 A | 2014 Fig. 8, p. 5716; Table I, p. 5713 | +-0.5 A/px, cal 0.6 px; on the ramps a single-time value carries the spread of the 7-column window, about +-7 A (59 to 72 A at 1 s, 48 to 60 A at 13 s); the current command is 200 A peak, ramped 0 to 2 s and down from about 11.95 s (it holds 199.8 A to 11.93 s) to 14.0 s; the paper's 137 A and the read 140.7 A disagree, and V4 must state which it uses |
+| Coil-end temperature against time | 51.1 degC at the start (s.d. 0.13, 0 to 1.5 s); 73.8 at 10 s, 77.1 at 11 s; 86.6 at 14 s; plateau 90.6 degC (s.d. 0.33, 18 to 20 s), reached after the current has stopped. The trace still rises over 18 to 20 s (90.1 at 18 s, 91.0 at 19.5 s, 90.8 at 20 s), so the s.d. is part trend, and the peak may come after 20 s; the figure's own dashed line at the top of the arrow is at 90.8 degC. The dashed "estimated" line is the authors' extrapolation ("If the maximum power testing is for 18 s, the temperature rise in the coil end will be around 70 K", p. 5716), not a measurement | 2014 Fig. 8, p. 5716 | 0.16 K/px, cal 0.6 px; the logged trace is a band (one-column spikes, median over 7 columns): its 10 to 90 % spread in the window is 0.9 to 1.6 K (73.0 to 74.6 degC at 10 s, 86.0 to 87.3 at 14 s), so a single-time value carries about +-0.8 K; the rise below averages 0 to 1.5 s and 18 to 20 s and keeps +-0.4 K |
+| Measured rise | **39.5 K** from the trace (90.6 - 51.1, +-0.4 K); the figure's arrow is labelled **41 K** and the text says 41 K for the 10 s test | 2014 Fig. 8 and p. 5716 | the printed 41 K and the read 39.5 K differ by 1.5 K, more than the reading error; the figure's own 41 K arrow runs from row 436.5 (51.1 degC) to row 192.5 (90.8 degC), which is 39.7 K, so the figure supports the read value; V4 must state which it compares with |
 | Cooling | natural cooling, "forced cooling is not implemented" | 2014 p. 5716 | printed |
 | Housing | motor case only in the photo of Fig. 3(a); not described | 2014 p. 5714 | **gap**: a V4 input row with a stated range |
 | Coil-end sensor | "coil-end temperature"; position and sensor type not described | 2014 p. 5716 | **gap** |
 | Temperature of the rest of the machine at the start | not given (only the coil end, 51.1 degC) | 2014 Fig. 8 | **gap**: V4 starts uniform at the coil-end value, as an input row |
-| Mechanical loss (bearing plus windage) | salient rotor 573 W at 7493 r/min (126 W at 2751, 355 at 6486, 1001 at 9994, 1611 at 12487, 1994 at 13894); cylindrical dummy 360 W at 7489 r/min | 2014 Fig. 7, p. 5716 | +-7 W and +-20 r/min per marker; the calibration reproduces the printed 2.0 kW and 980 W to 7 W |
+| Mechanical loss (bearing plus windage) | salient rotor 573 W at 7493 r/min (126 W at 2751, 355 at 6486, 1001 at 9994, 1611 at 12487, 1994 at 13894); cylindrical dummy 360 W at 7489 r/min | 2014 Fig. 7, p. 5716 | +-7 W and +-20 r/min per marker; the calibration reproduces the printed 2.0 kW and 980 W to 7 W. The salient markers at 2751, 3389 and 6486 r/min lie partly under the squares (12 of the 19 to 20 px marker height shows), so those three carry about +-26 W; 7493 r/min is clear. The paper's own scatter is larger: "About 20% variation is resulted in the mechanical loss depending on the bearing condition; thus, the mechanical loss is measured at each test" (p. 5716), about +-115 W at 573 W. Table III (c), test, 7500 r/min, gives a mechanical loss of 0.6 kW, which agrees with 573 W |
+| Bearing and windage split | bearing inner diameter 45 mm, front and rear; rotor and shaft 10.8 kg, dummy rotor and shaft 15.0 kg ("4.3 kg high"); "the bearing loss of the dummy rotor is around 39% increased. Thus, the estimated windage loss caused by salient poles is low with respect to that of the actual value", so the salient-minus-dummy difference understates the windage | 2014 p. 5716 | printed; V4 needs these to split the 573 W between the end caps (bearings) and the rotor (windage) |
 | Copper and iron loss at the test point | not printed for 7500 r/min; V4 takes copper from the RMS current and resistance and iron from the R3 model (spec 8 V4) | - | - |
+| Measured losses nearest the test point | Table III column (b), test result: 8700 r/min, 205 A peak, 130 A RMS, 113 N m, 103.4 kW, copper 6.0 kW, "iron and other losses" 4.4 kW, mechanical 0.7 kW. The R3 iron model reads 3 to 7 times low on this machine (tracker row 10a), so this 4.4 kW is the only measured bound on the iron loss near the test point | 2014 Table III, p. 5718 | printed; at 8700 r/min, not 7500 r/min (see the test point row) |
 
 V0 is complete: every V2 and V4 input above has a page or figure and an error, or is marked as a gap that becomes
 an input row of its gate. No comparison has been run.
+
+### 9.3 Corrections after review (2026-11-24)
+
+A review of the V0 record after the merge (PR #41) found two Faiz readings that took the wrong ink. At Fig. 10,
+89 min, the 2-D curve lies on the 50 degC gridline. The gridline mask hid it, and the reading took the 3-D
+middle curve (49.18 +- 0.15, now 50.01 +- 0.32 degC). At 1 min the curve is near vertical and crosses the 25 degC
+gridline. The mask cut the stroke, and the reading kept its top edge (25.38 +- 0.29, now 23.82 +- 2.01 degC). Both
+came from the +-5 px mask that `tools/digitise_r5_v0.py` put around each gridline. The tool now keeps the band
+rows in a run that reaches into a band and adds the band half-width (5 px) to its error. It drops a run inside a
+band only when the run is no taller than a gridline or lies among the axis ticks. Each changed point was checked
+against a crop of the figure. The same fix changes the Fig. 8 and Fig. 9 points that touch a gridline, and it reads
+6 more Fig. 8 points that the mask had split into two runs. `_drop_jumps` now drops no Fig. 9 variable point
+(89 min is read) and one constant point (39 min, see 9.1). The record above also gained the Fig. 2 domain, the
+Kiyota bearing facts, the 20 % mechanical-loss scatter, Table III (b), the 137 A Table I limit, the taper label
+(an inference) and the minor corrections of the review (pages, error bands, labels, the 41 K arrow).
+Every changed reading, minute: old -> new (degC +- K; "none" is no reading):
+
+- Fig. 8: 7: none -> 25.01 +- 0.51; 18: 29.58 +- 0.27 -> 29.71 +- 0.58; 19: none -> 30.00 +- 0.54; 35: 34.79 +- 0.05
+  -> 34.96 +- 0.40; 36: 35.25 +- 0.10 -> 35.21 +- 0.32; 53: 39.64 +- 0.20 -> 39.66 +- 0.40; 54: 39.79 +- 0.05 ->
+  39.93 +- 0.38; 55: 40.28 +- 0.10 -> 40.13 +- 0.43; 76: 44.74 +- 0.12 -> 44.86 +- 0.43; 77: none -> 45.03 +- 0.38;
+  78: 45.24 +- 0.07 -> 45.14 +- 0.34; 94: none -> 48.15 +- 0.18; 101: none -> 49.32 +- 0.18; 104: 49.75 +- 0.10 ->
+  49.81 +- 0.34; 105: none -> 49.96 +- 0.34; 106: 50.21 +- 0.05 -> 50.08 +- 0.36; 107: 50.28 +- 0.12 -> 50.16 +-
+  0.43.
+- Fig. 10: 1: 25.38 +- 0.29 -> 23.82 +- 2.01; 4: 30.59 +- 0.49 -> 30.52 +- 0.70; 9: 34.62 +- 0.28 -> 34.73 +- 0.53;
+  10: 35.34 +- 0.26 -> 35.26 +- 0.49; 21: 39.71 +- 0.19 -> 39.86 +- 0.47; 22: 40.30 +- 0.20 -> 40.18 +- 0.46; 41:
+  44.75 +- 0.16 -> 44.83 +- 0.39; 42: 44.83 +- 0.09 -> 44.92 +- 0.33; 43: 45.20 +- 0.09 -> 45.11 +- 0.32; 44: 45.25
+  +- 0.15 -> 45.24 +- 0.30; 86: 49.77 +- 0.13 -> 49.78 +- 0.29; 87: 49.79 +- 0.10 -> 49.89 +- 0.35; 88: 49.84 +-
+  0.06 -> 49.94 +- 0.30; 89: 49.18 +- 0.15 -> 50.01 +- 0.32; 90: 50.16 +- 0.08 -> 50.08 +- 0.30; 91: 50.21 +- 0.12
+  -> 50.12 +- 0.35.
+- Fig. 9 variable: 1: 25.20 +- 0.11 -> 23.79 +- 1.66; 4: 30.57 +- 0.48 -> 30.46 +- 0.74; 9: 34.40 +- 0.52 -> 34.52
+  +- 0.78; 10: 35.31 +- 0.22 -> 35.21 +- 0.46; 21: 40.15 +- 0.06 -> 39.95 +- 0.41; 22: 40.30 +- 0.21 -> 40.21 +-
+  0.45; 41: 44.75 +- 0.15 -> 44.77 +- 0.31; 42: 44.82 +- 0.08 -> 44.92 +- 0.32; 43: 45.19 +- 0.11 -> 45.09 +- 0.35;
+  86: 49.76 +- 0.14 -> 49.86 +- 0.38; 87: 49.79 +- 0.11 -> 49.86 +- 0.32; 88: 49.82 +- 0.08 -> 49.92 +- 0.32; 89:
+  none -> 49.99 +- 0.31; 90: 50.16 +- 0.08 -> 50.06 +- 0.32; 91: 50.21 +- 0.12 -> 50.16 +- 0.31.
+- Fig. 9 constant: 1: 23.59 +- 1.32 -> 23.79 +- 1.66; 4: 30.57 +- 0.48 -> 30.46 +- 0.74; 9: 34.40 +- 0.52 -> 34.52
+  +- 0.78; 11: 35.23 +- 0.08 -> 35.05 +- 0.38; 36: 39.78 +- 0.12 -> 39.81 +- 0.29; 37: 39.81 +- 0.09 -> 39.87 +-
+  0.29; 38: 39.83 +- 0.08 -> 39.93 +- 0.32; 41: 40.15 +- 0.06 -> 40.05 +- 0.31; 42: 40.15 +- 0.06 -> 40.05 +- 0.31;
+  43: 40.20 +- 0.11 -> 40.10 +- 0.35; 44: 40.21 +- 0.12 -> 40.12 +- 0.36.
