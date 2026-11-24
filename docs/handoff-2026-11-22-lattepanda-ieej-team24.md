@@ -1,5 +1,7 @@
 # Handoff 2026-11-22: LattePanda runs for IEEJ SRM2 and the TEAM 24 low-field fill
 
+**Done:** runs 1 to 3 on 2026-11-23 (8c96db5), run 4 on 2026-11-24 (36fff0e). Results are in `docs/ieej-srm2-results.md`, `docs/m5b-team24-results.md` and `docs/r4-end-effect-results.md`.
+
 For the LattePanda (owner or a session there). Four runs, all on branch `ccr-ae0b0426-2aybo8`. The cloud session
 that wrote this does the docs, the tracker and the PR when the results come back.
 
@@ -32,7 +34,7 @@ WT=$(realpath ../srm-forge-ieej)
 | 1 | IEEJ SRM2 at `full`, library 10JNEX900 (stacking 0.9), 16 positions x 5 currents, 8 workers | `docs/validation/ieej_srm2_full.json` | about 15 min | about 12 GB (8 workers; screening workers took 0.7 GB each) |
 | 2 | IEEJ SRM2 at `full`, stacking 1.0, 50/150/250 A, one process | `docs/validation/ieej_srm2_full_sf1.json` | about 1 h | under 2 GB |
 | 3 | R4 G1 on the TEAM 24 curve with the low-field gap filled: `nominal` and `slab` only | `docs/validation/r4_g1_diez_webb.json` | about 10 min | 11.5 GB |
-| 4 | Optional, after you see run 3: all 16 G1 runs on the filled curve (the full gate) | same file, extended | about 4 h | 24 GB (`mesh_fine`) |
+| 4 | Optional, after you see run 3: all 16 G1 runs on the filled curve (the full gate) | same file, extended | about 4 h (done 2026-11-24: 4 h 17 min) | 29 GB (`mesh_fine`; needs `MemoryMax=27G` and swap) |
 
 The times are scaled from the cloud screening run (IEEJ) and from the 2026-11-05 G1 run (`r4_g1.json`: 3.9 h,
 `mesh_fine` 23.7 GB), not measured for these exact runs.
@@ -50,10 +52,10 @@ systemd-run --user --unit=ieej-team24 --collect -p WorkingDirectory=$WT -p Memor
 Watch with `systemctl --user is-active ieej-team24` and `journalctl --user -u ieej-team24 -f`. G1 with `--keys`
 ends with "G1 INCOMPLETE" and exit code 2: that is expected, because the gate needs all 16 runs.
 
-Run 4, if run 3 is worth it (same JSON; the two finished runs are reused):
+Run 4, if run 3 is worth it (same JSON; the two finished runs are reused). `mesh_fine` peaks at 29 GB, so the cap is 27 GB with swap allowed (a 22 GB cap kills it):
 
 ```bash
-systemd-run --user --unit=g1-diez-webb --collect -p WorkingDirectory=$WT -p MemoryMax=22G -p OOMPolicy=continue \
+systemd-run --user --unit=g1-diez-webb --collect -p WorkingDirectory=$WT -p MemoryMax=27G -p OOMPolicy=continue \
   --setenv=PYTHONPATH=src:tests $MAIN/.venv/bin/python tools/end3d/g1_team24.py --low-field diez_webb \
   --json docs/validation/r4_g1_diez_webb.json
 ```

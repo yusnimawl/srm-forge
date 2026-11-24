@@ -148,7 +148,7 @@ Mesh (scale 0.5) and Js (1.98 to 2.05 T) change the filled static torque by less
 replaces it is an owner decision (tracker row 1d).
 
 In 3D on the filled curve (R4 G1 nominal, 2026-11-23) the torque is 3.1186 N·m (−3.15 %) and the rotor-pole flux
-4.5543e-4 Wb (−3.51 %), against −11.72 % and −8.30 % as printed (`docs/r4-end-effect-results.md`).
+4.5543e-4 Wb (−3.51 %), against −11.72 % and −8.30 % as printed. The full gate on the filled curve still fails, by 1.5 points (torque, budget 1.67 %) and 1.0 point (flux, budget 2.52 %), against 9.9 and 5.7 points as printed (`docs/r4-end-effect-results.md`).
 
 ## End-winding correction (M5d)
 

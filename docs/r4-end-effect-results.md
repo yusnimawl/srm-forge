@@ -102,7 +102,7 @@ Run notes:
 - The first run stopped after `hub_minus` (04:47) with no out-of-memory kill. The cause was not found. The rerun reused the 9 finished runs.
 - `yoke_plus` took 3560 s against about 500 s for the same-size runs, with the same 7 Newton steps. The cause was not measured.
 
-### G1 on the filled low-field curve (2026-11-23, nominal and slab only)
+### G1 on the filled low-field curve (2026-11-23 and 2026-11-24)
 
 Table I of TEAM 24 has no B-H point between 0 and 4000 A/m; read as printed, the first segment is a straight line
 (`docs/m5b-team24-results.md`, "Low-field B-H fill"). The two G1 runs below take the same models on the curve with
@@ -119,9 +119,29 @@ nominal 619 s, 11.5 GB.
   from the end effects.
 - The 3D slab agrees with the 2D model on the filled curve: torque +0.18 %, flux +0.44 %.
 - End effects are unchanged in size: slab to full adds 1.22 % torque (1.32 % as printed) and 10.6 % flux (10.3 %).
-- Against the budget of the gate as run (torque 1.82 %, flux 2.60 %), both errors are still outside, by 1.3 and
-  0.9 points. The budget rows were not rerun on the filled curve, so this is no verdict: the gate needs all 16 runs
-  (owner decision; about 4 h and 24 GB on the LattePanda).
+- Full gate on the filled curve (all 16 runs, owner go-ahead, LattePanda 2026-11-24, 4 h 17 min wall; same JSON):
+  **fail.** Torque error 3.15 % against a budget of 1.67 %, flux error 3.51 % against 2.52 %. All 16 runs
+  converged. The errors exceed the budgets by 1.5 points (torque) and 1.0 point (flux), against 9.9 and 5.7 points on
+  Table I as printed.
+
+| Row | Torque, filled | Torque, as printed | Flux, filled | Flux, as printed |
+|---|---|---|---|---|
+| Mesh | 0.259 % | 0.254 % | 0.018 % | 0.018 % |
+| Air box | 0.012 % | 0.048 % | 0.019 % | 0.058 % |
+| Material (Js + 2 %) | 0.000 % | 0.000 % | 0.000 % | 0.000 % |
+| Table rounding | 0.155 % | 0.155 % | 0.106 % | 0.106 % |
+| Fillets | 0.212 % | 0.273 % | 0.104 % | 0.138 % |
+| Hub radius | 0.400 % | 0.416 % | 0.007 % | 0.014 % |
+| Yoke thickness | 0.317 % | 0.356 % | 0.147 % | 0.166 % |
+| Search coil | not applicable | not applicable | 1.420 % | 1.381 % |
+| Coil end | 0.311 % | 0.318 % | 0.695 % | 0.723 % |
+| **Sum** | **1.67 %** | **1.82 %** | **2.52 %** | **2.60 %** |
+
+- The budget rows hardly depend on the curve. What remains is a model-low error of about 1.5 points in torque and
+  1 point in flux beyond the budget. The budget has no row for the fill itself (it is an assumption, no measured
+  point lies under it) or for eddy currents, which are zero at steady state.
+- Run note: `mesh_fine` (3.2 M DOFs) peaked at 29.0 GB (23.7 GB on Table I as printed); it ran under
+  `MemoryMax=27G` with 6 GB of swap and took 42.9 min. A 22 GB cap would have killed it.
 - Hook check on the filled curve: ψ(full) − ψ(slab) is 0.1381 Wb-turns against the analytic 0.0728 at image
   factor 1.5 (as printed: 0.1342).
 - For comparison, mufem's 3D transient of the rig on its own filled curve gives 3.15 N·m at 0.15 s (Raiden
