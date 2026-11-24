@@ -74,6 +74,22 @@ systemd-run --user --unit=g1-diez-webb --collect -p WorkingDirectory=$WT -p Memo
 - Run 4 only if run 3 lands near the measurement: it gives the full budget on the filled curve, so the gate can be
   read again.
 
+## Run 5 (added 2026-11-24): 8/6 budget after the MEASURED_GAP change
+
+The owner accepted the filled TEAM 24 curve, so `MEASURED_GAP` La and ψ_max went from 0.172 to 0.150 (peak torque
+unchanged). `docs/validation/em_validate_8_6.json` still holds the old `end_effect` row, so rerun it on the branch
+that carries the change (about 1 h; the map may come from the cache):
+
+```bash
+cd $WT && git pull --ff-only
+systemd-run --user --unit=em-validate-86 --collect -p WorkingDirectory=$WT -p MemoryMax=22G -p OOMPolicy=continue \
+  --setenv=PYTHONPATH=src:tests $MAIN/.venv/bin/python examples/em_validate_8_6.py 8 --json docs/validation/em_validate_8_6.json
+```
+
+Expected: the La and ψ_max `end_effect` rows fall by about 3.1 points (20.9 % to about 17.8 % on the 8/6); every
+other row and check equals the old file. Then `PYTHONPATH=src $MAIN/.venv/bin/python tools/validation_report.py`
+must print PASS. Commit both files and push.
+
 ## When done
 
 Commit only the new JSON files on the branch and push:

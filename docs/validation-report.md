@@ -61,13 +61,13 @@ Limits: psi 0.50 %, torque 1.70 %, band radius 1.00 %.
 
 Report only (not gated).
 
-srmcore 0.8.0.
+srmcore 0.8.0; steel curve: Table I with the low-field interval filled (Diez-Webb).
 
 | Quantity | Model | Measured | Error |
 |---|---|---|---|
-| static_torque | 2.79964 | 3.22 | -13.1 % |
-| rotor_flux | 0.000390688 | 0.000472 | -17.2 % |
-| current rise, max deviation | before 18.5647 % | after 8.09309 % | |
+| static_torque | 3.07555 | 3.22 | -4.5 % |
+| rotor_flux | 0.000410051 | 0.000472 | -13.1 % |
+| current rise, max deviation | before 15.3107 % | after 9.72644 % | |
 
 ## M5c FEMM
 

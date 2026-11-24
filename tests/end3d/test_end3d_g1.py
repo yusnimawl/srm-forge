@@ -130,8 +130,8 @@ def test_keys_and_low_field(tmp_path, monkeypatch):
     specs.clear()
     g1.main(["--json", str(path), "--keys", "nominal", "--low-field", "diez_webb"])
     assert specs == []                               # reused with the same curve
-    g1.main(["--json", str(path), "--keys", "nominal"])
-    assert [s["params"] for s in specs] == [{}]      # the table curve is a different run
+    g1.main(["--json", str(path), "--keys", "nominal", "--low-field", "table"])
+    assert [s["params"] for s in specs] == [{"low_field": "table"}]     # the other curve is a different run
     with pytest.raises(SystemExit):
         g1.main(["--json", str(path), "--keys", "nominal,bogus"])
 

@@ -68,12 +68,13 @@ def test_current_rise_callable_voltage():
 
 I_FINAL = 7.41
 MEASURED_TORQUE = 3.22
-# 2D results at 7.41 A on the default mesh (docs/m5b-team24-results.md); regression pins.
-TORQUE_2D = 2.7996
-PSI_2D = 0.3676
-ROTOR_FLUX_2D = 3.9069e-4
-CURRENT_20MS_2D = 5.308
-CURRENT_20MS_END = 4.822     # 20 ms current with the end-winding inductance (midpoint of image factors 1 and 2)
+# 2D results at 7.41 A on the default mesh and the default steel curve (Table I with the low-field interval
+# filled; docs/m5b-team24-results.md); regression pins.
+TORQUE_2D = 3.0755
+PSI_2D = 0.3834
+ROTOR_FLUX_2D = 4.1005e-4
+CURRENT_20MS_2D = 5.177
+CURRENT_20MS_END = 4.699     # 20 ms current with the end-winding inductance (midpoint of image factors 1 and 2)
 
 
 def _rel(x, y):

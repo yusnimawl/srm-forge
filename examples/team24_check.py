@@ -3,8 +3,8 @@ agreement, static torque, current rise, torque and rotor-pole flux against time 
 current, and the sensitivity of each to R, the voltage waveform, Js and the mesh. The output is the
 source of docs/m5b-team24-results.md.
 
-Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--json PATH] [--low-field diez_webb]
---low-field selects the steel curve below Table I's first point (team24_fixture.LOW_FIELD; default "table").
+Run from the repo root:  .venv\\Scripts\\python examples\\team24_check.py [--json PATH] [--low-field table|diez_webb]
+--low-field selects the steel curve below Table I's first point (team24_fixture.LOW_FIELD; default "diez_webb").
 """
 import json
 import sys
@@ -25,7 +25,7 @@ if "--json" in sys.argv:
     _i = sys.argv.index("--json")
     JSON_PATH = Path(sys.argv[_i + 1])
     del sys.argv[_i:_i + 2]
-LOW_FIELD = "table"
+LOW_FIELD = "diez_webb"
 if "--low-field" in sys.argv:
     _i = sys.argv.index("--low-field")
     LOW_FIELD = sys.argv[_i + 1]

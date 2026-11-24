@@ -38,7 +38,7 @@ class Team24Params:
     coil_mid_y: float = fx.COIL_MID_Y
     search_from_corner: float = fx.SEARCH_COIL_FROM_CORNER
     js: float = fx.ASSUMED_JS
-    low_field: str = "table"         # the steel curve below Table I's first point (fx.LOW_FIELD)
+    low_field: str = "diez_webb"     # the steel curve below Table I's first point (fx.LOW_FIELD)
     fillet: float = 0.0              # m; > 0 rounds the pole-root corners (stator pole to yoke, rotor pole to hub)
     end_clearance: float = 2e-3      # axial gap between the stack end face and the coil bridge
     air_radius_factor: float = 1.5   # outer air cylinder radius over r_stator_out

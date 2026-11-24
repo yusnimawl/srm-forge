@@ -151,6 +151,20 @@ nominal 619 s, 11.5 GB.
 
 Run 2026-11-05 on code 94f5fd7, results committed in 4a74fdb (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache and the check and label code are not changed. srmcore stays 0.7.0.
 
+**Update 2026-11-24 (owner):** TEAM 24 now uses its low-field-filled B-H curve (`docs/m5b-team24-results.md`). Its
+residuals fall to 4.49 % (`static_torque`) and 13.12 % (`rotor_flux`), so Krishnan 6/4 sets every key:
+
+| Budget key | TEAM 24, filled | Krishnan 6/4 at 20 A | `MEASURED_GAP` | Row value g / (1 - g) | Set by |
+|---|---|---|---|---|---|
+| `peak_torque` | 4.49 % | 19.2 % | 0.192 (unchanged) | 23.76 % | Krishnan 6/4 |
+| `la` | 13.12 % | 15.04 % | 0.150 (was 0.172) | 17.65 % (was 20.77 %) | Krishnan 6/4 |
+| `psi_max` | 13.12 % | 15.04 % | 0.150 (was 0.172) | 17.65 % (was 20.77 %) | Krishnan 6/4 |
+| `lu` | not measured | not in decision 7 | 0.0 | 0 % | none |
+
+The La and ψ_max `end_effect` rows of every design drop by 3.1 points; peak torque and Lu are unchanged. The 8/6
+evidence `docs/validation/em_validate_8_6.json` predates this and is rerun on the LattePanda. The table below is the
+2026-11-05 record.
+
 Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec decision 7):
 
 | Budget key | TEAM 24 | Krishnan 6/4 at 20 A | `MEASURED_GAP` | Row value g / (1 - g) | Set by |

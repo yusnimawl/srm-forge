@@ -38,9 +38,11 @@ MAP_MATCH_TOLERANCE = 1e-3        # peak-torque solve on the design's mesh vs th
 JS_STEP = 0.02                   # relative change of the saturation polarisation in the material row
 GRADE_ALLOWANCE = {"A": 0.0, "B": 0.03, "C": 0.10}   # B-H data confidence grade -> relative allowance
 # measured gap of the 2D map: the larger of the TEAM 24 and Krishnan 6/4 residuals (Krishnan torque less its
-# 2D-Lu share). The values are fractions of the measured value; the end_effect row converts them to fractions of
-# the model value, g / (1 - g), because budget rows are relative to the model value.
-MEASURED_GAP = {"la": 0.172, "lu": 0.0, "peak_torque": 0.192, "psi_max": 0.172}
+# 2D-Lu share; TEAM 24 on its B-H table with the low-field interval filled). Krishnan sets every key: torque
+# 19.2 % against TEAM 24's 4.5 %, La and psi_max 15.0 % (Krishnan La at 20 A) against TEAM 24's rotor-pole flux
+# 13.1 %. The values are fractions of the measured value; the end_effect row converts them to fractions of the
+# model value, g / (1 - g), because budget rows are relative to the model value.
+MEASURED_GAP = {"la": 0.150, "lu": 0.0, "peak_torque": 0.192, "psi_max": 0.150}
 # Krishnan 6/4 Lu at 1 A with the end winding, model high, as a fraction of the measured value. It is a 2D-model and
 # geometry gap, not an end effect. Model high, so the fraction of the model value is g / (1 + g).
 MEASURED_LU_GAP = 0.452
@@ -196,7 +198,7 @@ def em_validate(design: Design, result: MapResult, *, solver: str = "ngsolve",
                                        "peak_torque": gap["peak_torque"],
                                        "psi_max": half * key.i_max / values["psi_max"] + gap["psi_max"]},
                         "end winding, image factor 1 to 2; measured gap, not a modelled effect: model low by "
-                        "19.2 % of measured in peak torque (Krishnan 6/4), 17.2 % in La and ψ_max (TEAM 24)")
+                        "19.2 % of measured in peak torque, 15.0 % in La and ψ_max (Krishnan 6/4, larger than TEAM 24)")
     digitisation = max(m.digitisation_error or 0.0 for m in loaded.values())
     digitisation_row = BudgetRow("digitisation", {k: digitisation for k in KEYS}, "digitised B-H curve")
     lu_gap = MEASURED_LU_GAP / (1.0 + MEASURED_LU_GAP)

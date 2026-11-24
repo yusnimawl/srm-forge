@@ -4,9 +4,10 @@
         .venv/bin/python tools/end3d/g1_team24.py [--max-dofs N] [--json PATH] [--dry-run]
         [--low-field table|diez_webb] [--keys nominal,slab,...]
 
---low-field diez_webb runs every model on the steel curve with Table I's low-field interval filled
-(team24_fixture.bh_table); use its own --json, because the gate's budget rows then come from that curve. --keys runs
-only the named RUNS (the verdict needs at least nominal and the mesh and perturbation rows it sums).
+--low-field selects the steel curve below Table I's first point (team24_fixture.LOW_FIELD): "diez_webb", the
+default, with the interval filled, writes docs/validation/r4_g1_diez_webb.json; "table", Table I as printed, is the
+2026-11-05 record docs/validation/r4_g1.json. Pass the matching --json: every run stores its curve, so a run on the
+other curve is never reused. --keys runs only the named RUNS (the verdict needs nominal and every row it sums).
 
 Mesh levels are (h_gap, h_iron, h_end, h_mid) in mm: COARSE, NOMINAL (1.5 / 10 / 2 / 8, G0's 1.71 M DOFs) and FINE
 (1.2 / 8 / 1.5 / 6, 3.20 M DOFs). Every perturbation row runs at the NOMINAL level and the verdict's 3D values are
@@ -184,9 +185,9 @@ def _report(runs: dict) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--max-dofs", type=int, default=3_300_000)
-    ap.add_argument("--json", type=Path, default=ROOT / "docs/validation/r4_g1.json")
+    ap.add_argument("--json", type=Path, default=ROOT / "docs/validation/r4_g1_diez_webb.json")
     ap.add_argument("--dry-run", action="store_true", help="build every model, print key, DOFs and layers, solve nothing")
-    ap.add_argument("--low-field", choices=fx.LOW_FIELD, default="table",
+    ap.add_argument("--low-field", choices=fx.LOW_FIELD, default="diez_webb",
                     help="steel curve below Table I's first point (team24_fixture.LOW_FIELD)")
     ap.add_argument("--keys", help="comma-separated RUNS keys to run (default: all)")
     ap.add_argument("--one", help=argparse.SUPPRESS)
@@ -204,8 +205,7 @@ def main(argv=None) -> int:
         ap.error(f"unknown --keys {unknown}; choose from {', '.join(RUN_KEYS)}")
     for key in keys:
         params, level = RUNS[key]
-        if args.low_field != "table":
-            params = {**params, "low_field": args.low_field}
+        params = {**params, "low_field": args.low_field}
         old = runs.get(key) or {}
         if _ok(old) and old.get("params") == params and old.get("level_mm") == list(level) and not args.dry_run:
             print(f"{key}: reused", flush=True)

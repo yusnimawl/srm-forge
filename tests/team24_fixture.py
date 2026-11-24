@@ -94,9 +94,10 @@ COIL_SIGNS = (1.0, -1.0, 1.0, -1.0)
 # Table I has no point between H = 0 and its first point (4000 A/m, 1.413 T), so the table read as it is gives a
 # straight first segment (mu_r about 280) under every field below 1.413 T. Ruberg, Kielhorn and Zechner,
 # Mathematics 9(15) 1804 (2021), note that this changes the results. LOW_FIELD selects the curve below the first
-# point: "table" is Table I as printed; "diez_webb" fills the interval with the rational form of Diez and Webb,
-# IEEE Trans. Magn. 52(3) (2016), eq. (1) of degree 1, B = H / (a + b H) + mu0 H, fitted by least squares to Table I
-# points 1 to 4 and scaled to pass through point 1. The fill is an assumption (no measured point lies in it).
+# point: "table" is Table I as printed; "diez_webb" (the default) fills the interval with the rational form of
+# Diez and Webb, IEEE Trans. Magn. 52(3) (2016), eq. (1) of degree 1, B = H / (a + b H) + mu0 H, fitted by least
+# squares to Table I points 1 to 4 and scaled to pass through point 1. The fill is an assumption (no measured point
+# lies in it).
 LOW_FIELD = ("table", "diez_webb")
 FILL_H = (25.0, 50.0, 100.0, 200.0, 300.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0)
 
@@ -114,7 +115,7 @@ def diez_webb_fill() -> tuple[float, float, float]:
     return float(pa), float(pb), float(B_TABLE[1] / _diez_webb(H_TABLE[1], pa, pb))
 
 
-def bh_table(low_field: str = "table") -> tuple[tuple[float, ...], tuple[float, ...]]:
+def bh_table(low_field: str = "diez_webb") -> tuple[tuple[float, ...], tuple[float, ...]]:
     """(H, B) of the steel: Table I, with the interval below its first point filled when low_field is
     "diez_webb"."""
     if low_field == "table":
@@ -126,7 +127,7 @@ def bh_table(low_field: str = "table") -> tuple[tuple[float, ...], tuple[float, 
     return (0.0, *FILL_H, *H_TABLE[1:]), (0.0, *fill, *B_TABLE[1:])
 
 
-def steel_law(js: float = ASSUMED_JS, low_field: str = "table"):
+def steel_law(js: float = ASSUMED_JS, low_field: str = "diez_webb"):
     h, b = bh_table(low_field)
     return process_bh(BHTable(h=h, b=b), stacking_factor=1.0, saturation_polarisation=js)[0]
 
@@ -254,7 +255,7 @@ def _triangle_area(nodes, tris):
 
 
 def team24_problem(current: float, size_scale: float = 1.0, js: float = ASSUMED_JS,
-                   low_field: str = "table") -> Magnetostatic2D:
+                   low_field: str = "diez_webb") -> Magnetostatic2D:
     """TEAM 24 at a given series-circuit current in A (350 turns per coil); `js` is the assumed
     saturation polarisation in T, `low_field` the curve below Table I's first point (see LOW_FIELD)."""
     m = team24_mesh(size_scale)
@@ -317,7 +318,7 @@ MAP_CURRENTS = np.concatenate([np.linspace(0.0, 1.0, 9), np.linspace(1.25, 7.75,
 
 
 def locked_rotor_map(solver, currents=MAP_CURRENTS, size_scale: float = 1.0, js: float = ASSUMED_JS,
-                     low_field: str = "table") -> dict:
+                     low_field: str = "diez_webb") -> dict:
     """psi (Wb-turns), Arkkio torque (N.m, absolute) and rotor-pole flux (Wb) at each current, each point
     started from the previous solution. Raises if a point does not converge."""
     out = {"current": np.asarray(currents, float), "psi": [], "torque": [], "rotor_flux": []}
