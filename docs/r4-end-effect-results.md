@@ -161,9 +161,11 @@ residuals fall to 4.49 % (`static_torque`) and 13.12 % (`rotor_flux`), so Krishn
 | `psi_max` | 13.12 % | 15.04 % | 0.150 (was 0.172) | 17.65 % (was 20.77 %) | Krishnan 6/4 |
 | `lu` | not measured | not in decision 7 | 0.0 | 0 % | none |
 
-The La and ψ_max `end_effect` rows of every design drop by 3.1 points; peak torque and Lu are unchanged. The 8/6
-evidence `docs/validation/em_validate_8_6.json` predates this and is rerun on the LattePanda. The table below is the
-2026-11-05 record.
+The La and ψ_max `end_effect` rows of every design drop by 3.1 points; peak torque and Lu are unchanged. 8/6 `full`
+rerun on the LattePanda (2026-11-24, commit 1c9c2a5, `docs/validation/em_validate_8_6.json`, report PASS, label
+2D-verified): `end_effect` La 20.90 % → 17.78 %, ψ_max 21.04 % → 17.91 %; totals La 30.98 % → 27.86 %, ψ_max
+30.99 % → 27.87 %, Lu 42.11 % and peak torque 33.88 % unchanged. Every other row and check equals the 2026-11-05
+run. The table below is the 2026-11-05 record.
 
 Fixed values, from the larger of the TEAM 24 and Krishnan 6/4 residuals (spec decision 7):
 

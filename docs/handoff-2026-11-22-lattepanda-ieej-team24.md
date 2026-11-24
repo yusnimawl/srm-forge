@@ -1,6 +1,6 @@
 # Handoff 2026-11-22: LattePanda runs for IEEJ SRM2 and the TEAM 24 low-field fill
 
-**Done:** runs 1 to 3 on 2026-11-23 (8c96db5), run 4 on 2026-11-24 (36fff0e). Results are in `docs/ieej-srm2-results.md`, `docs/m5b-team24-results.md` and `docs/r4-end-effect-results.md`.
+**Done:** runs 1 to 3 on 2026-11-23 (8c96db5), run 4 on 2026-11-24 (36fff0e), run 5 on 2026-11-24 (1c9c2a5). Results are in `docs/ieej-srm2-results.md`, `docs/m5b-team24-results.md` and `docs/r4-end-effect-results.md`.
 
 For the LattePanda (owner or a session there). Four runs, all on branch `ccr-ae0b0426-2aybo8`. The cloud session
 that wrote this does the docs, the tracker and the PR when the results come back.
