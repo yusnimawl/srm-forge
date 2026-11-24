@@ -1,39 +1,39 @@
 {
- "srmcore": "0.7.0",
+ "srmcore": "0.8.0",
  "cpu": "13th Gen Intel(R) Core(TM) i5-1340P",
  "logical_cpus": 16,
  "workers": 8,
- "date": "2026-10-31",
+ "date": "2026-11-22",
  "runs": [
   {
    "design": "8_6",
    "item": "screening",
-   "seconds": 113.31346271600341
+   "seconds": 112.87432549699997
   },
   {
    "design": "8_6",
    "item": "full",
-   "seconds": 694.2198190759955
+   "seconds": 732.8743490879999
   },
   {
    "design": "8_6",
    "item": "full_extras",
-   "seconds": 656.3847748029948
+   "seconds": 692.0816165160004
   },
   {
    "design": "12_8",
    "item": "screening",
-   "seconds": 161.71053993499663
+   "seconds": 170.53721279599995
   },
   {
    "design": "12_8",
    "item": "full",
-   "seconds": 928.2983473779896
+   "seconds": 987.1363914570006
   },
   {
    "design": "12_8",
    "item": "full_extras",
-   "seconds": 445.66448033301276
+   "seconds": 472.3790657059999
   }
  ]
 }

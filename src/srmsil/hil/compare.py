@@ -21,6 +21,26 @@ SETTLE_S = 0.2           # s the matched SIL of a fixed-speed capture runs befor
 RPM = 2 * math.pi / 60
 
 
+def _f32(x: float) -> float:
+    return float(np.float32(x))
+
+
+def rig_scenario(scenario: Scenario, m: MotorData) -> Scenario:
+    """`scenario` with the fields the emulator receives as float32 (session.emu_config) rounded as it receives them.
+    A hysteresis decision near its threshold can flip on a 1e-8 difference, so the matched SIL runs the rig's values.
+    Idempotent."""
+    d = scenario.model_dump()
+    d["speed_rpm"] = _f32(scenario.speed_rpm * RPM) / RPM      # sent as rad/s
+    d["bus_voltage"] = _f32(scenario.bus_voltage or m.bus_voltage)
+    for k in ("theta0", "inertia", "friction", "load", "load_step", "load_step_time"):
+        d[k] = _f32(d[k])
+    for k in ("v_switch", "v_diode", "dead_time", "turn_on_delay", "turn_off_delay"):
+        d["converter"][k] = _f32(d["converter"][k])
+    for k in ("encoder_offset", "encoder_ecc_amp", "resolver_gain_mismatch", "resolver_phase_error"):
+        d["sensors"][k] = _f32(d["sensors"][k])
+    return Scenario.model_validate(d)
+
+
 def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, clock_ratio: float | None = None, *,
                      m: MotorData, end_s: float | None) -> Scenario:
     """`scenario` as the HIL ran it, for the SIL:
@@ -37,10 +57,11 @@ def matched_scenario(scenario: Scenario, latency_s: float, modes: HilModes, cloc
       sensors.delay = latency_s - dt/2 (D, at least 0) and sensors.delay_jitter = dt. A chop decision near its
       threshold depends on where in that range the sample falls, which the mean age alone does not reproduce.
     - ADC. The controller's HAL constants and code range of the HIL sensing chain (`config.hil_adc`).
+    - Plant inputs. The emulator's float32 config values (`rig_scenario`).
     - Duration. `end_s` (the end of the HIL capture since the controller's start, `hil["window_s"][1]`), so the SIL
       covers the HIL's window from the same start; None keeps the scenario's duration (a scenario that already runs
       from the controller's start to the end of the window). It has no default, so a caller with a window passes it."""
-    d = scenario.model_dump()
+    d = rig_scenario(scenario, m).model_dump()
     r = 1.0 if clock_ratio is None else clock_ratio
     d["controller_clock"] = r
     d["compute_delay"] = 1.0 / (scenario.resolved_isr_hz * r)
@@ -169,8 +190,9 @@ def match_plan(hil: SimResult, modes: HilModes, m: MotorData) -> MatchPlan:
             return MatchPlan(None, t0, f"the capture is too long for the matched SIL at dt {sc.dt:g} s (at most "
                                        f"{TRACE_CAP * sc.dt - SETTLE_S:g} s)")
     try:
-        start = Scenario.model_validate({**sc.model_dump(),
-                                         "theta0": math.remainder(sc.theta0 + sc.speed_rpm * RPM * t0, 2 * math.pi)})
+        rig = rig_scenario(sc, m)   # the rotor turns from the rig's float32 angle at the rig's float32 speed
+        start = Scenario.model_validate({**rig.model_dump(),
+                                         "theta0": math.remainder(rig.theta0 + rig.speed_rpm * RPM * t0, 2 * math.pi)})
         scenario = matched_scenario(start, h["latency_us"] * 1e-6, modes, h.get("clock_ratio"), m=m,
                                     end_s=win[1] - t0)
     except ValueError as exc:

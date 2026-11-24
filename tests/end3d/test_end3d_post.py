@@ -1,6 +1,7 @@
 import dataclasses
 import functools
 import math
+import os
 
 import pytest
 
@@ -58,13 +59,14 @@ def test_torque_virtual_work():
     assert _torque(m, sol) == pytest.approx((w[1] - w[-1]) / (2 * d), rel=2e-2)
 
 
+@pytest.mark.skipif(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") < 24e9,
+                    reason="needs about 24 GB of RAM (one full-model solve peaks at about 14 GB)")
 def test_torque_virtual_work_full():
+    # Each full-model solve is used once: uncached, so only one is held at a time.
+    run = functools.partial(_run.__wrapped__, slab=False, maxh=10e-3, gap_maxh=1.5e-3)
     d = math.radians(0.5)
-    w = {}
-    for sgn in (1, -1):
-        m, sol, _ = _run(slab=False, maxh=10e-3, gap_maxh=1.5e-3, rotor_angle=fx.ROTOR_ANGLE + sgn * d)
-        w[sgn] = post.coenergy(m, sol)
-    m, sol, _ = _run(slab=False, maxh=10e-3, gap_maxh=1.5e-3)
+    w = {sgn: post.coenergy(*run(rotor_angle=fx.ROTOR_ANGLE + sgn * d)[:2]) for sgn in (1, -1)}
+    m, sol, _ = run()
     assert _torque(m, sol) == pytest.approx((w[1] - w[-1]) / (2 * d), rel=2e-2)
 
 

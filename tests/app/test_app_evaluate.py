@@ -1,3 +1,4 @@
+import dataclasses
 import math
 from unittest import mock
 
@@ -230,10 +231,12 @@ def test_failed_evaluation_has_no_map():
     assert e.map is None
 
 
-def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None):
+def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None,
+                 ratios=None, seen=None):
     """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order (a failing check
     fails at 3000 rpm on the hot spot). `n_ranked` windings are EM-feasible (0: none is); `error_at` = (k, exc)
-    raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call."""
+    raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call; `ratios` sets the
+    torque and power ratio of each ranked winding and `seen` receives the ranked points."""
     import srmapp.thermal as th
     from srmapp.turns import TurnsChoice, choose_turns
     req = _req()
@@ -244,7 +247,11 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     def choose(*a, **k):
         c = real(*a, **k)
         assert len(c.scan) >= n_ranked
-        return TurnsChoice(c.scan[0], n_ranked > 0, c.envelope, c.scan, c.capped, tuple(c.scan[:n_ranked]))
+        ranked = c.scan[:n_ranked] if ratios is None else [dataclasses.replace(p, torque_ratio=r, power_ratio=r)
+                                                            for p, r in zip(c.scan, ratios)]
+        if seen is not None:
+            seen.extend(ranked)
+        return TurnsChoice(c.scan[0], n_ranked > 0, c.envelope, c.scan, c.capped, tuple(ranked))
 
     answers = iter(holds)
     rated = mock.Mock(return_value="RATING", side_effect=rate_error)
@@ -300,6 +307,14 @@ def test_thermal_checks_stop_at_the_cap(monkeypatch):
     assert MAX_THERMAL_CHECKS == 4 and len(checks) == 4
     assert not e.feasible and e.rating is None and not rated.called and e.winding is checks[0]
     assert "4 of 10" in e.error and "3000 rpm" in e.error
+
+
+def test_windings_below_the_rated_torque_factor_are_checked_last(monkeypatch):
+    # the rated set asks for 1 + TORQUE_FLOOR times the required torque: below that ratio a winding cannot hold
+    ratios, ranked = [1.06, 1.02, 1.12, 1.099, 1.15], []
+    e, _, checks = _ranked_eval(monkeypatch, [False] * 4, n_ranked=len(ratios), ratios=ratios, seen=ranked)
+    assert checks == [ranked[k].winding for k in (2, 4, 0, 1)]   # best-first inside each group
+    assert not e.feasible and e.winding is checks[0]   # the reported winding is the one the note describes
 
 
 @pytest.mark.parametrize("at", [1, 2])
