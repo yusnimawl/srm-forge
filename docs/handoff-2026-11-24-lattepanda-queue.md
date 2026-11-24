@@ -26,10 +26,9 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
    queued 2026-11-23 20:04 UTC; it waits until no `memf-*` unit is active, then starts runs 1 to 3. Follow
    `docs/handoff-2026-11-22-lattepanda-ieej-team24.md` on branch `ccr-ae0b0426-2aybo8`, runs 1 to 3 only. Run 4
    (the full 16-run R4 gate, about 4 h, 24 GB) waits for the owner, who decides after seeing run 3. Commit the
-   result JSON files to that branch and push. Then send the results to the cloud session "Switched reluctance motor
-   validation" (session_01Wzw16YT3vVcHut4teCjihs), which does the docs, the tracker and the PR.
+   result JSON files to that branch and push. Done; merged to main in PR #42 (2b53b7e).
 3. **R5e gate V0 (row 10k), a new session, after step 2 is done.** Step 2 is done (8c96db5 on
-   `ccr-ae0b0426-2aybo8`, results sent). The owner said yes to run 4: all 16 G1 runs ran 2026-11-24 01:47 to
+   `ccr-ae0b0426-2aybo8`). The owner said yes to run 4: all 16 G1 runs ran 2026-11-24 01:47 to
    06:04 UTC (36fff0e; G1 FAIL, torque -3.15 % vs budget 1.67 %, flux -3.51 % vs 2.52 %). Run it at
    `MemoryMax=27G`, not the 22G of the 2026-11-22 handoff: `mesh_fine` reports a 29.0 GB peak. Session "R5e gate V0: read and record (row 10k)" was created
    2026-11-23 21:17 UTC (session_01Wzw16YqYmkmu3jtyuuY69P), never spawned and was archived; the session "What's the
@@ -42,9 +41,16 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
 
 4. **Run 5 of the IEEJ handoff (8/6 budget after the `MEASURED_GAP` change, PR #42).** Done 2026-11-24 08:30 to
    08:48 UTC (unit `em-validate-86`, 1c9c2a5 on `ccr-ae0b0426-2aybo8`): report PASS, end_effect La 0.2090 to
-   0.1778 and psi_max 0.2104 to 0.1791, nothing else moved. The PR merge is the cloud session's job.
+   0.1778 and psi_max 0.2104 to 0.1791, nothing else moved. Merged in PR #42 (2b53b7e).
+5. **R5e gate V2 (row 10k).** In progress on branch `r5e-v2` (worktree `../srm-forge-v2`), plan
+   `docs/superpowers/plans/2026-11-24-r5e-v2-faiz.md`, built subagent-driven. V4, V5 and the demonstration follow.
 
 ## 3. Rules for every session
+
+- One session on the LattePanda does all srm-forge work: code, runs, docs, the Notion tracker and project doc, and
+  PRs (owner, 2026-11-24). The cloud session "Switched reluctance motor validation" is closed; its open items were
+  taken over (`docs/handoff-2026-11-24-cloud-wrapup.md`). Branch `ccr-ae0b0426-2aybo8` and the worktree
+  `../srm-forge-ieej` are removed.
 
 - Long jobs run with `systemd-run --user --unit=NAME ...`; a session restart kills processes the session started.
 - In a worktree, run Python with `PYTHONPATH=src` (`src:tests` for examples); the shared `.venv` imports the main
