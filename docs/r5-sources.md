@@ -33,6 +33,7 @@ Grades: **A** measured on the owner's lot or a measured table, **B** a test or m
 | 6n | Lamination conductivity scatter | none read; grade-C allowance of `srmapp.losses.LOSS_GRADE_ALLOWANCE["C"]` | C (rule, no measurement) | no scatter found; unfavourable end 18.6 x (1 - 0.25) = 13.95 W/(m K) by the plan's grade-C rule |
 | 7 | Band for every budget row that needs one | sections 6 and 7 | - | section 7 |
 | 8 | V3 record (Marquez-Fernandez 2018) | pp. 2, 3, 8 and 9 | B | section 8; the Milton value 2.41 is reproduced, the 0.47 point (3.11) is not (xi is given for 0.37 only); recorded, nothing changed |
+| 9 | V0 record: the inputs of V2 (Faiz 2009) and V4 (Kiyota 2014, 2012) | Faiz pp. 2928 to 2932; Kiyota 2014 pp. 5713 to 5717, 2012 pp. 2304 to 2306; `tools/digitise_r5_v0.py` | B (printed) / read with errors | section 9; gaps listed per gate; Kiyota's printed 41 K reads as 39.5 K from the trace |
 
 ## 1. 10JNEX900
 
@@ -393,3 +394,63 @@ Result: the formula **reproduces 2.41 to within 1 %** (the printed figure is rou
 V3's 0.47 point is **not reproduced**: the paper gives xi for fill 0.37 only, and with xi = 0.324 the formula gives 3.44 against the printed 3.11. This is recorded and nothing is changed: the model value, the printed value and the better-fit value stay as they are, and the band of section 7 is widened instead (spec §8 V3).
 
 The measured-agreement values are **24 % above** the Milton ones (3.0 / 2.41 = 1.245; 3.85 / 3.11 = 1.238 using the printed 3.11). The paper does not state the agreement as a number; it says only that the higher value gives "a better agreement" (pp. 8 and 9). So V3 as designed in spec §8 has: model input 2.41 or 3.11 (3.44 by this file's arithmetic for fill 0.47), and a better-fit value about 24 % higher, from one coil type each, with no temperature error reported as a number. A gate threshold must be set from the plan; the paper gives none.
+
+## 9. V0 record: the inputs of V2 and V4 (tracker row 10k)
+
+Read on 2026-11-24 from the PDFs in `docs/sources/papers/` (git-ignored). Page numbers are the printed journal
+pages. Figure readings come from `python tools/digitise_r5_v0.py [--papers DIR] --json docs/validation/r5_v0_readings.json`
+(axes fitted to the frame and every gridline or tick; the error of a reading is the fit residual plus half the
+height of the ink run the curve makes in the column, in the axis unit). The V3 inputs are in section 8. The Kiyota
+geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_kiyota.py` (tracker row 10a,
+`tests/kiyota_18_12.py`, about +-0.3 mm); V0 reuses it and does not read it again.
+
+### 9.1 V2: Faiz et al. 2009 (IEEE Trans. Magn. 45(7), pp. 2927-2934)
+
+| Input | Value | Where | Error |
+|---|---|---|---|
+| Machine | 4 phases, 8/6; stator OD 125 mm, stator slot-bottom diameter 100 mm; rotor OD 63 mm, rotor slot-bottom diameter 41 mm; air gap 0.35 mm; shaft 21 mm; stack 90 mm; stator and rotor pole arc 21 deg; 124 turns per coil; 0.69 ohm at 20 degC; rated 1500 r/min | Table I, p. 2928 | printed |
+| Not given | pole tapers (`tpr_s`, `tpr_R`), pole-tip tab, slot fillets (`fil_s`), slot liner and slot wedge thickness, frame thickness (Fig. 12(f) varies it 5 to 25 mm, the nominal is not stated) | Fig. 1, Fig. 2, p. 2928 | **gap**: each becomes a V2 input row with a stated range |
+| Thermal properties, k W/(m K), c J/(kg K), density kg/m3 | lamination 20, 438, 7650; copper 401, 385, 8933; slot liner 0.076, 1172, 2150; air 0.0263, 1007, 1.16; frame (aluminium) 177, 875, 2770; slot wedge 0.29, 1172, 2150 | Table II, p. 2928 | printed |
+| Equivalent winding conductivity | 0.83 W/(m K) | p. 2929 | printed |
+| Axial lamination conductivity | 1/30 of the radial value, 3-D only | pp. 2931 and 2932 | printed; not a 2-D input |
+| Air properties | k, nu, alpha, Pr, beta at 20, 40 and 60 degC | Table III, p. 2929 | printed |
+| Natural convection, outer surfaces | frame 5.2, lateral (end) surfaces 5 W/(m2 K), from Eq. (1) to (5) | p. 2930 | printed |
+| Forced convection, stator pole and slot-wedge surfaces facing the gap | 70 W/(m2 K) at 1000 r/min, Eq. (6) with the rotor tip speed | p. 2931 | printed |
+| Frame h used for every later result | 30 W/(m2 K) (a 4 m/s fan air speed) | p. 2931 | printed |
+| Losses (the inputs of every result except Figs. 12 and 13) | calculated: stator pole 5.9 W, stator yoke 10 W, rotor pole 2.8 W, rotor core 3.3 W (total 22 W, measured 25.5 W); copper DC 24.96 W (measured 21.32 W), AC 0.04 W | Table IV, p. 2930 | printed; the paper does not say how a part's loss is spread inside the part |
+| Operating point of the losses | 1000 r/min, single pulse, turn-on 10 deg, turn-off 20 deg | p. 2930 | printed |
+| Start and ambient temperature | 20 degC (every transient in Figs. 8 to 10 starts there) | Figs. 8 to 10, p. 2932 | read |
+| Inside-air temperature, h = 30 curve (the V2 boundary input) | 21.1 degC at 1 min, 24.0 at 5, 26.5 at 10, 28.5 at 15, 33.5 at 30, 38.9 at 50, 43.5 at 70, 47.4 at 90, 50.7 at 110, 52.0 at 119 min; 105 points, 1 to 119 min | Fig. 8, p. 2932 | +-0.56 K worst (curves merged below about 30 min), +-0.1 to +-0.2 K above 40 min; time +-0.07 min (cal 0.9 px) |
+| Lumped network that made Fig. 8 | resistances and capacitances | Table V, p. 2931 | printed; not needed when Fig. 8 is the input |
+
+Comparison targets:
+
+| Target | Value | Where | Error |
+|---|---|---|---|
+| 2-D winding temperature against time | 25.4 degC at 1 min, 31.7 at 5, 35.3 at 10, 37.7 at 15, 42.6 at 30, 46.1 at 50, 48.4 at 70, 50.2 at 90, 51.5 at 110, 52.1 at 119 min; 114 points | Fig. 10 (2D analysis), p. 2932 | +-1.0 K worst, +-0.1 to +-0.5 K typical; the 3-D middle curve touches it below about 30 min |
+| Winding temperature at three points, equivalent conductivity | A (near the laminations) 50.7, B (middle) 51.7, C (far) 52.6 degC; layered model 57.5, 71.9, 76.4 | Table VI and Fig. 11, p. 2932 | printed; **the time is not stated** and the points are not marked by coordinates. Fig. 10 at 119 min (52.1 +- 0.1) lies between B and C, so Table VI is most likely the 120 min state with the variable inside air; this is an inference, recorded as such |
+| What "winding temperature" in Fig. 10 is (maximum, mean or a point) | not stated | p. 2932 | **gap** |
+
+### 9.2 V4: Kiyota et al. 2014 (IEEE Trans. Ind. Electron. 61(10), pp. 5712-5721) and 2012 (IEEE Trans. Ind. Appl. 48(6), pp. 2303-2309)
+
+| Input | Value | Where | Error |
+|---|---|---|---|
+| Outer diameter, coil-end length, stack, slot fill | 264 mm; coil end 10.5 mm; iron stack 87 mm (design); slot fill 56 % (Table II), 57 % (text) | 2012 Table II, p. 2306; text p. 2304 | printed; the two fills differ |
+| Rotor outer radius | 91 mm | 2012 p. 2305 (text with Fig. 5) | printed |
+| Stator pole taper | 7.5 deg | 2012 Fig. 6, p. 2305 | printed |
+| Built machine | stator stack 87.25 mm, rotor stack 87.15 mm, axial length 112 mm; air gap 0.5 mm; 0.1 mm 10JNEX900; 0.9 mm wire, 9 parallel, 20 series turns; 650 V | 2014 Tables I and II, pp. 5713 and 5714 | printed |
+| Winding resistance | 97.8 mOhm measured (91.7 predicted); temperature of the measurement not stated | 2014 Table II, p. 5714 | printed; 20 degC is an assumption (`tests/kiyota_18_12.py`) |
+| Pole arcs, rotor taper, rotor yoke, shaft, stator yoke | read off 2012 Fig. 7 | `tools/digitise_kiyota.py`, row 10a | about +-0.3 mm |
+| Test point | maximum power, 7500 r/min; "the maximum output power is 109 kW at the rotational speed of 7500 r/min", so 138.8 N m at 109 kW (computed here) | 2014 p. 5717 | printed; Table III column (b) gives 8700 r/min, 103.4 kW, 130 A for "maximum output power" while the text on p. 5718 calls point (b) "7500 r/min": **the paper is inconsistent**; V4 uses Fig. 8 (7500 r/min) |
+| RMS current against time | ramp 16 A at 0 s, 65 A at 1 s, 140 A at 2 s; hold 140.7 A (s.d. 0.4 A, 2.5 to 11.5 s); fall 130 A at 12 s, 54 A at 13 s, 3 A at 14 s; 0.25 s steps | 2014 Fig. 8, p. 5716 | +-0.5 A/px, cal 0.6 px; the current command is 200 A peak, ramped 0 to 2 s and 11.7 to 14 s |
+| Coil-end temperature against time | 51.1 degC at the start (s.d. 0.13, 0 to 1.5 s); 73.8 at 10 s, 77.1 at 11 s; 86.6 at 14 s; plateau 90.6 degC (s.d. 0.33, 18 to 20 s), reached after the current has stopped | 2014 Fig. 8, p. 5716 | 0.16 K/px, cal 0.6 px; the logged trace is noisy (one-column spikes, median over 7 columns) |
+| Measured rise | **39.5 K** from the trace (90.6 - 51.1, +-0.4 K); the figure's arrow is labelled **41 K** and the text says 41 K for the 10 s test | 2014 Fig. 8 and p. 5716 | the printed 41 K and the read 39.5 K differ by 1.5 K, more than the reading error; V4 must state which it compares with |
+| Cooling | natural cooling, "forced cooling is not implemented" | 2014 p. 5716 | printed |
+| Housing | motor case only in the photo of Fig. 3(a); not described | 2014 p. 5714 | **gap**: a V4 input row with a stated range |
+| Coil-end sensor | "coil-end temperature"; position and sensor type not described | 2014 p. 5716 | **gap** |
+| Temperature of the rest of the machine at the start | not given (only the coil end, 51.1 degC) | 2014 Fig. 8 | **gap**: V4 starts uniform at the coil-end value, as an input row |
+| Mechanical loss (bearing plus windage) | salient rotor 573 W at 7493 r/min (126 W at 2751, 355 at 6486, 1001 at 9994, 1611 at 12487, 1994 at 13894); cylindrical dummy 360 W at 7489 r/min | 2014 Fig. 7, p. 5716 | +-7 W and +-20 r/min per marker; the calibration reproduces the printed 2.0 kW and 980 W to 7 W |
+| Copper and iron loss at the test point | not printed for 7500 r/min; V4 takes copper from the RMS current and resistance and iron from the R3 model (spec 8 V4) | - | - |
+
+V0 is complete: every V2 and V4 input above has a page or figure and an error, or is marked as a gap that becomes
+an input row of its gate. No comparison has been run.

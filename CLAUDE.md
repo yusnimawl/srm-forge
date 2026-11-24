@@ -54,6 +54,7 @@ python examples\scan_timing.py [--cache-dir DIR] [--json PATH]   # time the wind
 python tools\validation_report.py                   # write docs/validation-report.md from docs/validation/ (verdict PASS/PENDING/FAIL, exit 1 on FAIL); the CI row is stale unless ci.json's tag is v + the installed srmcore version, and the EMDLAB / Maxwell row is gated on the limits of tests/validation/test_emdlab.py
 python tools\engine_digest.py [--update]            # digest of the engine code behind map numbers against its pin (see Map pipeline 3)
 python tools\digitise_bh.py                         # reproduce the traced/read library B-H curves (needs the dev extra, PyMuPDF)
+python tools\digitise_r5_v0.py [--papers DIR] [--json PATH]   # R5e gate V0 figure readings (Faiz 2009 Figs. 8 and 10, Kiyota 2014 Figs. 7 and 8; record in docs/r5-sources.md section 9)
 $env:PYTHONPATH="tests"; python tools\femm_fixtures.py <machine> [--level F]   # regenerate a FEMM fixture (Windows, FEMM 4.2, pyfemm; hours)
 $env:PYTHONPATH="tests"; python examples\femm_check.py [machine ...] [--json PATH]   # FEMM cross-tool comparison tables
 $env:PYTHONPATH="tests"; python examples\emdlab_check.py [--json PATH]   # EMDLAB / Maxwell 8/6 comparison table (30 solves, about 7 min)
