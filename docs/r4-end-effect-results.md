@@ -147,6 +147,14 @@ nominal 619 s, 11.5 GB.
 - For comparison, mufem's 3D transient of the rig on its own filled curve gives 3.15 N·m at 0.15 s (Raiden
   Numerics validation case; reproduced in the cloud, 2026-11-22).
 
+**Closed as unexplained (owner, 2026-11-24).** The residual study (tracker 1d) ends here. The 1.5-point (torque) and
+1.0-point (flux) miss beyond the G1 budget on the filled curve has no measured cause. It stays covered by the
+measured gap in every design's budget ("Measured gap in the budget" below), which Krishnan 6/4 sets for every key
+and which is larger than either TEAM 24 residual. The image factor stays at 1.5 (the midpoint of the free-air and
+iron-image bounds) in the reports and in stage 2. The hook check above (3D ψ(full) − ψ(slab) 0.1381 Wb-turns against
+0.0728 analytic) is not a reason to change it: that difference also holds the stack-end fringing, and its split
+into end turns and fringing was not measured.
+
 ## Measured gap in the budget
 
 Run 2026-11-05 on code 94f5fd7, results committed in 4a74fdb (srmcore 0.7.0), 8/6 `full` map, `docs/validation-report.md`, verdict PASS. G1 failed, so no correction exists. Each design's `end_effect` budget row now holds the image-factor half-width plus a constant gap, `MEASURED_GAP` in `srmcore/maps/validation.py`. The map, its cache and the check and label code are not changed. srmcore stays 0.7.0.
