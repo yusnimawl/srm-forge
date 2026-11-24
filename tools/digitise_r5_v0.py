@@ -118,11 +118,25 @@ def faiz_fig10() -> dict:
 STATOR_OD_MM = 125.0                                     # Faiz Table I
 
 
+def _drop_jumps(curve: dict, limit_k: float = 1.0) -> dict:
+    """Drop a point that is more than `limit_k` from the median of its four nearest neighbours (a column where the
+    picker took the other curve or a label); the dropped points stay in `dropped`."""
+    pts = curve["points"]
+    bad = []
+    for i, p in enumerate(pts):
+        near = [pts[j][1] for j in range(max(0, i - 2), min(len(pts), i + 3)) if j != i]
+        if p[0] >= 8.0 and abs(p[1] - float(np.median(near))) > limit_k:   # the first minutes rise too steeply
+            bad.append(i)
+    curve["dropped"] = [pts[i] for i in bad]
+    curve["points"] = [p for i, p in enumerate(pts) if i not in bad]
+    return curve
+
+
 def faiz_fig9() -> dict:
     """Variable inside air is the upper curve, constant the lower (dotted); below about 5 min they merge."""
     legend = (280, 905, 60, 220)
-    return dict(variable=_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: min(r) if r else None),
-                constant=_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: max(r) if r else None))
+    return dict(variable=_drop_jumps(_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: min(r) if r else None)),
+                constant=_drop_jumps(_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: max(r) if r else None)))
 
 
 def faiz_fig11() -> dict:

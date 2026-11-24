@@ -413,7 +413,7 @@ geometry read off Kiyota 2012 Fig. 7 is already recorded with `tools/digitise_ki
 | Slot wedge thickness | 2.205 mm radial, beside both pole flanks | Fig. 11(a), p. 2932 | +-0.06 mm |
 | Slot-top radius | 49.6 to 50.0 mm (the iron line above the coil) | Fig. 11(a), p. 2932 | +-0.06 mm |
 | Pole shape | parallel-sided (taper 0); pole width 11.56 mm, against 11.61 mm from the 21 deg arc (a check on the scale) | Fig. 11(a), p. 2932 | +-0.06 mm |
-| Slot-top fillet | about 1.3 mm in their drawing; the search model has none, which would lower the coil by two fillet radii | Fig. 11(a), p. 2932 | read by eye, no error stated |
+| Slot-top fillet radius | input row, range 0 to 1.3 mm: about 1.3 mm by eye in their drawing, not measured in code; the search model has none, which would lower the coil by two fillet radii | Fig. 11(a), p. 2932 | by eye only, no error; **gap** inside the stated range |
 | Frame thickness | most likely 5 mm: Fig. 12(b) to (e) read 52.0 degC at the Table I values, and Fig. 12(f) reads 52.0 only at 5 mm (51.3 at 10 mm). This is an inference; Fig. 11 does not draw the frame | Fig. 12, p. 2932 | inference |
 | Not given | pole-tip tab; the shape of the fillet; the shape of the wedge chord (a straight chord in their drawing, an arc at the bore radius in ours); frame thickness as a printed value | Fig. 1, Fig. 2, Fig. 11, p. 2928 | **gap**: each becomes a V2 input row with a stated range |
 | Thermal properties, k W/(m K), c J/(kg K), density kg/m3 | lamination 20, 438, 7650; copper 401, 385, 8933; slot liner 0.076, 1172, 2150; air 0.0263, 1007, 1.16; frame (aluminium) 177, 875, 2770; slot wedge 0.29, 1172, 2150 | Table II, p. 2928 | printed |
