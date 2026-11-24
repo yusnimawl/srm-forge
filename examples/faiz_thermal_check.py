@@ -48,6 +48,18 @@ def fig8_air(readings: dict):
                  "extrapolation": "last 10 readings' least-squares slope from the last reading"}
 
 
+def dropped_lists(node, path="") -> dict:
+    """Every "dropped" list in the readings, by path."""
+    out = {}
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "dropped":
+                out[path or "/"] = v
+            else:
+                out.update(dropped_lists(v, f"{path}/{k}"))
+    return out
+
+
 def coil_sets(case: F.FaizCase):
     d = case.domain
     nodes = np.unique(np.concatenate([d.triangles[e] for e in d.coil_elements.values()]))
@@ -133,6 +145,9 @@ def main():
     targets = {"fig10": ("fig8", readings["faiz_fig10"]["points"]),
                "fig9_constant": ("constant", readings["faiz_fig9"]["constant"]["points"])}
     errors, verdicts, table_vi = {}, {}, {}
+    missing = [n for n, ok in (("mesh", "reference" in args.presets and nominal != "reference"),
+                               ("time_step", half is not None)) if not ok]
+    provisional = nominal != "full" or bool(missing)
     for frame in F.FRAMES:
         for air_name in airs:
             nom = runs[f"{nominal}/{frame}/{air_name}/dt{args.dt:g}"]["max"]
@@ -143,11 +158,15 @@ def main():
                 "time_step": [abs(a - b) for a, b in zip(nom, fine["max"])] if fine else None}
         for target, (air_name, points) in targets.items():
             e = errors[f"{frame}/{air_name}"]
-            verdicts[f"{frame}/{target}"] = verdict(runs[f"{nominal}/{frame}/{air_name}/dt{args.dt:g}"]["max"], points,
-                                                    e["mesh"], e["time_step"])
+            verdicts[f"{frame}/{target}"] = {**verdict(runs[f"{nominal}/{frame}/{air_name}/dt{args.dt:g}"]["max"],
+                                                       points, e["mesh"], e["time_step"]), "provisional": provisional}
         r = runs[f"{nominal}/{frame}/fig8/dt{args.dt:g}"]
         ours = {"max": r["max"][TABLE_VI_MIN], "mean": r["mean"][TABLE_VI_MIN], "min": r["min"][TABLE_VI_MIN]}
-        table_vi[frame] = {"ours": ours, "diff": {f"{q}-{p}": ours[q] - TABLE_VI[p] for q, p in TABLE_VI_PAIRS}}
+        e = errors[f"{frame}/fig8"]
+        table_vi[frame] = {"ours": ours, "diff": {f"{q}-{p}": ours[q] - TABLE_VI[p] for q, p in TABLE_VI_PAIRS},
+                           "mesh_err_max": e["mesh"][TABLE_VI_MIN] if e["mesh"] else None,
+                           "time_step_err_max": e["time_step"][TABLE_VI_MIN] if e["time_step"] else None,
+                           "table_vi_err": 0.05}    # print rounding
 
     f10 = {int(p[0]): p[1] for p in readings["faiz_fig10"]["points"]}
     f9 = {int(p[0]): p[1] for p in readings["faiz_fig9"]["constant"]["points"]}
@@ -164,7 +183,9 @@ def main():
                   f"worst excess {vd['worst_excess']:+.2f} K at {vd['worst_at_min']:g} min")
         tv = table_vi[frame]["ours"]
         print(f"  Table VI at {TABLE_VI_MIN} min (time inferred): ours max/mean/min {tv['max']:.2f}/{tv['mean']:.2f}/"
-              f"{tv['min']:.2f}; theirs A {TABLE_VI['A']} B {TABLE_VI['B']} C {TABLE_VI['C']}")
+              f"{tv['min']:.2f}; theirs A {TABLE_VI['A']} B {TABLE_VI['B']} C {TABLE_VI['C']}; diffs "
+              + ", ".join(f"{k} {v:+.2f}" for k, v in table_vi[frame]["diff"].items())
+              + f"; coil-max mesh/dt error {table_vi[frame]['mesh_err_max']}/{table_vi[frame]['time_step_err_max']}")
 
     # input rows on the nominal mesh: change of coil max at ROW_MIN (Fig. 8 air) and at the constant-air steady state
     def row(case, frame, frame_t=F.FRAME_T):
@@ -198,12 +219,10 @@ def main():
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps({
             "srmcore": version("srmcore"), "presets": args.presets, "nominal_preset": nominal, "dt_s": args.dt,
-            "dt_half_s": half, "missing_error_terms": [n for n, ok in (("mesh", "reference" in args.presets
-                                                                         and nominal != "reference"),
-                                                                        ("time_step", half is not None)) if not ok],
+            "dt_half_s": half, "missing_error_terms": missing, "provisional": provisional,
             "inputs": {
                 "readings": str(READINGS), "fig8_air": fig8_info,
-                "fig9_constant_dropped": readings["faiz_fig9"]["constant"].get("dropped", []),
+                "dropped_readings": dropped_lists(readings),
                 "table_vi": {**TABLE_VI, "source": "Table VI, p. 2932", "compared_at_min": TABLE_VI_MIN,
                              "pairs": "ours max-C, mean-B, min-A, by rank (an inference)",
                              "time": "inferred (not printed): Fig. 10 at 119 min lies between B and C"},

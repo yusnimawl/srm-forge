@@ -1,4 +1,7 @@
 """Faiz 8/6 stator case (R5 gate V2): geometry against Table I, the loads, the heat balance and the frame models."""
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 from dataclasses import replace
@@ -56,3 +59,15 @@ def test_with_air_changes_only_inside_air(case):
         if a.name == "inside_air":
             assert b.fixed_c == 45.0
     assert q.links == p.links
+
+
+def test_check_verdict_logic():
+    sys.path.insert(0, str(Path(__file__).parents[2] / "examples"))
+    from faiz_thermal_check import verdict
+    ours = [0.0, 10.0, 20.0, 30.0]
+    v = verdict(ours, [(1, 10.5, 1.0), (2, 22.0, 1.0), (3, 30.0, 0.1)], None, None)
+    assert [r["pass"] for r in v["points"]] == [True, False, True]
+    assert (v["n_pass"], v["all_pass"], v["passes_from_min"]) == (2, False, 3)
+    assert v["worst_at_min"] == 2 and v["worst_excess"] == pytest.approx(1.0)
+    w = verdict(ours, [(1, 10.5, 1.0), (2, 22.0, 1.0)], [0, 0, 1.0, 0], [0, 0, 0.5, 0])
+    assert w["all_pass"] and w["passes_from_min"] == 1
