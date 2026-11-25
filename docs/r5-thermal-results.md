@@ -279,9 +279,9 @@ A thickness read between two edges carries +-1 px per edge, up to +-0.12 mm. At 
 
 ### What this means for the ratings
 
-V2 does not show our solver wrong. With their frame lump, the 119 min state and Table VI C agree within 0.43 K and 0.02 K, and the mesh and step errors are under 0.05 K. V2 does not show it right either. The shape differs by up to 4.97 K. The most likely cause is an input the paper does not print (a hypothesis). If their early rise is the true one, ours runs 3 to 5 K cool for the first 30 min after a load step, the unsafe sign for a peak transient. V2 cannot say which model is right, because both are models and no measurement is involved.
+V2 does not show our solver wrong. With their frame lump, the 119 min state and Table VI C agree within 0.43 K and 0.02 K, and the mesh and step errors are under 0.05 K. V2 does not show it right either. The shape differs by up to 4.97 K. The most likely cause is an input the paper does not print (a hypothesis). V2 cannot say which model is right, because both are models and no measurement is involved.
 
-Our ratings give the coil the capacity of its copper only, fill x copper rho c (`srmapp.thermal_network`). That is the x 0.4 row above at a fill of 0.4, which closes minute 1 only.
+If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 30 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
 
 V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
 
