@@ -461,7 +461,7 @@ Comparison targets:
 | Mechanical loss (bearing plus windage) | salient rotor 573 W at 7493 r/min (126 W at 2751, 355 at 6486, 1001 at 9994, 1611 at 12487, 1994 at 13894); cylindrical dummy 360 W at 7489 r/min | 2014 Fig. 7, p. 5716 | +-7 W and +-20 r/min per marker; the calibration reproduces the printed 2.0 kW and 980 W to 7 W. The salient markers at 2751, 3389 and 6486 r/min lie partly under the squares (12 of the 19 to 20 px marker height shows), so those three carry about +-26 W; 7493 r/min is clear. The paper's own scatter is larger: "About 20% variation is resulted in the mechanical loss depending on the bearing condition; thus, the mechanical loss is measured at each test" (p. 5716), about +-115 W at 573 W. Table III (c), test, 7500 r/min, gives a mechanical loss of 0.6 kW, which agrees with 573 W |
 | Bearing and windage split | bearing inner diameter 45 mm, front and rear; rotor and shaft 10.8 kg, dummy rotor and shaft 15.0 kg ("4.3 kg high"); "the bearing loss of the dummy rotor is around 39% increased. Thus, the estimated windage loss caused by salient poles is low with respect to that of the actual value", so the salient-minus-dummy difference understates the windage | 2014 p. 5716 | printed; V4 needs these to split the 573 W between the end caps (bearings) and the rotor (windage) |
 | Copper and iron loss at the test point | not printed for 7500 r/min; V4 takes copper from the RMS current and resistance and iron from the R3 model (spec 8 V4) | - | - |
-| Measured losses nearest the test point | Table III column (b), test result: 8700 r/min, 205 A peak, 130 A RMS, 113 N m, 103.4 kW, copper 6.0 kW, "iron and other losses" 4.4 kW, mechanical 0.7 kW. The R3 iron model reads 3 to 7 times low on this machine (tracker row 10a), so this 4.4 kW is the only measured bound on the iron loss near the test point | 2014 Table III, p. 5718 | printed; at 8700 r/min, not 7500 r/min (see the test point row) |
+| Measured losses nearest the test point | Table III column (b), test result: 8700 r/min, 205 A peak, 130 A RMS, 113 N m, 103.4 kW, copper 6.0 kW, "iron and other losses" 4.4 kW, mechanical 0.7 kW. The R3 iron model reads 3 to 7 times low on this machine (tracker row 10a). Table III column (c), test result, is at the test speed but at light load: 7500 r/min, 35.4 A RMS, 36 N m, 28.5 kW, "iron and other losses" 0.6 kW, mechanical 0.6 kW (p. 5718). These two columns are the measured bounds on the iron loss near the test point: (b) near the test current, (c) at the test speed | 2014 Table III, p. 5718 | printed; at 8700 r/min, not 7500 r/min (see the test point row) |
 
 V0 is complete: every V2 and V4 input above has a page or figure and an error, or is marked as a gap that becomes
 an input row of its gate. No comparison has been run.
@@ -476,8 +476,9 @@ came from the +-5 px mask that `tools/digitise_r5_v0.py` put around each gridlin
 rows in a run that reaches into a band and adds the band half-width (5 px) to its error. It drops a run inside a
 band only when the run is no taller than a gridline or lies among the axis ticks. Each changed point was checked
 against a crop of the figure. The same fix changes the Fig. 8 and Fig. 9 points that touch a gridline, and it reads
-6 more Fig. 8 points that the mask had split into two runs. `_drop_jumps` now drops no Fig. 9 variable point
-(89 min is read) and one constant point (39 min, see 9.1). The record above also gained the Fig. 2 domain, the
+6 more Fig. 8 points that the mask had split into two runs. `_drop_jumps` no longer drops the Fig. 9 variable point
+at 89 min (it was dropped before and now reads 49.99 +- 0.31 degC). It still drops one constant point (39 min,
+see 9.1). The record above also gained the Fig. 2 domain, the
 Kiyota bearing facts, the 20 % mechanical-loss scatter, Table III (b), the 137 A Table I limit, the taper label
 (an inference) and the minor corrections of the review (pages, error bands, labels, the 41 K arrow).
 Every changed reading, minute: old -> new (degC +- K; "none" is no reading):
