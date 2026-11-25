@@ -21,7 +21,7 @@ def test_every_element_has_a_part(case):
 
 
 def test_areas_against_table_i(case):
-    # Table I, p. 2928: yoke 4418 mm2, slot 2980 mm2 (winding + liner + wedge)
+    # computed from Table I, p. 2928 diameters: yoke 4418 mm2, slot 2980 mm2 (winding + liner + wedge)
     assert case.part_area("yoke") * 1e6 == pytest.approx(4418, rel=0.005)
     slot = sum(case.part_area(n) for n in ("winding", "liner", "wedge")) * 1e6
     assert slot == pytest.approx(2980, rel=0.005)

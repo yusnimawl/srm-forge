@@ -113,6 +113,7 @@ def problem(case: FaizCase, air_c: float, frame: str = "printed", frame_t: float
     C1 and resistance R1 of Table V."""
     if frame not in FRAMES:
         raise ValueError(f"frame must be one of {FRAMES}")
+    # winding rho c: copper over the whole coil area, an inference (the paper gives no winding capacity; Table II lists copper); winding_rho_c overrides it
     props = {"pole": IRON, "yoke": IRON, "winding": (K_WINDING, COPPER[1], COPPER[2]), "liner": LINER, "wedge": WEDGE}
     k = np.array([props[p][0] for p in case.part])
     c = np.array([props[p][1] * props[p][2] for p in case.part])

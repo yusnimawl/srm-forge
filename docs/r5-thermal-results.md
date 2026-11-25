@@ -143,7 +143,7 @@ Re-run 2026-11-17 (`milton_k`, `hashin_shtrikman_lower`, python -I): fill 0.37 c
 
 ## V2: our 2-D solver against Faiz 2009 (8/6 stator)
 
-Verdict: V2 does not pass, because no case meets the pass rule at every Fig. 10 or Fig. 9 point, with the printed frame or with the Table V frame. The input difference found is the frame boundary. With the Table V frame, a gap in the shape of the curve remains: up to 4.97 K low between 2 and 105 min. Nothing was fitted.
+Verdict: V2 does not pass, because no case meets the pass rule at every Fig. 10 or Fig. 9 point, with the printed frame or with the Table V frame. The input difference found is the frame boundary. With the Table V frame, a gap in the shape of the curve remains: up to 4.97 K low between 2 and 105 min; Table VI: only the max-C row passes for `table_v`, the mean-B and min-A rows fail. Nothing was fitted.
 
 Run: 2026-11-24 to 25, LattePanda (i5-1340P), srmcore 0.8.0, JSON committed at 522c7d6 (`docs/validation/r5_v2_faiz.json`). Wall time 56 min 42 s, peak memory 821 MB, for 3 meshes (screening 15751, full 28619, reference 200368 nodes), 2 time steps and 6 input rows. Command, from the repository root:
 
@@ -218,7 +218,7 @@ Verdict per case. `passes_from_min` is None in every case: no case passes from a
 | `table_v` | Fig. 10 | 9 of 114 | 1, 106 to 113 min | +4.75 K at 29 min |
 | `table_v` | Fig. 9 constant | 8 of 113 | 91 to 98 min | +4.35 K at 23 min |
 
-The `printed` case crosses the figure once, near 25 min, and is 8.55 K high at 119 min. The `table_v` case meets Fig. 10 from 106 to 113 min and ends 0.43 K high at 119 min. In constant air it crosses Fig. 9 near 91 min and keeps rising: 41.56 degC at 119 min and 42.84 degC steady, against their flat 40.7 degC from about 80 min.
+The `printed` case crosses the figure once, near 25 min, and is 8.55 K high at 119 min. The `table_v` case meets Fig. 10 from 106 to 113 min and ends 0.43 K high at 119 min. In constant air it comes within the allowance of Fig. 9 at 91 min, crosses the figure at about 95 min and keeps rising: 41.56 degC at 119 min and 42.84 degC steady, against their flat 40.7 degC from about 80 min.
 
 Coil mean beside the maximum, 119 min, Fig. 8 air: `printed` 59.00, `table_v` 50.57 degC (Fig. 10 52.09). With the mean, `table_v` is 1.52 K low at 119 min, so the choice of metric does not turn the gate.
 
@@ -239,7 +239,7 @@ The frame lump of their own network (Table V) brings the late state to the figur
 
 ### The remaining gap: the shape and the early rise
 
-With the Table V frame, ours is low from 2 min to about 105 min. The gap is 3.35 K at 2 min, 4.30 K at 5 min, 4.97 K at 29 min, 2.42 K at 70 min, and closes at 106 min. In constant air ours is low to about 90 min and then rises past their plateau. Their curves rise faster early and settle sooner.
+With the Table V frame, ours is outside the allowance from 2 min to 105 min. The gap is 3.35 K at 2 min, 4.30 K at 5 min, 4.97 K at 29 min, 2.42 K at 70 min, and is inside the allowance from 106 min (still negative to 109 min). In constant air ours is low to about 94 min and then rises past their plateau. Their curves rise faster early and settle sooner.
 
 Early rise. Their Fig. 10 rise in the first minute is 3.82 K (23.82 +- 2.01 degC, so 1.81 to 5.83 K). Ours is 2.00 K. The factor is 1.9, with a range of 0.9 to 2.9, so the Fig. 10 point at 1 min passes. The Fig. 9 point at 1 min misses by 0.10 K. At 2 min their rise is 7.04 +- 1.00 K and ours is 3.69 K: a factor 1.9 (1.6 to 2.2). Adiabatic copper (Table II rho c over our coil area, Table IV copper loss) rises 2.26 K/min, 4.52 K in 2 min. Their 2 min rise is 1.5 to 3.5 K above that.
 
@@ -250,7 +250,7 @@ Hypotheses, not facts. The diagnosis (screening mesh, 30 s steps, not part of th
 | Fig. 10 (target) | 23.82 | 31.70 | 35.26 | 42.56 | 52.09 | |
 | none | 22.0 | 27.3 | 30.8 | 37.6 | 52.5 | late state agrees |
 | winding rho c x 0.4 | 23.7 | 30.1 | 32.8 | 38.7 | 53.0 | closes minute 1 only |
-| winding rho c x 0.25 | 24.7 | 31.0 | 33.3 | 39.0 | 53.2 | closes 1 to 5 min, 10 to 30 min stay 2.0 to 3.6 K low |
+| winding rho c x 0.25 | 24.7 | 31.0 | 33.3 | 39.0 | 53.2 | within the error at 1 min, 0.7 K low at 5 min; 10 to 30 min stay 2.0 to 3.6 K low |
 | copper loss x 2.4 | 24.7 | 36.8 | 44.1 | 55.3 | 75.6 | 23.5 K high at 119 min, ruled out |
 | R1 conductance, `printed` frame capacity | 22.0 | 27.6 | 32.1 | 42.0 | 55.4 | 30 min within 0.6 K, 3.3 K high at 119 min |
 
@@ -272,8 +272,8 @@ Change of the coil maximum in K, `full` mesh. The frame rows run on `printed` (n
 | frame 25 mm | -3.63 | -4.79 | -4.68 | -2.24 |
 | liner -1 px (-0.059 mm) | -0.29 | -0.30 | -0.30 | -0.29 |
 | liner +1 px (+0.059 mm) | +0.30 | +0.31 | +0.32 | +0.29 |
-| wedge -1 px | -0.02 | -0.02 | -0.02 | -0.04 |
-| wedge +1 px | -0.01 | -0.01 | -0.01 | +0.03 |
+| wedge -1 px (mesh noise) | -0.02 | -0.02 | -0.02 | -0.04 |
+| wedge +1 px (mesh noise) | -0.01 | -0.01 | -0.01 | +0.03 |
 
 A thickness read between two edges carries +-1 px per edge, up to +-0.12 mm. At that width the liner row would be about +-0.6 K, if the effect stays linear (an inference). No input row is near the 3 to 5 K gap. The slot-top fillet row (0 to 1.3 mm, section 9.1), the wedge chord shape and the pole-tip tab were not run.
 
@@ -281,7 +281,7 @@ A thickness read between two edges carries +-1 px per edge, up to +-0.12 mm. At 
 
 V2 does not show our solver wrong. With their frame lump, the 119 min state and Table VI C agree within 0.43 K and 0.02 K, and the mesh and step errors are under 0.05 K. V2 does not show it right either. The shape differs by up to 4.97 K. The most likely cause is an input the paper does not print (a hypothesis). V2 cannot say which model is right, because both are models and no measurement is involved.
 
-If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 30 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
+If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 29 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
 
 V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
 
