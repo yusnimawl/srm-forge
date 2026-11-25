@@ -42,8 +42,21 @@ For the next sessions. Read this, then the Notion progress page ("srm-forge prog
 4. **Run 5 of the IEEJ handoff (8/6 budget after the `MEASURED_GAP` change, PR #42).** Done 2026-11-24 08:30 to
    08:48 UTC (unit `em-validate-86`, 1c9c2a5 on `ccr-ae0b0426-2aybo8`): report PASS, end_effect La 0.2090 to
    0.1778 and psi_max 0.2104 to 0.1791, nothing else moved. Merged in PR #42 (2b53b7e).
-5. **R5e gate V2 (row 10k).** In progress on branch `r5e-v2` (worktree `../srm-forge-v2`), plan
-   `docs/superpowers/plans/2026-11-24-r5e-v2-faiz.md`, built subagent-driven. V4, V5 and the demonstration follow.
+5. **R5e gate V2 (row 10k).** Done on branch `r5e-v2` (worktree `../srm-forge-v2`), PR #43, waits on CI.
+   Verdict: V2 does not pass. The input difference is the frame: with the frame lump of Faiz Table V the 119 min
+   value is +0.43 K and Table VI's far point agrees within 0.02 K; a shape gap remains (up to 4.97 K low at 29 min,
+   cause not identified). The V0 readings were corrected after a review (59 points, `docs/r5-sources.md` §9.3).
+   Record: `docs/r5-thermal-results.md` V2, `docs/validation/r5_v2_faiz.json`.
+
+## 2a. Next session
+
+1. Check CI on PR #43 (`gh pr checks 43`). Merge if green; fix and re-run if not.
+2. After the merge: set tracker row 10k's status note (V2 merged, PR #43, merge commit), add the project doc
+   milestone row for the merge, remove `../srm-forge-v2` and the branch.
+3. Then the queue: V4 (Kiyota 2014 peak test), V5 (thermal mesh convergence on the 8/6 and the Kiyota motor), then
+   the 8/6 and bench-target demonstration. V4 and V5 go plan -> subagents -> reviews (a plan in
+   `docs/superpowers/plans/`, one implementer and one review per task); the diagnosis before a plan may stay inline.
+   V4's inputs are in `docs/r5-sources.md` §9.2, corrected 2026-11-24.
 
 ## 3. Rules for every session
 
