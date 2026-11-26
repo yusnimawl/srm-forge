@@ -1,6 +1,6 @@
 # R5 thermal and rotor stress results
 
-This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0, V2, V4 and V5 are pending.
+This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0 is complete (docs/r5-sources.md section 9). V2 is recorded below: it does not pass. V4 and V5 are pending.
 
 ## V1: solver against closed forms (tests/thermal)
 
@@ -140,6 +140,150 @@ Verdict: the Milton formula (Eq. (6), xi 0.324, copper 300 W/(m K), resin 1 W/(m
 The paper gives xi for fill 0.37 only. Solving for xi gives 0.304 (0.37) and 0.195 (0.47); these are derived here, not in the paper. The measured-agreement values are about 24 % above the Milton ones; the paper reports no temperature error as a number. Handling (spec section 8 V3: revise the band, not the measured values): no cited xi exists for other fills (search repeated 2026-11-17, docs/r5-sources.md 6.8). The `cross_wire` row of `srmapp.cooling.ROWS` now carries the error: the nominal is Milton with xi 0.324 at every fill (the cited value, carried over; the note in `Coefficients.notes` names the +10.6 % error at fill 0.47) and the unfavourable end is the Hashin-Shtrikman value. Band at fill 0.47, resin 1 W/(m K), copper 300: HS 2.75, nominal 3.44, printed Milton 3.11 (inside the band), measured-agreement 3.85. Band at fill 0.37: HS 2.16, nominal 2.43, printed 2.41, measured-agreement 3.0. Before this change the nominal at fill 0.47 was HS and the row had no width there. The measured values only widen the band.
 
 Re-run 2026-11-17 (`milton_k`, `hashin_shtrikman_lower`, python -I): fill 0.37 computed 2.430 against 2.41 (+0.8 %); fill 0.47 computed 3.439 against 3.11 (+10.6 %), unchanged. Tests: `tests/thermal/test_thermal_homogenise.py::test_v3_both_fills_with_the_one_cited_xi`, `tests/app/test_cooling.py::test_cross_wire_band_at_fill_without_cited_xi`. V3 stays "not reproduced exactly" at 0.47; the gap is now stated as a band, not closed.
+
+## V2: our 2-D solver against Faiz 2009 (8/6 stator)
+
+Verdict: V2 does not pass, because no case meets the pass rule at every Fig. 10 or Fig. 9 point, with the printed frame or with the Table V frame. The input difference found is the frame boundary. With the Table V frame, a gap in the shape of the curve remains: up to 4.97 K low between 2 and 105 min; Table VI: only the max-C row passes for `table_v`, the mean-B and min-A rows fail. Nothing was fitted.
+
+Run: 2026-11-24 to 25, LattePanda (i5-1340P), srmcore 0.8.0, JSON committed at 522c7d6 (`docs/validation/r5_v2_faiz.json`). Wall time 56 min 42 s, peak memory 821 MB, for 3 meshes (screening 15751, full 28619, reference 200368 nodes), 2 time steps and 6 input rows. Command, from the repository root:
+
+    systemd-run --user --unit=faiz-v2 --collect -p WorkingDirectory=$PWD -p MemoryMax=24G \
+      --setenv=PYTHONPATH=src:tests .venv/bin/python -u examples/faiz_thermal_check.py \
+      --json docs/validation/r5_v2_faiz.json
+
+The case is `tests/faiz_8_6.py`. The readings are `docs/validation/r5_v0_readings.json`. Every input has its page and error in docs/r5-sources.md section 9.1, with the corrections of section 9.3.
+
+### Inputs
+
+- Domain (Fig. 2): one 2-D stator with laminations, winding, slot liner, slot wedge and frame. The rotor is not in it. The rotor losses reach the model only through the inside air of Fig. 8.
+- Geometry: Table I. Liner 1.0 mm and wedge 2.2 mm (Fig. 11(a)), parallel-sided poles.
+- Properties: Table II. Winding conductivity 0.83 W/(m K) (p. 2929).
+- Losses: Table IV, spread uniformly inside each part (the paper does not say how): stator pole 5.9 W, stator yoke 10 W, copper 25.0 W, 40.9 W in the domain.
+- Bore (pole faces and wedge face): h 70 W/(m2 K) to the inside air. The inside air is the Fig. 8 curve (linear between readings, 20 degC at 0, the slope of the last 10 readings past 119 min, 0.149 K/min) or a constant 20 degC.
+- Start: 20 degC everywhere. Ambient 20 degC.
+- Frame, two cases. Both join the stator OD to one frame lump through half the shell thickness of aluminium.
+  - `printed`: an aluminium shell 5 mm thick (Table II), h 30 W/(m2 K) on its outer cylinder. The 5 mm thickness is an inference from Fig. 12.
+  - `table_v`: one lump with C1 5298 J/K and R1 0.57 K/W to ambient (Table V). Reading the R1-C1 node of their network as the frame is an inference.
+
+Differences from their model that the paper lets us see:
+
+1. Slot-centre strip. Our two coil sides in a slot leave a strip one liner thickness wide (1 mm) on the slot centreline, and the strip takes the liner properties (k 0.076 W/(m K)). The paper says the slot is filled with conductors. This is a geometry difference.
+2. Winding capacity. The winding takes copper rho c (Table II) over the whole coil area. The paper prints a winding conductivity but no winding capacity, so this is an inference.
+3. Frame boundary. Our frame h acts at the frame surface. The "outside air" layer of Fig. 2 is not modelled (the ambiguity in section 9.1).
+4. No slot-top fillet (about 1.3 mm in their drawing). The wedge is an arc at the bore radius, not their straight chord.
+
+Pass rule (spec section 8): at every Fig. 10 point (Fig. 8 inside air) and every Fig. 9 constant-air point, |ours - fig| <= fig error + mesh error + time-step error. Ours is the coil maximum on `full` at 15 s steps (backward Euler, 0 to 120 min). Fig. 10 does not say which temperature it shows, so the coil mean is reported beside it. Mesh error is |full - reference| and time-step error is |15 s - 7.5 s| on `full`, per minute.
+
+### Results
+
+Fig. 10 target, Fig. 8 inside air. Coil maximum in degC, difference to the figure in brackets. The error columns are the larger of the two cases.
+
+| Minute | Fig. 10 | `printed` 5 mm | `table_v` | Mesh error (K) | Time-step error (K) |
+|---|---|---|---|---|---|
+| 1 | 23.82 +- 2.01 | 22.01 (-1.81) pass | 22.00 (-1.82) pass | 0.005 | 0.022 |
+| 2 | 27.04 +- 1.00 | 23.72 (-3.32) | 23.69 (-3.35) | 0.007 | 0.033 |
+| 5 | 31.70 +- 0.49 | 27.71 (-3.99) | 27.40 (-4.30) | 0.012 | 0.044 |
+| 10 | 35.26 +- 0.49 | 32.29 (-2.97) | 30.95 (-4.31) | 0.019 | 0.029 |
+| 15 | 37.69 +- 0.30 | 35.75 (-1.94) | 33.13 (-4.56) | 0.022 | 0.017 |
+| 25 | 41.11 +- 0.36 | 41.13 (+0.02) pass | 36.27 (-4.84) | 0.021 | 0.016 |
+| 29 | 42.32 +- 0.20 | 42.90 (+0.58) | 37.35 (-4.97) | 0.020 | 0.016 |
+| 50 | 46.15 +- 0.16 | 49.82 (+3.67) | 42.21 (-3.94) | 0.021 | 0.013 |
+| 70 | 48.36 +- 0.18 | 54.15 (+5.79) | 45.94 (-2.42) | 0.022 | 0.009 |
+| 89 | 50.01 +- 0.32 | 57.15 (+7.14) | 48.87 (-1.14) | 0.020 | 0.006 |
+| 106 | 51.23 +- 0.15 | 59.27 (+8.04) | 51.06 (-0.17) pass | 0.024 | 0.004 |
+| 119 | 52.09 +- 0.15 | 60.64 (+8.55) | 52.52 (+0.43) | 0.024 | 0.004 |
+
+Fig. 9 target, constant 20 degC inside air:
+
+| Minute | Fig. 9 constant | `printed` 5 mm | `table_v` | Mesh error (K) | Time-step error (K) |
+|---|---|---|---|---|---|
+| 1 | 23.79 +- 1.66 | 22.01 (-1.78) | 22.00 (-1.79) | 0.005 | 0.023 |
+| 2 | 27.07 +- 0.89 | 23.69 (-3.38) | 23.66 (-3.41) | 0.009 | 0.036 |
+| 5 | 31.60 +- 0.51 | 27.51 (-4.09) | 27.20 (-4.40) | 0.014 | 0.048 |
+| 10 | 34.60 +- 0.26 | 31.61 (-2.99) | 30.31 (-4.29) | 0.020 | 0.031 |
+| 23 | 38.34 +- 0.16 | 37.79 (-0.55) | 33.80 (-4.54) | 0.021 | 0.021 |
+| 30 | 39.25 +- 0.16 | 39.92 (+0.67) | 35.02 (-4.23) | 0.021 | 0.020 |
+| 50 | 40.37 +- 0.14 | 43.54 (+3.17) | 37.62 (-2.75) | 0.028 | 0.015 |
+| 70 | 40.68 +- 0.14 | 45.16 (+4.48) | 39.37 (-1.31) | 0.025 | 0.009 |
+| 91 | 40.74 +- 0.14 | 45.90 (+5.16) | 40.57 (-0.17) pass | 0.025 | 0.005 |
+| 119 | 40.74 +- 0.14 | 46.29 (+5.55) | 41.56 (+0.82) | 0.026 | 0.004 |
+| steady | 40.7 from about 80 min | 46.47 | 42.84 | | |
+
+Verdict per case. `passes_from_min` is None in every case: no case passes from any minute to the end.
+
+| Case | Target | Points that pass | Where they pass | Worst excess over the allowance |
+|---|---|---|---|---|
+| `printed` 5 mm | Fig. 10 | 5 of 114 | 1, 24 to 27 min | +8.37 K at 119 min |
+| `printed` 5 mm | Fig. 9 constant | 3 of 113 | 25 to 27 min | +5.38 K at 119 min |
+| `table_v` | Fig. 10 | 9 of 114 | 1, 106 to 113 min | +4.75 K at 29 min |
+| `table_v` | Fig. 9 constant | 8 of 113 | 91 to 98 min | +4.35 K at 23 min |
+
+The `printed` case crosses the figure once, near 25 min, and is 8.55 K high at 119 min. The `table_v` case meets Fig. 10 from 106 to 113 min and ends 0.43 K high at 119 min. In constant air it comes within the allowance of Fig. 9 at 91 min, crosses the figure at about 95 min and keeps rising: 41.56 degC at 119 min and 42.84 degC steady, against their flat 40.7 degC from about 80 min.
+
+Coil mean beside the maximum, 119 min, Fig. 8 air: `printed` 59.00, `table_v` 50.57 degC (Fig. 10 52.09). With the mean, `table_v` is 1.52 K low at 119 min, so the choice of metric does not turn the gate.
+
+Table VI at 120 min, equivalent conductivity, printed to 0.1 K (rounding 0.05 K). The 120 min time is an inference (section 9.1). The pairs are by rank, an inference: our maximum with C (far from the laminations), our mean with B (middle), our minimum with A (near the laminations). Point A is a place and our minimum is the coldest coil node, so the min-A row compares different places.
+
+| Case | Ours max / mean / min (degC) | max - C | mean - B | min - A | Mesh error | Time-step error |
+|---|---|---|---|---|---|---|
+| `printed` 5 mm | 60.74 / 59.09 / 55.10 | +8.14 | +7.39 | +4.40 | 0.024 | 0.003 |
+| `table_v` | 52.62 / 50.68 / 45.89 | +0.02 | -1.02 | -4.81 | 0.023 | 0.004 |
+
+The `table_v` maximum meets C within 0.02 K, inside 0.05 + 0.023 + 0.004 K. Mean against B and min against A do not. The layered-winding column of Table VI (57.5, 71.9, 76.4 degC) is not compared: our winding is the equivalent-conductivity model only.
+
+### The input difference found: the frame
+
+The printed frame cannot reach Fig. 10 at any thickness in their Fig. 12(f) range, 5 to 25 mm. At 25 mm it is still 3.87 K high at 119 min (55.96 degC) and 3.49 K high in the constant-air steady state (44.23 degC). A thicker shell also lowers the early curve, which is already low (39.68 degC at 30 min, 2.88 K under Fig. 10).
+
+The frame lump of their own network (Table V) brings the late state to the figures. At 119 min `table_v` is 0.43 K above Fig. 10, and at 120 min its maximum is 0.02 K above Table VI C. Their 2-D model most likely used that frame, or one close to it (an inference). The paper does not print it as a 2-D input.
+
+### The remaining gap: the shape and the early rise
+
+With the Table V frame, ours is outside the allowance from 2 min to 105 min. The gap is 3.35 K at 2 min, 4.30 K at 5 min, 4.97 K at 29 min, 2.42 K at 70 min, and is inside the allowance from 106 min (still negative to 109 min). In constant air ours is low to about 94 min and then rises past their plateau. Their curves rise faster early and settle sooner.
+
+Early rise. Their Fig. 10 rise in the first minute is 3.82 K (23.82 +- 2.01 degC, so 1.81 to 5.83 K). Ours is 2.00 K. The factor is 1.9, with a range of 0.9 to 2.9, so the Fig. 10 point at 1 min passes. The Fig. 9 point at 1 min misses by 0.10 K. At 2 min their rise is 7.04 +- 1.00 K and ours is 3.69 K: a factor 1.9 (1.6 to 2.2). Adiabatic copper (Table II rho c over our coil area, Table IV copper loss) rises 2.26 K/min, 4.52 K in 2 min. Their 2 min rise is 1.5 to 3.5 K above that.
+
+Hypotheses, not facts. The diagnosis (screening mesh, 30 s steps, not part of the gate, in the plan `docs/superpowers/plans/2026-11-24-r5e-v2-faiz.md`, "Findings from the diagnosis") tried one input at a time on the `table_v` case:
+
+| Change, `table_v` frame | 1 min | 5 | 10 | 30 | 119 min | Result |
+|---|---|---|---|---|---|---|
+| Fig. 10 (target) | 23.82 | 31.70 | 35.26 | 42.56 | 52.09 | |
+| none | 22.0 | 27.3 | 30.8 | 37.6 | 52.5 | late state agrees |
+| winding rho c x 0.4 | 23.7 | 30.1 | 32.8 | 38.7 | 53.0 | closes minute 1 only |
+| winding rho c x 0.25 | 24.7 | 31.0 | 33.3 | 39.0 | 53.2 | within the error at 1 min, 0.7 K low at 5 min; 10 to 30 min stay 2.0 to 3.6 K low |
+| copper loss x 2.4 | 24.7 | 36.8 | 44.1 | 55.3 | 75.6 | 23.5 K high at 119 min, ruled out |
+| R1 conductance, `printed` frame capacity | 22.0 | 27.6 | 32.1 | 42.0 | 55.4 | 30 min within 0.6 K, 3.3 K high at 119 min |
+
+Winding capacity alone, loss density alone and frame conductance alone each fail. Their 2-D model most likely differs from the printed inputs in more than one place: the frame boundary, and something that heats the winding faster early. The paper does not let us find which. The copper x 2.4 factor was chosen against the old 1 min reading (25.38 degC, section 9.3).
+
+### Numerical error
+
+Mesh error |full - reference| is 0.004 to 0.028 K over the four series. Time-step error |15 s - 7.5 s| is 0.002 to 0.048 K, largest at 4 to 5 min. Both are small against the figure errors (0.09 K and up). For a first-order scheme |dt - dt/2| is about half the error of the dt run, and |full - reference| slightly under-estimates the error of `full`, because `reference` has an error of its own. Doubling both terms moves 3 of 454 points to pass (`printed` Fig. 10 at 22 and 23 min, `table_v` Fig. 9 at 99 min) and changes no case verdict.
+
+Energy balance: the JSON does not store it. The fast test `tests/thermal/test_thermal_faiz.py::test_steady_heat_balance` checks it for both frames: in a constant-air steady state the heat to the fixed lumps equals the 40.9 W of losses within 1e-6 relative. The same file checks the part areas against Table I and the load against Table IV.
+
+### Input rows
+
+Change of the coil maximum in K, `full` mesh. The frame rows run on `printed` (nominal 5 mm), the liner and wedge rows on `table_v`.
+
+| Row | 30 min | 60 min | 119 min | Constant-air steady |
+|---|---|---|---|---|
+| frame 15 mm | -2.10 | -2.63 | -2.49 | -1.21 |
+| frame 25 mm | -3.63 | -4.79 | -4.68 | -2.24 |
+| liner -1 px (-0.059 mm) | -0.29 | -0.30 | -0.30 | -0.29 |
+| liner +1 px (+0.059 mm) | +0.30 | +0.31 | +0.32 | +0.29 |
+| wedge -1 px (mesh noise) | -0.02 | -0.02 | -0.02 | -0.04 |
+| wedge +1 px (mesh noise) | -0.01 | -0.01 | -0.01 | +0.03 |
+
+A thickness read between two edges carries +-1 px per edge, up to +-0.12 mm. At that width the liner row would be about +-0.6 K, if the effect stays linear (an inference). No input row is near the 3 to 5 K gap. The slot-top fillet row (0 to 1.3 mm, section 9.1), the wedge chord shape and the pole-tip tab were not run.
+
+### What this means for the ratings
+
+V2 does not show our solver wrong. With their frame lump, the 119 min state and Table VI C agree within 0.43 K and 0.02 K, and the mesh and step errors are under 0.05 K. V2 does not show it right either. The shape differs by up to 4.97 K. The most likely cause is an input the paper does not print (a hypothesis). V2 cannot say which model is right, because both are models and no measurement is involved.
+
+If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 29 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
+
+V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
 
 ## First rating (8/6 screening, test fixture)
 

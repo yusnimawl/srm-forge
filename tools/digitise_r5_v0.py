@@ -4,6 +4,10 @@ r"""Reproduce the R5 gate V0 figure readings (tracker row 10k): the inputs and t
                the V2 inside-air input (the paper uses h = 30 W/(m2 K) on the frame for all later results).
   faiz_fig10 : Faiz et al. 2009, Fig. 10 (winding temperature, 2-D and 3-D, p. 2932, xref 92), the 2-D curve,
                the V2 comparison target.
+  faiz_fig9  : Faiz 2009, Fig. 9 (winding temperature with variable and constant inside air, p. 2932, xref 5), both
+               curves; the constant one is a V2 target that does not depend on the inside-air curve.
+  faiz_fig11 : Faiz 2009, Fig. 11(a) (their 2-D temperature plot, p. 2932, xref 180): slot liner, slot wedge, slot
+               top and pole width, the V2 geometry the text does not give.
   kiyota_fig7: Kiyota 2014, Fig. 7 (mechanical loss, salient rotor and cylindrical dummy; p. 5716, JPEG xref 138).
   kiyota_fig8: Kiyota, Kakishima and Chiba 2014, Fig. 8 (maximum-power test at 7500 r/min, p. 5716, JPEG xref
                204): the coil-end temperature and the RMS current against time, the V4 load and target.
@@ -11,7 +15,11 @@ r"""Reproduce the R5 gate V0 figure readings (tracker row 10k): the inputs and t
 Axes are least-squares fits to the frame and every gridline; `cal_px` is the largest fit residual. A reading is the
 centre of the ink run where the curve crosses a 5-px-wide column; its error is the calibration residual plus half
 the run's height, in the axis unit. Where curves overlap (Faiz, early times) the run holds all of them and the
-error covers the merged run.
+error covers the merged run. Where a steep curve crosses the column (Faiz, the first minutes) the run is the whole
+stroke; its centre is within 3 px of the stroke's crossing of the column centre (a line fitted to the five
+one-column centres). Faiz gridlines are not masked out: a run that reaches into a gridline band (GRID_BAND) keeps
+the band rows, gridline ink included, and its error gains the band half-width. A run inside a band is dropped as
+the bare gridline only when it is no taller than a gridline (GRID_PX) or lies among the axis ticks (TICK_PX).
 
 Usage: python tools/digitise_r5_v0.py [--papers DIR] [--json PATH]   (needs the dev extra, PyMuPDF; the PDFs are
        git-ignored, docs/sources/papers/.gitignore, so a fresh checkout passes the folder that holds them)
@@ -62,9 +70,15 @@ def _runs(mask: np.ndarray, gap: int = 3) -> list[tuple[float, int, int]]:
     return [(g.mean(), int(g.min()), int(g.max())) for g in np.split(idx, np.nonzero(np.diff(idx) > gap)[0] + 1)]
 
 
+GRID_BAND = 5   # px either side of a Faiz gridline row; a run that reaches into it holds gridline ink as well
+GRID_PX = 6     # a run inside a band and at most this tall is the bare gridline (2 to 5 px of ink)
+TICK_PX = 16    # columns this close to a side frame line hold the axis ticks (7 to 8 px tall), never a curve alone
+
+
 def _faiz(xref, t_end, y0, y1, ny, legend, pick):
     """One curve of a Faiz 2009 plot (x 0 to t_end min in 6 grid steps, y y0 to y1 degC in ny steps). `legend` is
-    the legend box (col0, col1, row0, row1) in px, masked out; `pick(runs)` chooses the curve's run in a column."""
+    the legend box (col0, col1, row0, row1) in px, masked out; `pick(runs)` chooses the curve's run in a column
+    from (centre, lo, hi, on_grid) tuples in row order, top run first."""
     ink = _image("faiz2009.pdf", xref)[..., 0] > 128            # the 1-bit images store ink as 255
     left, right = _ends(ink.sum(0))
     top, bottom = _ends(ink.sum(1))
@@ -73,21 +87,28 @@ def _faiz(xref, t_end, y0, y1, ny, legend, pick):
     rows = np.arange(int(top) + 6, int(bottom) - 6)
     grid_rows = [(y0 + (y1 - y0) * k / ny - by) / ay for k in range(1, ny)]
     grid_cols = [(t_end * k / 6 - bx) / ax for k in range(1, 6)]
+    band = np.any([np.abs(rows - g) <= GRID_BAND for g in grid_rows], axis=0)
     pts = []
     for t in np.arange(1.0, t_end, 1.0):
         c = int(round((t - bx) / ax))
         if min(abs(c - g) for g in grid_cols) < 6:
             continue
         col = ink[rows, c - 2:c + 3].any(1)
-        keep = np.all([np.abs(rows - g) > 5 for g in grid_rows], axis=0)
         if legend[0] <= c <= legend[1]:
-            keep &= (rows < legend[2]) | (rows > legend[3])
-        run = pick(_runs(col & keep))
+            col &= (rows < legend[2]) | (rows > legend[3])
+        ticks = min(c - left, right - c) < TICK_PX
+        runs = []
+        for centre, lo, hi in _runs(col):
+            if not band[lo:hi + 1].any():
+                runs.append((centre, lo, hi, False))
+            elif (~band[lo:hi + 1] & col[lo:hi + 1]).any() or (hi - lo + 1 > GRID_PX and not ticks):
+                runs.append((centre, lo, hi, True))      # a curve crossing or lying on a gridline; else the bare line
+        run = pick(runs)
         if run is None:
             continue
-        centre, lo, hi = run
+        centre, lo, hi, on_grid = run
         value = ay * (rows[0] + centre) + by
-        err = abs(ay) * (ry + (hi - lo) / 2 + 0.5)
+        err = abs(ay) * (ry + (hi - lo) / 2 + 0.5 + (GRID_BAND if on_grid else 0))
         pts.append((round(float(t), 1), round(float(value), 2), round(float(err), 2)))
     return dict(cal_px=dict(x=round(rx, 2), y=round(ry, 2)), min_per_px=round(ax, 4), k_per_px=round(abs(ay), 4),
                 points=pts)
@@ -111,6 +132,69 @@ def faiz_fig10() -> dict:
     return _faiz(92, 120.0, 20.0, 55.0, 7, legend=(200, 1015, 30, 270), pick=lambda r: min(r) if r else None)
 
 
+STATOR_OD_MM = 125.0                                     # Faiz Table I
+
+
+def _drop_jumps(curve: dict, limit_k: float = 1.0) -> dict:
+    """Drop a point that is more than `limit_k` from the median of its four nearest neighbours (a column where the
+    picker took the other curve or a label); the dropped points stay in `dropped`."""
+    pts = curve["points"]
+    bad = []
+    for i, p in enumerate(pts):
+        near = [pts[j][1] for j in range(max(0, i - 2), min(len(pts), i + 3)) if j != i]
+        if p[0] >= 8.0 and abs(p[1] - float(np.median(near))) > limit_k:   # the first minutes rise too steeply
+            bad.append(i)
+    curve["dropped"] = [pts[i] for i in bad]
+    curve["points"] = [p for i, p in enumerate(pts) if i not in bad]
+    return curve
+
+
+def faiz_fig9() -> dict:
+    """Variable inside air is the upper curve, constant the lower (dotted); below about 5 min they merge."""
+    legend = (280, 905, 60, 220)
+    return dict(variable=_drop_jumps(_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: min(r) if r else None)),
+                constant=_drop_jumps(_faiz(5, 120.0, 20.0, 55.0, 7, legend, pick=lambda r: max(r) if r else None)))
+
+
+def faiz_fig11() -> dict:
+    """Fig. 11(a) is a 45-degree stator sector centred on a pole (the top 600 rows of the 890 x 1324 image). The
+    drawn lines are the iron and coil boundaries (red channel < 70). Scale: the outer arc is the 125 mm OD; centre:
+    the mid-point of the two pole flanks on the left sector edge. Lengths in mm, each with its spread or +-1 px."""
+    a = _image("faiz2009.pdf", 180)[:600, :, 0].astype(int)
+    rows = np.arange(150, 450)
+    left = np.array([np.nonzero(a[r] < 235)[0].min() for r in rows])
+    edge = np.polyfit(rows, left, 1)
+    lines = []
+    for r in range(300, 490, 10):                       # coil, iron, iron, coil across the pole
+        runs = _runs(a[r, 280:560] < 70, gap=1)
+        if len(runs) == 4:
+            lines.append([280 + c for c, _, _ in runs])
+    lines = np.array(lines)
+    xc = lines[:, 1:3].mean()
+    yc = (xc - edge[1]) / edge[0]
+    cols = np.arange(150, 700, 10)
+    top = np.array([np.nonzero(a[:, c] < 235)[0].min() for c in cols])
+    r_out = np.hypot(cols - xc, top - yc)
+    px = r_out.mean() / (STATOR_OD_MM / 2)
+    radius = lambda c, r: float(np.hypot(c - xc, r - yc) / px)
+    liner_flank = np.concatenate([lines[:, 1] - lines[:, 0], lines[:, 3] - lines[:, 2]]) / px
+    c_left, c_right = int(lines[:, 0].mean()) - 7, int(lines[:, 3].mean()) + 7
+    wedge = []
+    for c in (c_left, c_right):                          # wedge top line and bore arc beside the flank
+        dark = _runs(a[440:600, c] < 90, gap=1)
+        wedge.append(radius(c, 440 + dark[0][0]) - radius(c, 440 + dark[-1][0]))
+    slot_top = []
+    for c in (200, 250):                                 # iron line, then coil line below it
+        dark = _runs(a[200:300, c] < 90, gap=1)
+        slot_top.append((radius(c, 200 + dark[0][0]), radius(c, 200 + dark[-1][0])))
+    pm = 1.0 / px
+    return dict(px_per_mm=round(float(px), 2), outer_arc_spread_px=round(float(r_out.std()), 2),
+                pole_width_mm=round(float((lines[:, 2] - lines[:, 1]).mean() / px), 3),
+                liner_flank_mm=round(float(liner_flank.mean()), 3), liner_flank_spread_mm=round(float(np.ptp(liner_flank)), 3),
+                liner_top_mm=[round(o - i, 3) for o, i in slot_top], slot_top_radius_mm=[round(o, 2) for o, _ in slot_top],
+                wedge_at_flank_mm=[round(w, 3) for w in wedge], one_px_mm=round(pm, 3))
+
+
 # Kiyota Fig. 8 calibration in px of the 962 x 575 JPEG. x: the bottom-axis tick marks at 0, 5, 10, 15 and 20 s
 # (0 s is the centre of the 2-px left frame line). y: the top frame line (250 A), the dotted "75 degrees" line
 # (100 A; 75 degC on the right axis) and the bottom frame line (0 A), which the green command trace covers, so the
@@ -121,8 +205,9 @@ KIYOTA_Y = ((474.5, 0.0), (289.0, 100.0), (13.0, 250.0))
 
 def kiyota_fig8() -> dict:
     """Left axis 0 to 250 A and right axis 45 to 120 degC on the same rows (0.3 degC per A). Temperature: the
-    dark-red trace (the lighter dashed 'estimated' extension is left out by the colour limits); the spikes of the
-    logged signal (one-column drops) are removed by a median over 7 columns. RMS current: the light-blue trace."""
+    dark-red trace; 1 to 2 px per column of the lighter dashed 'estimated' extension also pass the colour limits
+    from 15 to 20 s. The median over 7 columns removes them and the spikes of the logged signal (one-column
+    drops). RMS current: the light-blue trace."""
     a = _image("kiyota2014.pdf", 204)[..., :3].astype(float)
     (ax, bx), (ay, by) = (np.polyfit(*zip(*cal), 1) for cal in (KIYOTA_X, KIYOTA_Y))
     rx = max(abs(ax * p + bx - v) for p, v in KIYOTA_X) / ax
@@ -172,7 +257,7 @@ if __name__ == "__main__":
     ap.add_argument("--json", type=Path)
     args = ap.parse_args()
     PAPERS = args.papers
-    out = dict(faiz_fig8=faiz_fig8(), faiz_fig10=faiz_fig10(), kiyota_fig8=kiyota_fig8(), kiyota_fig7=kiyota_fig7())
+    out = dict(faiz_fig8=faiz_fig8(), faiz_fig9=faiz_fig9(), faiz_fig10=faiz_fig10(), faiz_fig11=faiz_fig11(), kiyota_fig8=kiyota_fig8(), kiyota_fig7=kiyota_fig7())
     text = json.dumps(out, indent=1)
     if args.json:
         args.json.write_text(text + "\n")
