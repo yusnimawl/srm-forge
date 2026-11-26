@@ -28,7 +28,8 @@ def test_search_job_end_to_end(tmp_path):
         r = client.post("/api/jobs", json=BODY)
         assert r.status_code == 201, r.text
         job_id = r.json()["id"]
-        end = time.time() + 5400
+        # Upper bound: the density scan is about 6.4x slower (auto, 8 workers: 363.3 s vs 57.2 s); replace by measured search time x 1.25.
+        end = time.time() + 10800
         while time.time() < end:
             job = client.get(f"/api/jobs/{job_id}").json()
             if job["status"] in {"done", "failed", "cancelled"}:

@@ -109,6 +109,34 @@ def test_no_winding_reasons_name_the_cap_in_wire_mode():
     assert not s.passes and "no winding" in s.reason and "j_peak_max 40 A/mm2" in s.reason
 
 
+def _with_current(rows):
+    """Wrap the envelope so the phase current is `rows(current)`: pins which speeds count as continuous."""
+    from srmapp import turns
+    real = turns._envelope
+
+    def wrapped(*a, **k):
+        env = real(*a, **k)
+        w = dataclasses.replace(env.waveforms, current=rows(env.waveforms.current))
+        return dataclasses.replace(env, waveforms=w)
+    return mock.patch.multiple("srmapp.turns", _envelope=wrapped)
+
+
+def test_continuous_speed_carries_the_coupling_note():
+    def last_continuous(c):
+        c = np.zeros_like(c)
+        c[-1] = 1.0
+        return c
+    with _with_current(last_continuous):
+        e, _ = _evaluate(_req())
+    assert "continuous conduction at 6000 r/min" in e.error and "no mutual coupling" in e.error
+
+
+def test_single_pulse_evaluation_has_no_coupling_note():
+    with _with_current(np.zeros_like):
+        e, _ = _evaluate(_req())
+    assert "continuous conduction" not in e.error
+
+
 def test_density_mode_evaluation_fills_the_metrics():
     e, stage = _evaluate(_req())
     assert e.status == "ok" and e.winding is not None and e.winding.wire is None

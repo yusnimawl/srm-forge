@@ -177,14 +177,23 @@ def test_continuous_stroke_waveform():
     assert not np.all(w.current[0] > 0)                  # 12 000 r/min stays single pulse
     np.testing.assert_allclose(4 * w.torque[1].mean(), env.torque[1], rtol=1e-3)
     np.testing.assert_allclose(np.sqrt((w.current[1] ** 2).mean()), env.i_rms[1], rtol=1e-3)
-    assert env.torque[1] > 2 * 0.06                       # single pulse gives 0.06 N·m (test_drive_tail)
+    mp = pytest.MonkeyPatch()
+    mp.setattr(drive, "_strokes", _single_pulse)
+    try:
+        single = drive.envelope(MAP, MACHINE, 100.0, 0.1, [40000.0]).torque[0]
+    finally:
+        mp.undo()
+    assert env.torque[1] >= 2 * single                    # a single pulse gives far less at 40 000 r/min
 
 
-def test_min_copper_and_fixed_stroke_continuous():
+def test_min_copper_and_fixed_stroke_continuous(monkeypatch):
     rpm, volts = 40000.0, 100.0
     top = drive.envelope(MAP, MACHINE, volts, 0.1, [rpm]).torque[0]
     s = drive.min_copper_stroke(MAP, MACHINE, volts, 0.1, rpm, 0.95 * top)
     assert s is not None and s.psi_on > 0 and s.valid
+    with monkeypatch.context() as m:
+        m.setattr(drive, "_strokes", _single_pulse)
+        assert drive.min_copper_stroke(MAP, MACHINE, volts, 0.1, rpm, 0.95 * top) is None   # no single pulse reaches it
     assert s.current.max() <= s.current_limit * (1 + 1e-9)
     again = drive.fixed_stroke(MAP, MACHINE, volts, 0.1, rpm, s.theta_on, s.theta_off, s.current_limit)
     assert again.valid and again.psi_on == pytest.approx(s.psi_on, rel=1e-9)

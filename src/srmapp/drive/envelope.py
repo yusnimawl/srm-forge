@@ -1,7 +1,8 @@
 """Minimal drive model: torque-speed envelope of a machine from the ψ/T map of phase A (v0 spec §4.5).
 
 Voltage control with a hysteresis current limit (the map's I_max unless given) and ideal commutation: a single pulse
-per period, or continuous conduction (the flux left at turn-on, `_strokes`) where no single pulse completes. No
+per period. For on/off pairs whose single pulse does not complete, the periodic steady state (continuous conduction,
+the flux left at turn-on); the envelope takes whichever pair gives most work. No
 mutual coupling (the other phases are open in the map), which continuous conduction makes larger, and no iron loss.
 Peak-only and unvalidated."""
 import math
@@ -46,8 +47,9 @@ class Envelope:
     over one rotor pole pitch of the chosen stroke (0 where no stroke is valid). `theta_off` may exceed one pitch: the
     flux tail runs past alignment, and `theta_off` is then measured from the start of the table.
 
-    A chosen stroke is a single pulse or, where no single pulse completes, a continuous-conduction stroke whose flux
-    does not return to zero before the next turn-on.
+    A chosen stroke is a single pulse or a continuous-conduction stroke whose flux does not return to zero before the
+    next turn-on (a pair whose single pulse does not complete uses the periodic steady state; the pair with most work
+    wins at each speed).
 
     `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
     stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the

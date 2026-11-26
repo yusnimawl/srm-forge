@@ -212,6 +212,11 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     i_rms = float(np.max(env.i_rms))
     if not req.wire_mode and w.turns / w.paths >= max_turns:
         notes.append(f"turn scan reached its limit of {max_turns}; more turns may also be feasible")
+    if env.waveforms is not None:
+        cont = env.speeds_rpm[np.all(env.waveforms.current > 0, axis=1)]
+        if cont.size:
+            notes.append("continuous conduction at " + ", ".join(f"{r:g}" for r in cont) + " r/min: the drive model has "
+                         "no mutual coupling, so the margin at these speeds is not measured")
     if not choice.feasible and choice.capped:
         notes.append(f"no winding is feasible and the {peak_cap_text(cap)} left out windings that fit the slot; "
                      + ("an explicit j_peak_max above it might allow one" if cap == J_PEAK_SCREEN else

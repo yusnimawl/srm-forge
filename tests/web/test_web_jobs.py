@@ -214,7 +214,8 @@ def test_real_search_job_in_thread(make, tmp_path):
     SearchRequest.model_validate(req)
     store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("search", req)
-    got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=5400)
+    # Upper bound: the density scan is about 6.4x slower (auto, 8 workers: 363.3 s vs 57.2 s); replace by measured search time x 1.25.
+    got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=10800)
     assert got["status"] == "done", got
     result = store.get_result(j)
     json.dumps(result, allow_nan=False)

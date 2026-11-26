@@ -294,7 +294,7 @@ strokes; both strokes are continuous. Measured on the cached maps (read-only pro
 
 Both 112.5 N·m results sit at the 187.5 A limit. A 0.4 % change in torque target moves the RMS by about 16 %, so
 the bisection in `match_rms` can only return the nearest stroke the grid holds. The plan's risk R2 expected the grid to
-move the RMS by up to 3.5 %; here it moves it 9.4 % (the 117.4 A row against 130 A, whose nearest alternative is 136.7 A).
+move the RMS by up to 3.5 %; here the 117.4 A row is 9.7 % under the measured 130 A, and the nearest alternative, 136.7 A, is 16.4 % above it.
 The 10.23 ratio at 15.5 mm is a valid point at 0.4 % under the torque, closer to the measured torque than the torque
 row (+3.4 %), but 9.7 % under the measured RMS.
 
@@ -305,7 +305,7 @@ change in torque, which matters for the bike search against the 10 to 15 % targe
 10.0 at 59 kW and 12.2 to 12.8 at 99 kW, 6.5 at the 15.5 mm 30 kW point (at 15 % more torque than the measured). The `K_IRON_HI` curve (3.2 up to 1.5 kHz,
 linear to 7.0 at 2.78 kHz): the continuous points at 9.3 to 12.8 sit above the 3.2 to 7.0 curve, so at high power the rated iron factor is on the unsafe side.
 The measured figure also holds stray and AC copper loss, which the data do not separate, so the ratios over-state
-the iron error. Changing `K_IRON_HI` is not in this plan; it stays an open item.
+the iron error. The continuous-point ratios (9.3 to 12.8 measured over model) are a factor of 9 to 13 against the owner's 10 to 15 % accuracy target for the iron loss, and the rated factor `K_IRON_HI` (3.2 to 7.0) does not cover them: this is the unsafe side. Changing `K_IRON_HI` is not in this plan; it stays an open item.
 
 **Mutual coupling is not modelled.** In continuous conduction every phase carries current at every angle (all three
 phases of the 18/12; on an 8/6 the phases overlap far more than in single pulse). The maps hold one excited phase and
@@ -323,7 +323,7 @@ and the evaluation takes 367 s instead of 58 s. With the same 242-turn winding o
 single pulse and equal main bit for bit, and every faster speed has more torque (6000 r/min: 1.78 to 9.03 N·m). The
 case material is M19 (no loss data), so no rated evaluation was timed and `RATING_BUDGET_S` is unchanged. Open owner
 decision: whether density mode should prefer windings that are feasible in single pulse until the mutual coupling
-under continuous conduction is measured.
+under continuous conduction is measured. The numbers behind this paragraph, per speed for the auto and the fixed 242-turn winding, are in `docs/validation/cc86_8_6_density.json`.
 
 ## Preliminary screening run (laptop, 2026-10-19)
 

@@ -86,6 +86,8 @@ periodic-steady-state search, so the density scan is about 6x slower. Same case,
 | wire | auto | 5.8 s | 5.8 s | 3.8 s |
 | wire | fixed | 1.5 to 1.6 s | 1.5 to 1.6 s | 0.8 s |
 
+The density "fixed" 6.4 s is the 500-turn winding the branch picks, against 0.8 s for main's 242-turn one, so `SCAN_BUDGET_S["fixed"]` 8.0 s comes from the slower case (conservative).
+
 The wire windings are single pulse apart from a few strokes, so their time moved little (3.8 s to 5.8 s auto).
 
 `SCAN_BUDGET_S` is now "auto" 454.1 s (363.3 s x 1.25, density at 8 workers) and "fixed" 8.0 s (6.4 s x 1.25).
