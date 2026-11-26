@@ -247,14 +247,63 @@ Findings:
    trend for their own model (correction factor 4 at 1 kHz, 10 at 2.78 kHz) and names coefficient error at high
    frequency, additional losses and skin effect in the winding. The measurement holds stray and extra copper losses
    too, so the ratio over-states the iron error; it is the pessimistic side.
-2. **Continuous conduction is not modelled.** Table III (b) (113 N·m at 8700 r/min, 103 kW) and the Fig. 16 points
-   at 59 and 99 kW have no stroke in the model: its best at (b) is 55 N·m (50 kW, 57 A RMS against 130 A measured).
-   Kiyota 2012 states that these outputs use continuous current, and that discontinuous current alone limits the
-   output to 57 kW; the 2014 Fig. 17 current never returns to zero at 100 kW. `srmapp.drive.envelope` requires the
-   flux to die away before the next stroke, so high-speed power above the single-pulse limit is under-predicted.
-   These three points are left out of the ratios.
-3. Stator yoke 16.3 or 15.5 mm changes the ratios by at most 5 %; at 15.5 mm the 30 kW point at 13 900 r/min also
-   has no single-pulse stroke.
+2. **Continuous conduction is modelled from srmapp 0.10.0** (2026-11-27, LattePanda, `docs/validation/kiyota_cc_16p3.json`,
+   `kiyota_cc_15p5.json`). Before it, (b) and the Fig. 16 points at 59 and 99 kW had no stroke (best at (b): 55 N·m,
+   57 A RMS against 130 A measured) and were left out of the ratios. Kiyota 2012 states that these outputs use
+   continuous current, and the 2014 Fig. 17 current never returns to zero at 100 kW. The envelope now takes the
+   periodic steady state where no single pulse completes. Every peak current is below the 300 A map top. The
+   single-pulse rows (a), (c), f1 to f5 at 16.3 mm and f1 to f4 at 15.5 mm equal the 2026-11-18 rows exactly.
+3. Stator yoke 16.3 or 15.5 mm changes the ratios by at most 5 % at the single-pulse points (the table below); at
+   15.5 mm the 30 kW point at 13 900 r/min (f5) also has a stroke, now in continuous conduction.
+
+### Continuous-conduction points (2026-11-27)
+
+Same method as the table above; "Conduction" is the stroke type the envelope chose.
+
+| Point | r/min | Conduction | RMS meas / model (A), 16.3 / 15.5 | Peak meas / model (A), 16.3 / 15.5 | Model iron (W), 16.3 / 15.5 | Ratio, 16.3 | Ratio, 15.5 |
+|---|---|---|---|---|---|---|---|
+| III (b) 113 N·m, 103 kW, torque stroke | 8700 | continuous | 130 / 136.7 / 136.5 | 205 / 206.7 / 205.9 | 451 / 475 | 9.75 | 9.26 |
+| III (b), current stroke (RMS 130 A asked) | 8700 | continuous | 130 / 136.7 / 117.4 | 205 / 206.7 / 188 | 451 / 430 | 9.75 | 10.23 |
+| Fig. 16, 59 kW | 13 900 | continuous | - / 61.6 / 61.7 | - / 112 / 112 | 335 / 339 | 9.98 | 9.89 |
+| Fig. 16, 99 kW | 13 900 | continuous | - / 111.7 / 112.0 | - / 188 / 188 | 545 / 574 | 12.83 | 12.17 |
+| Fig. 16, 30.0 kW (f5) | 13 900 | single pulse / continuous | - / 33.3 / 38.3 | - / 68 / 75 | 225 / 241 | 6.96 | 6.49 |
+
+(The RMS and peak columns read: measured / model at 16.3 mm / model at 15.5 mm. At 16.3 mm the (b) current-stroke
+row is the torque-stroke row.)
+
+Accuracy at (b): the torque stroke needs 136.7 A RMS at 16.3 mm and 136.5 A at 15.5 mm against 130 A measured, +5.1 %
+and +5.0 %, inside the 10 to 15 % target; the peak current matches within 1 % (206.7 and 205.9 A against 205 A).
+
+**Failed acceptance line.** The "current" variant at (b), the stroke whose RMS equals the measured 130 A, does not
+land within 0.5 %: it gives 136.7 A at 16.3 mm and 117.4 A at 15.5 mm. The least-copper RMS jumps at the boundary
+between single-pulse and continuous strokes (no single pulse reaches the torque; the cheapest continuous one is
+already at 136 A), so the bisection in `match_rms` returns the nearest feasible stroke. At 15.5 mm that stroke is
+far below the measured value (the model is at 117.4 A and 188 A peak, 3 % under the torque, with a different
+conduction angle), so the 10.23 ratio there is not a like-for-like point.
+
+**The three new points and `K_IRON_HI`.** Measured "iron and other" over model iron is 9.3 to 9.8 at (b), 9.9 to
+10.0 at 59 kW and 12.2 to 12.8 at 99 kW, 6.5 at the 15.5 mm 30 kW point. The `K_IRON_HI` curve (3.2 up to 1.5 kHz,
+linear to 7.0 at 2.78 kHz) sits below all of them, so at high power the rated iron factor is on the unsafe side.
+The measured figure also holds stray and AC copper loss, which the data do not separate, so the ratios over-state
+the iron error. Changing `K_IRON_HI` is not in this plan; it stays an open item.
+
+**Mutual coupling is not modelled.** In continuous conduction every phase carries current at every angle (all three
+phases of the 18/12; on an 8/6 the phases overlap far more than in single pulse). The maps hold one excited phase and
+the envelope adds the phase torques with no coupling. Krishnan (Ch 6) asks for a coupled model once phase currents
+overlap more than 30 to 40 % of the period, where the mutual flux reaches about 10 % of the phase flux. So the
+continuous strokes carry a coupling error that is not measured and is larger than for single pulse; this is a risk to
+the 10 to 15 % target. The loss path solves all phases together (`srmcore.maps.stroke.stroke_fields`), so the iron
+loss sees the coupled field; the drive torque and flux do not. Bike motor v1 part 4 measures the coupling on the
+winner with the overlap map.
+
+**Winding choice (8/6 screening density case).** Density mode picks the feasible winding with the most equivalent
+turns, and continuous conduction makes high-turn windings feasible. With the auto winding the branch picks 500 turns
+(the scan's limit) where main picks 242; torque at 750 r/min falls from 40.7 to 30.6 N·m, speeds above 3000 r/min gain,
+and the evaluation takes 367 s instead of 58 s. With the same 242-turn winding on both trees, 300 and 750 r/min stay
+single pulse and equal main bit for bit, and every faster speed has more torque (6000 r/min: 1.78 to 9.03 N·m). The
+case material is M19 (no loss data), so no rated evaluation was timed and `RATING_BUDGET_S` is unchanged. Open owner
+decision: whether density mode should prefer windings that are feasible in single pulse until the mutual coupling
+under continuous conduction is measured.
 
 ## Preliminary screening run (laptop, 2026-10-19)
 
