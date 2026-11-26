@@ -25,11 +25,16 @@ def _omega(rpm):
     return rpm * 2 * np.pi / 60
 
 
-@pytest.fixture(scope="module", params=SPEEDS)
+CASES = [(rpm, VOLTS) for rpm in SPEEDS] + [(9000.0, 100.0)]
+
+
+@pytest.fixture(scope="module", params=CASES, ids=lambda c: f"{c[0]:g}rpm-{c[1]:g}V")
 def solved(request, tables, pairs):
     on, off = pairs
-    omega = _omega(request.param)
-    return omega, drive._strokes(tables, omega, VOLTS, R, on, off), drive._simulate(tables, omega, VOLTS, R, on, off)
+    rpm, volts = request.param
+    omega = _omega(rpm)
+    return (omega, volts, drive._strokes(tables, omega, volts, R, on, off),
+            drive._simulate(tables, omega, volts, R, on, off))
 
 
 @pytest.mark.parametrize("rpm", SPEEDS)
@@ -48,7 +53,7 @@ def test_run_from_rest_is_simulate(tables, pairs, rpm, trace):
 
 
 def test_accepted_single_pulses_keep_their_numbers(solved):
-    _, (w_t, w_l, i2, valid, psi0), (s_t, s_l, s_i2, s_valid) = solved
+    _, _, (w_t, w_l, i2, valid, psi0), (s_t, s_l, s_i2, s_valid) = solved
     assert np.all(valid[s_valid]) and not psi0[s_valid].any()
     for new, old in ((w_t, s_t), (w_l, s_l), (i2, s_i2)):
         np.testing.assert_array_equal(new[s_valid], old[s_valid])
@@ -60,20 +65,30 @@ def test_accepted_single_pulses_keep_their_numbers(solved):
 
 def test_periodic_strokes_are_periodic(tables, pairs, solved):
     on, off = pairs
-    omega, (_, _, _, valid, psi0), (*_, s_valid) = solved
+    omega, volts, (_, _, _, valid, psi0), (*_, s_valid) = solved
     per = np.flatnonzero(valid & ~s_valid)
     tol = drive.PERIODIC_TOL * tables.psi[:, -1].max()
     if per.size == 0:
         pytest.skip("no periodic stroke at this speed")
-    *_, end, _, beyond = drive._run(tables, omega, VOLTS, R, on[per], off[per], psi0[per])
+    *_, end, _, beyond, psi_t, _ = drive._run(tables, omega, volts, R, on[per], off[per], psi0[per], trace=True)
     assert np.all(np.abs(end - psi0[per]) <= 2 * tol) and not beyond.any()
-    *_, i_t = drive._run(tables, omega, VOLTS, R, on[per], off[per], psi0[per], trace=True)
-    assert i_t.max() <= tables.current[-1] * (1 + 1e-6)
+    # the flux (hence the current) stays inside the table at every step
+    rows = (on[per][None, :] + np.arange(TOP + 1)[:, None]) % TOP
+    assert np.all(psi_t <= tables.psi[rows, -1] * (1 + 1e-6))
 
 
-def test_periodic_strokes_exist_at_speed(solved):
-    _, (_, _, _, valid, psi0), (*_, s_valid) = solved
-    assert (valid & ~s_valid).sum() == (psi0 > 0).sum()
+def test_strokes_beyond_the_current_limit_are_rejected(tables, pairs):
+    on, off = pairs
+    omega = _omega(9000.0)
+    *_, valid, psi0 = drive._strokes(tables, omega, 100.0, R, on, off)
+    rej = np.flatnonzero(~drive._simulate(tables, omega, 100.0, R, on, off)[3])
+    cap = tables.psi[on % TOP, -1]
+    admissible = rej[drive._run(tables, omega, 100.0, R, on[rej], off[rej], cap[rej])[3] <= cap[rej]]
+    left = admissible[~valid[admissible]]
+    assert left.size                                      # converged roots that break the limit rule exist here
+    assert not valid[left].any() and not psi0[left].any()
+    ok = admissible[valid[admissible]]
+    assert not drive._run(tables, omega, 100.0, R, on[ok], off[ok], psi0[ok])[5].any()
 
 
 def test_brute_force_matches_root(tables, pairs):
@@ -119,11 +134,12 @@ def test_full_period_pulse_is_an_always_on_stroke(tables, pairs):
     assert w_t[0] < 0.01 * best[0][best[3]].max()
 
 
+@pytest.mark.parametrize("rpm", SPEEDS)
 @pytest.mark.parametrize("volts", [100.0, 400.0])
-def test_no_stroke_needs_the_iteration_cap(tables, pairs, monkeypatch, volts):
+def test_no_stroke_needs_the_iteration_cap(tables, pairs, monkeypatch, rpm, volts):
     on, off = pairs
-    omega = _omega(9000.0)
+    omega = _omega(rpm)
     full = drive._strokes(tables, omega, volts, R, on, off)
-    monkeypatch.setattr(drive, "PERIODIC_MAX_ITER", drive.PERIODIC_MAX_ITER // 2)
+    monkeypatch.setattr(drive, "PERIODIC_MAX_ITER", 10_000)
     for a, b in zip(drive._strokes(tables, omega, volts, R, on, off), full):
         np.testing.assert_array_equal(a, b)
