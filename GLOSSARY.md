@@ -12,8 +12,16 @@ _Avoid_: bench target, bench motor
 The numbers the bike motor must meet: peak and continuous power, top speed, rear wheel size and the gear ratios to try.
 _Avoid_: bike spec, requirements (alone)
 
+**Design voltage**:
+The lowest battery voltage at which the bike motor must still give full peak power: 300 V. Below it the bike may give less power.
+_Avoid_: minimum bus voltage (the empty battery goes lower), nominal voltage
+
+**Total ratio**:
+Motor speed divided by rear wheel speed, through the planetary gear and the chain or belt together.
+_Avoid_: gear ratio (alone), reduction
+
 **Power density**:
-Rated power per active mass (kW/kg), or per active volume (kW/L). Higher is better. The goal is the highest power density.
+Rated power per active mass (kW/kg), or per active volume (kW/L), counted on the motor alone (stator, rotor, winding). Higher is better. The goal is the highest power density.
 _Avoid_: specific power
 
 **Order pack**:
