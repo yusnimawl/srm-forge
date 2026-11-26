@@ -1,0 +1,214 @@
+{
+ "preset": "full",
+ "stator_yoke": 0.0155,
+ "r_phase": 0.11893947,
+ "inductance": {
+  "l_end": 4.572115021432726e-05,
+  "unaligned": 0.0010333546259922491,
+  "aligned": 0.009333462036401069,
+  "measured_unaligned": 0.0012,
+  "measured_aligned": 0.0091
+ },
+ "points": [
+  {
+   "name": "a",
+   "rpm": 2768.0,
+   "f_elec_hz": 553.6,
+   "torque_target": 209.0,
+   "measured_peak": 240.0,
+   "measured_rms": 137.0,
+   "measured_iron_w": 700.0,
+   "torque": {
+    "torque_model": 209.39462845783734,
+    "computed_peak": 225.0,
+    "computed_rms": 128.90265084330497,
+    "model_iron_w": 227.10192138252566,
+    "cut_edge_low_w": 217.90684780369477,
+    "cut_edge_high_w": 294.71456762318365,
+    "iron_uncertainty_pct": 38.86735135255407,
+    "valid": true,
+    "ratio_measured_over_model": 3.082316502381919
+   },
+   "current": {
+    "torque_model": 218.37044730782173,
+    "computed_peak": 225.0,
+    "computed_rms": 136.92089002019128,
+    "model_iron_w": 232.66737690340466,
+    "cut_edge_low_w": 223.23538924494832,
+    "cut_edge_high_w": 302.2953789405587,
+    "iron_uncertainty_pct": 39.092121334869475,
+    "valid": true,
+    "ratio_measured_over_model": 3.0085868045463697
+   }
+  },
+  {
+   "name": "b",
+   "rpm": 8700.0,
+   "f_elec_hz": 1740.0,
+   "torque_target": 113.0,
+   "measured_peak": 205.0,
+   "measured_rms": 130.0,
+   "measured_iron_w": 4400.0,
+   "torque": null,
+   "current": {
+    "torque_model": 55.095661305194575,
+    "computed_peak": 108.73159337056912,
+    "computed_rms": 57.21016861529573,
+    "model_iron_w": 252.62900729713658,
+    "cut_edge_low_w": 243.43078445227556,
+    "cut_edge_high_w": 342.5661670783501,
+    "iron_uncertainty_pct": 28.95247938375957,
+    "valid": true,
+    "ratio_measured_over_model": 17.416843960538618
+   }
+  },
+  {
+   "name": "c",
+   "rpm": 7500.0,
+   "f_elec_hz": 1500.0,
+   "torque_target": 36.0,
+   "measured_peak": 76.0,
+   "measured_rms": 35.4,
+   "measured_iron_w": 600.0,
+   "torque": {
+    "torque_model": 36.152295727310836,
+    "computed_peak": 69.57944602332165,
+    "computed_rms": 34.21331722252938,
+    "model_iron_w": 215.97359526795967,
+    "cut_edge_low_w": 208.0472802512208,
+    "cut_edge_high_w": 288.6304994914652,
+    "iron_uncertainty_pct": 29.06844856575296,
+    "valid": true,
+    "ratio_measured_over_model": 2.7781173863201962
+   },
+   "current": {
+    "torque_model": 37.686533955510974,
+    "computed_peak": 71.42491486420977,
+    "computed_rms": 35.3378104032355,
+    "model_iron_w": 220.2381778514483,
+    "cut_edge_low_w": 212.15319022202118,
+    "cut_edge_high_w": 294.37753227619254,
+    "iron_uncertainty_pct": 29.099316407276067,
+    "valid": true,
+    "ratio_measured_over_model": 2.724323302405375
+   }
+  },
+  {
+   "name": "f1",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 10.085156393909454,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 823.0,
+   "torque": {
+    "torque_model": 10.118863853994215,
+    "computed_peak": 40.60908549770433,
+    "computed_rms": 18.33144374425767,
+    "model_iron_w": 166.27638736394255,
+    "cut_edge_low_w": 160.5248073440147,
+    "cut_edge_high_w": 228.25469403260868,
+    "iron_uncertainty_pct": 26.542724567014087,
+    "valid": true,
+    "ratio_measured_over_model": 4.949590335990603
+   },
+   "current": null
+  },
+  {
+   "name": "f2",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 11.830135769967358,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 944.0,
+   "torque": {
+    "torque_model": 11.949172249619535,
+    "computed_peak": 45.703063501924056,
+    "computed_rms": 20.988897845559634,
+    "model_iron_w": 178.15818164532,
+    "cut_edge_low_w": 172.00408365834326,
+    "cut_edge_high_w": 245.1675706825546,
+    "iron_uncertainty_pct": 26.87546092617851,
+    "valid": true,
+    "ratio_measured_over_model": 5.298662072558247
+   },
+   "current": null
+  },
+  {
+   "name": "f3",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 15.072774610515902,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 1123.0,
+   "torque": {
+    "torque_model": 15.113083455553904,
+    "computed_peak": 53.02593743755908,
+    "computed_rms": 25.16184156198902,
+    "model_iron_w": 202.95186546918399,
+    "cut_edge_low_w": 195.94795445609816,
+    "cut_edge_high_w": 279.30641883907305,
+    "iron_uncertainty_pct": 27.342343368578536,
+    "valid": true,
+    "ratio_measured_over_model": 5.533331745455255
+   },
+   "current": null
+  },
+  {
+   "name": "f4",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 15.361314507344373,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 1260.0,
+   "torque": {
+    "torque_model": 15.390377657801489,
+    "computed_peak": 53.02593743755908,
+    "computed_rms": 25.382311400052195,
+    "model_iron_w": 213.63798679183037,
+    "cut_edge_low_w": 206.2649404536682,
+    "cut_edge_high_w": 293.1037262297381,
+    "iron_uncertainty_pct": 27.267494392165858,
+    "valid": true,
+    "ratio_measured_over_model": 5.897827530212352
+   },
+   "current": null
+  },
+  {
+   "name": "f5",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 20.630602623235756,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 1564.0,
+   "torque": null,
+   "current": null
+  },
+  {
+   "name": "f6",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 40.57420549211801,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 3348.0,
+   "torque": null,
+   "current": null
+  },
+  {
+   "name": "f7",
+   "rpm": 13900.0,
+   "f_elec_hz": 2780.0,
+   "torque_target": 68.32899556799961,
+   "measured_peak": null,
+   "measured_rms": null,
+   "measured_iron_w": 6989.0,
+   "torque": null,
+   "current": null
+  }
+ ]
+}

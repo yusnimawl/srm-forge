@@ -233,11 +233,11 @@ def test_estimate_without_history_uses_the_budget(client):
     pytest.importorskip("ngsolve")
     case_id = _draft(client, _inputs("full"))
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
-        "new_map": True, "seconds": 1560.0 + 72.0, "basis": "budget", "rated": False}
+        "new_map": True, "seconds": 1560.0 + 454.1, "basis": "budget", "rated": False}
     case_id = _draft(client, _inputs("screening"))
-    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()["seconds"] == 228.0 + 72.0
+    assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()["seconds"] == 228.0 + 454.1
     fixed = _inputs("screening") | {"winding": {"turns": 10}}
-    assert client.get(f"/api/cases/{_draft(client, fixed)}/estimate?thermal=false").json()["seconds"] == 228.0 + 1.0
+    assert client.get(f"/api/cases/{_draft(client, fixed)}/estimate?thermal=false").json()["seconds"] == 228.0 + 8.0
 
 
 def test_estimate_uses_recent_map_and_scan_times(client):
@@ -248,7 +248,7 @@ def test_estimate_uses_recent_map_and_scan_times(client):
     store.add_map_time("screening", 5.0)
     case_id = _draft(client, _inputs("full"))
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {
-        "new_map": True, "seconds": 150.0 + 72.0, "basis": "budget", "rated": False}     # no scan history yet
+        "new_map": True, "seconds": 150.0 + 454.1, "basis": "budget", "rated": False}     # no scan history yet
     store.add_scan_time("auto", 60.0)
     store.add_scan_time("auto", 80.0)
     store.add_scan_time("fixed", 1.0)
@@ -261,7 +261,7 @@ def test_estimate_of_a_cached_map(client, monkeypatch):
     monkeypatch.setattr(cases, "map_cache_hit", lambda inputs, cache_dir: seen.append(cache_dir) or True)
     case_id = _draft(client, _inputs())
     out = client.get(f"/api/cases/{case_id}/estimate?thermal=false").json()
-    assert out == {"new_map": False, "seconds": 72.0, "basis": "budget", "rated": False}     # only the winding choice remains
+    assert out == {"new_map": False, "seconds": 454.1, "basis": "budget", "rated": False}     # only the winding choice remains
     assert seen == [client.app.state.settings.cache_dir]
     client.app.state.store.add_scan_time("auto", 30.0)
     assert client.get(f"/api/cases/{case_id}/estimate?thermal=false").json() == {"new_map": False, "seconds": 30.0, "basis": "history", "rated": False}

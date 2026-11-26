@@ -70,4 +70,4 @@ run used a setup this page does not fully state. Fewer than `MIN_PARALLEL_JOBS` 
 so its 8-worker time equals the 1-worker time. Density 1 worker ran 239 s, 246 s and 257 s over three runs.
 
 `SCAN_BUDGET_S` in `srmweb/cases.py` (the estimate before any scan was timed) is the measured time x 1.25, the rule
-of the M5e2 speed budgets: "auto" 72 s from density mode at 8 workers (the slower mode), "fixed" 1 s.
+of the M5e2 speed budgets: "auto" 454.1 s from density mode at 8 workers (the slower mode; 363.3 s measured with continuous conduction, `docs/validation/scan_timing_cc.json`), "fixed" 8.0 s (density, 6.4 s).

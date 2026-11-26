@@ -70,8 +70,8 @@ def test_estimate_adds_the_scan_to_a_new_map(tmp_path, monkeypatch):
     inputs = CaseInputs.model_validate(_raw())
     fixed = CaseInputs.model_validate(_raw(winding={"turns": 10}))
     monkeypatch.setattr(cases, "map_cache_hit", lambda i, d: False)
-    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 228.0 + 72.0, "basis": "budget", "rated": False}
-    assert cases.estimate(fixed, store, tmp_path)["seconds"] == 228.0 + 1.0
+    assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 228.0 + 454.1, "basis": "budget", "rated": False}
+    assert cases.estimate(fixed, store, tmp_path)["seconds"] == 228.0 + 8.0
     store.add_map_time("screening", 100.0)
     store.add_scan_time("auto", 20.0)
     assert cases.estimate(inputs, store, tmp_path) == {"new_map": True, "seconds": 120.0, "basis": "history", "rated": False}
