@@ -2,6 +2,22 @@
 
 Status: approved in chat 2026-10-12 (owner). Replaces the sub-project order in the core spec §1.3 and the open v0 steps (v0b-3, the v0 optimiser plan). M1–M5 and v0a/v0b stay as history under their old names. Each R gets its own spec, plan and checklist; this file fixes the order, the scope of each step and the decisions behind them.
 
+## 0. Order from 2026-11-26 (owner)
+
+The owner re-anchored the roadmap to their goal: first a motor for their own motorcycle, then a car motor, then pitching the tool (core spec §11, 2026-11-26). The R names stay, because the reports, pull requests and commits use them. The order is now:
+
+1. **Merged steps** (unchanged): R1, R2, R3, R3b, R3c, R4, R6d, R8a, R8b, and R5a to R5d.
+2. **Bike motor v1** (new step, the current milestone). Its parts, in order:
+   1. Thermal checks: V4 (Kiyota 2014 peak transient) and V5 (thermal mesh convergence). This is what is left of R5e. The V2 gap (Faiz) is accepted. The Kiyota 18/12 rotor-stress check (V6 on the Kiyota rotor) is replaced by part 5.
+   2. Continuous current in the drive model, re-checked on the Kiyota high-power points.
+   3. Bike search at total ratios 8, 12 and 15, with the jacket only and with the jacket plus end-winding oil spray.
+   4. Confirm the top 3 to 5 at the `full` preset, the 2D-verified check on the winner, and a mutual-coupling check on the winner with the overlap map.
+   5. Detailed (FE) rotor stress, fatigue and air-gap closure on the top 3 to 5.
+   6. Order pack for jystator (stacks and wound stator): lamination DXF, winding sheet, stack and materials, tolerances and air gap, bearings. This is the minimal R10.
+3. **Later**, until the bike motor is ordered: R7 (recommender), R6 (what-if tab), R6b (software QA), R6c (speed report), R6e (web polish and the 3D view), R9 (ripple optimisation), and the rest of R10 (datasheet, full package). R7 moves before the bike search ends if that search shows the random sample is missing good designs: the top designs change a lot between runs, or the best sit at the edge of the sampled range.
+
+Done when for Bike motor v1: the six parts are done, the winner meets the four trust tests of core spec §11 (2026-11-26), and the order pack is on main.
+
 ## 1. What the owner wants
 
 A tool the owner can run without knowing motor design. They enter requirements and get recommendations for the most power-dense SRM. Then they edit the chosen shape and simulate and tune its control.
