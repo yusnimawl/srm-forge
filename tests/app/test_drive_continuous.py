@@ -143,3 +143,53 @@ def test_no_stroke_needs_the_iteration_cap(tables, pairs, monkeypatch, rpm, volt
     monkeypatch.setattr(drive, "PERIODIC_MAX_ITER", 10_000)
     for a, b in zip(drive._strokes(tables, omega, volts, R, on, off), full):
         np.testing.assert_array_equal(a, b)
+
+
+# --- envelope, least-copper and fixed strokes -------------------------------------------------------------------
+
+MAP = synthetic_map(n_angles=24)
+ENV_SPEEDS = np.array([100.0, 1500.0, 6000.0, 12000.0, 40000.0])
+
+
+def _single_pulse(t, omega, volts, r, on, off):
+    return (*drive._simulate(t, omega, volts, r, on, off), np.zeros(on.size))
+
+
+@pytest.mark.parametrize("volts", [400.0, 100.0])
+def test_envelope_is_the_single_pulse_envelope_or_better(monkeypatch, volts):
+    real = drive.envelope(MAP, MACHINE, volts, 0.1, ENV_SPEEDS)
+    monkeypatch.setattr(drive, "_strokes", _single_pulse)
+    old = drive.envelope(MAP, MACHINE, volts, 0.1, ENV_SPEEDS)
+    same = real.work_torque == old.work_torque
+    for a, b in ((real.torque, old.torque), (real.i_rms, old.i_rms), (real.theta_on, old.theta_on),
+                 (real.theta_off, old.theta_off), (real.copper_loss, old.copper_loss)):
+        np.testing.assert_array_equal(a[same], b[same])
+    assert np.all(real.work_torque[~same] > old.work_torque[~same])
+    assert np.all(real.torque >= old.torque)
+    if volts == 100.0:
+        assert not same[-1]                  # 40 000 r/min needs continuous conduction
+
+
+def test_continuous_stroke_waveform():
+    env = drive.envelope(MAP, MACHINE, 100.0, 0.1, [12000.0, 40000.0])
+    w = env.waveforms
+    assert np.all(w.current[1] > 0)                      # the phase never turns off
+    assert not np.all(w.current[0] > 0)                  # 12 000 r/min stays single pulse
+    np.testing.assert_allclose(4 * w.torque[1].mean(), env.torque[1], rtol=1e-3)
+    np.testing.assert_allclose(np.sqrt((w.current[1] ** 2).mean()), env.i_rms[1], rtol=1e-3)
+    assert env.torque[1] > 2 * 0.06                       # single pulse gives 0.06 N·m (test_drive_tail)
+
+
+def test_min_copper_and_fixed_stroke_continuous():
+    rpm, volts = 40000.0, 100.0
+    top = drive.envelope(MAP, MACHINE, volts, 0.1, [rpm]).torque[0]
+    s = drive.min_copper_stroke(MAP, MACHINE, volts, 0.1, rpm, 0.95 * top)
+    assert s is not None and s.psi_on > 0 and s.valid
+    assert s.current.max() <= s.current_limit * (1 + 1e-9)
+    again = drive.fixed_stroke(MAP, MACHINE, volts, 0.1, rpm, s.theta_on, s.theta_off, s.current_limit)
+    assert again.valid and again.psi_on == pytest.approx(s.psi_on, rel=1e-9)
+    assert again.torque_avg == pytest.approx(s.torque_avg, rel=1e-9)
+    assert again.i_rms == pytest.approx(s.i_rms, rel=1e-9)
+    # a lower torque at a speed that allows single pulses keeps psi_on at 0
+    low = drive.min_copper_stroke(MAP, MACHINE, 400.0, 0.1, 1500.0, 0.5)
+    assert low.psi_on == 0.0
