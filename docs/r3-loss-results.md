@@ -266,24 +266,44 @@ Same method as the table above; "Conduction" is the stroke type the envelope cho
 | III (b), current stroke (RMS 130 A asked) | 8700 | continuous | 130 / 136.7 / 117.4 | 205 / 206.7 / 188 | 451 / 430 | 9.75 | 10.23 |
 | Fig. 16, 59 kW | 13 900 | continuous | - / 61.6 / 61.7 | - / 112 / 112 | 335 / 339 | 9.98 | 9.89 |
 | Fig. 16, 99 kW | 13 900 | continuous | - / 111.7 / 112.0 | - / 188 / 188 | 545 / 574 | 12.83 | 12.17 |
-| Fig. 16, 30.0 kW (f5) | 13 900 | single pulse / continuous | - / 33.3 / 38.3 | - / 68 / 75 | 225 / 241 | 6.96 | 6.49 |
+| Fig. 16, 30.0 kW (f5), model torque 23.75 N·m at 15.5 mm | 13 900 | single pulse / continuous | - / 33.3 / 38.3 | - / 68 / 75 | 225 / 241 | 6.96 | 6.49 |
 
 (The RMS and peak columns read: measured / model at 16.3 mm / model at 15.5 mm. At 16.3 mm the (b) current-stroke
-row is the torque-stroke row.)
+row is the torque-stroke row.) The f5 stroke at 15.5 mm gives 23.75 N·m against the 20.63 N·m target (+15.1 %, 34.6 kW
+instead of 30.0 kW), so its 6.49 ratio is taken at 15 % more torque; its 75 A peak is exactly the 2/8 current limit
+(see the grid effect below).
 
 Accuracy at (b): the torque stroke needs 136.7 A RMS at 16.3 mm and 136.5 A at 15.5 mm against 130 A measured, +5.1 %
-and +5.0 %, inside the 10 to 15 % target; the peak current matches within 1 % (206.7 and 205.9 A against 205 A).
+and +5.0 %; the peak current matches within 1 % (206.7 and 205.9 A against 205 A). Two caveats. The torque stroke
+overshoots the target: 117.66 N·m at 16.3 mm (+4.1 %) and 116.85 N·m at 15.5 mm (+3.4 %) against 113 N·m. And the RMS
+depends on the current-limit grid: a stroke at 112.5 N·m needs 116.6 A, which is 10.3 % below the measured RMS, so
+the RMS at (b) spans -10.3 % to +5.1 % depending on the grid. Both ends are inside the 10 to 15 % target, but the
+spread is the size of the target.
 
 **Failed acceptance line.** The "current" variant at (b), the stroke whose RMS equals the measured 130 A, does not
-land within 0.5 %: it gives 136.7 A at 16.3 mm and 117.4 A at 15.5 mm. The least-copper RMS jumps at the boundary
-between single-pulse and continuous strokes (no single pulse reaches the torque; the cheapest continuous one is
-already at 136 A), so the bisection in `match_rms` returns the nearest feasible stroke. At 15.5 mm that stroke is
-far below the measured value (the model is at 117.4 A and 188 A peak, 3 % under the torque, with a different
-conduction angle), so the 10.23 ratio there is not a like-for-like point.
+land within 0.5 %: it gives 136.7 A at 16.3 mm and 117.4 A at 15.5 mm (9.7 % under the measured RMS, 112.58 N·m,
+0.4 % under the torque, 187.5 A peak). The cause is the current-limit grid of `min_copper_stroke` (default
+`n_limits` = 8: limits k/8 of the 300 A map top, 37.5 A steps), not a boundary between single-pulse and continuous
+strokes; both strokes are continuous. Measured on the cached maps (read-only probe, task review):
+
+| Target (N·m) | n_limits | 16.3 mm | 15.5 mm |
+|---|---|---|---|
+| 112.5 | 8 | 112.65 N·m, 116.6 A RMS (psi_on 0.107) | 112.58 N·m, 117.4 A (psi_on 0.111) |
+| 113 | 8 | 117.66 N·m, 136.7 A | 116.85 N·m, 136.5 A |
+| 113 | 24 | 116.35 N·m, 123.9 A | 116.17 N·m, 124.2 A |
+
+Both 112.5 N·m results sit at the 187.5 A limit. A 0.4 % change in torque target moves the RMS by about 16 %, so
+the bisection in `match_rms` can only return the nearest stroke the grid holds. The plan's risk R2 expected the grid to
+move the RMS by up to 3.5 %; here it moves it 9.4 % (the 117.4 A row against 130 A, whose nearest alternative is 136.7 A).
+The 10.23 ratio at 15.5 mm is a valid point at 0.4 % under the torque, closer to the measured torque than the torque
+row (+3.4 %), but 9.7 % under the measured RMS.
+
+Open item: the current-limit grid resolution. It moves the continuous-conduction RMS by up to about 16 % for a 0.4 %
+change in torque, which matters for the bike search against the 10 to 15 % target.
 
 **The three new points and `K_IRON_HI`.** Measured "iron and other" over model iron is 9.3 to 9.8 at (b), 9.9 to
-10.0 at 59 kW and 12.2 to 12.8 at 99 kW, 6.5 at the 15.5 mm 30 kW point. The `K_IRON_HI` curve (3.2 up to 1.5 kHz,
-linear to 7.0 at 2.78 kHz) sits below all of them, so at high power the rated iron factor is on the unsafe side.
+10.0 at 59 kW and 12.2 to 12.8 at 99 kW, 6.5 at the 15.5 mm 30 kW point (at 15 % more torque than the measured). The `K_IRON_HI` curve (3.2 up to 1.5 kHz,
+linear to 7.0 at 2.78 kHz): the continuous points at 9.3 to 12.8 sit above the 3.2 to 7.0 curve, so at high power the rated iron factor is on the unsafe side.
 The measured figure also holds stray and AC copper loss, which the data do not separate, so the ratios over-state
 the iron error. Changing `K_IRON_HI` is not in this plan; it stays an open item.
 
