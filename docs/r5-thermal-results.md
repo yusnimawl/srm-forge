@@ -287,42 +287,46 @@ V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's 
 
 ## V4: our thermal network against the Kiyota 18/12 peak transient
 
-Verdict: V4 passes. The nominal coil-end peak rise is 39.20 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.8 % cold (r = +0.0076). Against the printed 41 K it reads 4.6 % cold (r = +0.046) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
+Verdict: V4 passes. The nominal coil-end peak rise is 39.22 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.7 % cold (r = +0.00716). Against the printed 41 K it reads 4.4 % cold (r = +0.0454) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
 
-Run: `kiyota-v4`, 2026-11-27, 16:33 to 17:31 WIB (58 min), LattePanda, commit c9d2207, srmcore 0.8.0, srmapp 0.10.1, peak RSS 2.7 GB. Command: `$env:PYTHONPATH="src;tests"; python examples\kiyota_thermal_check.py --json docs/validation/r5_v4_kiyota.json`. Record: `docs/validation/r5_v4_kiyota.json`. Case: `tests/kiyota_thermal.py`.
+Run: `kiyota-v4b`, 2026-11-27, 57.5 min, LattePanda, commit 1348c0b, srmcore 0.8.0, srmapp 0.11.0, peak RSS 2778 MB. Iron capacity counts the stacking factor (0.90), which moved the peak by +0.02 K against the first run (39.20 K). Command: `$env:PYTHONPATH="src;tests"; python examples\kiyota_thermal_check.py --json docs/validation/r5_v4_kiyota.json`. Record: `docs/validation/r5_v4_kiyota.json`. Case: `tests/kiyota_thermal.py`.
 
-Inputs (sources and errors in `docs/r5-sources.md` 9.2): the Fig. 8 RMS current read off the figure (140.7 A hold, 14 s), uniform start at 51.1 degC, ambient 25 degC (assumed), 573 W mechanical loss (Fig. 7), iron loss 4400 W (Table III (b)) divided by `K_IRON_HI` at 1500 Hz for the nominal set and applied whole in the rated set, uniform over the stator iron. Phase resistance 92.5 mOhm at 20 degC, the winding alone. The paper prints 97.8 mOhm at the terminals and says that 5.3 mOhm of it is coil connections (0.78 m) and terminal wiring (1.68 m in all; 2014 pp. 5714-5715). Eq. (1) gives 4.9 mOhm for 1.68 m, so the winding is 92.5 to 92.9 mOhm. The tool's mean-turn value is 92.6 mOhm. Iron capacity is 438 J/(kg K) x 7490 kg/m3 from the library record. The quantity compared is the maximum over 0 to 20 s of the hottest end-winding lump above the start temperature. The rating's hot spot (coil sides included) is reported beside it: 39.20 K nominal and 39.83 K rated at `full`, not judged. The rated set leaves the `end_winding_model` row out, because that row carries this gate's own residual.
+Inputs (sources and errors in `docs/r5-sources.md` 9.2): the Fig. 8 RMS current read off the figure (140.7 A hold, 14 s), uniform start at 51.1 degC, ambient 25 degC (assumed), 573 W mechanical loss (Fig. 7), iron loss 4400 W (Table III (b)) divided by `K_IRON_HI` at 1500 Hz for the nominal set and applied whole in the rated set, uniform over the stator iron. Phase resistance 92.5 mOhm at 20 degC, the winding alone. The paper prints 97.8 mOhm at the terminals and says that 5.3 mOhm of it is coil connections (0.78 m) and terminal wiring (1.68 m in all; 2014 pp. 5714-5715). Eq. (1) gives 4.9 mOhm for 1.68 m, so the winding is 92.5 to 92.9 mOhm. The tool's mean-turn value is 92.6 mOhm. Iron capacity is 438 J/(kg K) x 7490 kg/m3 x 0.90 from the library record (the heat load is per gross stack volume). The quantity compared is the maximum over 0 to 20 s of the hottest end-winding lump above the start temperature. The rating's hot spot (coil sides included) is reported beside it: 39.22 K nominal and 39.82 K rated at `full`, not judged. The rated set leaves the `end_winding_model` row out, because that row carries this gate's own residual.
 
 Results (rise above 51.1 degC, K):
 
 | Preset | Thermal-domain nodes | Nominal | Rated | Wall time (nominal, rated) |
 |---|---|---|---|---|
-| screening | 73 879 | 39.20 | 39.79 | 27 s, 28 s |
-| full | 135 396 | 39.20 | 39.79 | 89 s, 96 s |
-| reference | 951 237 | 39.20 | 39.80 | 259 s, 254 s |
+| screening | 73 879 | 39.22 | 39.82 | 27 s, 27 s |
+| full | 135 396 | 39.22 | 39.82 | 89 s, 94 s |
+| reference | 951 237 | 39.22 | 39.82 | 259 s, 261 s |
 
-Mesh build: 27 s, 53 s and 722 s. The model reaches the peak earlier than the trace. At 10 s it reads 30.5 K against 22.7 K on the trace, and at 14 s 39.1 K against 35.5 K. The trace peaks after the current stops, and the model does not reproduce that lag. A sensor lag is not modelled and a time-matched comparison is out of scope, so the peak is compared and the shape is not.
+Mesh build: 28 s, 53 s and 719 s. The model reaches the peak earlier than the trace. At 10 s it reads 30.5 K against 22.7 K on the trace, and at 14 s 39.1 K against 35.5 K. The trace peaks after the current stops, and the model does not reproduce that lag. A sensor lag is not modelled and a time-matched comparison is out of scope, so the peak is compared and the shape is not.
 
 Numerical error (nominal, K): mesh |full - reference| 0.002, time step |0.05 s - 0.025 s| 0.011, total 0.014. For the rated set the total is 0.011 K.
 
-Input rows (change of the end-lump peak in K, `screening` nominal, signed):
+The 573 W mechanical loss may be counted twice: Table III (b) prints "iron and other losses" 4.4 kW and mechanical 0.7 kW as separate lines, so the 4.4 kW probably leaves it out (an inference: `docs/r5-sources.md` does not say so outright). Either way it moves the nominal peak by +0.007 K (39.210 K without it, 39.216 K with it, `screening`). The bike-gates plan (its D9) reconciles the loss split when that plan lands.
+
+The trace keeps rising about 4 s after the current stops. As an inference, the measured peak is then probably a lower bound of the coil-end peak, and r is most likely the smallest reading.
+
+Input rows (change of the end-lump peak in K, `full` nominal, signed):
 
 | Row | Low | High |
 |---|---|---|
 | Resistance 92.5 to 97.8 mOhm (94.9 mOhm is the inference with the connections at the coil end: +1.08) | 0 | +2.40 |
-| Cold-iron start (copper and end lumps at 51.1, the rest at the ambient) | -2.51 | 0 |
-| Iron 0.6 kW (Table III (c)) | -0.09 | 0 |
+| Cold-iron start (copper and end lumps at 51.1, the rest at the ambient) | -2.50 | 0 |
+| Iron 0.6 kW (Table III (c)) | -0.10 | 0 |
 | Mechanical loss at the end caps | 0 | +0.16 |
 | Stator pole arc +-0.3 mm | -0.07 | +0.07 |
-| Housing 4 and 16 mm, rotor pole arc, rotor yoke, ambient 40 degC | each at most 0.02 | |
+| Housing 4 and 16 mm, rotor pole arc, rotor yoke (0.00 each), ambient 40 degC (+0.02) | each at most 0.02 | |
 
-Band: nominal 39.20 K at `full`, rows -2.68 and +2.65 K, so 36.51 to 42.45 K. The rated set reads 39.79 K, 0.59 K above the nominal.
+Band: the low end is the nominal 39.22 K at `full` minus the negative rows (-2.68 K), 36.53 K. The high end is the rated set (39.82 K, 0.60 K above the nominal) plus the positive rows (+2.65 K) plus the numerical error (0.01 K), 42.48 K.
 
-Pass rule: the band must reach the target within its reading error, that is low at most target + 0.4 K and high at least target - 0.4 K. For 39.5 K the nominal is 0.30 K below it, inside the 0.4 K reading error, so the trace pass needs no row. For the printed 41 K the high side must reach 40.6 K. The rated set (39.79 K) does not, and the resistance row (+2.40 K) does. The earlier plan risk that V4 passes only through the resistance row is reversed for the trace: the diagnosis had used the terminal resistance, which reads 41.6 K.
+Pass rule: the band must reach the target within its reading error, that is low at most target + 0.4 K and high at least target - 0.4 K. For 39.5 K the nominal is 0.28 K below it, inside the 0.4 K reading error, so the trace pass needs no row. For the printed 41 K the high side must reach 40.6 K. The rated set (39.82 K) does not, and the resistance row (+2.40 K) does. The earlier plan risk that V4 passes only through the resistance row is reversed for the trace: the diagnosis had used the terminal resistance, which reads 41.6 K.
 
 Zero-capacity effect: without iron capacity the coil end read 49.2 K nominal (63.3 K rated) at the terminal resistance. With the library specific heat it reads 41.6 K at 97.8 mOhm and 39.2 K at 92.5 mOhm. The iron stores part of the heat in the first seconds. The 438 J/(kg K) is carried over from Faiz 2009 Table II (p. 2928), a lamination of unstated grade, not 10JNEX900 (grade C, owner decision 2026-11-27). The V4 pass depends on it. A measured 10JNEX900 value would move the result.
 
-What this means for the ratings: the peak transient of the end winding reads 0.8 % cold against the measured peak. Call 9 of the plan applies: r > 0, so the `end_winding_model` row is set to r. The rated set divides every end-winding lump capacity by 1 + `END_WINDING_PEAK_RESIDUAL` (0.007593, `srmapp.cooling`). The row moves the peak rating only. Its budget share is 0 K by construction, because shares are steady hot-spot rises. The rating's steady (continuous) side still has no measured check. V4 is one machine, one 14 s pulse, one coil-end sensor of unknown position, and an assumed ambient and housing. Against the owner's 10 to 15 % target the peak rise is inside it, with the iron loss held at a measured-over-model factor and not predicted (finding 1 of `docs/r3-loss-results.md`).
+What this means for the ratings: the peak transient of the end winding reads 0.7 % cold against the measured peak. Call 9 of the plan applies: r > 0, so the `end_winding_model` row is set to r. The rated set divides every end-winding lump capacity by 1 + `END_WINDING_PEAK_RESIDUAL` (0.007159, `srmapp.cooling`). The row moves the peak rating only. Its budget share is 0 K by construction, because shares are steady hot-spot rises. The rating's steady (continuous) side still has no measured check. V4 is one machine, one 14 s pulse, one coil-end sensor of unknown position, and an assumed ambient and housing. Against the owner's 10 to 15 % target: V4 checks copper heating in a 14 s copper-dominated pulse, with the iron loss held at a measured-over-model factor and not predicted (finding 1 of `docs/r3-loss-results.md`). The closed-form adiabatic copper rise alone is 40.60 K (`adiabatic_copper_rise_k` in the JSON), 2.8 % from 39.5 K, and the conduction and cooling rows (cross_wire, liner, contact, air gap, cooling h, lamination k) do not reach the 14 s peak. So V4 does not check the cooling paths, a 30 s peak from warm, or the continuous rating.
 
 ## Thermal mesh (no separate gate, owner 2026-11-27)
 
@@ -416,7 +420,7 @@ In the first run 28 strokes were solved. The liner row dominates: the liner take
 - Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
 - Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
 - `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
-- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.10.1), so iron has capacity (before that it was zero, with a note). Expansion and through-stack conductivity stay open: the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Expansion and through-stack conductivity are on the owner list below (material data, tracker 10d).
+- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.11.0), so iron has capacity (before that it was zero, with a note). Expansion and through-stack conductivity stay open: the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Expansion and through-stack conductivity are on the owner list below (material data, tracker 10d).
 - Six FE-derived constants need the owner's yes: moved to the owner list below.
 - Search candidates read `no_fillet`: moved to the owner list below (before R5c).
 - Kiyota 18/12 V6: R5e.

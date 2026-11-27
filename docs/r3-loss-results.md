@@ -253,9 +253,9 @@ Findings:
    continuous current, and the 2014 Fig. 17 current never returns to zero at 100 kW. The envelope now takes the
    periodic steady state where no single pulse completes. Every peak current is below the 300 A map top. The
    single-pulse rows (a), (c), f1 to f5 at 16.3 mm and f1 to f4 at 15.5 mm equal the 2026-11-18 rows exactly.
-4. **How `K_IRON_HI` = 3.2 was chosen.** It is the largest measured-over-model ratio at or below 1.5 kHz, 3.170 (torque stroke at (a), yoke 16.3 mm), rounded up. The current-stroke rule would give 3.08. Above 1.5 kHz the curve is linear to 7.0 at 2.78 kHz.
 3. Stator yoke 16.3 or 15.5 mm changes the ratios by at most 5 % at the single-pulse points (the table below); at
    15.5 mm the 30 kW point at 13 900 r/min (f5) also has a stroke, now in continuous conduction.
+4. **How `K_IRON_HI` = 3.2 was chosen.** It is the largest measured-over-model ratio at or below 1.5 kHz, 3.170 (torque stroke at (a), yoke 16.3 mm), rounded up. The current-stroke rule would give 3.08. Above 1.5 kHz the curve is linear to 7.0 at 2.78 kHz.
 
 ### Continuous-conduction points (2026-11-27)
 
