@@ -17,3 +17,4 @@ One page per merged roadmap step, the summary: the project doc in Notion holds t
 | R6d | Optimisation research | 2026-11-06 | #21 | [r6d.md](r6d.md) |
 | R8a | Control software-in-the-loop | 2026-10-20 | #6 | [r8a.md](r8a.md) |
 | R8b | Control HIL | 2026-10-29 | #8 | [r8b.md](r8b.md) |
+| Bike v1, part 2 | Continuous conduction in the drive model | 2026-11-27 | #44 | [bike-v1-2.md](bike-v1-2.md) |

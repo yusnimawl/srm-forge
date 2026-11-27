@@ -7,16 +7,22 @@ Status: approved in chat 2026-10-12 (owner). Replaces the sub-project order in t
 The owner re-anchored the roadmap to their goal: first a motor for their own motorcycle, then a car motor, then pitching the tool (core spec §11, 2026-11-26). The R names stay, because the reports, pull requests and commits use them. The order is now:
 
 1. **Merged steps** (unchanged): R1, R2, R3, R3b, R3c, R4, R6d, R8a, R8b, and R5a to R5d.
-2. **Bike motor v1** (new step, the current milestone). Its parts, in order:
-   1. Thermal checks: V4 (Kiyota 2014 peak transient) and V5 (thermal mesh convergence). This is what is left of R5e. The V2 gap (Faiz) is accepted. The Kiyota 18/12 rotor-stress check (V6 on the Kiyota rotor) is replaced by part 5.
-   2. Continuous current in the drive model, re-checked on the Kiyota high-power points.
-   3. Bike search at total ratios 8, 12 and 15, with the jacket only and with the jacket plus end-winding oil spray.
-   4. Confirm the top 3 to 5 at the `full` preset, the 2D-verified check on the winner, and a mutual-coupling check on the winner with the overlap map.
-   5. Detailed (FE) rotor stress, fatigue and air-gap closure on the top 3 to 5.
-   6. Order pack for jystator (stacks and wound stator): lamination DXF, winding sheet, stack and materials, tolerances and air gap, bearings. This is the minimal R10.
+2. **Bike motor v1** (new step, the current milestone). Its parts, in order (revised 2026-11-27 after the stakeholder review, owner "yes"):
+   0. Gates and ranking: rotor stress as a stage-1 filter (status `ok` and safety factor at least 1.5, generator yoke floor 0.55); shortlist lightest first, top k per pole set; iron-loss frequency cap at the measured 2.78 kHz; thermal errors no longer hidden as "not rated"; pick the lightest design that passes, nominal beside rated; fix the windage double count; losses off the power check; current ripple within the 170 A device peak; density mode prefers single-pulse windings.
+   1. Critical speed (first bending at least 1.3 x top speed), bearing speed (DN) and air-gap closure (at most 50 % of the gap) checks.
+   2. Peak-heat check V4 against Kiyota 2014, with the 10JNEX900 specific heat 438 J/(kg K). The separate thermal mesh check V5 is dropped.
+   3. Continuous current in the drive model: done, PR #44, 2026-11-27 (report `docs/reports/bike-v1-2.md`).
+   4. Bike search command: requirements JSON in, maps shared over ratio and cooling, one result line per design, resume, systemd-run.
+   5. Smoke search (8 designs, 2 shortlisted, screening, ratio 15, both coolings).
+   6. Bike search: total ratios 8, 12 and 15, jacket and jacket plus spray, 2 seeds; each ratio's winner side by side.
+   7. Confirm the top 3 to 5 at `full`, the 2D-verified check, the overlap map and a finer thermal mesh on the winner.
+   8. Detailed (FE) rotor stress, gap closure and critical speed on the finalists.
+   9. Order pack for jystator: lamination DXF, winding sheet (insulation rated for SiC dv/dt), stack and materials, tolerances, bearings, embedded thermocouples, the datasheet motor chart, a frozen predicted test sheet.
+
+   Before the bike search also: the iron-loss factor at high power and the current-limit grid for continuous strokes (both found by part 3).
 3. **Later**, until the bike motor is ordered: R7 (recommender), R6 (what-if tab), R6b (software QA), R6c (speed report), R6e (web polish and the 3D view), R9 (ripple optimisation), and the rest of R10 (datasheet, full package). R7 moves before the bike search ends if that search shows the random sample is missing good designs: the top designs change a lot between runs, or the best sit at the edge of the sampled range.
 
-Done when for Bike motor v1: the six parts are done, the winner meets the four trust tests of core spec §11 (2026-11-26), and the order pack is on main.
+Done when for Bike motor v1: the ten parts are done, the winner meets the four trust tests of core spec §11 (2026-11-26), and the order pack is on main.
 
 ## 1. What the owner wants
 
