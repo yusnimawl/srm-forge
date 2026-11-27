@@ -4,7 +4,8 @@ measured rise of the coil-end sensor, 39.5 +- 0.4 K read off the trace (the pape
 
 Ours is the peak over 0 to 20 s of the hottest end-winding lump over the start temperature (the rating's hot spot,
 coil sides included, is reported beside it and not judged). Nominal = every cooling row at its nominal; rated =
-`frozenset(ROWS)`. The phase resistance is the winding alone, 92.5 mOhm: the measured 97.8 mOhm includes 5.3 mOhm of coil
+`frozenset(ROWS) - {"end_winding_model"}`: that row carries this gate's own residual, so applying it here would be
+circular and a re-run would not reproduce the committed record. The phase resistance is the winding alone, 92.5 mOhm: the measured 97.8 mOhm includes 5.3 mOhm of coil
 connections and terminal wiring (2014 pp. 5714 to 5715; Eq. (1) gives 4.9 mOhm for the same 1.68 m, so 92.9 mOhm
 for the winding is the other reading). The resistance input row runs 92.5 to 97.8 mOhm; 94.9 mOhm is the
 inference if the 0.78 m of connections sits at the coil end. The mean-turn value of the tool is 92.6 mOhm.
@@ -35,6 +36,7 @@ import kiyota_18_12 as k18
 import kiyota_thermal as kt
 from srmapp.cooling import ROWS
 
+RATED_ROWS = frozenset(ROWS) - {"end_winding_model"}   # V4 measures that row
 R_NOMINAL = 92.5e-3             # ohm at 20 degC, winding alone (92.5 to 92.9 mOhm, see the docstring)
 R_TERMINAL = 97.8e-3            # measured at the terminals
 R_END_INFERENCE = 94.9e-3       # if the 0.78 m of connections sits at the coil end (inference)
@@ -100,7 +102,7 @@ def main():
         t0 = time.perf_counter()
         case = kt.build(preset)
         entry = {"nodes": len(case.domain.nodes), "mesh_wall_s": time.perf_counter() - t0}
-        for name, rows in (("nominal", frozenset()), ("rated", frozenset(ROWS))):
+        for name, rows in (("nominal", frozenset()), ("rated", RATED_ROWS)):
             res = simulate(case, a.dt, rows)
             entry[name] = summary(res, a.dt)
             if preset == "full" and not a.no_dt_check:
@@ -156,6 +158,7 @@ def main():
         a.json.parent.mkdir(parents=True, exist_ok=True)
         a.json.write_text(json.dumps({
             "inputs": {
+                "rated_rows": "every row except end_winding_model, which carries this gate's own residual (circular otherwise)",
                 "current": "docs/validation/r5_v0_readings.json kiyota_fig8.rms_current_a, linear between readings, 0 after the last",
                 "start_c": kt.START_C, "ambient_c": kt.AMBIENT_C + 0.0, "ambient_note": "25 degC assumed, not printed (call 5)",
                 "resistance_ohm_20c": {"nominal": R_NOMINAL, "terminal": R_TERMINAL, "end_inference": R_END_INFERENCE,

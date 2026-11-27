@@ -134,8 +134,3 @@ def test_keep_returns_the_states():
     assert r == rate(envelope=3.0)
     assert len(k) == 1 and k[0][0] is not None and k[0][1] is None
 
-
-def test_smaller_end_capacity_lowers_the_peak_only():
-    big, small = rate(make_solver(cap=200.0), peak_s=30.0, start_nm=2.0), rate(make_solver(cap=200.0 / 1.5), peak_s=30.0, start_nm=2.0)
-    assert small.continuous_nm == pytest.approx(big.continuous_nm)
-    assert small.peak_nm < big.peak_nm

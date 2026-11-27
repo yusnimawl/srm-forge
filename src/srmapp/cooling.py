@@ -168,7 +168,8 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
              "(Boglietti's routes need an air speed no source gives); air properties at a 60 degC film",
              "thermal_mesh: not yet measured (R5e)",
              f"end_winding_model: the rated set divides the end-lump capacity by 1 + {END_WINDING_PEAK_RESIDUAL:g} "
-             "(gate V4 residual of the peak rise)",
+             "(gate V4 residual of the peak rise); it moves the peak rating only, and its budget share is 0 K by "
+             "construction (shares are steady hot-spot rises)",
              f"end-frame and end-face h are taken at an assumed surface temperature of {2 * AIR_FILM_C - setup.ambient_c:g} degC "
              "(an assumption, not cited)"]
     fill = machine.fill_factor if fill is None else fill
