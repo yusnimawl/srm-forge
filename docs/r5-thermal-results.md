@@ -285,6 +285,28 @@ If their early rise is the true one, our model of this case reads 3.4 to 5.0 K l
 
 V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
 
+## Thermal mesh (no separate gate, owner 2026-11-27)
+
+Verdict: the rating's thermal network changes by at most 0.26 K at `screening` and 0.16 K at `full` against `reference` on the 8/6, under the 0.5 K rating tolerance (`TOL_K`). The `thermal_mesh` row stays 0. A finer thermal mesh runs in the confirm step (roadmap section 0, Bike motor v1 part 7).
+
+Run: planning probe of 2026-11-26, LattePanda, a script in `/tmp` that is not in the repository. The 8/6 with 10JNEX900 laminations of 0.1 mm, 24 turns of one 1.0 mm strand, R from `series_resistance` at 20 degC, the machine's default fill. The network is `build_network` with the placeholder `CoolingSetup()` and coefficients at 2000 r/min. The loads are fixed on every mesh: DC copper at 10 A RMS for the steady state, 20 A RMS for the 30 s peak (`srmapp.thermal.peak_transient`, from that steady state), iron 30 W split 0.7 and 0.3 uniform per part, times `iron_factor` in the rated set. Two sets: nominal and rated (every row unfavourable). Hot spot in degC:
+
+| Preset | Nodes | Nominal steady | Nominal peak | Rated steady | Rated peak | Wall time |
+|---|---|---|---|---|---|---|
+| screening | 31 543 | 96.894 | 120.733 | 134.801 | 161.170 | 16 s |
+| full | 57 987 | 96.934 | 120.779 | 134.881 | 161.270 | 38 s |
+| reference | 405 997 | 96.999 | 120.853 | 135.016 | 161.429 | 313 s |
+| screening - reference | | -0.105 | -0.120 | -0.215 | -0.259 | |
+| full - reference | | -0.065 | -0.074 | -0.135 | -0.159 | |
+
+Wall times include the mesh. The rating's bisection stops within `TOL_K` = 0.5 K below the limit, so a change of this size does not move a rating. The `screening` preset is not the `full` knobs at a larger scale, so the three levels do not follow one h² line.
+
+Limits:
+
+- 8/6 only. The Kiyota case was not run: its planned steady load (60 A RMS, 1.5 kW iron) ran away above 1000 degC with the placeholder jacket. 30 A with 300 W stator iron gives 99.7 degC.
+- Iron capacity was zero at the time. Steady values do not depend on it. The peak values do.
+- The reference has an error of its own, so the differences read slightly low (an inference).
+
 ## First rating (8/6 screening, test fixture)
 
 Source: `tests/app/test_thermal_rate.py` (slow), real 8/6 screening map, default placeholder cooling, 160 degC limit (class H). This is a test fixture. It is not a validation: no measured thermal case exists, the cooling is placeholder, and the map is `screening`.
