@@ -37,12 +37,12 @@ Against the 10 to 15 % target: V4 checks the copper heating of a short pulse. It
 - 2026-11-27, builder: the residual goes into the row although it is inside the 0.4 K reading error (the safe side).
 - 2026-11-27, builder: V4's own rated set leaves out `end_winding_model` (it would correct itself).
 - 2026-11-27, builder: iron capacity takes the stacking factor, and V4 was re-run (the error was on the unsafe side).
+- 2026-11-28, owner: the bike search replaces the 8/6 and bench-target demonstration, so R5e closes with this step; the cooling paths are checked on the bike winner, with the gap stated as a band in the ranking until then.
 
 ## Open after this step
 
 - 10JNEX900 thermal expansion and through-stack conductivity: the lamination-data row of the tracker (jystator email).
-- The rest of R5e, the 8/6 and bench-target demonstration: tracker row 10k.
-- Cooling paths and a 30 s peak from warm have no measured check: before the bike search ranks on peak ratings.
+- Cooling paths and a 30 s peak from warm have no measured check: a band in the bike ranking, then a check on the winner (Bike motor v1, confirm step).
 - `RATING_BUDGET_S` not re-timed (one fewer solve per speed): tracker, Later.
 - Cases evaluated at srmapp 0.10.0 show beside 0.11.0 cases with no stale chip: tracker.
 - The bike-gates plan rebases on this step and takes srmapp 0.12.0: Bike motor v1, step 0.
