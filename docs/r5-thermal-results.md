@@ -287,7 +287,7 @@ V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's 
 
 ## V4: our thermal network against the Kiyota 18/12 peak transient
 
-Verdict: V4 passes. The nominal coil-end peak rise is 39.22 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.7 % cold (r = +0.00716). Against the printed 41 K it reads 4.4 % cold (r = +0.0454) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
+Verdict: V4 passes. The nominal coil-end peak rise is 39.22 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.7 % cold (r = +0.00716). Against the printed 41 K it reads 4.5 % cold (r = +0.0454) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
 
 Run: `kiyota-v4b`, 2026-11-27, 57.5 min, LattePanda, commit 1348c0b, srmcore 0.8.0, srmapp 0.11.0, peak RSS 2778 MB. Iron capacity counts the stacking factor (0.90), which moved the peak by +0.02 K against the first run (39.20 K). Command: `$env:PYTHONPATH="src;tests"; python examples\kiyota_thermal_check.py --json docs/validation/r5_v4_kiyota.json`. Record: `docs/validation/r5_v4_kiyota.json`. Case: `tests/kiyota_thermal.py`.
 
