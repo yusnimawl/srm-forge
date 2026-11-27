@@ -370,10 +370,10 @@ def test_no_em_feasible_winding_is_not_rated(monkeypatch):
     assert "no winding is EM-feasible" in e.error and "not thermally rated" in e.error
 
 
-def test_refusal_keeps_em_choice(monkeypatch):
+def test_refusal_is_infeasible(monkeypatch):
     from srmcore.materials.loss import MissingLossData
     e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, MissingLossData("no loss table")))
-    assert e.status == "ok" and e.rating is None and e.feasible
+    assert e.status == "ok" and e.rating is None and not e.feasible
     assert "no loss table" in e.error and "not thermally rated" in e.error
 
 
@@ -471,3 +471,21 @@ def test_rated_infeasible_stays_off_the_front():
                           rated_continuous_kw_per_kg=v, rated_peak_kw_per_kg=v)
     res = SearchResult(_req(), 2, {}, 0, (ev(False, 9.0), ev(True, 1.0)), False)
     assert [e.feasible for e in res.pareto()] == [True]
+
+
+def test_input_error_from_the_context_is_a_failed_evaluation_and_is_logged(monkeypatch, caplog):
+    from srmcore.model.errors import InputError
+    with caplog.at_level("ERROR", logger="srmapp.evaluate"):
+        e, _, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, InputError([])))
+    assert e.status == "InputError" and not e.feasible
+    assert any(r.exc_info for r in caplog.records)
+
+
+def test_choose_turns_error_is_a_failed_evaluation_and_is_logged(caplog):
+    stage = stage1(_req(), make_8_6())
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
+            mock.patch("srmapp.evaluate.choose_turns", side_effect=ValueError("scan broke")), \
+            caplog.at_level("ERROR", logger="srmapp.evaluate"):
+        e = evaluate_stage2(_cand(), _req(), stage, max_turns=30)
+    assert e.status == "ValueError" and "scan broke" in e.error and not e.feasible
+    assert any(r.exc_info for r in caplog.records) and _cand().id in caplog.text

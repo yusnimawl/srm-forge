@@ -162,3 +162,32 @@ def test_candidates_carry_the_rotor_root_fillet():
         m = c.design.machine
         root = 2 * pole_half_width(m, m.rotor_yoke_outer_radius)
         assert m.rotor_fillet_radius == pytest.approx(ROTOR_FILLET_SHARE * root)
+
+
+def _failing(statuses):
+    it = iter(statuses)
+
+    def fake(candidate, req, stage, **kw):
+        status = next(it)
+        if status == "ok":
+            return _fake(candidate, req, stage, **kw)
+        return Evaluation(candidate.id, candidate.design, status, f"{status} last", stage.mass.iron, None,
+                          *([float("nan")] * 5), False, None, None)
+    return fake
+
+
+def _run(statuses):
+    with mock.patch("srmapp.pipeline.evaluate_stage2", _failing(statuses)):
+        return run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                          SearchSettings(n_candidates=60, shortlist=len(statuses), seed=1))
+
+
+def test_third_failure_of_one_status_stops_the_search():
+    res = _run(["ok", "MapFailed", "MapFailed", "ok", "MapFailed", "ok", "ok"])
+    assert len(res.evaluations) == 5 and not res.cancelled
+    assert res.stopped == "stopped after 3 evaluations failed with MapFailed: MapFailed last"
+
+
+def test_two_failures_of_each_of_two_statuses_do_not_stop_it():
+    res = _run(["MapFailed", "ValueError", "MapFailed", "ValueError", "ok"])
+    assert len(res.evaluations) == 5 and res.stopped == ""

@@ -2,6 +2,7 @@
 drive envelope and scores (v0 spec §4.4-4.6, v0a-2 spec §3), and, with `thermal`, the winding checked against the
 rated hot-spot limit and rated. Unvalidated. ψ includes the analytic end-winding inductance. Parallel paths and
 the RMS current-density limit: small-cycle spec."""
+import logging
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,12 +11,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import srmcore
+from srmcore.materials import MissingLossData
 from srmcore.maps import build_map
 from srmcore.maps.end_winding import end_winding_inductance, with_end_winding
 from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
 from . import __version__
+from .cooling import MissingCoolingData
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .limits import Limit, hard_limits
@@ -31,6 +34,7 @@ if TYPE_CHECKING:
     from .thermal_fields import ThermalFields
 
 _NAN = float("nan")
+_log = logging.getLogger(__name__)
 NOT_RATED = "not thermally rated"
 END_IMAGE_FACTOR = 1.5    # midpoint of the free-air (1) and iron-image (2) end-winding bounds
 MAX_THERMAL_CHECKS = 4    # ranked windings checked against the rated hot-spot limit per design, best first
@@ -117,13 +121,14 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     are checked best-first against the rated hot-spot limit; the first that holds is chosen and rated in full
     (`thermal_progress(step, done, total)`: "windings", "strokes", "thermal"). None holding leaves the best EM winding,
     infeasible; with `rate_failed` that best winding is rated in full anyway. `fields_out` receives the temperature
-    fields of every rating made. A refusal (no loss or thermal data) keeps the EM choice, unrated; any later error fails the evaluation."""
+    fields of every rating made. A refusal (`MissingLossData`, `MissingCoolingData`) makes the design infeasible, unrated (note "not thermally rated"); any other error fails the evaluation and is logged."""
     design = candidate.design
     machine = design.machine
     try:
         result = build_map(design, stage.i_map if i_map is None else i_map, solver=solver, workers=workers, n_angles=grid.n_angles,
                            n_currents=grid.n_currents, cache_dir=cache_dir, progress=progress, cancel=cancel)
     except Exception as exc:  # batch boundary: one bad design must not lose the search (not BaseException)
+        _log.exception("map of candidate %s failed", candidate.id)
         return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
     if not result.complete:
         return _failed(candidate, stage, "cancelled", "map cancelled", j_limit)
@@ -139,6 +144,9 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                               progress=scan_progress, cancel=cancel)
     except ScanCancelled:
         return _failed(candidate, stage, "cancelled", "winding scan cancelled", j_limit)
+    except Exception as exc:  # batch boundary, as for the map
+        _log.exception("winding choice of candidate %s failed", candidate.id)
+        return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
     if choice.point is None:
         cap_text = f" ({peak_cap_text(cap)})" if req.wire_mode and math.isfinite(cap) else ""
         return _failed(candidate, stage, "no_winding",
@@ -164,9 +172,12 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
             ctx = context(checks[0])
         except InterruptedError:
             return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
-        except ValueError as exc:   # refusals (MissingLossData, MissingCoolingData, no thermal data) come before any solve
+        except (MissingLossData, MissingCoolingData) as exc:   # refusals come before any solve
             notes.append(f"{exc}; {NOT_RATED}")
-            refused = True
+            refused, feasible = True, False
+        except Exception as exc:  # batch boundary, as for the map
+            _log.exception("thermal context of candidate %s failed", candidate.id)
+            return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
         if not refused:
             try:
                 first = None
@@ -199,6 +210,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
             except InterruptedError:
                 return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
             except Exception as exc:  # batch boundary, as for the map: a failed solve must not lose the search
+                _log.exception("thermal rating of candidate %s failed", candidate.id)
                 return _failed(candidate, stage, type(exc).__name__, str(exc), j_limit)
     w = point.winding
     chosen = machine.model_copy(update={"turns_per_pole": w.turns,

@@ -53,6 +53,9 @@ class SearchSettings:
         return 1 + JS_STEP + GRADE_ALLOWANCE[worst]
 
 
+MAX_SAME_FAILURES = 3   # evaluations failing with one status before the search stops
+
+
 @dataclass(frozen=True)
 class SearchResult:
     requirements: Requirements
@@ -63,6 +66,7 @@ class SearchResult:
     cancelled: bool
     limit_rejected: dict[str, int] = field(default_factory=dict)   # candidates failing each hard limit
     dropped_pole_sets: dict[str, str] = field(default_factory=dict)   # "ns/nr" -> reason, removed before sampling
+    stopped: str = ""   # why the search stopped early on repeated failures; empty when it did not
 
     def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
         """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""
@@ -107,7 +111,7 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
     passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.iron, reverse=True)
     shortlist = passing[:settings.shortlist]
     evaluations: list[Evaluation] = []
-    cancelled = False
+    cancelled, stopped, failures = False, "", {}
     for done, (candidate, stage) in enumerate(shortlist, start=1):
         if cancel is not None and cancel():
             cancelled = True
@@ -124,7 +128,13 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
             cancelled = True
             break
         evaluations.append(evaluation)
+        if evaluation.status not in ("ok", "no_winding"):
+            failures[evaluation.status] = failures.get(evaluation.status, 0) + 1
+            if failures[evaluation.status] == MAX_SAME_FAILURES:
+                stopped = (f"stopped after {MAX_SAME_FAILURES} evaluations failed with {evaluation.status}: "
+                           f"{evaluation.error}")
+                break
         if progress is not None:
             progress(done, len(shortlist))
     return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled, limit_rejected,
-                        dropped_sets)
+                        dropped_sets, stopped)
