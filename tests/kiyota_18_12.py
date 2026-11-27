@@ -50,37 +50,41 @@ def waivers():
     return waive_rules("self_starting")
 
 
-def _params(clearance: float, stator_yoke: float, fill: float = FILL) -> RadialSRMParams:
+def _params(clearance: float, stator_yoke: float, fill: float = FILL, stator_arc: float = STATOR_ARC,
+            rotor_arc: float = ROTOR_ARC, rotor_yoke: float = ROTOR_YOKE) -> RadialSRMParams:
     return RadialSRMParams(
         n_stator_poles=18, n_rotor_poles=12, n_phases=3,
         stator_outer_diameter=STATOR_OD, rotor_outer_diameter=2 * ROTOR_R, air_gap=AIR_GAP,
         stack_length=STACK, shaft_diameter=2 * SHAFT_R,
-        stator_pole_arc=STATOR_ARC, rotor_pole_arc=ROTOR_ARC,
+        stator_pole_arc=stator_arc, rotor_pole_arc=rotor_arc,
         stator_pole_taper=STATOR_TAPER, rotor_pole_taper=ROTOR_TAPER,
-        stator_yoke_thickness=stator_yoke, rotor_yoke_thickness=ROTOR_YOKE,
+        stator_yoke_thickness=stator_yoke, rotor_yoke_thickness=rotor_yoke,
         stator_fillet_radius=0.0, rotor_fillet_radius=0.0,
         turns_per_pole=TURNS_PER_POLE, fill_factor=fill,
         slot_liner_thickness=LINER, coil_inner_clearance=clearance, lamination_thickness=LAMINATION,
     )
 
 
-def machine(stator_yoke: float = STATOR_YOKE) -> RadialSRMParams:
+def machine(stator_yoke: float = STATOR_YOKE, stator_arc: float = STATOR_ARC, rotor_arc: float = ROTOR_ARC,
+            rotor_yoke: float = ROTOR_YOKE) -> RadialSRMParams:
     """The 18/12 with the coil packed against the yoke: the clearance is solved so the coil side holds the copper
     area at the cited slot fill. The cited 56 % does not fit the coil area inside the liner (192 mm² against the
     204 mm² it needs, 199 mm² at the 15.5 mm yoke), so the cited fill is taken over a larger slot area than the
     model's coil side; the coil then fills the half slot at MIN_CLEARANCE and `fill_factor` is the copper over
     that coil area."""
     target = COPPER_AREA / FILL
-    p0 = _params(MIN_CLEARANCE, stator_yoke)
+    geo = dict(stator_arc=stator_arc, rotor_arc=rotor_arc, rotor_yoke=rotor_yoke)
+    p0 = _params(MIN_CLEARANCE, stator_yoke, **geo)
     area0 = coil_geometry(p0).area
     if area0 <= target:
-        return _params(MIN_CLEARANCE, stator_yoke, COPPER_AREA / area0)
+        return _params(MIN_CLEARANCE, stator_yoke, COPPER_AREA / area0, **geo)
     hi = p0.stator_yoke_inner_radius - p0.slot_liner_thickness - p0.bore_radius - 1e-4
-    clearance = brentq(lambda c: coil_geometry(_params(c, stator_yoke)).area - target, MIN_CLEARANCE, hi, xtol=1e-9)
-    return _params(clearance, stator_yoke)
+    clearance = brentq(lambda c: coil_geometry(_params(c, stator_yoke, **geo)).area - target, MIN_CLEARANCE, hi, xtol=1e-9)
+    return _params(clearance, stator_yoke, **geo)
 
 
-def design(preset: str = "full", stator_yoke: float = STATOR_YOKE) -> Design:
-    p = machine(stator_yoke).model_copy(update={"materials": RegionMaterials(stator="10JNEX900", rotor="10JNEX900")})
+def design(preset: str = "full", stator_yoke: float = STATOR_YOKE, stator_arc: float = STATOR_ARC,
+           rotor_arc: float = ROTOR_ARC, rotor_yoke: float = ROTOR_YOKE) -> Design:
+    p = machine(stator_yoke, stator_arc, rotor_arc, rotor_yoke).model_copy(update={"materials": RegionMaterials(stator="10JNEX900", rotor="10JNEX900")})
     with waivers():
         return Design(machine=p, mesh=MeshSettings(preset=preset))
