@@ -119,6 +119,8 @@ def run(preset="full", points=None, workers=None, cache_dir=None, solver="ngsolv
                                                              workers, cache_dir, fractions)
             c = row[variant]
             if c:
+                c["psi_on"] = float(trace.psi_on)
+                c["conduction"] = "continuous" if trace.psi_on > 0 else "single pulse"
                 log(f"{name} [{variant}]: {rpm:.0f} rpm, T {c['torque_model']:.1f} N·m, iron {c['model_iron_w']:.0f} W "
                     f"vs {iron:.0f} W (x{c['ratio_measured_over_model']:.2f}), peak {c['computed_peak']:.0f} A, "
                     f"rms {c['computed_rms']:.1f} A")
@@ -149,8 +151,8 @@ def main():
         points = set(args[args.index("--points") + 1:])
     out = run(preset, points, workers, cache_dir, stator_yoke=yoke)
     print(f"\nKiyota 18/12, preset {preset}, stator yoke {1e3 * yoke:.1f} mm, R {1e3 * R_PHASE:.1f} mohm at 75 C.")
-    print("| Point | rpm | f_e (Hz) | T target (N·m) | Variant | peak meas/comp (A) | rms meas/comp (A) | "
-          "iron meas (W) | iron model (W) | cut-edge range (W) | +/- | meas/model |\n|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("| Point | rpm | f_e (Hz) | T target (N·m) | Variant | conduction | peak meas/comp (A) | rms meas/comp (A) | "
+          "iron meas (W) | iron model (W) | cut-edge range (W) | +/- | meas/model |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in out["points"]:
         for v in ("torque", "current"):
             c = r[v]
@@ -158,7 +160,7 @@ def main():
                 continue
             mp = "-" if r["measured_peak"] is None else f"{r['measured_peak']:.0f}"
             mr = "-" if r["measured_rms"] is None else f"{r['measured_rms']:.1f}"
-            print(f"| {r['name']} | {r['rpm']:.0f} | {r['f_elec_hz']:.0f} | {r['torque_target']:.1f} | {v} | "
+            print(f"| {r['name']} | {r['rpm']:.0f} | {r['f_elec_hz']:.0f} | {r['torque_target']:.1f} | {v} | {c['conduction']} | "
                   f"{mp} / {c['computed_peak']:.0f} | {mr} / {c['computed_rms']:.1f} | {r['measured_iron_w']:.0f} | "
                   f"{c['model_iron_w']:.0f} | {c['cut_edge_low_w']:.0f} to {c['cut_edge_high_w']:.0f} | "
                   f"{c['iron_uncertainty_pct']:.0f} % | {c['ratio_measured_over_model']:.2f} |")

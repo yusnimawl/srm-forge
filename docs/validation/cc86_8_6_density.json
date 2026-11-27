@@ -1,0 +1,321 @@
+{
+ "case": {
+  "machine": "8/6 screening density (make_8_6, MeshSettings screening)",
+  "requirements": {
+   "peak_power_w": 1000,
+   "peak_torque_nm": 3.2,
+   "base_speed_rpm": 3000,
+   "max_speed_rpm": 6000
+  },
+  "material": "M19 (no loss data, not thermally rated)",
+  "srmapp_versions": {
+   "main": "0.9.1",
+   "branch": "0.10.0"
+  },
+  "conduction_rule": "continuous when the phase-A current waveform is above 0 at every sample"
+ },
+ "runs": {
+  "auto": {
+   "main": {
+    "winding": "Winding(turns=242, strands=1, copper_area=6.731520305637964e-07, current=13.463040611275927, resistance=4.988872621818632, copper_mass=3.3471634449263363, wire=None, paths=1)",
+    "turns": 242.0,
+    "paths": 1.0,
+    "wall_s": 57.85058557498269
+   },
+   "branch": {
+    "winding": "Winding(turns=500, strands=1, copper_area=3.2580558279287746e-07, current=6.516111655857549, resistance=21.296669548778393, copper_mass=3.3471634449263363, wire=None, paths=1)",
+    "turns": 500.0,
+    "paths": 1.0,
+    "wall_s": 366.81508130801376
+   },
+   "speeds": [
+    {
+     "rpm": 300.0,
+     "main_torque_nm": 41.957745856259216,
+     "branch_torque_nm": 41.130992970937605,
+     "main_i_rms_a": 9.272799897771202,
+     "branch_i_rms_a": 4.489596718066141,
+     "branch_conduction": "single",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 750.0,
+     "main_torque_nm": 40.73701923599124,
+     "branch_torque_nm": 30.61204446153656,
+     "main_i_rms_a": 9.136820197313948,
+     "branch_i_rms_a": 4.385654293104109,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 1500.0,
+     "main_torque_nm": 28.61362693726498,
+     "branch_torque_nm": 15.321723156297356,
+     "main_i_rms_a": 7.315128035660598,
+     "branch_i_rms_a": 3.7732834700916573,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3000.0,
+     "main_torque_nm": 7.247046357604291,
+     "branch_torque_nm": 7.655194997685477,
+     "main_i_rms_a": 3.176422576892541,
+     "branch_i_rms_a": 3.7777870015709047,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3272.727272727273,
+     "main_torque_nm": 5.999129580655604,
+     "branch_torque_nm": 7.005509791837894,
+     "main_i_rms_a": 2.8883514058339785,
+     "branch_i_rms_a": 3.7792239394957723,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3545.4545454545455,
+     "main_torque_nm": 5.086937732485124,
+     "branch_torque_nm": 6.450276601006011,
+     "main_i_rms_a": 2.6543873337237636,
+     "branch_i_rms_a": 3.7781166382679587,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3818.181818181818,
+     "main_torque_nm": 4.37703792012927,
+     "branch_torque_nm": 5.974871973774658,
+     "main_i_rms_a": 2.4574906229217,
+     "branch_i_rms_a": 3.7766444554091465,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4090.909090909091,
+     "main_torque_nm": 3.814479214889933,
+     "branch_torque_nm": 5.56399556261797,
+     "main_i_rms_a": 2.28931020742293,
+     "branch_i_rms_a": 3.775545310121088,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4363.636363636364,
+     "main_torque_nm": 3.359657508329711,
+     "branch_torque_nm": 5.206356330760892,
+     "main_i_rms_a": 2.1438226767300237,
+     "branch_i_rms_a": 3.7747110347187367,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4636.363636363636,
+     "main_torque_nm": 2.983862083768259,
+     "branch_torque_nm": 4.8914885235308105,
+     "main_i_rms_a": 2.01658918945743,
+     "branch_i_rms_a": 3.7740668995565594,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4909.090909090909,
+     "main_torque_nm": 2.667812968642565,
+     "branch_torque_nm": 4.6119580238748785,
+     "main_i_rms_a": 1.9042289828885568,
+     "branch_i_rms_a": 3.773239178020216,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5181.818181818182,
+     "main_torque_nm": 2.3812140397245414,
+     "branch_torque_nm": 4.362557272616717,
+     "main_i_rms_a": 1.8012117412082094,
+     "branch_i_rms_a": 3.772472484581516,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5454.545454545455,
+     "main_torque_nm": 2.1530435699297135,
+     "branch_torque_nm": 4.138502553059656,
+     "main_i_rms_a": 1.7116057461641332,
+     "branch_i_rms_a": 3.771832895963127,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5727.272727272728,
+     "main_torque_nm": 1.9559366412327337,
+     "branch_torque_nm": 3.9361902472123234,
+     "main_i_rms_a": 1.6307121581142916,
+     "branch_i_rms_a": 3.7712907600558663,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 6000.0,
+     "main_torque_nm": 1.7845527716301706,
+     "branch_torque_nm": 3.7528245356802996,
+     "main_i_rms_a": 1.557276181109847,
+     "branch_i_rms_a": 3.7708297501595793,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    }
+   ]
+  },
+  "fixed_242": {
+   "main": {
+    "winding": "Winding(turns=242, strands=1, copper_area=6.731520305637964e-07, current=13.463040611275927, resistance=4.988872621818632, copper_mass=3.3471634449263363, wire=None, paths=1)",
+    "turns": 242.0,
+    "paths": 1.0,
+    "wall_s": 1.0952229889808223
+   },
+   "branch": {
+    "winding": "Winding(turns=242, strands=1, copper_area=6.731520305637964e-07, current=13.463040611275927, resistance=4.988872621818632, copper_mass=3.3471634449263363, wire=None, paths=1)",
+    "turns": 242.0,
+    "paths": 1.0,
+    "wall_s": 6.0618102320004255
+   },
+   "speeds": [
+    {
+     "rpm": 300.0,
+     "main_torque_nm": 41.957745856259216,
+     "branch_torque_nm": 41.957745856259216,
+     "main_i_rms_a": 9.272799897771202,
+     "branch_i_rms_a": 9.272799897771202,
+     "branch_conduction": "single",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 750.0,
+     "main_torque_nm": 40.73701923599124,
+     "branch_torque_nm": 40.73701923599124,
+     "main_i_rms_a": 9.136820197313948,
+     "branch_i_rms_a": 9.136820197313948,
+     "branch_conduction": "single",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 1500.0,
+     "main_torque_nm": 28.61362693726498,
+     "branch_torque_nm": 34.80421780780911,
+     "main_i_rms_a": 7.315128035660598,
+     "branch_i_rms_a": 9.128813032596645,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3000.0,
+     "main_torque_nm": 7.247046357604291,
+     "branch_torque_nm": 18.205205838772557,
+     "main_i_rms_a": 3.176422576892541,
+     "branch_i_rms_a": 8.015937163194952,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3272.727272727273,
+     "main_torque_nm": 5.999129580655604,
+     "branch_torque_nm": 16.67321068505891,
+     "main_i_rms_a": 2.8883514058339785,
+     "branch_i_rms_a": 7.9833292761345245,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3545.4545454545455,
+     "main_torque_nm": 5.086937732485124,
+     "branch_torque_nm": 15.374571366284142,
+     "main_i_rms_a": 2.6543873337237636,
+     "branch_i_rms_a": 7.949066802054678,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 3818.181818181818,
+     "main_torque_nm": 4.37703792012927,
+     "branch_torque_nm": 14.259244539384351,
+     "main_i_rms_a": 2.4574906229217,
+     "branch_i_rms_a": 7.92132505059001,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4090.909090909091,
+     "main_torque_nm": 3.814479214889933,
+     "branch_torque_nm": 13.299134824345265,
+     "main_i_rms_a": 2.28931020742293,
+     "branch_i_rms_a": 7.907284578482016,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4363.636363636364,
+     "main_torque_nm": 3.359657508329711,
+     "branch_torque_nm": 12.456220695591242,
+     "main_i_rms_a": 2.1438226767300237,
+     "branch_i_rms_a": 7.887958251492091,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4636.363636363636,
+     "main_torque_nm": 2.983862083768259,
+     "branch_torque_nm": 11.718460319078849,
+     "main_i_rms_a": 2.01658918945743,
+     "branch_i_rms_a": 7.879482430164408,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 4909.090909090909,
+     "main_torque_nm": 2.667812968642565,
+     "branch_torque_nm": 11.05808304016616,
+     "main_i_rms_a": 1.9042289828885568,
+     "branch_i_rms_a": 7.870880996996047,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5181.818181818182,
+     "main_torque_nm": 2.3812140397245414,
+     "branch_torque_nm": 10.466822682929152,
+     "main_i_rms_a": 1.8012117412082094,
+     "branch_i_rms_a": 7.864141241771409,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5454.545454545455,
+     "main_torque_nm": 2.1530435699297135,
+     "branch_torque_nm": 9.93792013908702,
+     "main_i_rms_a": 1.7116057461641332,
+     "branch_i_rms_a": 7.847796581110666,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 5727.272727272728,
+     "main_torque_nm": 1.9559366412327337,
+     "branch_torque_nm": 9.463435153386488,
+     "main_i_rms_a": 1.6307121581142916,
+     "branch_i_rms_a": 7.84296504108848,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    },
+    {
+     "rpm": 6000.0,
+     "main_torque_nm": 1.7845527716301706,
+     "branch_torque_nm": 9.031746907994503,
+     "main_i_rms_a": 1.557276181109847,
+     "branch_i_rms_a": 7.838635163429714,
+     "branch_conduction": "continuous",
+     "main_conduction": "single"
+    }
+   ]
+  }
+ }
+}

@@ -214,6 +214,7 @@ def test_real_search_job_in_thread(make, tmp_path):
     SearchRequest.model_validate(req)
     store, runner = make(lambda kind, r, rep, ctx: run_job(kind, r, rep, ctx))
     j = runner.submit("search", req)
+    # The real search job took 1146 to 1158 s on slow run 45881425276 (2026-11-26).
     got = _wait(store, j, {"done", "failed", "cancelled"}, timeout=5400)
     assert got["status"] == "done", got
     result = store.get_result(j)

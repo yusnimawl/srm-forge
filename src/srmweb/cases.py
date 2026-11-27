@@ -18,7 +18,7 @@ BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that
 # rating span (first thermal callback to return, winding checks included) when none has been timed: LattePanda x 1.25
 # (8/6, screening 850 s, full 1631 s; docs/validation/r5d_rating_*.json); reference = 4 x full
 RATING_BUDGET_S = {"screening": 1063.0, "full": 2039.0, "reference": 8155.0}
-SCAN_BUDGET_S = {"auto": 72.0, "fixed": 1.0}    # winding-choice time when none has been timed: LattePanda x 1.25
+SCAN_BUDGET_S = {"auto": 454.1, "fixed": 8.0}    # winding-choice time when none has been timed: LattePanda x 1.25
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
 
 

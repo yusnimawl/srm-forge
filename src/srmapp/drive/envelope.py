@@ -1,7 +1,10 @@
 """Minimal drive model: torque-speed envelope of a machine from the ψ/T map of phase A (v0 spec §4.5).
 
-Single-pulse voltage control with a hysteresis current limit (the map's I_max unless given), ideal commutation, no
-mutual coupling (the other phases are open in the map) and no iron loss. Peak-only and unvalidated."""
+Voltage control with a hysteresis current limit (the map's I_max unless given) and ideal commutation: a single pulse
+per period. For on/off pairs whose single pulse does not complete, the periodic steady state (continuous conduction,
+the flux left at turn-on); the envelope takes whichever pair gives most work. No
+mutual coupling (the other phases are open in the map), which continuous conduction makes larger, and no iron loss.
+Peak-only and unvalidated."""
 import math
 from dataclasses import dataclass
 
@@ -20,6 +23,8 @@ OFF_RANGE = (0.45, 1.25)       # turn-off search range, fraction of the pitch fr
 OFF_ALIGNED_END = 0.995        # the turn-off grid has n_off points up to here, and continues at the same spacing
 N_ON, N_OFF = 80, 80
 _EPS = 1e-9
+PERIODIC_TOL = 1e-6          # root tolerance, fraction of the largest limit flux: 1e-4 already moves the least-copper current by 0.2 %
+PERIODIC_MAX_ITER = 60       # Illinois needs at most 22 on the probed designs; a stroke left unconverged is invalid
 
 
 @dataclass(frozen=True)
@@ -41,6 +46,10 @@ class Envelope:
     `work_loop` is ∮ i dψ for the chosen stroke; they agree up to discretisation. `i_rms` is the phase RMS current
     over one rotor pole pitch of the chosen stroke (0 where no stroke is valid). `theta_off` may exceed one pitch: the
     flux tail runs past alignment, and `theta_off` is then measured from the start of the table.
+
+    A chosen stroke is a single pulse or a continuous-conduction stroke whose flux does not return to zero before the
+    next turn-on (a pair whose single pulse does not complete uses the periodic steady state; the pair with most work
+    wins at each speed).
 
     `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
     stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the
@@ -103,26 +112,34 @@ def power_factor(power: np.ndarray, voltage: np.ndarray, current: np.ndarray, n_
         return np.where(den > 0, power / den, np.nan)
 
 
-def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray,
-              trace: bool = False):
-    """One stroke for every (on, off) index pair, each simulated from its turn-on over exactly one period on the
-    periodic table (the flux tail runs past alignment into the start of the next period). `off` may exceed the table
-    end. Returns (work_torque, work_loop, ∫i² dθ, valid), and with `trace` also ψ and i at every step from turn-on,
-    shape (n_theta, n_pairs). A stroke is valid when its flux is back to 1 % of its peak before the same phase turns
-    on again.
+def _run(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray, psi0: np.ndarray,
+         trace: bool = False):
+    """One period for every (on, off) index pair, each simulated from its turn-on with the flux `psi0` (Wb-turns;
+    0 is the stroke from rest), on the periodic table (the flux tail runs past alignment into the start of the next
+    period). `off` may exceed the table end. Returns (work_torque, work_loop, ∫i² dθ, end flux, peak flux, beyond),
+    and with `trace` also ψ and i at every step from turn-on, shape (n_theta, n_pairs), row 0 the start. `beyond` is
+    true for a stroke that at some step would hold the current above the limit even with full negative voltage.
 
-    The pairs are kept sorted by turn-on, so the strokes running at step `a` (turn-on in (a - n, a]) are one
-    contiguous slice and only that slice is advanced. A stroke that was running at the previous step starts its
-    step at the end torque of that step, which is reused except where the table row wraps."""
+    The pairs are kept sorted by turn-on (`psi0` with them), so the strokes running at step `a` (turn-on in
+    (a - n, a]) are one contiguous slice and only that slice is advanced. A stroke that was running at the previous
+    step starts its step at the end torque of that step, which is reused except where the table row wraps."""
     n = t.theta.size - 1
     order = None if on.size < 2 or np.all(on[1:] >= on[:-1]) else np.argsort(on, kind="stable")
     if order is not None:
-        on, off = on[order], off[order]
-    psi, i = np.zeros(on.size), np.zeros(on.size)
+        on, off, psi0 = on[order], off[order], psi0[order]
+    psi = np.array(psi0, dtype=float)
+    i = np.zeros(on.size)
+    for k in np.unique(on[psi > 0] % n):
+        m = (on % n == k) & (psi > 0)
+        i[m] = np.interp(psi[m], t.psi[k], t.current)
+    lim = t.psi[:, -1]
+    beyond = np.zeros(on.size, bool)
     w_t, w_l, i2, peak = np.zeros(on.size), np.zeros(on.size), np.zeros(on.size), np.zeros(on.size)
     tq_end = np.zeros(on.size)       # torque at the end of the previous step, per stroke
     dth = t.theta[1] - t.theta[0]
     psi_t, i_t = (np.zeros((n + 1, on.size)), np.zeros((n + 1, on.size))) if trace else (None, None)
+    if trace:
+        psi_t[0], i_t[0] = psi, i
     steps = np.arange(int(on.max()) + n)
     first = np.searchsorted(on, steps - n, side="right")     # strokes with on <= a - n have finished
     started = np.searchsorted(on, steps, side="right")       # strokes with on <= a
@@ -133,6 +150,7 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
         s = slice(lo, hi)
         psi_s, i_s = psi[s], i[s]
         pulse = a < off[s]
+        beyond[s] |= psi_s - (volts + r * i_s) / omega * dth > lim[k + 1] * (1 + _EPS)
         v = np.where(pulse, volts, -volts)
         new = psi_s + (v - r * i_s) / omega * dth
         new = np.where(pulse, np.minimum(new, t.psi[k + 1, -1]), new)     # current limit while the pulse is on
@@ -152,8 +170,7 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
             idx = np.arange(lo, hi)
             psi_t[a + 1 - on[idx], idx] = new
             i_t[a + 1 - on[idx], idx] = i_new
-    valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # the flux must be gone before the next turn-on
-    out = (w_t, w_l, i2, valid, psi_t, i_t) if trace else (w_t, w_l, i2, valid)
+    out = (w_t, w_l, i2, psi, peak, beyond, psi_t, i_t) if trace else (w_t, w_l, i2, psi, peak, beyond)
     if order is not None:
         back = np.empty_like(order)
         back[order] = np.arange(order.size)
@@ -161,11 +178,69 @@ def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, 
     return out
 
 
-def _stroke_waveforms(t: _Tables, omega: float, volts: float, r: float, on: int, off: int):
-    """Current, flux, average phase voltage, torque and dc-link current of one stroke, each shape (n,) on the table
-    angles (the tail wraps into the start of the period)."""
+def _simulate(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray,
+              trace: bool = False):
+    """One stroke for every (on, off) index pair, each simulated from its turn-on at zero flux over exactly one
+    period (see `_run`). Returns (work_torque, work_loop, ∫i² dθ, valid), and with `trace` also ψ and i at every step
+    from turn-on, shape (n_theta, n_pairs). A stroke is valid when its flux is back to 1 % of its peak before the
+    same phase turns on again."""
+    w_t, w_l, i2, psi, peak, _, *tr = _run(t, omega, volts, r, on, off, np.zeros(on.size), trace)
+    valid = psi <= 0.01 * np.maximum(peak, 1e-12)       # the flux must be gone before the next turn-on
+    return (w_t, w_l, i2, valid, *tr)
+
+
+def _strokes(t: _Tables, omega: float, volts: float, r: float, on: np.ndarray, off: np.ndarray):
+    """Single-pulse strokes (`_simulate`), plus the periodic steady state of every stroke `_simulate` rejects.
+    With F(p) the end flux of one period that starts at turn-on with flux p, a rejected stroke has F(0) > 0 and
+    G = F - p falls with p, so a root in [0, ψ(θ_on, I_lim)] is found by Illinois regula falsi. A root is accepted
+    when it converged and no step needs more than the current limit (`_run` `beyond`). Returns (work_torque,
+    work_loop, ∫i² dθ, valid, start flux); accepted periodic strokes carry their integrals and root, every other
+    stroke keeps `_simulate`'s numbers and a start flux of 0."""
     n = t.theta.size - 1
-    *_, psi_r, i_r = _simulate(t, omega, volts, r, np.array([on]), np.array([off]), trace=True)
+    w_t, w_l, i2, valid = _simulate(t, omega, volts, r, on, off)
+    psi0 = np.zeros(on.size)
+    sel = np.flatnonzero(~valid)
+    if sel.size == 0:
+        return w_t, w_l, i2, valid, psi0
+    o, f = on[sel], off[sel]
+    tol = PERIODIC_TOL * t.psi[:, -1].max()
+    lo, hi = np.zeros(sel.size), t.psi[o % n, -1].copy()
+    g_lo = _run(t, omega, volts, r, o, f, lo)[3] - lo
+    g_hi = _run(t, omega, volts, r, o, f, hi)[3] - hi
+    act = g_hi <= 0                                      # G(cap) > 0: no admissible periodic state
+    ok = act.copy()
+    x = hi.copy()
+    side = np.zeros(sel.size, int)
+    for _ in range(PERIODIC_MAX_ITER):
+        idx = np.flatnonzero(act)
+        if idx.size == 0:
+            break
+        xn = (lo[idx] * g_hi[idx] - hi[idx] * g_lo[idx]) / (g_hi[idx] - g_lo[idx])
+        g = _run(t, omega, volts, r, o[idx], f[idx], xn)[3] - xn
+        x[idx] = xn
+        done = (np.abs(g) <= tol) | (hi[idx] - lo[idx] <= tol)
+        pos = g > 0
+        up, down = idx[pos], idx[~pos]
+        g_hi[up[side[up] == 1]] *= 0.5                   # Illinois: halve the retained end after two moves on one side
+        lo[up], g_lo[up], side[up] = xn[pos], g[pos], 1
+        g_lo[down[side[down] == -1]] *= 0.5
+        hi[down], g_hi[down], side[down] = xn[~pos], g[~pos], -1
+        act[idx[done]] = False
+    idx = np.flatnonzero(ok & ~act)
+    if idx.size:
+        a_t, a_l, a_i2, _, _, beyond = _run(t, omega, volts, r, o[idx], f[idx], x[idx])
+        good = ~beyond
+        gi = sel[idx[good]]
+        w_t[gi], w_l[gi], i2[gi], psi0[gi] = a_t[good], a_l[good], a_i2[good], x[idx[good]]
+        valid[gi] = True
+    return w_t, w_l, i2, valid, psi0
+
+
+def _stroke_waveforms(t: _Tables, omega: float, volts: float, r: float, on: int, off: int, psi0: float = 0.0):
+    """Current, flux, average phase voltage, torque and dc-link current of one stroke from its root flux `psi0`, each
+    shape (n,) on the table angles (the tail wraps into the start of the period)."""
+    n = t.theta.size - 1
+    *_, psi_r, i_r = _run(t, omega, volts, r, np.array([on]), np.array([off]), np.array([float(psi0)]), trace=True)
     psi_r, i_r = psi_r[:, 0], i_r[:, 0]
     i_bar = 0.5 * (i_r[:-1] + i_r[1:])
     v = omega * np.diff(psi_r) / (t.theta[1] - t.theta[0]) + r * i_bar
@@ -226,7 +301,7 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     traces = []
     for rpm in speeds:
         omega = rpm * 2 * math.pi / 60
-        w_t, w_l, i2, valid = _simulate(t, omega, bus_voltage, resistance, on, off)
+        w_t, w_l, i2, valid, psi0 = _strokes(t, omega, bus_voltage, resistance, on, off)
         if rms_limit is not None:
             valid &= i2 / period <= rms_limit**2 * (1 + _EPS)
         best = int(np.argmax(np.where(valid, w_t, -np.inf))) if valid.any() else -1
@@ -235,7 +310,8 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
             traces.append((zero,) * 5)
             continue
         if waveforms:
-            traces.append(_stroke_waveforms(t, omega, bus_voltage, resistance, int(on[best]), int(off[best])))
+            traces.append(_stroke_waveforms(t, omega, bus_voltage, resistance, int(on[best]), int(off[best]),
+                                                 float(psi0[best])))
         strokes_per_rev = machine.n_phases * machine.n_rotor_poles
         rows.append((strokes_per_rev * w_t[best] / (2 * math.pi),
                      machine.n_phases * resistance * i2[best] / period,
@@ -256,7 +332,8 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
 @dataclass(frozen=True)
 class StrokeTrace:
     """One stroke of phase A on the table angles (n,), tail wrapped into the start of the period. `current_limit`
-    is the hysteresis limit (A), `torque_avg` the revolution average over all phases, `copper_dc_w` = q·R·i_rms²."""
+    is the hysteresis limit (A), `torque_avg` the revolution average over all phases, `copper_dc_w` = q·R·i_rms².
+    `psi_on` is the flux at turn-on (Wb-turns): 0 for a single pulse, above 0 for a continuous-conduction stroke."""
     theta_on: float
     theta_off: float
     current_limit: float
@@ -266,6 +343,7 @@ class StrokeTrace:
     i_rms: float
     copper_dc_w: float
     valid: bool = True
+    psi_on: float = 0.0
 
 
 def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float,
@@ -287,32 +365,33 @@ def min_copper_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: 
     for k in range(1, n_limits + 1):
         limit = k / n_limits * top_current
         t = _tables(result, period, limit, n_theta)
-        w_t, _, i2, valid = _simulate(t, omega, bus_voltage, resistance, on, off)
+        w_t, _, i2, valid, psi0 = _strokes(t, omega, bus_voltage, resistance, on, off)
         ok = valid & (per_rev * w_t >= torque_nm)
         if not ok.any():
             continue
         j = int(np.argmin(np.where(ok, i2, np.inf)))
         if best is None or i2[j] < best[0]:
-            best = (i2[j], t, limit, int(on[j]), int(off[j]), per_rev * w_t[j])
+            best = (i2[j], t, limit, int(on[j]), int(off[j]), per_rev * w_t[j], float(psi0[j]))
     if best is None:
         return None
-    i2, t, limit, o, f, tq = best
-    return _trace(t, machine, omega, bus_voltage, resistance, limit, o, f, tq, i2, True)
+    i2, t, limit, o, f, tq, p0 = best
+    return _trace(t, machine, omega, bus_voltage, resistance, limit, o, f, tq, i2, True, p0)
 
 
 def _trace(t: _Tables, machine: RadialSRMParams, omega: float, volts: float, resistance: float, limit: float,
-           on: int, off: int, torque: float, i2: float, valid: bool) -> StrokeTrace:
+           on: int, off: int, torque: float, i2: float, valid: bool, psi0: float = 0.0) -> StrokeTrace:
     period = t.theta[-1]
-    cur, psi, *_ = _stroke_waveforms(t, omega, volts, resistance, on, off)
+    cur, psi, *_ = _stroke_waveforms(t, omega, volts, resistance, on, off, psi0)
     return StrokeTrace(_theta(t, on), _theta(t, off), limit, cur, psi, torque, math.sqrt(i2 / period),
-                       machine.n_phases * resistance * i2 / period, valid)
+                       machine.n_phases * resistance * i2 / period, valid, psi0)
 
 
 def fixed_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float, resistance: float, rpm: float,
                  theta_on: float, theta_off: float, current_limit: float, *, n_theta: int = N_THETA) -> StrokeTrace:
-    """The single pulse from `theta_on` to `theta_off` (rad on the table, 0 = aligned; `theta_off` may exceed one rotor
+    """The stroke from `theta_on` to `theta_off` (rad on the table, 0 = aligned; `theta_off` may exceed one rotor
     pole pitch) with the hysteresis limit `current_limit` (A, at most the map's top current), snapped to the table
-    angles. `valid` is False when the flux has not died away before the next turn-on."""
+    angles: a single pulse, or the periodic steady state where the flux does not die away before the next turn-on.
+    `valid` is False when no periodic state keeps the current within the limit."""
     require_complete(result)
     if result.excited != "A":
         raise ValueError("the envelope needs the phase A map (excited='A')")
@@ -325,7 +404,7 @@ def fixed_stroke(result: MapResult, machine: RadialSRMParams, bus_voltage: float
         raise ValueError(f"the pulse needs 0 <= theta_on < theta_off, got {theta_on} and {theta_off} rad")
     t = _tables(result, period, current_limit, n_theta)
     omega = rpm * 2 * math.pi / 60
-    w_t, _, i2, valid = _simulate(t, omega, bus_voltage, resistance, np.array([on]), np.array([off]))
+    w_t, _, i2, valid, psi0 = _strokes(t, omega, bus_voltage, resistance, np.array([on]), np.array([off]))
     per_rev = machine.n_phases * machine.n_rotor_poles / (2 * math.pi)
     return _trace(t, machine, omega, bus_voltage, resistance, current_limit, on, off, per_rev * w_t[0], i2[0],
-                  bool(valid[0]))
+                  bool(valid[0]), float(psi0[0]))

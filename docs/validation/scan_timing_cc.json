@@ -1,0 +1,63 @@
+{
+  "machine": "server-LattePanda-Sigma",
+  "cpus": 16,
+  "date": "2026-11-27",
+  "rows": [
+    {
+      "mode": "density",
+      "winding": "auto",
+      "workers": 1,
+      "seconds": 1770.6917711569695,
+      "scanned": 1000
+    },
+    {
+      "mode": "density",
+      "winding": "fixed",
+      "workers": 1,
+      "seconds": 6.39406812004745,
+      "scanned": 1
+    },
+    {
+      "mode": "density",
+      "winding": "auto",
+      "workers": 8,
+      "seconds": 363.29452550795395,
+      "scanned": 1000
+    },
+    {
+      "mode": "density",
+      "winding": "fixed",
+      "workers": 8,
+      "seconds": 6.398432973015588,
+      "scanned": 1
+    },
+    {
+      "mode": "wire",
+      "winding": "auto",
+      "workers": 1,
+      "seconds": 5.846822338993661,
+      "scanned": 12
+    },
+    {
+      "mode": "wire",
+      "winding": "fixed",
+      "workers": 1,
+      "seconds": 1.518550518027041,
+      "scanned": 1
+    },
+    {
+      "mode": "wire",
+      "winding": "auto",
+      "workers": 8,
+      "seconds": 5.842928658996243,
+      "scanned": 12
+    },
+    {
+      "mode": "wire",
+      "winding": "fixed",
+      "workers": 8,
+      "seconds": 1.5721204099827446,
+      "scanned": 1
+    }
+  ]
+}

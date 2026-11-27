@@ -70,4 +70,24 @@ run used a setup this page does not fully state. Fewer than `MIN_PARALLEL_JOBS` 
 so its 8-worker time equals the 1-worker time. Density 1 worker ran 239 s, 246 s and 257 s over three runs.
 
 `SCAN_BUDGET_S` in `srmweb/cases.py` (the estimate before any scan was timed) is the measured time x 1.25, the rule
-of the M5e2 speed budgets: "auto" 72 s from density mode at 8 workers (the slower mode), "fixed" 1 s.
+of the M5e2 speed budgets. The 2026-11-18 values were "auto" 72 s and "fixed" 1 s; from 2026-11-27 they are in
+the next section.
+
+## With continuous conduction (srmapp 0.10.0, LattePanda, 2026-11-27)
+
+The 2026-11-18 table above is the single-pulse drive. Strokes the single-pulse simulation rejects now go through a
+periodic-steady-state search, so the density scan is about 6x slower. Same case, machine and command
+(`python examples/scan_timing.py`; `docs/validation/scan_timing_cc.json`):
+
+| Mode | Winding | 1 worker | 8 workers | Before (1 / 8 workers) |
+|---|---|---|---|---|
+| density | auto | 1770.7 s | 363.3 s | 239 s / 57.2 s |
+| density | fixed | 6.4 s | 6.4 s | 0.8 s |
+| wire | auto | 5.8 s | 5.8 s | 3.8 s |
+| wire | fixed | 1.5 to 1.6 s | 1.5 to 1.6 s | 0.8 s |
+
+The density "fixed" 6.4 s is the 500-turn winding the branch picks, against 0.8 s for main's 242-turn one, so `SCAN_BUDGET_S["fixed"]` 8.0 s comes from the slower case (conservative).
+
+The wire windings are single pulse apart from a few strokes, so their time moved little (3.8 s to 5.8 s auto).
+
+`SCAN_BUDGET_S` is now "auto" 454.1 s (363.3 s x 1.25, density at 8 workers) and "fixed" 8.0 s (6.4 s x 1.25).

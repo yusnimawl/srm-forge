@@ -1,5 +1,6 @@
 """The winding scan (`turns.choose_turns`) and the drive simulation under it give the same numbers as the unoptimised
-code kept in `envelope_reference.py`: bit for bit, not within a tolerance."""
+single-pulse code kept in `envelope_reference.py` plus the same periodic layer (`_strokes`): bit for bit, not
+within a tolerance."""
 import math
 
 import numpy as np
@@ -81,7 +82,8 @@ def test_envelope_without_waveforms_has_the_same_numbers():
 
 
 def _reference_scan(result, req, every, **kw):
-    """Every `every`-th winding through the full `envelope` on the reference simulation, as choose_turns used to."""
+    """Every `every`-th winding through the full `envelope` on the reference single-pulse simulation (the periodic layer
+    stays), as choose_turns used to."""
     choice = choose_turns(result, MACHINE, req, **kw)
     grid = turns.speed_grid(req)
     band = grid[grid >= req.base_speed_rpm]
