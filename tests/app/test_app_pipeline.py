@@ -131,8 +131,8 @@ def test_explicit_margin_overrides_the_grade_rule():
 def test_search_candidates_use_the_settings_materials():
     with mock.patch("srmapp.pipeline.evaluate_stage2", side_effect=_fake) as ev:
         run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
-                   SearchSettings(n_candidates=4, shortlist=1, seed=1, materials=RegionMaterials()))
-    assert ev.call_args.args[0].design.machine.materials == RegionMaterials()
+                   SearchSettings(n_candidates=4, shortlist=1, seed=1, materials=RegionMaterials(rotor="10JNEX900")))
+    assert ev.call_args.args[0].design.machine.materials == RegionMaterials(rotor="10JNEX900")
     assert ev.call_args.kwargs["margin"] == pytest.approx(1.12)
 
 

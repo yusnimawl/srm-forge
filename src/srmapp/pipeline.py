@@ -10,6 +10,7 @@ from srmcore.materials.library import load_material
 from srmcore.maps.validation import GRADE_ALLOWANCE, JS_STEP
 from srmcore.model.design import RegionMaterials
 
+from .limits import SEARCH_REQUIRES_PASS, hard_limits
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
@@ -58,6 +59,7 @@ class SearchResult:
     stage1_rejected: int
     evaluations: tuple[Evaluation, ...]
     cancelled: bool
+    limit_rejected: dict[str, int] = field(default_factory=dict)   # candidates failing each hard limit
 
     def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
         """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""
@@ -82,7 +84,16 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
     margin = settings.resolved_margin
     scored = [(c, stage1(req, c.design.machine, margin, settings.j_peak, settings.peak_cap))
               for c in candidates]
-    passing = [(c, s) for c, s in scored if s.passes]
+    passing, limit_rejected = [], {}
+    for c, s in scored:
+        if not s.passes:
+            continue
+        bad = [lim.name for lim in hard_limits(req, c.design.machine)
+               if lim.status == "fail" or (lim.status == "not_run" and lim.name in SEARCH_REQUIRES_PASS)]
+        for name in bad:
+            limit_rejected[name] = limit_rejected.get(name, 0) + 1
+        if not bad:
+            passing.append((c, s))
     passing.sort(key=lambda cs: cs[1].torque_upper / cs[1].mass.iron, reverse=True)
     shortlist = passing[:settings.shortlist]
     evaluations: list[Evaluation] = []
@@ -105,4 +116,4 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
         evaluations.append(evaluation)
         if progress is not None:
             progress(done, len(shortlist))
-    return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled)
+    return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled, limit_rejected)

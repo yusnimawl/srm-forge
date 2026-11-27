@@ -42,12 +42,13 @@ def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, 
     beta_s, beta_r = limit * (1.0 + 0.6 * u[3]), limit * (1.0 + 0.7 * u[4])
     w_s = 2 * (d_r / 2 + gap) * math.sin(beta_s / 2)
     w_r = d_r * math.sin(beta_r / 2)
+    # The rotor yoke ratio starts at 0.55 because the stress model's box does (docs/r5-sources.md section 5).
     machine = RadialSRMParams(
         n_stator_poles=ns, n_rotor_poles=nr, n_phases=m,
         stator_outer_diameter=d_o, rotor_outer_diameter=d_r, air_gap=gap, stack_length=stack,
         shaft_diameter=d_r * (0.25 + 0.20 * u[7]),
         stator_pole_arc=beta_s, rotor_pole_arc=beta_r,
-        stator_yoke_thickness=w_s * (0.5 + 0.4 * u[5]), rotor_yoke_thickness=w_r * (0.5 + 0.5 * u[6]),
+        stator_yoke_thickness=w_s * (0.5 + 0.4 * u[5]), rotor_yoke_thickness=w_r * (0.55 + 0.45 * u[6]),
         turns_per_pole=REFERENCE_TURNS, fill_factor=0.5, slot_liner_thickness=4e-4, coil_inner_clearance=1e-3,
         lamination_thickness=lamination, max_speed_rpm=max_speed_rpm, materials=materials)
     root = 2 * pole_half_width(machine, machine.rotor_yoke_outer_radius)

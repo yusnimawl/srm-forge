@@ -18,6 +18,7 @@ from srmcore.model.design import Design
 from . import __version__
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
+from .limits import Limit, hard_limits
 from .requirements import Requirements
 from .sizing.estimates import active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
 from .sizing.generator import Candidate
@@ -83,6 +84,7 @@ class Evaluation:
     active_volume_l: float = _NAN              # litres, stator outer cylinder with the end windings (`active_volume`)
     rated_continuous_kw_per_l: float = _NAN    # as rated_continuous_kw_per_kg, per litre
     rated_peak_kw_per_l: float = _NAN
+    limits: tuple[Limit, ...] = ()             # the closed-form hard limits of the chosen design
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limit: float) -> Evaluation:
@@ -225,13 +227,16 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     over_mass = req.max_mass_kg is not None and mass > req.max_mass_kg
     if over_mass:
         notes.append(f"mass {mass:.2f} kg above the {req.max_mass_kg:.2f} kg limit")
+    limits = hard_limits(req, chosen)
+    notes += [lim.note for lim in limits if lim.status != "pass"]
+    failed_limit = any(lim.status == "fail" for lim in limits)
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       point.torque_ratio, point.power_ratio, peak_power, peak_power / 1000 / mass,
-                      float(env.efficiency[at_base]), feasible and not over_mass, env, key, choice.scan,
+                      float(env.efficiency[at_base]), feasible and not over_mass and not failed_limit, env, key, choice.scan,
                       i_rms, i_rms / (w.paths * w.copper_area), arrays,
                       map_curves(arrays, chosen, w, key, l_end * k * k), j_limit, rating=rating,
                       rated_continuous_kw_per_kg=_rated_kw_per_kg(rating, req, "continuous_nm", mass),
                       rated_peak_kw_per_kg=_rated_kw_per_kg(rating, req, "peak_nm", mass),
                       thermal_check=held, active_volume_l=litres,
                       rated_continuous_kw_per_l=_rated_kw_per_kg(rating, req, "continuous_nm", litres),
-                      rated_peak_kw_per_l=_rated_kw_per_kg(rating, req, "peak_nm", litres))
+                      rated_peak_kw_per_l=_rated_kw_per_kg(rating, req, "peak_nm", litres), limits=limits)

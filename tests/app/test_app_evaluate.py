@@ -187,7 +187,7 @@ def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
     e, stage = _evaluate(_req(wires=[THICK], phase_current_a=100.0, max_mass_kg=limit))
     assert stage.passes and e.status == "ok" and not e.feasible
     assert "mass" in e.error and f"{limit:.2f} kg limit" in e.error
-    assert free.error == "not thermally rated"
+    assert "not thermally rated" in free.error and "rotor stress not checked" in free.error
 
 
 @pytest.mark.slow
@@ -326,7 +326,7 @@ def test_no_winding_holds(monkeypatch):
     e, rated, checks = _ranked_eval(monkeypatch, [False, False, False])
     assert e.rating is None and not e.feasible and e.winding is checks[0]
     assert "no winding holds the rated hot-spot limit" in e.error and not rated.called
-    assert "3000 rpm" in e.error and "hot spot above the limit" in e.error and "checked" not in e.error
+    assert "3000 rpm" in e.error and "hot spot above the limit" in e.error and "EM-feasible windings" not in e.error
 
 
 def test_thermal_checks_stop_at_the_cap(monkeypatch):
