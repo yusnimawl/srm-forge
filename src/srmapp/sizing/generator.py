@@ -15,6 +15,7 @@ from srmcore.post.rotor_stress import pole_half_width
 from srmcore.topology.radial import build_outline
 
 from ..requirements import Requirements
+from .estimates import active_length
 
 # (stator poles, rotor poles, phases). About 57 % of the 16/12 samples (measured over 100 to 400 samples,
 # 10JNEX900, mostly the pole arc) fall outside the stress model's range (12 rotor poles were swept at 3 phases) and are rejected with that reason.
@@ -67,13 +68,13 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
                       preset: Literal["screening", "full"] = "full") -> tuple[list[Candidate], dict[str, int]]:
     """About `n` valid designs, split evenly over `pole_sets`, built from `materials` with the stator
     material's lamination thickness, meshed at `preset`. Designs the validator or the topology fit
-    check rejects are dropped and counted; a pole set that cannot yield its share simply contributes fewer,
+    check rejects are dropped and counted (a total length above `req.max_length_m` too, under "length"); a pole set that cannot yield its share simply contributes fewer,
     so the result may hold fewer than `n` designs. An empty `pole_sets` gives no candidates. With
-    `req.max_length_m` set the stack never exceeds it (the end windings are checked in stage 1)."""
+    `req.max_length_m` set the stack range tops at it and every candidate's `active_length` is within it."""
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
     lamination = load_material(materials.stator).thickness or DEFAULT_LAMINATION
     d_lo = min(MIN_OD, d_hi / 2)
-    dropped = {"validator": 0, "fit": 0}
+    dropped = {"validator": 0, "fit": 0, "length": 0}
     if not pole_sets:
         return [], dropped
     base, extra = divmod(n, len(pole_sets))
@@ -98,6 +99,9 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
                 build_outline(machine)
             except InputError:
                 dropped["fit"] += 1
+                continue
+            if req.max_length_m is not None and active_length(machine) > req.max_length_m:
+                dropped["length"] += 1   # the end windings push the total above the limit
                 continue
             kept.append(Candidate(hashlib.sha256(design.to_json().encode()).hexdigest()[:12], design))
             taken += 1

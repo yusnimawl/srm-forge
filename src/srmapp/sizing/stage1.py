@@ -46,8 +46,8 @@ def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: f
     reason = ""
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
         reason = f"iron mass {mass.iron:.2f} kg above the {req.max_mass_kg:.2f} kg limit"
-    elif req.max_length_m is not None and active_length(p) > req.max_length_m:
-        reason = f"total length {active_length(p) * 1e3:.0f} mm above the {req.max_length_m * 1e3:.0f} mm limit"
+    elif req.max_length_m is not None and (length := active_length(p)) > req.max_length_m:   # owner limit, core spec §11, 2026-11-26 item 11
+        reason = f"total length {length * 1e3:.0f} mm above the {req.max_length_m * 1e3:.0f} mm limit"
     elif mmf == 0.0:
         reason = ("no winding meets the wire, phase current and peak current-density "
                   f"({peak_cap_text(j_peak_max)}) limits" if req.wire_mode and math.isfinite(j_peak_max) else
