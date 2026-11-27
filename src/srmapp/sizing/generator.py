@@ -16,8 +16,8 @@ from srmcore.topology.radial import build_outline
 
 from ..requirements import Requirements
 
-# (stator poles, rotor poles, phases). About 64 % of the 16/12 samples fall outside the stress model's pole arc
-# range (12 rotor poles were swept at 3 phases) and are rejected with that reason.
+# (stator poles, rotor poles, phases). About 57 % of the 16/12 samples (measured over 100 to 400 samples,
+# 10JNEX900, mostly the pole arc) fall outside the stress model's range (12 rotor poles were swept at 3 phases) and are rejected with that reason.
 POLE_SETS = ((6, 4, 3), (8, 6, 4), (12, 8, 3), (16, 12, 4), (24, 16, 3))
 DEFAULT_MAX_OD = 0.35      # m
 MIN_OD = 0.08              # m
@@ -35,9 +35,14 @@ class Candidate:
 
 
 def _machine(u: np.ndarray, ns: int, nr: int, m: int, d_lo: float, d_hi: float, max_speed_rpm: float,
-             materials: RegionMaterials, lamination: float) -> RadialSRMParams:
+             materials: RegionMaterials, lamination: float, max_stack: float | None = None) -> RadialSRMParams:
     d_o = d_lo + u[0] * (d_hi - d_lo)
-    stack = d_o * (0.25 + 0.95 * u[1])
+    if max_stack is None:
+        stack = d_o * (0.25 + 0.95 * u[1])
+    else:   # the stack range tops at the total-length limit (core spec section 11, 2026-11-26 item 11)
+        hi = min(1.2 * d_o, max_stack)
+        lo = min(0.25 * d_o, hi)
+        stack = lo + u[1] * (hi - lo)
     d_r = d_o * (0.50 + 0.15 * u[2])
     gap = min(max(d_o / 400, 3e-4), 8e-4)
     limit = 2 * math.pi / (m * nr)              # Lawrenson self-starting limit on the pole arcs
@@ -63,15 +68,16 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
     """About `n` valid designs, split evenly over `pole_sets`, built from `materials` with the stator
     material's lamination thickness, meshed at `preset`. Designs the validator or the topology fit
     check rejects are dropped and counted; a pole set that cannot yield its share simply contributes fewer,
-    so the result may hold fewer than `n` designs."""
+    so the result may hold fewer than `n` designs. An empty `pole_sets` gives no candidates. With
+    `req.max_length_m` set the stack never exceeds it (the end windings are checked in stage 1)."""
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
     lamination = load_material(materials.stator).thickness or DEFAULT_LAMINATION
     d_lo = min(MIN_OD, d_hi / 2)
+    dropped = {"validator": 0, "fit": 0}
     if not pole_sets:
-        return [], {"validator": 0, "fit": 0}
+        return [], dropped
     base, extra = divmod(n, len(pole_sets))
     children = np.random.SeedSequence(seed).spawn(len(pole_sets))
-    dropped = {"validator": 0, "fit": 0}
     kept: list[Candidate] = []
     for index, (ns, nr, m) in enumerate(pole_sets):
         per_set = base + (index < extra)
@@ -82,7 +88,7 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
             if taken == per_set:
                 break
             try:
-                machine = _machine(u, ns, nr, m, d_lo, d_hi, req.max_speed_rpm, materials, lamination)
+                machine = _machine(u, ns, nr, m, d_lo, d_hi, req.max_speed_rpm, materials, lamination, req.max_length_m)
                 design = Design(machine=machine, mesh=MeshSettings(preset=preset))
                 require_valid(design)
             except InputError:

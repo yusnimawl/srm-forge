@@ -83,3 +83,14 @@ def test_sample_candidates_preset():
 def test_16_12_samples_pass_the_validator_and_the_fit_check():
     cands, _ = sample_candidates(_req(), 4, seed=0, pole_sets=[(16, 12, 4)])
     assert len(cands) == 4 and all(c.design.machine.n_rotor_poles == 12 for c in cands)
+
+
+def test_unset_length_limit_keeps_the_candidates():
+    a, _ = sample_candidates(_req(), 8, seed=3)
+    b, _ = sample_candidates(_req(max_length_m=None), 8, seed=3)
+    assert [c.id for c in a] == [c.id for c in b]
+
+
+def test_length_limit_caps_the_stack():
+    cands, _ = sample_candidates(_req(max_length_m=0.05), 12, seed=0)
+    assert cands and all(c.design.machine.stack_length <= 0.05 for c in cands)

@@ -105,3 +105,22 @@ def test_search_drops_pole_sets_above_the_frequency_cap():
     assert res.sampled == 0 and ev.call_count == 0
     assert set(res.dropped_pole_sets) == {"6/4", "8/6", "12/8", "16/12", "24/16"}
     assert "Hz" in res.dropped_pole_sets["6/4"]
+
+
+def test_frequency_limit_edge_passes():
+    lim = frequency_limit(12, _req(max_speed_rpm=13900.0))
+    assert lim.value == 2780.0 and lim.status == "pass"
+
+
+def test_search_drops_only_the_sets_above_the_cap_and_samples_the_rest():
+    with mock.patch("srmapp.pipeline.evaluate_stage2"):
+        res = run_search(_req(max_speed_rpm=10610.0), SearchSettings(n_candidates=10, shortlist=3, materials=JNEX))
+    assert set(res.dropped_pole_sets) == {"24/16"}
+    assert res.sampled == 10
+
+
+def test_hard_limits_include_the_frequency_and_a_case_above_it_is_infeasible():
+    assert "iron_frequency" in {lim.name for lim in hard_limits(_req(), make_8_6())}
+    from test_app_evaluate import _evaluate
+    e, _ = _evaluate(_req(max_speed_rpm=30000.0))
+    assert not e.feasible and "Hz" in e.error

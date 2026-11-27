@@ -23,6 +23,7 @@ class Requirements(BaseModel):
     bus_voltage_v: float = Field(default=400.0, gt=0)
     max_outer_diameter_m: float | None = Field(default=None, gt=0)
     max_mass_kg: float | None = Field(default=None, gt=0)
+    max_length_m: float | None = Field(default=None, gt=0)         # stack plus both end windings (the `active_volume` length)
     wires: tuple[Wire, ...] = ()                                   # wire mode when non-empty
     phase_current_a: float | None = Field(default=None, gt=0)      # inverter peak phase current, A
     max_slot_fill: float = Field(default=0.6, gt=0, le=0.9)        # outer wire area / coil-side area
@@ -34,7 +35,7 @@ class Requirements(BaseModel):
     cooling: CoolingSetup = CoolingSetup()
     bearing: BearingSetup = BearingSetup()                          # friction and windage; placeholder until chosen
 
-    @field_validator("max_outer_diameter_m")
+    @field_validator("max_outer_diameter_m", "max_length_m")
     @classmethod
     def _metres(cls, value):
         if value is not None and not _OD_RANGE[0] <= value <= _OD_RANGE[1]:

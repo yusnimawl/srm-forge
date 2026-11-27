@@ -8,7 +8,7 @@ from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
 
 from ..requirements import Requirements
-from .estimates import J_PEAK, J_PEAK_SCREEN, Mass, active_mass, pole_chord, peak_cap_text
+from .estimates import J_PEAK, J_PEAK_SCREEN, Mass, active_length, active_mass, pole_chord, peak_cap_text
 from .winding import max_mmf
 
 # Allowance on the saturation flux for mu0*H beyond Js and fringing.
@@ -46,6 +46,8 @@ def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: f
     reason = ""
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
         reason = f"iron mass {mass.iron:.2f} kg above the {req.max_mass_kg:.2f} kg limit"
+    elif req.max_length_m is not None and active_length(p) > req.max_length_m:
+        reason = f"total length {active_length(p) * 1e3:.0f} mm above the {req.max_length_m * 1e3:.0f} mm limit"
     elif mmf == 0.0:
         reason = ("no winding meets the wire, phase current and peak current-density "
                   f"({peak_cap_text(j_peak_max)}) limits" if req.wire_mode and math.isfinite(j_peak_max) else
