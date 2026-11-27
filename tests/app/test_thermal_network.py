@@ -159,3 +159,13 @@ def test_imported_iron_builds():
     n, _ = net(machine=machine, dom=dom)
     s = ThermalSolver(n.problem)
     s.steady(lambda _t: ThermalLoad(np.zeros(len(dom.triangles))))
+
+
+def test_end_winding_model_divides_the_end_capacity():
+    from srmapp.cooling import END_WINDING_PEAK_RESIDUAL
+    nom, _ = net()
+    co = coefficients(CoolingSetup(), M, 3000.0, frozenset({"end_winding_model"}), None, fill=FILL)
+    rated = build_network(DOM, M, W, FILL, co, CoolingSetup())
+    caps = lambda n: [lump.capacity for lump in n.problem.lumps if lump.hot_spot]  # noqa: E731
+    assert caps(rated) == pytest.approx([c / (1 + END_WINDING_PEAK_RESIDUAL) for c in caps(nom)], rel=1e-12)
+    assert np.allclose(rated.problem.conductivity, nom.problem.conductivity)   # steady states do not change

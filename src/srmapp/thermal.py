@@ -482,7 +482,7 @@ def rate_context(ctx: ThermalContext, *, em_budget: UncertaintyBudget | None = N
                     return None
             base = hot_spot(frozenset())
             for row in ROWS:
-                if row in ("thermal_mesh", "end_winding_model"):
+                if row == "thermal_mesh":
                     rise = 0.0
                 else:
                     h = hot_spot(frozenset({row}))

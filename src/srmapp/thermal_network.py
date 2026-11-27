@@ -108,7 +108,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
     h_end = coeffs.h_end_face
     end_lumps = {c: f"end_{c}" for c in coils}
 
-    lumps = [Lump(end_lumps[c], capacity=end_cu_mass * copper.thermal.specific_heat, hot_spot=True) for c in coils]
+    lumps = [Lump(end_lumps[c], capacity=end_cu_mass * copper.thermal.specific_heat / coeffs.end_capacity_factor, hot_spot=True) for c in coils]
     lumps += [Lump("end_space"), Lump("airgap"), Lump("housing"), Lump("end_caps"),
               Lump("ambient", fixed_c=setup.ambient_c)]
     links: list = []

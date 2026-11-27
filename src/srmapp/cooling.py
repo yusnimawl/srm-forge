@@ -50,6 +50,7 @@ SPRAY_H = {                        # 6.4: measured h range (low, high), W/(m2 K)
 }
 AIR_FILM_C = 60.0                  # 6.3: top of the cited air table (Faiz Table III)
 MILTON_XI_REFERENCE = MILTON_XI[0.37]   # 6.8: the one cited xi, carried to fills without a cited value
+END_WINDING_PEAK_RESIDUAL = 0.007593   # gate V4: nominal end-lump peak 39.2023 K against the 39.5 K Kiyota trace target (docs/validation/r5_v4_kiyota.json)
 V3_XI_ERROR = 0.106                # 8: Milton with that xi at fill 0.47, 3.44 against the printed 3.11 (one point)
 RE_MIN = 1e4                       # 6.1: Gnielinski in duct_h; below this no cited correlation
 
@@ -139,6 +140,7 @@ class Coefficients:
     slot_flow_m3s: float | None
     slot_inlet_c: float | None
     notes: tuple[str, ...]
+    end_capacity_factor: float = 1.0   # divides the end-winding lump capacity (end_winding_model row)
 
 
 def _duct(coolant: str, inlet_c: float, h: float, w: float, flow: float, length: float, what: str):
@@ -164,7 +166,9 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     u = lambda row: row in unfavourable  # noqa: E731
     notes = ["air-gap correlation has no cited scatter", "end-space correlation has no cited scatter "
              "(Boglietti's routes need an air speed no source gives); air properties at a 60 degC film",
-             "thermal_mesh and end_winding_model: not yet measured (R5e)",
+             "thermal_mesh: not yet measured (R5e)",
+             f"end_winding_model: the rated set divides the end-lump capacity by 1 + {END_WINDING_PEAK_RESIDUAL:g} "
+             "(gate V4 residual of the peak rise)",
              f"end-frame and end-face h are taken at an assumed surface temperature of {2 * AIR_FILM_C - setup.ambient_c:g} degC "
              "(an assumption, not cited)"]
     fill = machine.fill_factor if fill is None else fill
@@ -239,4 +243,5 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
         k_cross_wire=k_wire, k_liner=k_liner, liner_thickness=machine.slot_liner_thickness,
         k_impregnation=resin, contact_gap=gap, k_housing=K_HOUSING,
         k_lamination=K_LAMINATION[u("lamination_k")], h_air_gap=h_gap, h_end_frame=h_frame,
-        h_end_face=h_face, **jk, **sp, **so, notes=tuple(notes))
+        h_end_face=h_face, **jk, **sp, **so, notes=tuple(notes),
+        end_capacity_factor=1.0 + END_WINDING_PEAK_RESIDUAL if u("end_winding_model") else 1.0)
