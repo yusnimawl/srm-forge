@@ -1,4 +1,6 @@
-# Bike v1, part 2: continuous conduction in the drive model
+# Bike v1, part 3: continuous conduction in the drive model
+
+(Part 2 until the 2026-11-27 renumbering; the file name stays.)
 
 Merged 2026-11-27, PR #44. Versions after the merge: srmapp 0.10.0, srmweb 0.12.1 (`web/` stays 0.12.0, srmcore stays 0.8.0).
 Plan `docs/superpowers/plans/2026-11-26-continuous-conduction.md`. Detailed results `docs/r3-loss-results.md` (Kiyota section) and `docs/winding-scan-profile.md`.

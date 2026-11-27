@@ -14,7 +14,8 @@ One page per merged roadmap step, the summary: the project doc in Notion holds t
 | R5b | Cooling options, thermal network and ratings | 2026-11-09 | #24 | [r5b.md](r5b.md) |
 | R5c | Ratings replace j_limit | 2026-11-19 | #34 | [r5c.md](r5c.md) |
 | R5d | Thermal tab | 2026-11-22 | #35 | [r5d.md](r5d.md) |
+| R5e V4 (Bike v1, part 2) | Peak-heat check V4 | 2026-11-28 | #46 | [r5e-v4.md](r5e-v4.md) |
 | R6d | Optimisation research | 2026-11-06 | #21 | [r6d.md](r6d.md) |
 | R8a | Control software-in-the-loop | 2026-10-20 | #6 | [r8a.md](r8a.md) |
 | R8b | Control HIL | 2026-10-29 | #8 | [r8b.md](r8b.md) |
-| Bike v1, part 2 | Continuous conduction in the drive model | 2026-11-27 | #44 | [bike-v1-2.md](bike-v1-2.md) |
+| Bike v1, part 3 | Continuous conduction in the drive model | 2026-11-27 | #44 | [bike-v1-2.md](bike-v1-2.md) |
