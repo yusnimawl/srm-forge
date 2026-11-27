@@ -19,11 +19,11 @@ jobs:
       matrix:
         os: [ubuntu-latest]   # Windows is not run (owner, 2026-11-13); its open items are on the tracker backlog
         python-version: ["3.12", "3.14"]
-        # Three parts run side by side. One job took 52 min 49 s of test time on main's last run, and the
-        # continuous-conduction drive makes tests/app 1.55x slower. On PR #44 (run 45881424969) app on 3.14 took
-        # 58 min 26 s of tests against the 60 min limit: test_app_turns.py 1139 s, test_app_evaluate.py 998 s, the rest of tests/app about 1370 s.
+        # Four parts run side by side, so the slowest part sets the wall time. On main run 45937325313 the turns and
+        # evaluate files ran as one part of 34 min 47 s; each now runs alone.
         part:
-          - {name: scan, args: "tests/app/test_app_turns.py tests/app/test_app_evaluate.py"}
+          - {name: turns, args: "tests/app/test_app_turns.py"}
+          - {name: evaluate, args: "tests/app/test_app_evaluate.py"}
           - {name: app, args: "tests/app --ignore=tests/app/test_app_turns.py --ignore=tests/app/test_app_evaluate.py"}
           - {name: rest, args: "--ignore=tests/app"}
     name: fast (${{ matrix.os }}, ${{ matrix.python-version }}, ${{ matrix.part.name }})
