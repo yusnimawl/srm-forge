@@ -312,7 +312,7 @@ The lamination end faces are adiabatic (no cited through-stack conductivity); an
 | lamination_k | 2.69 | 2.88 |
 | thermal_mesh, end_winding_model | 0 | 0 |
 
-Re-run 2026-11-27 (srmapp 0.10.1, 10JNEX900 iron capacity 438 J/(kg K) x density; same inputs, 29 strokes, 542 s rating wall time, probe wall 1128 s with the map):
+Re-run 2026-11-27 (srmapp 0.10.1, 10JNEX900 iron capacity 438 J/(kg K) x density; same requirements and cooling, 29 strokes, 542 s rating wall time, 1128 s for the probe with the map):
 
 | Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
 |---|---|---|---|---|---|
@@ -321,9 +321,32 @@ Re-run 2026-11-27 (srmapp 0.10.1, 10JNEX900 iron capacity 438 J/(kg K) x density
 | 2000 rpm | rated | 2.309 | 3.105 (envelope) | 159.9 | 130.8 |
 | 6000 rpm | rated | 2.069 | 3.049 (envelope) | 158.3 | 123.5 |
 
-Budget shares, in K of hot-spot rise at the rated continuous torque (2000 / 6000 rpm): iron 1.66 / 5.92, em_torque 6.79 / 5.78, liner 16.9 / 14.4, contact 5.62 / 5.82, lamination_k 2.69 / 2.69, cooling_h 0.07 / 0.07. What moved and why: the peak-end hot spots fall 2.6 to 3.0 K (nominal) and 1.9 to 2.4 K (rated) because iron now stores heat during the peak transient; the peaks stay at the envelope. The nominal continuous torques and every steady budget share except iron do not depend on capacity, and they equal the old table within 0.2 % (3.225 to 3.226, 3.164 to 3.159). The rated 6000 rpm continuous torque (2.230 to 2.069 Nm) and the iron shares (0.75 to 1.66 and 2.67 to 5.92 K) change because the earlier table was recorded before `K_IRON_HI` became the Kiyota curve (2026-11-18) and before the continuous-conduction strokes (srmapp 0.10.0), not because of the capacity. The 2000 rpm rated continuous moves 2.304 to 2.309 Nm for the same reason. The probe's asserts (relations only) passed unchanged.
+Budget shares of the re-run, in K of hot-spot rise at the rated continuous torque (the torque differs from the first run at 6000 rpm, so the shares do too):
 
-28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 550 s for the module on the bench host.
+| Row | 2000 rpm | 6000 rpm |
+|---|---|---|
+| iron | 1.66 | 5.92 |
+| em_torque | 6.79 | 5.78 |
+| cross_wire | 0.05 | 0.04 |
+| liner | 16.9 | 14.4 |
+| contact | 5.62 | 5.82 |
+| air_gap | 0 | 0 |
+| cooling_h | 0.07 | 0.07 |
+| lamination_k | 2.69 | 2.69 |
+| thermal_mesh, end_winding_model | 0 | 0 |
+| mechanical_loss | 0.01 | 0.08 |
+
+(Source: the `Rating.shares` printed by the probe; the first-run table has no cross_wire value, no mechanical_loss row and shows 0 for cross_wire.) What moved and why:
+
+- Peak-end hot spots fall 2.6 (2000 rpm) and 2.9 K (6000 rpm) in the nominal set and 1.9 and 2.4 K in the rated set. Inference, not isolated: iron now stores heat during the peak transient, which lowers the peak-end hot spot. In the rated set this is the net of the capacity (down) and the higher iron factor (up, `K_IRON_HI` 3.2 and more). The peaks stay at the envelope.
+- Steady values do not depend on capacity (the steady solve does not use it). The nominal continuous torques equal the first run within 0.2 % (3.225 to 3.226, 3.164 to 3.159 Nm).
+- The first table was recorded 2026-11-09. Four changes to rating inputs landed after it and were not isolated from each other: `K_IRON_HI` as the Kiyota curve (2026-11-18), the continuous-conduction strokes (srmapp 0.10.0), friction and windage heat with the `mechanical_loss` row (2026-11-17, 4d754f1), and the `cross_wire` nominal as Milton with xi 0.324 instead of Hashin-Shtrikman at fill other than 0.37 (2026-11-17, 1cc953b; it moves the nominal set).
+- The rated continuous torque at 6000 rpm falls 7 % (2.230 to 2.069 Nm). The shares are taken at that torque, so they follow it at 6000 rpm: em_torque 6.58 to 5.78 K, liner 15.8 to 14.4, contact 6.20 to 5.82, lamination_k 2.88 to 2.69. The iron shares rise (0.75 to 1.66 and 2.67 to 5.92 K) with the iron factor. These changes come from the four input changes above, not from the capacity.
+- The 2000 rpm rated continuous torque moves 2.304 to 2.309 Nm (+0.2 %), within the 1 % bracket resolution; no cause is attributed.
+
+The probe's asserts (relations only) passed unchanged.
+
+In the first run 28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time of the first run: 550 s for the module on the bench host.
 
 ## R5b: the R5a open list, item by item
 
@@ -332,7 +355,7 @@ Budget shares, in K of hot-spot rise at the rated continuous torque (2000 / 6000
 - Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
 - Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
 - `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
-- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.10.1), so iron has capacity; expansion and through-stack conductivity stay open: (before 2026-11-27 iron capacity was zero with a note) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
+- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.10.1), so iron has capacity (before that it was zero, with a note). Expansion and through-stack conductivity stay open: the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Expansion and through-stack conductivity are on the owner list below (material data, tracker 10d).
 - Six FE-derived constants need the owner's yes: moved to the owner list below.
 - Search candidates read `no_fillet`: moved to the owner list below (before R5c).
 - Kiyota 18/12 V6: R5e.
