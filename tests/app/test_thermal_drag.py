@@ -73,3 +73,55 @@ def test_zero_torque_solves_no_stroke(monkeypatch):
     ctx, asked, _ = make(monkeypatch)
     ctx.load_at(RPM, frozenset())(0.0)
     assert asked == []
+
+
+def test_secant_converges_where_plain_steps_would_not(monkeypatch):
+    k = 0.8      # need(a) = T f + k a: a plain step shrinks the error by 0.8 only
+    f, ik = FACTOR, 1.0
+    ctx, asked, _ = make(monkeypatch, iron_w=lambda n: 0.0)
+    ctx.stroke = lambda rpm, a: (asked.append(a), (types.SimpleNamespace(torque_avg=a),
+                                                    types.SimpleNamespace(iron_w=k * a * OMEGA / (f * ik))))[1]
+    monkeypatch.setattr(th, "mechanical_loss", lambda *a, **kw: types.SimpleNamespace(total_w=0.0))
+    ctx.load_at(RPM, frozenset())(2.0)
+    assert len(asked) <= 4 and asked[-1] == pytest.approx(2.0 * f / (1 - k), rel=2e-3)
+    plain = 2.0 * f
+    for _ in range(th.DRAG_MAX_STROKES):
+        plain = 2.0 * f + k * plain
+    assert abs(plain - 2.0 * f / (1 - k)) > 2e-3 * 2.0 * f / (1 - k)      # six plain steps would still miss
+
+
+def test_none_at_a_later_attempt_returns_none(monkeypatch):
+    ctx, asked, _ = make(monkeypatch, torque_avg=lambda ask: 0.0)
+    real = ctx.stroke
+    ctx.stroke = lambda rpm, t: real(rpm, t) if not asked else None
+    assert ctx.load_at(RPM, frozenset())(2.0) is None
+
+
+def test_shaft_top_is_reached_and_stays_within_the_em_top(monkeypatch):
+    ctx, asked, _ = make(monkeypatch, iron_w=lambda n: IRON_W)
+    em_top = 5.0
+    top, fell = ctx.shaft_top(RPM, frozenset(ROWS), em_top)
+    assert not fell
+    loss = (IRON_W * IRON_FACTOR + MECH[True]) / OMEGA
+    assert top == pytest.approx((em_top / FACTOR - loss) * (1 - th.DRAG_TOL))
+    asked.clear()
+    assert ctx.load_at(RPM, frozenset(ROWS))(top) is not None
+    assert max(asked) <= em_top
+
+
+def test_em_bound_speed_takes_the_shaft_top_branch(monkeypatch):
+    ctx, _, _ = make(monkeypatch)
+    top, _ = ctx.shaft_top(RPM, frozenset(), 5.0)
+    probes = []
+
+    class Solver:
+        def steady(self, load):
+            return load
+
+        def hot_spot(self, t):
+            return types.SimpleNamespace(temperature_c=50.0, location="x")
+
+    load_at = ctx.load_at(RPM, frozenset())
+    monkeypatch.setattr(th, "_kind_mean", lambda *a: 0.0)
+    r = th.rate_speed(RPM, top, 200.0, 30.0, lambda: Solver(), lambda t: probes.append(t) or load_at(t))
+    assert probes[:2] == [0.0, top] and r.continuous_nm == top and r.envelope_nm == top

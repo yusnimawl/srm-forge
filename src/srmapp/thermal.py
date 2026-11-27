@@ -44,7 +44,7 @@ BIG_K = 1000.0           # excess assigned to an infeasible torque (no stroke, o
 @dataclass(frozen=True)
 class SpeedRating:
     rpm: float
-    envelope_nm: float
+    envelope_nm: float      # shaft torque: the EM envelope less the loss torque of the stroke at it (`ThermalContext.shaft_top`)
     continuous_nm: float
     peak_nm: float
     continuous_hot_spot: HotSpot
@@ -197,7 +197,7 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
 GROWTH_LOW = 0.094
 _TORQUE_TOL = 1e-9
 DRAG_TOL = 1e-3          # a stroke is enough when its torque is within this of the torque plus loss torque it must cover
-DRAG_MAX_STROKES = 4     # the iron loss moves little with the stroke, so a few solves converge; more means a bug
+DRAG_MAX_STROKES = 6     # secant steps converge in a few solves; hitting the cap means slow convergence or a shaft torque no stroke reaches
 
 
 @dataclass(frozen=True)
@@ -306,19 +306,37 @@ class ThermalContext:
     def solver_for(self, rpm, rows):
         return lambda: ThermalSolver(self.at(rpm, rows)[1].problem)
 
+    def _drag_terms(self, rpm, rows):
+        """Torque factor, iron factor, speed (rad/s) and the set's mechanical loss (W; the same for every torque)."""
+        coeffs = self.at(rpm, rows)[0]
+        mech = mechanical_loss(self.machine, self.req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+        return coeffs, rpm * 2 * math.pi / 60, mech
+
+    def shaft_top(self, rpm, rows, em_top):
+        """The shaft torque whose stroke ask stays within the EM envelope `em_top`: the loss torque of the stroke at
+        `em_top` comes off em_top / factor. Iron loss rises with torque, so every ask `load_at` makes at this top is at
+        or below `em_top`. Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
+        then em_top / factor."""
+        coeffs, omega, mech = self._drag_terms(rpm, rows)
+        s = self.stroke(rpm, em_top)
+        if s is None:
+            return em_top / coeffs.torque_factor, True
+        loss = (s[1].iron_w * coeffs.iron_factor + mech.total_w) / omega
+        return max(em_top / coeffs.torque_factor - loss, 0.0) * (1.0 - DRAG_TOL), False
+
     def load_at(self, rpm, rows):
         coeffs, net = self.at(rpm, rows)
-        domain, req = self.domain, self.req
-
-        omega = rpm * 2 * math.pi / 60
-        mech = mechanical_loss(self.machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)   # same for every torque
+        domain = self.domain
+        _, omega, mech = self._drag_terms(rpm, rows)
 
         def load(torque: float):
             if torque <= 0:
                 zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
                 return lambda t: zero
-            # `torque` is at the shaft: the stroke must also cover the iron, windage and friction torque
-            ask = torque * coeffs.torque_factor
+            # `torque` is at the shaft: the stroke must also cover the iron, windage and friction torque. All the iron
+            # loss counts as drag torque (safe side: part of the core loss is supplied electrically, so this
+            # understates the shaft torque).
+            ask, need, hist = torque * coeffs.torque_factor, float("nan"), []
             for _ in range(DRAG_MAX_STROKES):
                 s = self.stroke(rpm, ask)
                 if s is None:
@@ -327,10 +345,17 @@ class ThermalContext:
                 need = (torque + (sl.iron_w * coeffs.iron_factor + mech.total_w) / omega) * coeffs.torque_factor
                 if trace.torque_avg >= need * (1.0 - DRAG_TOL):
                     break
-                ask = need
+                hist.append((ask, need))
+                nxt = need
+                if len(hist) >= 2:   # secant step on the fixed point a = need(a)
+                    (a0, n0), (a1, n1) = hist[-2:]
+                    den = 1.0 - (n1 - n0) / (a1 - a0) if a1 != a0 else 0.0
+                    if den > 0:
+                        nxt = a1 + (n1 - a1) / den
+                ask = nxt if math.isfinite(nxt) and nxt > 0 else need
             else:
-                raise RuntimeError(f"no stroke covers the shaft torque plus the loss torque within {DRAG_MAX_STROKES} "
-                                   f"strokes at {rpm:g} rpm")
+                raise RuntimeError(f"no stroke covers the shaft torque {torque:g} N.m plus the loss torque within "
+                                   f"{DRAG_MAX_STROKES} strokes at {rpm:g} rpm (last need {need:g} N.m)")
             heat = point_heat(sl, trace, domain, self.static, self.hot, self.wire, self.machine, self.limit,
                               coeffs.iron_factor, rpm, mech)
             return load_fn(heat, net, self.machine, self.hot)
@@ -478,9 +503,14 @@ def rate_context(ctx: ThermalContext, *, em_budget: UncertaintyBudget | None = N
         omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
         start = None if req.continuous_power_w is None else req.continuous_power_w / omega
         top = env[rpm]
-        ratings = [rate_speed(rpm, top / at(rpm, rows)[0].torque_factor, limit, req.peak_duration_s,
-                              solver_for(rpm, rows), load_at(rpm, rows), start, keep=kept if rows else None)
-                   for rows in (frozenset(), frozenset(ROWS))]   # the rated set's deliverable envelope is top / torque factor
+        ratings = []
+        for rows in (frozenset(), frozenset(ROWS)):
+            # SpeedRating.envelope_nm is the shaft envelope: the EM top less the loss torque of the stroke at it
+            shaft, fell_back = ctx.shaft_top(rpm, rows, top)
+            if fell_back and "no stroke reaches the EM top" not in " ".join(notes):
+                notes.append("no stroke reaches the EM top at some speed: the shaft envelope there ignores the loss torque")
+            ratings.append(rate_speed(rpm, shaft, limit, req.peak_duration_s, solver_for(rpm, rows), load_at(rpm, rows),
+                                      start, keep=kept if rows else None))
         nominal.append(ratings[0])
         rated.append(ratings[1])
         t_rated = ratings[1].continuous_nm
