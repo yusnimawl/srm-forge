@@ -283,15 +283,15 @@ V2 does not show our solver wrong. With their frame lump, the 119 min state and 
 
 If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 29 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
 
-V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
+V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row stays 0 (see the thermal mesh note) and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
 
 ## Thermal mesh (no separate gate, owner 2026-11-27)
 
 Verdict: the rating's thermal network changes by at most 0.26 K at `screening` and 0.16 K at `full` against `reference` on the 8/6, under the 0.5 K rating tolerance (`TOL_K`). The `thermal_mesh` row stays 0. A finer thermal mesh runs in the confirm step (roadmap section 0, Bike motor v1 part 7).
 
-Run: planning probe of 2026-11-26, LattePanda, a script in `/tmp` that is not in the repository. The 8/6 with 10JNEX900 laminations of 0.1 mm, 24 turns of one 1.0 mm strand, R from `series_resistance` at 20 degC, the machine's default fill. The network is `build_network` with the placeholder `CoolingSetup()` and coefficients at 2000 r/min. The loads are fixed on every mesh: DC copper at 10 A RMS for the steady state, 20 A RMS for the 30 s peak (`srmapp.thermal.peak_transient`, from that steady state), iron 30 W split 0.7 and 0.3 uniform per part, times `iron_factor` in the rated set. Two sets: nominal and rated (every row unfavourable). Hot spot in degC:
+Run: planning probe of 2026-11-26, LattePanda, a script in `/tmp` that is not in the repository. The 8/6 with 10JNEX900 laminations of 0.1 mm, 24 turns of one 1.0 mm strand, R from `series_resistance` at 20 degC, the machine's default fill. The network is `build_network` with the placeholder `CoolingSetup()` and coefficients at 2000 r/min. The loads are fixed on every mesh. DC copper is 10 A RMS for the steady state and 20 A RMS for the 30 s peak (`srmapp.thermal.peak_transient`, from that steady state). Iron is 30 W, 0.7 in the stator iron and 0.3 in the rotor iron, uniform per part, times `iron_factor` in the rated set. Two sets: nominal and rated (every row unfavourable). Hot spot in degC:
 
-| Preset | Nodes | Nominal steady | Nominal peak | Rated steady | Rated peak | Wall time |
+| Preset | Thermal-domain nodes | Nominal steady | Nominal peak | Rated steady | Rated peak | Wall time |
 |---|---|---|---|---|---|---|
 | screening | 31 543 | 96.894 | 120.733 | 134.801 | 161.170 | 16 s |
 | full | 57 987 | 96.934 | 120.779 | 134.881 | 161.270 | 38 s |
@@ -299,7 +299,7 @@ Run: planning probe of 2026-11-26, LattePanda, a script in `/tmp` that is not in
 | screening - reference | | -0.105 | -0.120 | -0.215 | -0.259 | |
 | full - reference | | -0.065 | -0.074 | -0.135 | -0.159 | |
 
-Wall times include the mesh. The rating's bisection stops within `TOL_K` = 0.5 K below the limit, so a change of this size does not move a rating. The `screening` preset is not the `full` knobs at a larger scale, so the three levels do not follow one h² line.
+Wall times include the mesh. The rating's Illinois (regula falsi) search stops within `TOL_K` = 0.5 K below the limit, or at `BRACKET_REL`, so it stops anywhere in (-0.5, 0] K. A change of this size is inside the rating's stop tolerance. The `screening` preset is not the `full` knobs at a larger scale, so the three levels do not follow one h² line.
 
 Limits:
 
