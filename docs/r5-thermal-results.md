@@ -1,6 +1,6 @@
 # R5 thermal and rotor stress results
 
-This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0 is complete (docs/r5-sources.md section 9). V2 is recorded below: it does not pass. V4 and V5 are pending.
+This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0 is complete (docs/r5-sources.md section 9). V2 is recorded below: it does not pass. V4 is recorded below: it passes. V5 has no separate gate (see the thermal mesh note).
 
 ## V1: solver against closed forms (tests/thermal)
 
@@ -283,7 +283,46 @@ V2 does not show our solver wrong. With their frame lump, the 119 min state and 
 
 If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 29 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
 
-V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row stays 0 (see the thermal mesh note) and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
+V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row stays 0 (see the thermal mesh note). The `end_winding_model` row is set by V4 (below). The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
+
+## V4: our thermal network against the Kiyota 18/12 peak transient
+
+Verdict: V4 passes. The nominal coil-end peak rise is 39.20 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.8 % cold (r = +0.0076). Against the printed 41 K it reads 4.6 % cold (r = +0.046) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
+
+Run: `kiyota-v4`, 2026-11-27, 16:33 to 17:31 WIB (58 min), LattePanda, commit c9d2207, srmcore 0.8.0, srmapp 0.10.1, peak RSS 2.7 GB. Command: `$env:PYTHONPATH="src;tests"; python examples\kiyota_thermal_check.py --json docs/validation/r5_v4_kiyota.json`. Record: `docs/validation/r5_v4_kiyota.json`. Case: `tests/kiyota_thermal.py`.
+
+Inputs (sources and errors in `docs/r5-sources.md` 9.2): the Fig. 8 RMS current read off the figure (140.7 A hold, 14 s), uniform start at 51.1 degC, ambient 25 degC (assumed), 573 W mechanical loss (Fig. 7), iron loss 4400 W (Table III (b)) divided by `K_IRON_HI` at 1500 Hz for the nominal set and applied whole in the rated set, uniform over the stator iron. Phase resistance 92.5 mOhm at 20 degC, the winding alone. The paper prints 97.8 mOhm at the terminals and says that 5.3 mOhm of it is coil connections (0.78 m) and terminal wiring (1.68 m in all; 2014 pp. 5714-5715). Eq. (1) gives 4.9 mOhm for 1.68 m, so the winding is 92.5 to 92.9 mOhm. The tool's mean-turn value is 92.6 mOhm. Iron capacity is 438 J/(kg K) x 7490 kg/m3 from the library record. The quantity compared is the maximum over 0 to 20 s of the hottest end-winding lump above the start temperature. The rating's hot spot (coil sides included) is reported beside it: 39.20 K nominal and 39.83 K rated at `full`, not judged. The rated set leaves the `end_winding_model` row out, because that row carries this gate's own residual.
+
+Results (rise above 51.1 degC, K):
+
+| Preset | Thermal-domain nodes | Nominal | Rated | Wall time (nominal, rated) |
+|---|---|---|---|---|
+| screening | 73 879 | 39.20 | 39.79 | 27 s, 28 s |
+| full | 135 396 | 39.20 | 39.79 | 89 s, 96 s |
+| reference | 951 237 | 39.20 | 39.80 | 259 s, 254 s |
+
+Mesh build: 27 s, 53 s and 722 s. The model reaches the peak earlier than the trace. At 10 s it reads 30.5 K against 22.7 K on the trace, and at 14 s 39.1 K against 35.5 K. The trace peaks after the current stops, and the model does not reproduce that lag. A sensor lag is not modelled and a time-matched comparison is out of scope, so the peak is compared and the shape is not.
+
+Numerical error (nominal, K): mesh |full - reference| 0.002, time step |0.05 s - 0.025 s| 0.011, total 0.014. For the rated set the total is 0.011 K.
+
+Input rows (change of the end-lump peak in K, `screening` nominal, signed):
+
+| Row | Low | High |
+|---|---|---|
+| Resistance 92.5 to 97.8 mOhm (94.9 mOhm is the inference with the connections at the coil end: +1.08) | 0 | +2.40 |
+| Cold-iron start (copper and end lumps at 51.1, the rest at the ambient) | -2.51 | 0 |
+| Iron 0.6 kW (Table III (c)) | -0.09 | 0 |
+| Mechanical loss at the end caps | 0 | +0.16 |
+| Stator pole arc +-0.3 mm | -0.07 | +0.07 |
+| Housing 4 and 16 mm, rotor pole arc, rotor yoke, ambient 40 degC | each at most 0.02 | |
+
+Band: nominal 39.20 K at `full`, rows -2.68 and +2.65 K, so 36.51 to 42.45 K. The rated set reads 39.79 K, 0.59 K above the nominal.
+
+Pass rule: the band must reach the target within its reading error, that is low at most target + 0.4 K and high at least target - 0.4 K. For 39.5 K the nominal is 0.30 K below it, inside the 0.4 K reading error, so the trace pass needs no row. For the printed 41 K the high side must reach 40.6 K. The rated set (39.79 K) does not, and the resistance row (+2.40 K) does. The earlier plan risk that V4 passes only through the resistance row is reversed for the trace: the diagnosis had used the terminal resistance, which reads 41.6 K.
+
+Zero-capacity effect: without iron capacity the coil end read 49.2 K nominal (63.3 K rated) at the terminal resistance. With the library specific heat it reads 41.6 K at 97.8 mOhm and 39.2 K at 92.5 mOhm. The iron stores part of the heat in the first seconds. The 438 J/(kg K) is carried over from Faiz 2009 Table II (p. 2928), a lamination of unstated grade, not 10JNEX900 (grade C, owner decision 2026-11-27). The V4 pass depends on it. A measured 10JNEX900 value would move the result.
+
+What this means for the ratings: the peak transient of the end winding reads 0.8 % cold against the measured peak. Call 9 of the plan applies: r > 0, so the `end_winding_model` row is set to r. The rated set divides every end-winding lump capacity by 1 + `END_WINDING_PEAK_RESIDUAL` (0.007593, `srmapp.cooling`). The row moves the peak rating only. Its budget share is 0 K by construction, because shares are steady hot-spot rises. The rating's steady (continuous) side still has no measured check. V4 is one machine, one 14 s pulse, one coil-end sensor of unknown position, and an assumed ambient and housing. Against the owner's 10 to 15 % target the peak rise is inside it, with the iron loss held at a measured-over-model factor and not predicted (finding 1 of `docs/r3-loss-results.md`).
 
 ## Thermal mesh (no separate gate, owner 2026-11-27)
 
@@ -392,8 +431,8 @@ R5d:
 - Web: route, job kind and Thermal tab for ratings; run report; options-graph axes. None exist yet.
 
 R5e:
-- V0, V2, V4 and V5 (no measured continuous case; the continuous rating has no measured check) and Kiyota 18/12 V6, on the LattePanda.
-- The 8/6 and bench-target demonstrations.
+- V0, V2 and V4 are recorded above and in docs/r5-sources.md section 9. V5 has no separate gate: the thermal mesh note stands, and a finer thermal mesh runs in the confirm step (roadmap section 0). The continuous rating has no measured check.
+- Moved out by roadmap section 0 (owner, 2026-11-26): V6 on the Kiyota rotor (Bike motor v1 part 8) and the 8/6 and bench-target demonstrations.
 
 R6:
 - A re-rate with new cooling needs new strokes. Spec section 10 promised cached strokes and thermal solves only; R5b does not meet that. R6 needs a loss-against-torque reuse design.

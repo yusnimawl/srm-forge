@@ -166,7 +166,8 @@ def coefficients(setup: CoolingSetup, machine: RadialSRMParams, rpm: float,
     u = lambda row: row in unfavourable  # noqa: E731
     notes = ["air-gap correlation has no cited scatter", "end-space correlation has no cited scatter "
              "(Boglietti's routes need an air speed no source gives); air properties at a 60 degC film",
-             "thermal_mesh: not yet measured (R5e)",
+             "thermal_mesh: the 8/6 probe moves the rating network by up to 0.26 K (screening) and 0.16 K (full) against "
+             "reference, under the 0.5 K rating tolerance, so the row is 0 (docs/r5-thermal-results.md)",
              f"end_winding_model: the rated set divides the end-lump capacity by 1 + {END_WINDING_PEAK_RESIDUAL:g} "
              "(gate V4 residual of the peak rise); it moves the peak rating only, and its budget share is 0 K by "
              "construction (shares are steady hot-spot rises)",

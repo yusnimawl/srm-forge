@@ -468,6 +468,18 @@ Comparison targets:
 V0 is complete: every V2 and V4 input above has a page or figure and an error, or is marked as a gap that becomes
 an input row of its gate. No comparison has been run.
 
+V4 inputs added at the run (2026-11-27, `docs/validation/r5_v4_kiyota.json`, results in `docs/r5-thermal-results.md`):
+
+| Input | Value | Status |
+|---|---|---|
+| Iron loss M | 4400 W from Table III (b), 600 W from (c); nominal = M / `K_IRON_HI` at 1500 Hz, rated = M | printed at 8700 and 7500 r/min; routed through `K_IRON_HI` 3.2, a measured-over-model factor, not a prediction |
+| Model iron loss at (b) | the PR #44 continuous-conduction model value, for comparison only | not an input; R3 finding 2 |
+| Winding resistance | 92.5 mOhm nominal, row up to 97.8 mOhm | 5.3 mOhm of the printed 97.8 is connections and terminal wiring (pp. 5714-5715); winding alone 92.5 to 92.9 mOhm |
+| Ambient | 25 degC | **gap**, assumed; row 40 degC (+0.02 K) |
+| Housing | 8 mm default, rows 4 and 16 mm (at most 0.00 K) | **gap**, range assumed |
+| Iron capacity | 438 J/(kg K), grade C | **gap**: carried over from Faiz 2009 Table II (p. 2928), a lamination of unstated grade; without it the nominal reads 49.2 K |
+| Start state | uniform 51.1 degC; row: cold iron at the ambient (-2.51 K) | **gap**, the rest of the machine's start temperature is not printed |
+
 ### 9.3 Corrections after review (2026-11-24)
 
 A review of the V0 record after the merge (PR #41) found two Faiz readings that took the wrong ink. At Fig. 10,

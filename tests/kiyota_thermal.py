@@ -5,7 +5,7 @@ from 51.1 degC. `run` solves the transient on the thermal network of `srmapp` wi
 (docs/superpowers/plans/2026-11-26-r5e-v4-v5.md, calls 1 to 6).
 
 The phase resistance is an argument of `winding` and `run` on purpose: 97.8 mOhm is the value at the terminals
-(2014 p. 5715); 5.3 mOhm of it is coil connections and terminal wiring, so the winding alone is about 92.5 mOhm.
+(2014 pp. 5714-5715); 5.3 mOhm of it is coil connections and terminal wiring, so the winding alone is 92.5 to 92.9 mOhm.
 The caller picks one."""
 import json
 import math
