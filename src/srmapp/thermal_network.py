@@ -60,7 +60,7 @@ def build_network(domain: ThermalDomain, machine: RadialSRMParams, winding: Wind
         if getattr(m, "thermal", None) is None:
             raise ValueError(f"{part} material {name!r} has no thermal block (no cited conductivity)")
         c = m.thermal.specific_heat
-        cap_iron[part] = 0.0 if c is None else c * m.density
+        cap_iron[part] = 0.0 if c is None else c * m.density * m.stacking_factor
     if any(v == 0.0 for v in cap_iron.values()):
         notes.append("iron has no cited specific heat: its capacity is zero (steady results unaffected)")
     notes.append("lamination end faces are adiabatic: no cited through-stack conductivity (errs hot)")

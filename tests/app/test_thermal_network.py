@@ -41,7 +41,7 @@ def test_iron_capacity_from_library_specific_heat():
     n, _ = net()
     m = load_material("10JNEX900")
     for kind in ("stator_iron", "rotor_iron"):
-        assert np.allclose(n.problem.capacity[DOM.element_kind == kind], m.thermal.specific_heat * m.density)
+        assert np.allclose(n.problem.capacity[DOM.element_kind == kind], m.thermal.specific_heat * m.density * m.stacking_factor)
     assert not any("iron has no cited specific heat" in x for x in n.notes)
 
 

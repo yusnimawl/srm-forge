@@ -133,4 +133,3 @@ def test_keep_returns_the_states():
     r = rate_speed(1000.0, 3.0, LIMIT, 10.0, lambda: solver, quad, None, keep=k)
     assert r == rate(envelope=3.0)
     assert len(k) == 1 and k[0][0] is not None and k[0][1] is None
-

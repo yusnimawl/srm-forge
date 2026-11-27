@@ -38,7 +38,7 @@ M_IRON_LOW_W = 600.0            # Table III (c), 7500 r/min, light load
 MECH_W = 573.0                  # mechanical loss, Fig. 7 at 7493 r/min
 RPM = 7500.0                    # 1500 Hz stator electrical frequency on 12 rotor poles
 AMBIENT_C = 25.0                # assumed, not printed
-RATED_MECH = 1.2                # the paper's 20 % bearing-condition scatter on the mechanical loss
+RATED_MECH = 1.2                # Kiyota 2014 p. 5716: about 20 % mechanical-loss variation with bearing condition
 T_REF_C = 20.0                  # the resistance handed to `winding` is the 20 degC value
 
 
