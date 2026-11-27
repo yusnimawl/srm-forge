@@ -23,6 +23,8 @@ Run from the repo root:
 import argparse
 import json
 import math
+import resource
+import time
 import srmapp
 import srmcore
 from pathlib import Path
@@ -48,9 +50,9 @@ ROWS_DEF = {      # name -> list of (label, kwargs of rig / run / build)
     "cold-iron start": [("cold iron", {"start": "cold_iron"})],
     "mechanical at end caps": [("friction", {"mech": "friction"})],
     "housing": [("4 mm", {"housing": 4e-3}), ("16 mm", {"housing": 16e-3})],
-    "stator pole arc": [(f"{s:+.1f} mm", {"geo": {"stator_arc": k18.STATOR_ARC + s * D_MM / R_BORE}}) for s in (-1, 1)],
-    "rotor pole arc": [(f"{s:+.1f} mm", {"geo": {"rotor_arc": k18.ROTOR_ARC + s * D_MM / k18.ROTOR_R}}) for s in (-1, 1)],
-    "rotor yoke": [(f"{s:+.1f} mm", {"geo": {"rotor_yoke": k18.ROTOR_YOKE + s * D_MM}}) for s in (-1, 1)],
+    "stator pole arc": [(f"{s * 0.3:+.1f} mm", {"geo": {"stator_arc": k18.STATOR_ARC + s * D_MM / R_BORE}}) for s in (-1, 1)],
+    "rotor pole arc": [(f"{s * 0.3:+.1f} mm", {"geo": {"rotor_arc": k18.ROTOR_ARC + s * D_MM / k18.ROTOR_R}}) for s in (-1, 1)],
+    "rotor yoke": [(f"{s * 0.3:+.1f} mm", {"geo": {"rotor_yoke": k18.ROTOR_YOKE + s * D_MM}}) for s in (-1, 1)],
     "ambient 40 degC": [("40 degC", {"ambient": 40.0})],
 }
 
@@ -95,8 +97,9 @@ def main():
           f"(winding alone), {R_TERMINAL * 1e3:.1f} mOhm at the terminals; split: {SPLIT}")
     out, nominal = {}, {}
     for preset in a.presets:
+        t0 = time.perf_counter()
         case = kt.build(preset)
-        entry = {"nodes": len(case.domain.nodes)}
+        entry = {"nodes": len(case.domain.nodes), "mesh_wall_s": time.perf_counter() - t0}
         for name, rows in (("nominal", frozenset()), ("rated", frozenset(ROWS))):
             res = simulate(case, a.dt, rows)
             entry[name] = summary(res, a.dt)
@@ -138,6 +141,9 @@ def main():
             rows_out[rname] = {"variants": vs, "low_k": min(0.0, *d), "high_k": max(0.0, *d)}
     neg = sum(r["low_k"] for r in rows_out.values())
     pos = sum(r["high_k"] for r in rows_out.values())
+    rows_run = bool(rows_out)
+    if not rows_run:
+        flags.append("input rows not run: counted as 0")
     low, high = nom + neg - err["nominal"]["total_k"], rat + pos + err["rated"]["total_k"]
     verdicts = {"trace_39.5": verdict(kt.TARGET_K[0], nom, low, high), "printed_41": verdict(kt.PRINTED_K, nom, low, high)}
     print(f"band {low:.2f} to {high:.2f} K (nominal {nom:.2f}, rated {rat:.2f}, rows {neg:+.2f} / {pos:+.2f}, "
@@ -157,6 +163,9 @@ def main():
                                        "note": "nominal = winding alone (controller ruling); the terminal value is a row"},
                 "iron_w": {"nominal_M": kt.M_IRON_W, "low_M": kt.M_IRON_LOW_W, "source": "Table III (b) and (c), iron and other",
                            "route": "nominal = M / k_iron_hi(1500 Hz), rated = M, uniform over the stator iron (call 1)"},
+                "compared_quantity": "end-lump peak: maximum over 0 to 20 s of the hottest end-winding lump minus the start temperature; the sensor is on the coil end (2014 p. 5716); the rating hot spot is reported beside it, not judged (call 2)",
+                "target_source": "39.5 +- 0.4 K, the trace reading (docs/r5-sources.md 9.2; the figure's own arrow spans 39.7 K); the printed 41 K has its own verdict (call 3)",
+                "start_state": "uniform 51.1 degC at every node and free lump; row: copper nodes and end lumps at 51.1, the rest at the ambient (call 4)",
                 "iron_capacity_j_m3_k": "438 J/(kg K) x 7490 kg/m3 from the 10JNEX900 library record (owner, 2026-11-27)",
                 "mechanical_w": {"value": kt.MECH_W, "source": "Fig. 7 at 7493 r/min", "route": "windage in the rotor iron; rated x 1.2; row: friction at the end caps"},
                 "em_torque_row": "no effect: the current is imposed, not found from a torque (call 7)",
@@ -165,7 +174,8 @@ def main():
                 "target_k": list(kt.TARGET_K), "printed_k": kt.PRINTED_K, "trace_k": TRACE, "dt_s": a.dt, "t_end_s": 20.0},
             "adiabatic_copper_rise_k": ad, "adiabatic_inputs": CU, "presets": out, "numerical_error": err, "rows": rows_out,
             "band": {"low_k": low, "high_k": high, "neg_rows_k": neg, "pos_rows_k": pos, "base_preset": base},
-            "verdicts": verdicts, "flags": flags,
+            "verdicts": verdicts, "flags": flags, "input_rows_run": rows_run,
+            "peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
             "hot_spot_beside_end_lump": {p: {k: (e[k]["hot_peak_k"], e[k]["hot_peak_where"], e[k]["end_peak_k"]) for k in ("nominal", "rated")} for p, e in out.items()},
             "srmcore_version": srmcore.__version__, "srmapp_version": srmapp.__version__}, indent=1))
 
