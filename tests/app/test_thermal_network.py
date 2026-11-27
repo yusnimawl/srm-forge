@@ -8,6 +8,7 @@ from srmapp.cooling import CoolingSetup, EndSpray, Jacket, MissingCoolingData, S
 from srmapp.sizing.estimates import coil_side_area
 from srmapp.sizing.winding import Winding
 from srmapp.thermal_network import _edge_keys, _tri_area, build_network
+from srmcore.materials.library import load_material
 from srmcore.mesh.static import build_static_mesh
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.iron import IronArc
@@ -34,6 +35,14 @@ def coil_load(n, q=1e6):
     q_el = np.zeros(len(DOM.triangles))
     q_el[DOM.element_kind == "coil"] = q
     return lambda _t: ThermalLoad(q_el)
+
+
+def test_iron_capacity_from_library_specific_heat():
+    n, _ = net()
+    m = load_material("10JNEX900")
+    for kind in ("stator_iron", "rotor_iron"):
+        assert np.allclose(n.problem.capacity[DOM.element_kind == kind], m.thermal.specific_heat * m.density)
+    assert not any("iron has no cited specific heat" in x for x in n.notes)
 
 
 def test_every_part_anchored():

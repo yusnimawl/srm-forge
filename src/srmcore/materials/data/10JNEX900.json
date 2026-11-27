@@ -86,9 +86,10 @@
   },
   "thermal": {
     "conductivity": 18.6,
+    "specific_heat": 438.0,
     "provenance": {
-      "source": "Ou et al., IEEE Trans. Ind. Appl. 57(1), 2021, accepted manuscript, Table I (quoting their refs. [22], [27], [28], not tested by them); see docs/r5-sources.md",
-      "page": "manuscript p. 2, Table I",
+      "source": "Conductivity: Ou et al., IEEE Trans. Ind. Appl. 57(1), 2021, accepted manuscript, Table I (quoting their refs. [22], [27], [28], not tested by them). Specific heat: 438 J/(kg K) carried over from Faiz et al., IEEE Trans. Magn. 45(7), 2009, Table II, p. 2928 (stator lamination 20 W/(m K), 438 J/(kg K), 7650 kg/m3; grade not stated), owner decision 2026-11-27 (core spec §11), until the jystator data arrive; not a 10JNEX900 measurement. See docs/r5-sources.md",
+      "page": "manuscript p. 2, Table I; Faiz 2009 p. 2928, Table II",
       "date": "2026-11-07",
       "typical": true
     },

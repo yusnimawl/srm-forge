@@ -312,6 +312,17 @@ The lamination end faces are adiabatic (no cited through-stack conductivity); an
 | lamination_k | 2.69 | 2.88 |
 | thermal_mesh, end_winding_model | 0 | 0 |
 
+Re-run 2026-11-27 (srmapp 0.10.1, 10JNEX900 iron capacity 438 J/(kg K) x density; same inputs, 29 strokes, 542 s rating wall time, probe wall 1128 s with the map):
+
+| Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
+|---|---|---|---|---|---|
+| 2000 rpm | nominal | 3.226 | 3.416 (envelope) | 158.5 | 121.3 |
+| 6000 rpm | nominal | 3.159 | 3.354 (envelope) | 158.5 | 116.6 |
+| 2000 rpm | rated | 2.309 | 3.105 (envelope) | 159.9 | 130.8 |
+| 6000 rpm | rated | 2.069 | 3.049 (envelope) | 158.3 | 123.5 |
+
+Budget shares, in K of hot-spot rise at the rated continuous torque (2000 / 6000 rpm): iron 1.66 / 5.92, em_torque 6.79 / 5.78, liner 16.9 / 14.4, contact 5.62 / 5.82, lamination_k 2.69 / 2.69, cooling_h 0.07 / 0.07. What moved and why: the peak-end hot spots fall 2.6 to 3.0 K (nominal) and 1.9 to 2.4 K (rated) because iron now stores heat during the peak transient; the peaks stay at the envelope. The nominal continuous torques and every steady budget share except iron do not depend on capacity, and they equal the old table within 0.2 % (3.225 to 3.226, 3.164 to 3.159). The rated 6000 rpm continuous torque (2.230 to 2.069 Nm) and the iron shares (0.75 to 1.66 and 2.67 to 5.92 K) change because the earlier table was recorded before `K_IRON_HI` became the Kiyota curve (2026-11-18) and before the continuous-conduction strokes (srmapp 0.10.0), not because of the capacity. The 2000 rpm rated continuous moves 2.304 to 2.309 Nm for the same reason. The probe's asserts (relations only) passed unchanged.
+
 28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 550 s for the module on the bench host.
 
 ## R5b: the R5a open list, item by item
@@ -321,7 +332,7 @@ The lamination end faces are adiabatic (no cited through-stack conductivity); an
 - Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
 - Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
 - `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
-- No iron specific heat, expansion or through-stack conductivity: iron capacity is zero (a note says so; steady results are unaffected) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
+- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.10.1), so iron has capacity; expansion and through-stack conductivity stay open: (before 2026-11-27 iron capacity was zero with a note) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
 - Six FE-derived constants need the owner's yes: moved to the owner list below.
 - Search candidates read `no_fillet`: moved to the owner list below (before R5c).
 - Kiyota 18/12 V6: R5e.
@@ -346,7 +357,7 @@ Owner:
 - Cooling concept: decided 2026-11-10 (core spec section 11): oil spray on the end windings plus the jacket at high load, the oil cooled into the water loop by a 3D-printed heat exchanger; jacket only at low load. The search default stays jacket only; end spray is an opt-in setup. The cooling placeholders stay as flagged defaults (owner, 2026-11-10; the UI labels them "placeholder cooling"): ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
 - The contact gap and resin conductivity (cited nominals 0.03 mm and 1.0 W/(m K), unfavourable 0.08 mm and 0.6) and any placeholder in docs/r5-sources.md section 7.
 - End spray runs with Shell Diala S4 ZX-I since 2026-11-10 (cp from Cragoe 1929, density from the Shell data sheet; docs/r5-sources.md 6.7). Shaft oil stays refused (no cited h). An oil slot channel stays refused: no viscosity curve and no laminar Nu are read. The oil's thermal expansion is not cited, so the spray oil rise reads a few percent low.
-- Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
+- Iron specific heat for 10JNEX900 is carried over from Faiz 2009 (438 J/(kg K), 2026-11-27) until the jystator data arrive. Thermal expansion for 10JNEX900 (tracker 10d) stays open: the stator thermal growth stays absent.
 - Rotor stress, decided 2026-11-10 (core spec section 11): the six FE-derived constants are accepted, and search candidates carry a rotor root fillet of 0.05 x the pole width at the root (`generator.ROTOR_FILLET_SHARE`), inside the fit's 0.025 to 0.2 ratio.
 - Peak start state: decided 2026-11-10 (core spec section 11): the peak starts from the steady state at the required continuous torque (the current reading).
 - Oil choice and the heat exchanger's approach (oil inlet minus water temperature). The oil is Shell Diala S4 ZX-I (owner, 2026-11-10); its cp and k still need a cited source. The approach is a wide band until measured.
