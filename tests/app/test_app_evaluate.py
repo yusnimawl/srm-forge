@@ -414,7 +414,8 @@ def test_rated_kw_per_kg_is_the_lowest_rated_power_from_base_speed_over_mass():
 
 
 def test_screen_capped_infeasible_result_says_screen():
-    req = _req(wires=[dict(kind="round", diameter=1e-3, outer_diameter=1.08e-3)], phase_current_a=100.0)
+    # A thick wire at a high current keeps the scan small: the screen keeps 9 of the 12 windings that fit.
+    req = _req(wires=[dict(kind="round", diameter=6.0e-3, outer_diameter=6.2e-3)], phase_current_a=2500.0)
     e, stage = _evaluate(req, margin=1e6)
     assert stage.j_peak_max == est.J_PEAK_SCREEN
     assert e.status == "ok" and not e.feasible

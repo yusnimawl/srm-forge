@@ -199,7 +199,8 @@ THIN = dict(kind="round", diameter=1.0e-3, outer_diameter=1.08e-3)
 
 
 def test_default_peak_cap_is_the_screen():
-    req = _req(wires=[THIN], phase_current_a=100.0)
+    # A thick wire at a high current keeps the scan small: the screen keeps 9 of the 12 windings that fit.
+    req = _req(wires=[THICK], phase_current_a=2500.0)
     choice = choose_turns(_map_for(req, j_peak_max=1e12), MACHINE, req)
     assert len(choice.scan) == len(wire_windings(MACHINE, req, 0, J_PEAK_SCREEN)) and choice.capped
     assert max(s.winding.current_density for s in choice.scan) <= J_PEAK_SCREEN * (1 + 1e-9)
