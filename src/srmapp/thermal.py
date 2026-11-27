@@ -196,6 +196,8 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
 # The FE showed the centrifugal growth up to 9.4 % low (docs/r5-thermal-results.md); the gap uses the unsafe-side correction.
 GROWTH_LOW = 0.094
 _TORQUE_TOL = 1e-9
+DRAG_TOL = 1e-3          # a stroke is enough when its torque is within this of the torque plus loss torque it must cover
+DRAG_MAX_STROKES = 4     # the iron loss moves little with the stroke, so a few solves converge; more means a bug
 
 
 @dataclass(frozen=True)
@@ -308,15 +310,27 @@ class ThermalContext:
         coeffs, net = self.at(rpm, rows)
         domain, req = self.domain, self.req
 
+        omega = rpm * 2 * math.pi / 60
+        mech = mechanical_loss(self.machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)   # same for every torque
+
         def load(torque: float):
             if torque <= 0:
                 zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
                 return lambda t: zero
-            s = self.stroke(rpm, torque * coeffs.torque_factor)
-            if s is None:
-                return None
-            trace, sl = s
-            mech = mechanical_loss(self.machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+            # `torque` is at the shaft: the stroke must also cover the iron, windage and friction torque
+            ask = torque * coeffs.torque_factor
+            for _ in range(DRAG_MAX_STROKES):
+                s = self.stroke(rpm, ask)
+                if s is None:
+                    return None
+                trace, sl = s
+                need = (torque + (sl.iron_w * coeffs.iron_factor + mech.total_w) / omega) * coeffs.torque_factor
+                if trace.torque_avg >= need * (1.0 - DRAG_TOL):
+                    break
+                ask = need
+            else:
+                raise RuntimeError(f"no stroke covers the shaft torque plus the loss torque within {DRAG_MAX_STROKES} "
+                                   f"strokes at {rpm:g} rpm")
             heat = point_heat(sl, trace, domain, self.static, self.hot, self.wire, self.machine, self.limit,
                               coeffs.iron_factor, rpm, mech)
             return load_fn(heat, net, self.machine, self.hot)

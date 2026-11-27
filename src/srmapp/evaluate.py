@@ -155,6 +155,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     notes = []
     if not thermal:
         notes.append(NOT_RATED)
+        notes.append("power check without iron, windage and friction loss (thermal off)")
     elif not choice.ranked:
         notes.append(f"no winding is EM-feasible; {NOT_RATED}")
     else:

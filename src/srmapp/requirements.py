@@ -16,6 +16,7 @@ _POWER_TOLERANCE = 0.10
 class Requirements(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    # power and torque are at the motor shaft; the caller converts wheel power (28 kW / 0.93 for the bike)
     peak_power_w: float = Field(gt=0)
     peak_torque_nm: float = Field(gt=0)
     base_speed_rpm: float = Field(gt=0)
@@ -29,7 +30,7 @@ class Requirements(BaseModel):
     max_slot_fill: float = Field(default=0.6, gt=0, le=0.9)        # outer wire area / coil-side area
     winding_temperature_c: float = Field(default=120.0, ge=-40, le=250)   # copper temperature for resistance and AC loss
     cut_process: Literal["unspecified", "wedm", "punching", "laser"] = "unspecified"   # lamination cutting process
-    continuous_power_w: float | None = Field(default=None, gt=0)
+    continuous_power_w: float | None = Field(default=None, gt=0)   # at the shaft
     peak_duration_s: float = Field(default=30.0, gt=0)
     insulation_class: Literal["B", "F", "H"] = "H"
     cooling: CoolingSetup = CoolingSetup()
