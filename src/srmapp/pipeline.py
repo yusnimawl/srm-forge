@@ -10,12 +10,12 @@ from srmcore.materials.library import load_material
 from srmcore.maps.validation import GRADE_ALLOWANCE, JS_STEP
 from srmcore.model.design import RegionMaterials
 
-from .limits import SEARCH_REQUIRES_PASS, hard_limits
+from .limits import SEARCH_REQUIRES_PASS, frequency_limit, hard_limits
 from .evaluate import Evaluation, StageTwoGrid, evaluate_stage2
 from .pareto import pareto_mask
 from .requirements import Requirements
 from .sizing.estimates import J_PEAK, J_PEAK_SCREEN, J_SCREEN
-from .sizing.generator import sample_candidates
+from .sizing.generator import POLE_SETS, sample_candidates
 from .sizing.stage1 import stage1
 
 if TYPE_CHECKING:
@@ -36,6 +36,8 @@ class SearchSettings:
     j_peak_max: float | None = None  # A/m², peak conductor current density cap in wire mode; None: J_PEAK_SCREEN
     thermal: bool = True            # rate every feasible design (continuous and peak per speed)
     n_speeds: int = 6               # speeds per rating
+    pole_sets: tuple[tuple[int, int, int], ...] = POLE_SETS   # (stator poles, rotor poles, phases)
+    per_pole_set: int | None = None  # feasible evaluations per pole set; None: no cap
 
     @property
     def peak_cap(self) -> float:
@@ -60,6 +62,7 @@ class SearchResult:
     evaluations: tuple[Evaluation, ...]
     cancelled: bool
     limit_rejected: dict[str, int] = field(default_factory=dict)   # candidates failing each hard limit
+    dropped_pole_sets: dict[str, str] = field(default_factory=dict)   # "ns/nr" -> reason, removed before sampling
 
     def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
         """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""
@@ -79,7 +82,14 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
                on_fields: "Callable[[str, ThermalFields], None] | None" = None) -> SearchResult:
     """`progress(done, total)` after each stage-2 design; `point_progress(design, designs, points_done, points)`
     while each design's map is built."""
-    candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed,
+    dropped_sets, pole_sets = {}, []
+    for ns, nr, m in settings.pole_sets:
+        lim = frequency_limit(nr, req)
+        if lim.status == "fail":
+            dropped_sets[f"{ns}/{nr}"] = lim.note
+        else:
+            pole_sets.append((ns, nr, m))
+    candidates, dropped = sample_candidates(req, settings.n_candidates, seed=settings.seed, pole_sets=pole_sets,
                                            materials=settings.materials, preset=settings.preset)
     margin = settings.resolved_margin
     scored = [(c, stage1(req, c.design.machine, margin, settings.j_peak, settings.peak_cap))
@@ -116,4 +126,5 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
         evaluations.append(evaluation)
         if progress is not None:
             progress(done, len(shortlist))
-    return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled, limit_rejected)
+    return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled, limit_rejected,
+                        dropped_sets)

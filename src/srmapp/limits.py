@@ -6,8 +6,9 @@ from typing import Literal
 
 from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
-from srmcore.post.rotor_stress import SAFETY_FACTOR, rotor_stress
+from srmcore.post.rotor_stress import OVERSPEED, SAFETY_FACTOR, rotor_stress
 
+from .cooling import K_IRON_HI
 from .requirements import Requirements
 
 # A search never shortlists a rotor whose stress was not checked (rotor bursting is not recoverable by a later step).
@@ -33,13 +34,24 @@ def rotor_limit(machine: RadialSRMParams, req: Requirements) -> Limit:
         sf = s.safety_factor
         if sf >= SAFETY_FACTOR:
             return Limit("rotor_stress", "pass", sf, SAFETY_FACTOR,
-                         f"rotor safety factor {sf:.2f} at {rpm} r/min (1.2 x top speed)")
+                         f"rotor safety factor {sf:.2f}, at least {SAFETY_FACTOR:g}, at {rpm} r/min ({OVERSPEED:g} x top speed)")
         return Limit("rotor_stress", "fail", sf, SAFETY_FACTOR,
-                     f"rotor safety factor {sf:.2f} below {SAFETY_FACTOR:g} at {rpm} r/min (1.2 x top speed)")
+                     f"rotor safety factor {sf:.2f} below {SAFETY_FACTOR:g} at {rpm} r/min ({OVERSPEED:g} x top speed)")
     if s.status in ("kt_out_of_range", "no_fillet"):
         return Limit("rotor_stress", "fail", None, SAFETY_FACTOR, f"rotor stress not valid for this rotor: {s.note}")
     return Limit("rotor_stress", "not_run", None, SAFETY_FACTOR, f"rotor stress not checked: {s.note}")
 
 
+def frequency_limit(n_rotor_poles: int, req: Requirements) -> Limit:
+    """Top stator electrical frequency against the last frequency of the Kiyota iron-loss factor curve
+    (`K_IRON_HI`); above it the loss factor is a held value, not a measurement."""
+    f_max = K_IRON_HI[-1][0]
+    f = n_rotor_poles * req.max_speed_rpm / 60
+    if f <= f_max:
+        return Limit("iron_frequency", "pass", f, f_max, f"stator electrical frequency {f:.0f} Hz at top speed")
+    return Limit("iron_frequency", "fail", f, f_max,
+                 f"stator electrical frequency {f:.0f} Hz at top speed, above {f_max:.0f} Hz (end of the iron-loss data)")
+
+
 def hard_limits(req: Requirements, machine: RadialSRMParams) -> tuple[Limit, ...]:
-    return (rotor_limit(machine, req),)
+    return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req))

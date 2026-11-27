@@ -60,7 +60,7 @@ def test_very_restrictive_limit_returns_nothing_and_counts_drops():
 def test_split_is_even_over_pole_sets():
     cands, _ = sample_candidates(_req(), 8, seed=0)
     counts = [sum(c.design.machine.n_stator_poles == s for c in cands) for s, _, _ in POLE_SETS]
-    assert counts == [2, 2, 2, 2]
+    assert counts == [2, 2, 2, 1, 1]
 
 
 def test_small_n_uses_first_pole_sets():
@@ -78,3 +78,8 @@ def test_materials_and_their_lamination_thickness_are_set():
 def test_sample_candidates_preset():
     kept, _ = sample_candidates(_req(), 4, seed=0, preset="screening")
     assert kept and all(c.design.mesh.preset == "screening" for c in kept)
+
+
+def test_16_12_samples_pass_the_validator_and_the_fit_check():
+    cands, _ = sample_candidates(_req(), 4, seed=0, pole_sets=[(16, 12, 4)])
+    assert len(cands) == 4 and all(c.design.machine.n_rotor_poles == 12 for c in cands)

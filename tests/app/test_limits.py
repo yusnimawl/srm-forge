@@ -1,9 +1,10 @@
+import math
 from unittest import mock
 
 import pytest
 from conftest import make_8_6
 
-from srmapp.limits import SEARCH_REQUIRES_PASS, hard_limits, rotor_limit
+from srmapp.limits import SEARCH_REQUIRES_PASS, frequency_limit, hard_limits, rotor_limit
 from srmapp.pipeline import SearchSettings, run_search
 from srmapp.requirements import Requirements
 from srmapp.sizing.generator import _DIMS, _machine
@@ -25,7 +26,7 @@ def _req(**kw):
 def test_ok_above_the_safety_factor_passes():
     lim = rotor_limit(make_8_6(materials=JNEX), _req())
     assert lim.status == "pass" and lim.value >= 1.5
-    assert "7 200 r/min" in lim.note
+    assert "7 200 r/min" in lim.note and "at least 1.5" in lim.note and "1.2 x top speed" in lim.note
 
 
 def test_ok_below_the_safety_factor_fails_and_names_it():
@@ -35,9 +36,15 @@ def test_ok_below_the_safety_factor_fails_and_names_it():
 
 
 def test_no_fillet_and_out_of_range_fail():
-    assert rotor_limit(make_8_6(materials=JNEX, rotor_fillet_radius=0.0), _req()).status == "fail"
-    thin = make_8_6(materials=JNEX, rotor_yoke_thickness=0.5 * 0.012 * 0.5)
-    assert rotor_stress(thin, 7650.0, load_material("10JNEX900").mechanical, 6000.0).status == "kt_out_of_range"
+    rotor = load_material("10JNEX900")
+    bare = make_8_6(materials=JNEX, rotor_fillet_radius=0.0)
+    assert rotor_stress(bare, rotor.density, rotor.mechanical, 6000.0).status == "no_fillet"
+    assert rotor_limit(bare, _req()).status == "fail"
+    base = make_8_6(materials=JNEX)
+    chord = base.rotor_outer_diameter * math.sin(base.rotor_pole_arc / 2)
+    # a yoke of 0.3 x the tip chord is below the stress model's 0.55 floor
+    thin = make_8_6(materials=JNEX, rotor_yoke_thickness=0.3 * chord)
+    assert rotor_stress(thin, rotor.density, rotor.mechanical, 6000.0).status == "kt_out_of_range"
     assert rotor_limit(thin, _req()).status == "fail"
 
 
@@ -68,7 +75,7 @@ def test_search_requires_a_checked_rotor():
     with mock.patch("srmapp.pipeline.evaluate_stage2") as ev:
         res = run_search(_req(), SearchSettings(n_candidates=8, shortlist=3, seed=1, materials=RegionMaterials()))
     assert ev.call_count == 0 and res.evaluations == ()
-    assert res.limit_rejected == {"rotor_stress": res.stage1_rejected} and res.stage1_rejected > 0
+    assert res.limit_rejected["rotor_stress"] > 0
 
 
 def test_evaluation_with_a_failing_rotor_is_infeasible():
@@ -80,4 +87,21 @@ def test_evaluation_with_a_failing_rotor_is_infeasible():
     with mock.patch("test_app_evaluate._cand", return_value=cand):
         e, _ = _evaluate(_req())
     assert e.status == "ok" and not e.feasible
-    assert [l.status for l in e.limits] == ["fail"] and "no root fillet" in e.error
+    assert {l.name: l for l in e.limits}["rotor_stress"].status == "fail" and "no root fillet" in e.error
+
+
+def test_frequency_limit_by_pole_set():
+    def st(nr, rpm):
+        return frequency_limit(nr, _req(max_speed_rpm=rpm))
+    assert st(16, 10610).status == "fail" and "2829 Hz" in st(16, 10610).note
+    assert st(12, 10610).status == "pass"
+    assert st(12, 15915).status == "fail"
+    assert st(8, 19894).status == "pass"
+
+
+def test_search_drops_pole_sets_above_the_frequency_cap():
+    with mock.patch("srmapp.pipeline.evaluate_stage2") as ev:
+        res = run_search(_req(max_speed_rpm=60000.0), SearchSettings(n_candidates=8, shortlist=3, materials=JNEX))
+    assert res.sampled == 0 and ev.call_count == 0
+    assert set(res.dropped_pole_sets) == {"6/4", "8/6", "12/8", "16/12", "24/16"}
+    assert "Hz" in res.dropped_pole_sets["6/4"]

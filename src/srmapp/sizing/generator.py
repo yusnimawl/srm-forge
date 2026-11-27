@@ -16,7 +16,9 @@ from srmcore.topology.radial import build_outline
 
 from ..requirements import Requirements
 
-POLE_SETS = ((6, 4, 3), (8, 6, 4), (12, 8, 3), (24, 16, 3))   # (stator poles, rotor poles, phases)
+# (stator poles, rotor poles, phases). About 64 % of the 16/12 samples fall outside the stress model's pole arc
+# range (12 rotor poles were swept at 3 phases) and are rejected with that reason.
+POLE_SETS = ((6, 4, 3), (8, 6, 4), (12, 8, 3), (16, 12, 4), (24, 16, 3))
 DEFAULT_MAX_OD = 0.35      # m
 MIN_OD = 0.08              # m
 _DIMS = 8
@@ -65,6 +67,8 @@ def sample_candidates(req: Requirements, n: int, *, seed: int = 0, pole_sets=POL
     d_hi = req.max_outer_diameter_m or DEFAULT_MAX_OD
     lamination = load_material(materials.stator).thickness or DEFAULT_LAMINATION
     d_lo = min(MIN_OD, d_hi / 2)
+    if not pole_sets:
+        return [], {"validator": 0, "fit": 0}
     base, extra = divmod(n, len(pole_sets))
     children = np.random.SeedSequence(seed).spawn(len(pole_sets))
     dropped = {"validator": 0, "fit": 0}
