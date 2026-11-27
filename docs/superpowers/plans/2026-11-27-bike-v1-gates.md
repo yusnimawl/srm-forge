@@ -4,16 +4,39 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 > Implementers: Sonnet. Reviewers (spec and code, after each task and at the end): Opus.
 
+## Revised 2026-11-28
+
+Main moved after this plan was written (PR #45, PR #46 and the owner decisions of 2026-11-27 and 2026-11-28).
+
+1. D9 dropped: Kiyota's "iron and other" leaves the mechanical loss out (Diagnosis 7), so nothing is counted
+   twice. Task 5 has no code.
+2. D6: the drag torque takes the mechanical loss of the set, so the rated set takes the high end of both bands.
+3. D11, Task 12, Diagnosis 12: the owner's three angular-contact candidates replace the Koyo 60 series. The check
+   blocks.
+4. The "Owner decision" question is gone (answered 2026-11-28). The section now lists the decisions the plan follows.
+5. D10 and Task 11: the span allowance is checked against the candidates, and `BearingSetup.placeholder` keeps its
+   meaning.
+6. Task 10: the ranking says that its peak kW/kg is a band from rated to nominal (owner, 2026-11-28 item 2).
+7. Task 1: the line 190 assertion becomes a containment check, because Tasks 6 and 13 add notes to the same error.
+8. Task 14: the main baseline is srmapp 0.11.0 (iron heat capacity, end-winding residual). The loss torque is the
+   only expected cause of a change.
+9. Versions: srmapp 0.11.0 to 0.12.0, srmweb 0.12.1 to 0.12.2, `web/` stays 0.12.0, srmcore stays 0.8.0.
+10. CI: the fast suite runs as four parts (turns, evaluate, app, rest). New test files land in `app`. Task 17
+    records each part.
+11. Sources: the bending and bearing-speed sources go to `docs/r5-sources.md` sections 10 and 11 (core spec §11,
+    2026-11-27).
+12. Hours: 36.5 attended, about 40.5 elapsed.
+
 **Goal:** The search keeps only designs that meet the owner's hard limits, ranks the lightest design that holds its
 rated check first, and stops hiding thermal errors. Parts 0 and 1 of the Bike motor v1 path (roadmap spec §0): rotor
-stress, iron-loss frequency cap, total length, shortlist order, thermal errors, objective, windage double count,
-shaft power after losses, current ripple, single-pulse preference, first bending speed, bearing speed and air-gap
-closure.
+stress, iron-loss frequency cap, total length, shortlist order, thermal errors, objective, windage double count
+(checked: none), shaft power after losses, current ripple, single-pulse preference, first bending speed, bearing speed
+and air-gap closure.
 
-**Done when:** every task below is merged to main with CI green (fast suite on 3.12 and 3.14, slow suite run on the
-branch), the LattePanda runs are recorded in `docs/bike-v1-gates-results.md`, `docs/reports/bike-v1-0.md` and
-`docs/reports/bike-v1-1.md` are on main, and no item of this plan is left for later except the open items listed at
-the end.
+**Done when:** every task below is merged to main with CI green (fast suite, all four parts, on 3.12 and 3.14, slow
+suite run on the branch), the LattePanda runs are recorded in `docs/bike-v1-gates-results.md`,
+`docs/reports/bike-v1-0.md` and `docs/reports/bike-v1-1.md` are on main, and no item of this plan is left for later
+except the open items listed at the end.
 
 **Architecture:** srmapp only. A new module `src/srmapp/limits.py` holds the closed-form hard limits (rotor stress,
 iron-loss frequency, first bending, bearing speed, air-gap closure) as `Limit` records. `run_search` applies them
@@ -23,8 +46,9 @@ lowers each winding's current limit by half the switching ripple and ranks singl
 mode. srmcore does not change.
 
 **Sources:** roadmap spec §0 parts 0 and 1 (`docs/superpowers/specs/2026-10-12-roadmap-r1-r10-design.md`). Core spec
-§11 rows of 2026-11-26 (bike target) and 2026-11-27 (hard limits). Stakeholder review issues 1 to 3, 5, 6, 8 to 12
-(`docs/reviews/2026-11-26-bike-v1-stakeholder-review.md`). `docs/reports/bike-v1-2.md` (continuous conduction).
+§11 rows of 2026-11-26 (bike target), 2026-11-27 (hard limits, bearing candidates) and 2026-11-28 (after the peak-heat
+check V4). Stakeholder review issues 1 to 3, 5, 6, 8 to 12 (`docs/reviews/2026-11-26-bike-v1-stakeholder-review.md`).
+`docs/reports/bike-v1-2.md` (continuous conduction). `docs/bearing-candidates.md` (bearing limits).
 
 ## Global constraints
 
@@ -39,8 +63,10 @@ mode. srmcore does not change.
   (`tests/app/test_app_scan_equality.py`) must pass unedited.
 - A test literal that changes is updated in the same commit, with old value, new value and reason in the commit
   message. The expected changes are listed per task. Any other change: stop and report to the controller.
-- Every new or changed rule cites its source in a code comment or in `docs/r3-sources.md`. Numbers with no cited
-  source are named placeholders and the evaluation says so in a note.
+- Every new or changed rule cites its source in a code comment, `docs/r3-sources.md` or `docs/r5-sources.md`. Numbers
+  with no cited source are named placeholders and the evaluation says so in a note.
+- CI runs the fast suite as four parts side by side (`turns`, `evaluate`, `app`, `rest`; `.github/workflows/ci.yml`),
+  each with a 60 min job limit. New `tests/app` files land in `app`. Keep new fast tests on synthetic maps and fakes.
 - Comments explain the code as it is. No plan history in comments. Prose in docs follows `docs/writing-plan.md`.
 
 ## Diagnosis (2026-11-27, probes on the LattePanda, not committed)
@@ -115,12 +141,26 @@ The two batch boundaries (`evaluate.py:124`, `:199`) keep only `str(exc)`, so th
 `SearchResult.pareto` (`pipeline.py:62`) is a front over rated continuous and rated peak kW/kg, so it rewards power
 above the requirement and uses the rated set only. Evaluations hold no nominal kW/kg.
 
-### 7. Windage double count (review issue 10)
+### 7. Windage double count (review issue 10): none (revised 2026-11-28)
 
 `ThermalContext.load_at` adds the windage and the bearing friction at every torque (`thermal.py:319`). The row
-`mechanical_loss` only moves them to the high end of their bands. The rated set has every row of `ROWS`
-(`cooling.py:22`), so it takes the Kiyota iron factor, which holds Kiyota's measured windage and friction, and then
-adds the high end of both again.
+`mechanical_loss` moves them to the high end of their bands, and the rated set has every row of `ROWS`
+(`cooling.py:22`). The review assumed that the Kiyota iron factor `K_IRON_HI` already holds Kiyota's windage and
+friction. It does not:
+
+1. `K_IRON_HI` 3.2 is Table III (a): "iron and other" 0.7 kW over the model's iron loss, 3.08 with the current
+   stroke (227 W) and 3.17 with the torque stroke, rounded up (`docs/r3-loss-results.md`, Kiyota finding 4). The 7.0 at 2.78 kHz rounds the Fig. 16 ratios (4.95 to 6.96).
+   `examples/kiyota_losses_check.py` takes the printed values and subtracts nothing.
+2. Table III (2014, p. 5718, read from the page image) prints "Mechanical loss, kW" in its own row: 0.2, 0.7 and
+   0.6 kW at (a), (b) and (c). Its efficiencies close only with the mechanical loss outside "iron and other". At (a)
+   the input is 60.5 + 6.8 + 0.7 + 0.2 = 68.2 kW, so eta_e = 60.7 / 68.2 = 89.0 % and eta_m = 60.5 / 68.2 = 88.7 %,
+   both as printed. At (c), with the 0.6 kW inside "iron and other", eta_e would be 98.3 % against 96.4 % printed.
+3. For Fig. 16 the paper says so: "The iron and other losses are given by subtracting the output power, the copper
+   loss, and the mechanical loss from the input power" (2014, p. 5719).
+
+So the rated set counts windage and friction once. The windage heat enters the rotor iron after the iron factor
+(`thermal_load.py:74`), not under it. Gate V4 also kept `mechanical_loss` in its rated set, so its 573 W is counted
+once (`docs/r5-thermal-results.md` left this to D9).
 
 ### 8. Shaft power (review issue 11)
 
@@ -168,16 +208,22 @@ passing designs:
 The check binds at ratio 15. Rigid supports read the speed high: ball-bearing compliance is not in the model and has
 no cited stiffness here (risk R4).
 
-### 12. Bearing speed (step 1)
+### 12. Bearing speed (step 1, revised 2026-11-28)
 
-`srmcore.post.bearing_friction` cites only JTEKT Table 8-1 (friction coefficients). JTEKT gives no DN or dmn rule: the
-limiting speed is a catalogue value per bearing, for grease and for oil-bath lubrication, valid at C/P >= 16 and
-Fa/Fr <= 0.25, and "when bearing rotational speed exceeds 80 % of catalog specification, consult with JTEKT"
-(https://www.jtekt.co.jp/products/bearing/en/support/bearing-knowledge/8-0000.html). Read values: 6005 (25 x 47 mm)
-15 000 r/min grease, 18 000 oil, and 6205NR 13 000 grease, 15 000 oil
-(https://www.jtekt.co.jp/products/bearing/en/p/detail/print.php?pno=6005, `pno=6205NR`). Shafts of the stage-1
-passing designs at ratio 15 are 20 to 45 mm. With the placeholder bore (the shaft diameter), a standard deep groove
-ball bearing on grease fails at 19 894 r/min for every bore of 25 mm and up. This is the owner question below.
+The owner chose three hybrid angular-contact candidates (core spec §11, 2026-11-27; values and sources in
+`docs/bearing-candidates.md`). The check blocks a design when 1.2 x top speed is above the candidate's catalogue
+limiting speed for its lubrication x 0.81 (SKF Table 39, DB set at preload A; 0.81 assumed for NSK until its factor is
+read; §11, 2026-11-28 item 3). Limits x 0.81, r/min:
+
+| Candidate | d x D x B, mm | Grease | Oil-air |
+|---|---|---|---|
+| SKF 7005 CD/HCP4A | 25 x 47 x 12 | 34 830 | 54 270 |
+| NSK 30BNR19HTSUMP3 | 30 x 47 x 9 | 25 920 | 29 970 |
+| SKF 7006 CD/HCP4A | 30 x 55 x 13 | 30 780 | 45 360 |
+
+At ratio 15 the check speed is 1.2 x 19 894 = 23 873 r/min, 92 % of the lowest limit (NSK on grease). So every
+candidate passes every bike ratio, and the check binds only above a 21 600 r/min top speed. The 2026-11-27 reading of
+the Koyo 60 series (6005 at 15 000 r/min on grease, which blocked every shaft of 25 mm and up) is superseded.
 
 ### 13. Air-gap closure (step 1)
 
@@ -218,12 +264,13 @@ closure, so the centrifugal part alone is a valid lower bound to check now (D12)
   unchanged and still feeds the web plot.
 - **D6. Shaft power.** `Requirements.peak_power_w`, `peak_torque_nm` and `continuous_power_w` are at the motor shaft.
   In `ThermalContext.load_at`, a shaft torque T needs a stroke whose EM torque is at least
-  (T + (P_iron x iron factor + P_mech) / omega) x torque factor. The iron loss is the stroke's own (`sl.iron_w`), the
-  mechanical loss is nominal. Start at T x factor. While the stroke's `torque_avg` is below that need x (1 -
-  `DRAG_TOL`) (1e-3), solve again at the need (at most `DRAG_MAX_STROKES` = 4 strokes, and more raises `RuntimeError`,
-  which the batch boundary turns into a failed evaluation). Check and rating both use `load_at`, so rated torques are
-  shaft torques. The EM-only scan stays on EM power. With `thermal` off the evaluation notes that the power check has
-  no losses.
+  (T + (P_iron x iron factor + P_mech) / omega) x torque factor. The iron loss is the stroke's own (`sl.iron_w`).
+  P_mech is the `mechanical_loss` that `load_at` already computes for the set: nominal, or the high end of both bands
+  in the rated set (D9 keeps the row). It does not depend on the torque, so compute it once. Start at T x factor.
+  While the stroke's `torque_avg` is below that need x (1 - `DRAG_TOL`) (1e-3), solve again at the need (at most
+  `DRAG_MAX_STROKES` = 4 strokes, and more raises `RuntimeError`, which the batch boundary turns into a failed
+  evaluation). Check and rating both use `load_at`, so rated torques are shaft torques. The EM-only scan stays on EM
+  power. With `thermal` off the evaluation notes that the power check has no losses.
 - **D7. Ripple.** New `Requirements.switching_frequency_hz` (None: no ripple check, today's behaviour) and
   `max_bus_voltage_v` (None: `bus_voltage_v`). When both `switching_frequency_hz` and `phase_current_a` are set,
   `choose_turns` replaces each winding's current by the largest I <= `w.current` with I + dI(I)/2 <= `phase_current_a`.
@@ -237,22 +284,34 @@ closure, so the centrifugal part alone is a valid lower bound to check now (D12)
   over the strokes with start flux 0, after the RMS filter. It is not a new simulation. `ScanPoint.single_pulse`
   (default True) is true when those torques meet the margin at base speed and over the band. The density-mode key
   becomes (not `single_pulse`, -turns / paths, paths). The wire-mode key does not change.
-- **D9. Windage in the rated set.** `cooling.RATED_ROWS` = `ROWS` without `mechanical_loss`. The Kiyota factor holds
-  Kiyota's windage and friction. The nominal windage and friction stay in both sets: the smooth-cylinder windage is a
-  lower bound for a salient rotor, and Kiyota's share is at its own size and speed. The residual double count is the
-  nominal value, a few % of the rated iron loss, on the safe side. `check_requirement`, `rate_context` and the budget
-  shares use `RATED_ROWS`.
+- **D9. Windage in the rated set: dropped (2026-11-28).** Kiyota's "iron and other" leaves the mechanical loss out
+  (Diagnosis 7), so `K_IRON_HI` holds no windage or friction. The rated set keeps every row of `ROWS`,
+  `mechanical_loss` included, and `check_requirement`, `rate_context` and the budget-share loop do not change (the loop
+  keeps `thermal_mesh` and `end_winding_model` at 0 K). No `cooling.RATED_ROWS` is made, so the local `RATED_ROWS` of
+  `examples/kiyota_thermal_check.py` (every row except `end_winding_model`) has no name clash. Kiyota names skin effect
+  in the winding among the causes of "other". The wire-mode copper model also adds skin and proximity loss, so that
+  part may count twice, on the safe side. This plan does not change it.
 - **D10. Bending.** First bending speed by Dunkerley (a lower bound of the fundamental): 1/w^2 = 1/w_r^2 + 1/w_s^2,
   w_r^2 = 48 E I / (m_rotor L^3) with the rotor laminations lumped at mid-span, w_s = (pi / L)^2 sqrt(E I / (rho A))
   for the uniform shaft. Rigid simple supports. The stack's added stiffness is left out (safe side) and so is the
   bearing compliance (unsafe side, R4). Limit 1.3 x `max_speed_rpm` (`BENDING_MARGIN`). Span: new
   `BearingSetup.span_m`. None: stack + 2 x (coil build + liner) + 2 x `SPAN_ALLOWANCE` (15 mm, half a bearing width plus
-  a wall, a placeholder with a note). A longer span lowers the speed, so the allowance errs on the safe side.
-- **D11. Bearing speed.** New `BearingSetup.limiting_speed_rpm` (the chosen bearing's catalogue limiting speed for its
-  lubrication). Given: `pass` when `max_speed_rpm` is at most that, `fail` above it, with a note above 80 % (JTEKT
-  consult rule). Not given: compare with the Koyo 60-series open deep groove ball bearing at the next catalogue bore
-  at or above the bearing bore, grease lubrication (the table read in Task 12). At or under it: `pass`. Above it:
-  `not_run` with a note that names the standard bearing and its limit (owner default, see the question below).
+  a wall, a placeholder with a note). A longer span lowers the speed. The allowance is on the safe side only when it
+  is at least the real distance from the end winding to the bearing centre. With one candidate per end (half width
+  4.5 to 6.5 mm) 15 mm leaves 8.5 to 10.5 mm for clearance and end cap. A DB set per end (half width 9 to 13 mm)
+  leaves 2 to 6 mm, which is likely short. The note says so, and the owner's end-cap drawing sets `span_m` (R4).
+- **D11. Bearing speed (owner, §11 2026-11-27 and 2026-11-28).** `bearing_limit(req)` is `fail` when
+  `OVERSPEED` (1.2, `srmcore.post.rotor_stress`) x `max_speed_rpm` is above the candidate's catalogue limiting speed
+  for its lubrication x `DB_PRELOAD_A` (0.81), else `pass`. It never returns `not_run`. New fields
+  `BearingSetup.candidate` (one of the three names of Diagnosis 12, or None) and `BearingSetup.lubrication` (`grease`
+  or `oil_air`, default `grease`). With `candidate` None the check takes the lowest limit of the three for the
+  lubrication, so it holds for whichever candidate the order pack picks (on grease: NSK 30BNR19HTSUMP3, 25 920 r/min,
+  so a top speed of at most 21 600 r/min). The candidate is a field. A rule "the smallest bore that fits the shaft"
+  was rejected for three reasons. The final choice is open (§11). The shaft diameter is a sampled variable. A journal
+  can step down from the rotor seat, so every shaft of 25 mm and up would "fit" the 7005, the fastest candidate, and
+  pass designs that the NSK would block. The check does not relate the candidate bore to the shaft (open item 8). The note names the candidate, the
+  lubrication, the catalogue speed and the factor, and says when the factor is assumed (NSK). In `hard_limits`, so a
+  `fail` rejects a search candidate (D2) and makes a case infeasible.
 - **D12. Gap closure.** `gap_limit`: the larger closure of `continuous_overspeed` and `peak_overspeed` must be at most
   0.5 x `air_gap` (`GAP_SHARE`, §11 2026-11-27 item 4). With `closure` None, stator and rotor of one material and the
   rotor at or above the bore temperature in both cases, check the centrifugal part alone (`pass` or `fail`, note: the
@@ -265,18 +324,13 @@ closure, so the centrifugal part alone is a valid lower bound to check now (D12)
   evaluations. `run_search` stops after the third evaluation with the same failure status (an exception class name)
   and sets `SearchResult.stopped`.
 
-## Owner decision
+## Owner decisions this plan follows
 
-**Question:** with no bearing chosen, should the bearing-speed check block designs whose top speed is above the
-grease limiting speed of a standard 60-series deep groove ball bearing at the shaft bore (Koyo catalogue)? At
-19 900 r/min this blocks every shaft of 25 mm and up, so nearly all of ratios 12 and 15.
-
-**Recommended default:** report it as a note, do not block. Block as soon as the chosen bearing's limiting speed is
-entered (`BearingSetup.limiting_speed_rpm`). Task 12 builds the default. The other answer is one line
-(`not_run` becomes `fail`) and needs no new task.
-
-Also for the owner, no answer needed to start: the ripple assumes hard chopping at the highest bus voltage (D7). Soft
-chopping halves it. That is one constant once the inverter is known.
+- Bearing speed blocks, at the candidate's limit x 0.81 (§11, 2026-11-28 item 3): D11, Task 12.
+- The ranking states the peak-rating gap as a band, and the cooling paths and a 30 s peak from warm are checked on the
+  winner in the confirm step (§11, 2026-11-28 item 2): Task 10.
+- No answer needed to start: the ripple assumes hard chopping at the highest bus voltage (D7). Soft chopping halves
+  it. That is one constant once the inverter is known.
 
 ## Files
 
@@ -287,11 +341,12 @@ chopping halves it. That is one constant once the inverter is known.
   `docs/validation/bike_gates_rating_screening.json`, `docs/reports/bike-v1-0.md`, `docs/reports/bike-v1-1.md`.
 - Modify: `src/srmapp/requirements.py`, `src/srmapp/mechanical.py`, `src/srmapp/sizing/generator.py`,
   `src/srmapp/sizing/stage1.py`, `src/srmapp/pipeline.py`, `src/srmapp/evaluate.py`, `src/srmapp/thermal.py`,
-  `src/srmapp/cooling.py`, `src/srmapp/turns.py`, `src/srmapp/drive/envelope.py`, `src/srmapp/__init__.py` (0.11.0),
+  `src/srmapp/turns.py`, `src/srmapp/drive/envelope.py`, `src/srmapp/__init__.py` (0.12.0),
   `src/srmweb/serialize.py`, `src/srmweb/__init__.py` (0.12.2), `web/openapi.json`, `web/src/api/schema.ts`
-  (generated), and the tests named per task.
-- Modify docs: `CLAUDE.md`, `docs/r3-sources.md` (sections 8 and 9), `docs/r3-loss-results.md` (friction and windage
-  bullet), `docs/r5-thermal-results.md` (rated set), `docs/reports/README.md`.
+  (generated), and the tests named per task. `src/srmapp/cooling.py` does not change (D9).
+- Modify docs: `CLAUDE.md`, `docs/r5-sources.md` (new sections 10 and 11), `docs/r3-loss-results.md` (Kiyota finding
+  1), `docs/r5-thermal-results.md` (shaft-torque ratings, the V4 mechanical-loss paragraph), the roadmap spec §0 part 0
+  wording, `docs/reports/README.md`.
 
 ---
 
@@ -307,7 +362,8 @@ chopping halves it. That is one constant once the inverter is known.
   `SEARCH_REQUIRES_PASS = ("rotor_stress",)` for now, with a one-line why.
 - [ ] Generator: rotor yoke `w_r * (0.55 + 0.45 * u[6])`, comment: the stress model's box starts at 0.55 of the tip chord.
 - [ ] `run_search`: after stage 1, apply `hard_limits` to the passing designs and reject per D2. New fields
-  `SearchResult.limit_rejected: dict[str, int] = {}` (rejections per limit name). `stage1_rejected` counts them too.
+  `SearchResult.limit_rejected: dict[str, int] = {}` (rejections per limit name; a candidate that fails several limits
+  counts under each). `stage1_rejected` also counts each limit-rejected candidate, once.
 - [ ] `evaluate_stage2`: `limits = hard_limits(req, chosen)`. Any `fail` makes it infeasible with its note, each
   `not_run` adds its note. New field `Evaluation.limits: tuple[Limit, ...] = ()`.
 - [ ] Tests (fast): status mapping for all five stress statuses (build each with `make_8_6` overrides: 10JNEX900
@@ -318,7 +374,9 @@ chopping halves it. That is one constant once the inverter is known.
   (`tests/app/test_app_pipeline.py:131`): materials `RegionMaterials()` to `RegionMaterials(rotor="10JNEX900")`
   (M19 stator keeps the 1.12 margin), because the M19 rotor has no strength data and every candidate is now rejected.
   `test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible` (`tests/app/test_app_evaluate.py:190`):
-  `free.error` gains the "rotor stress not checked: the rotor material has no mechanical data" note.
+  `free.error` gains the "rotor stress not checked: the rotor material has no mechanical data" note. Tasks 6 and 13
+  add more notes to the same string (thermal off, gap closure with no rating), so the assertion becomes
+  `"not thermally rated" in free.error and "rotor stress not checked" in free.error` now, and those tasks leave it.
 - [ ] `python -m pytest tests/app/test_limits.py tests/app/test_app_pipeline.py tests/app/test_app_evaluate.py
   tests/app/test_app_generator.py -m "not slow"` passes. Commit.
 
@@ -374,22 +432,11 @@ chopping halves it. That is one constant once the inverter is known.
   `test_refusal_is_infeasible`, `e.feasible` to `not e.feasible`.
 - [ ] Fast tests of the touched files pass. Commit.
 
-### Task 5: Windage out of the rated set (about 1 h)
+### Task 5: Windage in the rated set (dropped 2026-11-28, D9)
 
-**Files:** `src/srmapp/cooling.py`, `src/srmapp/thermal.py:356,428,469,484,501,531`, `tests/app/test_cooling.py`,
-`tests/app/test_thermal_rate.py`.
-
-- [ ] `RATED_ROWS` (D9) with the one-line why. Every `frozenset(ROWS)` in `thermal.py` becomes
-  `frozenset(RATED_ROWS)`, and the shares loop runs over `RATED_ROWS`. `coefficients` still accepts every row of
-  `ROWS`.
-- [ ] Rating notes: "windage heats the rotor iron and bearing friction heats the end caps; the rated set takes the high
-  end of both bands" becomes "...; both are at their nominal value in the rated set, because the Kiyota iron factor
-  already holds the measured windage and friction".
-- [ ] Test (fast, fake context as in `tests/app/test_thermal_check.py`): the rows `check_requirement` asks for equal
-  `frozenset(RATED_ROWS)`.
-- [ ] Expected literal change: `test_rate_8_6` (slow, `tests/app/test_thermal_rate.py:58`) `set(ROWS)` to
-  `set(RATED_ROWS)`.
-- [ ] Commit.
+No code change and no commit. The rated set keeps `mechanical_loss` (Diagnosis 7). `thermal.py`, `cooling.py` and
+`test_rate_8_6` (`set(ROWS)`, `tests/app/test_thermal_rate.py:58`) stay as they are. The doc edits that record the
+evidence are in Task 16. The number stays so that the later task numbers and the review issue map do not move.
 
 ### Task 6: Shaft power after losses (about 3 h)
 
@@ -403,8 +450,8 @@ chopping halves it. That is one constant once the inverter is known.
 - [ ] Evaluation note with `thermal` off: "power check without iron, windage and friction loss (thermal off)".
 - [ ] Tests (fast, a fake `stroke` and `stroke_losses` on a `ThermalContext` built with `__new__` and the needed
   attributes, or monkeypatched methods): the stroke asked for covers torque plus loss torque times the factor, the loop
-  ends after two strokes when the loss is constant, it raises after 4, the nominal set uses iron factor 1, zero torque
-  solves no stroke.
+  ends after two strokes when the loss is constant, it raises after 4, the nominal set uses iron factor 1 and the
+  nominal mechanical loss, the rated set the high end of the mechanical bands, zero torque solves no stroke.
 - [ ] Slow tests that read rated torques keep their bounds: `test_rate_8_6`, `test_check_matches_rating_8_6`,
   `test_rated_choice_8_6`. No literal there changes (they assert relations).
 - [ ] Commit.
@@ -451,7 +498,8 @@ chopping halves it. That is one constant once the inverter is known.
     `tests/app/test_app_turns.py`, and `point` is unchanged.
 - [ ] Density tests in `tests/app/test_app_turns.py:94-125` pass unedited, or each changed assertion is stated with
   the reason (a top-turns winding that needs continuous conduction).
-- [ ] `python -m pytest tests/app -m "not slow"` passes. Record its time against main on the same machine. Commit.
+- [ ] `python -m pytest tests/app -m "not slow"` passes (the `turns`, `evaluate` and `app` CI parts). Record its time
+  against main on the same machine. Commit.
 
 ### Task 9: Shortlist order (about 2.5 h plus the `gates-bound` run)
 
@@ -478,47 +526,64 @@ chopping halves it. That is one constant once the inverter is known.
 **Files:** `src/srmapp/evaluate.py`, `src/srmapp/thermal.py:352`, `src/srmapp/pipeline.py`,
 `tests/app/test_app_evaluate.py`, `tests/app/test_app_pipeline.py`.
 
-- [ ] `check_requirement(ctx, n_speeds=6, rows=frozenset(RATED_ROWS))`.
+- [ ] `check_requirement(ctx, n_speeds=6, rows=frozenset(ROWS))` (the default keeps today's rated set; D9).
 - [ ] `Evaluation.nominal_continuous_kw_per_kg`, `nominal_peak_kw_per_kg` (NaN default), `nominal_check:
   RequirementCheck | None = None`. `_rated_kw_per_kg` takes the set (`rating.rated` or `rating.nominal`).
 - [ ] When no winding holds, run the nominal check on `checks[0]` (rebuild its context when more than one was checked,
   as `rate_failed` does) and store it.
 - [ ] `SearchResult.recommended()`, `recommendation` and `margin_sensitive()` per D5.
+- [ ] Peak band (owner, §11 2026-11-28 item 2): constant `PEAK_BAND_NOTE` in `pipeline.py`, "peak kW/kg is a band
+  from rated to nominal: the peak-heat check (V4) measured one 14 s copper-dominated pulse, so the cooling paths and a
+  30 s peak from warm have no measured check (confirm step on the winner)". Property `SearchResult.notes` returns
+  `(PEAK_BAND_NOTE,)` when `recommended()` is not empty, else `()`. Nothing else.
 - [ ] Tests: recommended order and ties, an infeasible lighter design with a holding nominal check makes
   `recommendation` None and appears in `margin_sensitive()`, one without it leaves the recommendation, a thermal-off
-  search recommends nothing, nominal kW/kg read `rating.nominal`.
+  search recommends nothing and has no notes, a search with a recommendation has the peak-band note, nominal kW/kg
+  read `rating.nominal`.
 - [ ] Commit.
 
 ### Task 11: First bending speed (about 3 h)
 
-**Files:** `src/srmapp/mechanical.py`, `src/srmapp/limits.py`, `tests/app/test_limits.py`, `docs/r3-sources.md`
-(section 9).
+**Files:** `src/srmapp/mechanical.py`, `src/srmapp/limits.py`, `tests/app/test_limits.py`, `docs/r5-sources.md`
+(new section 10).
 
 - [ ] Source: read one open text that states Dunkerley's formula and the simply supported beam stiffness 48 E I / L^3
   and the uniform-beam first frequency (a university vibration text or a NASA report you can open). Record it in
-  `docs/r3-sources.md` section 9 with a grade, the rigid-support and lumped-mass assumptions and their signs.
-- [ ] `BearingSetup.span_m: float | None` (gt 0) and `SPAN_ALLOWANCE = 0.015` (placeholder, note).
-  `mechanical.first_bending_rpm(machine, bearing)` per D10. `bending_limit(machine, req)`: `pass` at or above
+  `docs/r5-sources.md` section 10 with a grade, the rigid-support and lumped-mass assumptions and their signs.
+- [ ] `BearingSetup.span_m: float | None` (gt 0) and `SPAN_ALLOWANCE = 0.015` (placeholder; the note says it may be
+  short for a DB set per end, D10). `BearingSetup.placeholder` keeps its meaning, the friction inputs: compare
+  `type`, `count`, `bore_diameter_m` and `radial_load_n` with their defaults only, so that setting `span_m` (or, in
+  Task 12, `candidate` and `lubrication`) does not drop the friction placeholder note. Test it.
+- [ ] `mechanical.first_bending_rpm(machine, bearing)` per D10. `bending_limit(machine, req)`: `pass` at or above
   `BENDING_MARGIN` x top speed, `fail` below, `not_run` without shaft mechanical data. In `hard_limits` and
   `SEARCH_REQUIRES_PASS`.
 - [ ] Tests: hand numbers for one machine (write the arithmetic in the test), Dunkerley below both single terms, a longer
   span lowers the speed, the placeholder note appears, `make_8_6` at 6000 r/min passes.
 - [ ] Commit.
 
-### Task 12: Bearing speed (about 3 h)
+### Task 12: Bearing speed (about 2 h, revised 2026-11-28)
 
-**Files:** `src/srmapp/mechanical.py`, `src/srmapp/limits.py`, `tests/app/test_limits.py`, `docs/r3-sources.md`
-(section 8).
+**Files:** `src/srmapp/mechanical.py`, `src/srmapp/limits.py`, `tests/app/test_limits.py`, `docs/r5-sources.md`
+(new section 11).
 
-- [ ] Read the Koyo product pages (`https://www.jtekt.co.jp/products/bearing/en/p/detail/print.php?pno=60NN`) for the
-  60 series, bores 10 to 50 mm: d, D, B, grease and oil limiting speeds. Record the table, the URLs, the date, the
-  C/P >= 16 and Fa/Fr <= 0.25 conditions and the 80 % consult rule in `docs/r3-sources.md` section 8. Grade B
-  (manufacturer values, no stated accuracy, "for reference only").
-- [ ] `KOYO_60_GREASE_RPM` in `mechanical.py` (bore mm to r/min). `BearingSetup.limiting_speed_rpm: float | None`
-  (gt 0). `bearing_limit(machine, req)` per D11. In `hard_limits`, not in `SEARCH_REQUIRES_PASS`.
-- [ ] Tests: a chosen bearing passes and fails at its limit, the 80 % note, the placeholder at 6000 r/min with a 20 mm
-  shaft passes, at 19 894 r/min with a 25 mm shaft it is `not_run` and names 6005 and 15 000 r/min, a bore above the
-  table is `not_run`.
+- [ ] `docs/r5-sources.md` section 11 (core spec §11 2026-11-27 puts the values there): the six catalogue speeds of
+  `docs/bearing-candidates.md` with d x D x B and basis (single bearing; SKF "attainable"), SKF Table 39 (DB set
+  factors 0.81 / 0.75 / 0.65 / 0.40 for preload A to D), and the SKF note that oil-air values drop for oil mist or
+  jet. Grades: SKF B (catalogue values). NSK C (the page is the YN variant, not the exact designation, and its set
+  factor is not read, so 0.81 is assumed). Point to `docs/bearing-candidates.md` for the full record. JTEKT's 80 %
+  consult rule is not carried over: it is a rule of JTEKT's own catalogue, and the 0.81 set factor takes its place.
+- [ ] `mechanical.py`: `BEARING_SPEED_RPM` (candidate name to grease and oil-air catalogue speeds) and
+  `DB_PRELOAD_A = 0.81`, each with a source comment. `BearingCandidate = Literal["SKF 7005 CD/HCP4A",
+  "NSK 30BNR19HTSUMP3", "SKF 7006 CD/HCP4A"]`. `BearingSetup.candidate: BearingCandidate | None = None` and
+  `BearingSetup.lubrication: Literal["grease", "oil_air"] = "grease"`. The friction model does not read them (open
+  item 8).
+- [ ] `limits.bearing_limit(req)` per D11. In `hard_limits`. Not in `SEARCH_REQUIRES_PASS`, because it never returns
+  `not_run`.
+- [ ] Tests: with no candidate on grease, top speed 21 590 r/min passes and 21 610 fails (NSK, 25 920 r/min).
+  `candidate="SKF 7005 CD/HCP4A"` passes at 29 000 and fails at 29 050 (34 830). `oil_air` uses the oil-air speed
+  (7005: 54 270). The NSK note says that its factor is assumed. `make_8_6` at 6000 r/min passes. A search whose top
+  speed is above the default limit counts every stage-1 pass in `limit_rejected["bearing_speed"]` and evaluates
+  nothing (fakes as in `tests/app/test_app_pipeline.py`).
 - [ ] Commit.
 
 ### Task 13: Air-gap closure (about 1.5 h)
@@ -529,7 +594,7 @@ chopping halves it. That is one constant once the inverter is known.
   the design infeasible on `fail`. No rating: `not_run` with "no rating".
 - [ ] Tests with hand-built `Rating.gap` values: full closure pass and fail at 0.5 x gap, the centrifugal-only path
   (same material, rotor hotter) pass and fail, a cooler rotor or two materials give `not_run`, `not_run` never makes a
-  design infeasible.
+  design infeasible. `tests/app/test_app_evaluate.py:190` holds unedited after Task 1 (a containment check).
 - [ ] Commit.
 
 ### Task 14: LattePanda runs (about 1.5 h attended, 1.5 h wall)
@@ -545,10 +610,12 @@ Run one at a time. Check every acceptance line before committing.
 - [ ] Unit `gates-rating` (about 30 min): `examples/rating_timing.py --preset screening --json
   docs/validation/bike_gates_rating_screening.json`, same `systemd-run` form. Record the stroke count and the time
   against `RATING_BUDGET_S["screening"]` (1063 s). If over 1063 / 1.25 s, update the budget to the measured x 1.25 in
-  `src/srmweb/cases.py` (srmweb is bumped in Task 15). Run the same command from `/home/server/srm-forge` (main) first
-  and record its rated continuous and peak torques per speed. Acceptance: rated, and every per-speed change against
-  main is explained by the two causes (the loss torque lowers it, the nominal windage in the rated set raises it).
-  A change over 10 % at any speed: stop and report.
+  `src/srmweb/cases.py` (srmweb is bumped in Task 15). Run the same command from `/home/server/srm-forge` (main,
+  srmapp 0.11.0) first and record its rated continuous and peak torques per speed. Take main's numbers from this run
+  only: srmapp 0.11.0 gave the iron a heat capacity and the end winding a peak residual, so the peak ends read 2 to
+  3 K cooler on the 8/6 than any 0.10.0 record. Acceptance: rated, and every per-speed change against main is a drop
+  that the loss torque explains ((iron x factor + mechanical) / omega x torque factor, from the strokes). A rise, or
+  a change over 10 % at any speed: stop and report.
 - [ ] Gate counts (under 1 min, no unit): for ratios 8, 12 and 15, 250 samples, the counts per pole set of stage-1
   passes, limit rejections per limit and dropped pole sets, written to `docs/bike-v1-gates-results.md` with the
   command used.
@@ -559,10 +626,10 @@ Run one at a time. Check every acceptance line before committing.
 **Files:** `src/srmapp/__init__.py`, `src/srmweb/serialize.py:97-107`, `src/srmweb/__init__.py`,
 `tests/web/test_report_route.py:35`, `web/openapi.json`, `web/src/api/schema.ts`.
 
-- [ ] srmapp 0.10.0 to 0.11.0 (feasibility, rankings, rated torques and winding currents change).
-- [ ] `search_result_json` adds `recommended_ids`, `recommendation_id`, `stopped`, `limit_rejected` and
+- [ ] srmapp 0.11.0 to 0.12.0 (feasibility, rankings, rated torques and winding currents change).
+- [ ] `search_result_json` adds `recommended_ids`, `recommendation_id`, `notes`, `stopped`, `limit_rejected` and
   `dropped_pole_sets`. srmweb 0.12.1 to 0.12.2, `tests/web/test_report_route.py:35` takes the new literal. `web/`
-  stays 0.12.0 (no UI change).
+  stays 0.12.0 (no UI change). The new `BearingSetup` fields reach the API schema through `Requirements`.
 - [ ] `python -m srmweb.openapi web/openapi.json; cd web; npm run gen:api; npm run build; npx vitest run`.
   Old setup files load unchanged (new fields are optional). `python -m pytest tests/web -m "not slow"` passes.
 - [ ] Commit.
@@ -572,13 +639,16 @@ Run one at a time. Check every acceptance line before committing.
 - [ ] `docs/bike-v1-gates-results.md`: the Diagnosis tables, the `gates-bound` shares and regulated currents, the
   rating time and stroke count, the gate counts, and the limits of each check against the 10 to 15 % target (the
   rigid-bearing error of bending, the hard-chopping assumption, the centrifugal-only gap).
-- [ ] `docs/r3-sources.md` sections 8 and 9 (Tasks 11 and 12). `docs/r3-loss-results.md`, friction and windage, the
-  "Thermal" bullet: the rated set takes the nominal values (D9). `docs/r5-thermal-results.md`: one paragraph on the
-  rated set and the shaft-torque ratings.
+- [ ] `docs/r5-sources.md` sections 10 and 11 (Tasks 11 and 12).
+- [ ] D9 evidence. `docs/r3-loss-results.md`, Kiyota finding 1: one sentence that the measurement leaves the
+  mechanical loss out (Table III row and efficiencies, 2014 p. 5719), so `K_IRON_HI` holds no windage or friction.
+  `docs/r5-thermal-results.md`: the V4 paragraph that says the 573 W "may be counted twice" now says it is counted
+  once, with the same evidence, and one new paragraph on the shaft-torque ratings. Roadmap spec §0 part 0: "fix the
+  windage double count" becomes "windage double count checked: none (Kiyota Table III)".
 - [ ] `CLAUDE.md`: the srmapp paragraph (limits and the search rule, shortlist order and `BOUND_SHARE`,
-  `recommended`, shaft torque in the rating, the ripple-limited winding current, single pulse first in density mode,
-  `RATED_ROWS`, the new `Requirements` and `BearingSetup` fields), the Losses item 7 sentence on the rated set, the
-  "Current state" line and the versions (srmapp 0.11.0, srmweb 0.12.2).
+  `recommended` and the peak-band note, shaft torque in the rating, the ripple-limited winding current, single pulse
+  first in density mode, the new `Requirements` and `BearingSetup` fields, the bearing candidates and their factor),
+  the "Current state" line and the versions (srmapp 0.12.0, srmweb 0.12.2).
 - [ ] `docs/reports/bike-v1-0.md` and `bike-v1-1.md` from `docs/reports/TEMPLATE.md`, rows in
   `docs/reports/README.md` ("Bike v1, part 0" gates and ranking, "Bike v1, part 1" speed checks). Written after CI is
   green, in the merge session.
@@ -588,8 +658,9 @@ Run one at a time. Check every acceptance line before committing.
 
 - [ ] Opus final review of the whole branch against this plan (spec and code), fixes by the implementer, a scoped
   re-review of the fixes.
-- [ ] Push, open the PR, fast CI green on 3.12 and 3.14, the slow suite dispatched on the branch and green. Record the
-  fast-suite time against the last main run.
+- [ ] Push, open the PR, fast CI green on 3.12 and 3.14 in all four parts, the slow suite dispatched on the branch and
+  green. Record each part's time (`turns`, `evaluate`, `app`, `rest`) against the last main run. A part within 10 min
+  of its 60 min limit: stop and report.
 - [ ] Controller, not this plan's implementers: merge, the Notion project doc (section and dated row), the Notion
   tracker (this item Done only when its "Done when" holds, plus the open items below), the Roadmap rows for parts 0
   and 1.
@@ -603,19 +674,26 @@ Run one at a time. Check every acceptance line before committing.
 
 ## Open items this plan leaves (add to the tracker)
 
-1. The owner's bearing (type, bore, limiting speed): until then the bearing-speed check reports and does not block.
+1. The final bearing, its lubrication and its preload (order pack, §11 2026-11-27): until then the bearing-speed check
+   takes the lowest limit of the three candidates on grease. The NSK set factor (0.81 assumed) and the page of the
+   exact NSK designation are not read.
 2. Chopping mode of the owner's inverter: hard chopping is assumed (D7).
 3. The 10JNEX900 expansion coefficient: the thermal part of the gap closure is not run.
 4. Bearing radial stiffness in the bending check (no cited value): the rigid supports read the speed high (R4).
 5. An FE stress sweep of 12-pole rotors at 4 phases, so 16/12 samples are not rejected for their pole arc.
 6. The efficiency map on shaft power (it still counts EM power as output).
 7. A 10JNEX900 ring test above 2.78 kHz, which would lift the frequency cap (review issue 3).
+8. The friction model still takes a deep groove ball bearing at the shaft bore. The candidates are angular contact
+   at 25 and 30 mm bores, and no check relates the candidate bore to the shaft (a shaft under 25 mm needs a journal
+   above the rotor seat). Update the friction default and add a bore check when the bearing is final.
+9. The end-cap distance behind `SPAN_ALLOWANCE` (15 mm): likely short for a DB set per end (D10).
 
 ## Out of scope
 
-The bike search command, the search preset default (`full`, review issue 4), the peak-heat check V4, FE stress and
-critical speed (part 8), mutual coupling, `K_IRON_HI` at high power, the current-limit grid of continuous strokes, any
-web UI change, and any srmcore change.
+The bike search command, the search preset default (`full`, review issue 4), the cooling-path check and the 30 s peak
+from warm (confirm step on the winner, §11 2026-11-28), FE stress and critical speed (part 8), mutual coupling,
+`K_IRON_HI` at high power, the possible double count of AC winding loss inside Kiyota's "other" (D9, safe side), the
+current-limit grid of continuous strokes, any web UI change, and any srmcore change.
 
 ## Risks
 
@@ -628,13 +706,14 @@ web UI change, and any srmcore change.
   hard chopping, a low-turn winding can lose 20 to 45 % of its current limit. That moves the winding choice to more
   turns and changes results. It is the physics of the owner's 170 A limit, and the hard-chopping half of it is an
   assumption (open item 2).
-- **R4, rigid bearings.** A ball bearing of the bike's size can lower the first bending speed by roughly 5 to 10 %
-  (uncited estimate). The 1.3 margin covers part of it. Part 8 (FE on the finalists) includes the bearings.
-- **R5, results change.** Every evaluation from srmapp 0.11.0 can differ: feasibility (limits, refusals), the
-  winding (ripple, single pulse), rated torques (loss torque, rated set). Stored evaluations keep their numbers. The
-  web shows the version.
+- **R4, rigid bearings and the span.** A ball bearing of the bike's size can lower the first bending speed by roughly
+  5 to 10 % (uncited estimate). The 1.3 margin covers part of it. The 15 mm span allowance may be short for a DB set
+  per end (D10), which also reads the speed high. Part 8 (FE on the finalists) includes the bearings.
+- **R5, results change.** Every evaluation from srmapp 0.12.0 can differ: feasibility (limits, refusals), the
+  winding (ripple, single pulse), rated torques (loss torque). Stored evaluations keep their numbers. The web shows
+  the version.
 - **R6, test churn.** The expected literal changes are listed per task. Fast-suite time grows by the new tests only
-  (synthetic maps, fakes). The rated slow tests get slower by R2.
+  (synthetic maps, fakes), most of them in the `app` CI part. The rated slow tests get slower by R2.
 
 ## Hours
 
@@ -644,17 +723,17 @@ web UI change, and any srmcore change.
 | 2. Pole sets, frequency cap | 1.5 |
 | 3. Total length | 1 |
 | 4. Thermal errors | 2 |
-| 5. Windage out of the rated set | 1 |
+| 5. Windage in the rated set (dropped, D9) | 0 |
 | 6. Shaft power after losses | 3 |
 | 7. Current ripple | 3 |
 | 8. Single pulse first | 2.5 |
 | 9. Shortlist order | 2.5 |
 | 10. Objective | 3 |
 | 11. First bending | 3 |
-| 12. Bearing speed | 3 |
+| 12. Bearing speed (candidates read already) | 2 |
 | 13. Gap closure | 1.5 |
 | 14. LattePanda runs (3 h wall) | 1.5 attended |
 | 15. Versions, web keys, API schema | 1 |
-| 16. Docs and reports | 2.5 |
+| 16. Docs and reports (plus the D9 evidence) | 3 |
 | 17. Reviews, PR, CI | 2 |
-| Total | 38 attended, about 42 elapsed |
+| Total | 36.5 attended, about 40.5 elapsed |
