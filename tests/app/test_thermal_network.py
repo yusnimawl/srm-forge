@@ -8,6 +8,7 @@ from srmapp.cooling import CoolingSetup, EndSpray, Jacket, MissingCoolingData, S
 from srmapp.sizing.estimates import coil_side_area
 from srmapp.sizing.winding import Winding
 from srmapp.thermal_network import _edge_keys, _tri_area, build_network
+from srmcore.materials.library import load_material
 from srmcore.mesh.static import build_static_mesh
 from srmcore.model.design import Design, MeshSettings
 from srmcore.model.iron import IronArc
@@ -34,6 +35,14 @@ def coil_load(n, q=1e6):
     q_el = np.zeros(len(DOM.triangles))
     q_el[DOM.element_kind == "coil"] = q
     return lambda _t: ThermalLoad(q_el)
+
+
+def test_iron_capacity_from_library_specific_heat():
+    n, _ = net()
+    m = load_material("10JNEX900")
+    for kind in ("stator_iron", "rotor_iron"):
+        assert np.allclose(n.problem.capacity[DOM.element_kind == kind], m.thermal.specific_heat * m.density * m.stacking_factor)
+    assert not any("iron has no cited specific heat" in x for x in n.notes)
 
 
 def test_every_part_anchored():
@@ -150,3 +159,32 @@ def test_imported_iron_builds():
     n, _ = net(machine=machine, dom=dom)
     s = ThermalSolver(n.problem)
     s.steady(lambda _t: ThermalLoad(np.zeros(len(dom.triangles))))
+
+
+def test_end_winding_model_divides_the_end_capacity():
+    from srmapp.cooling import END_WINDING_PEAK_RESIDUAL
+    nom, _ = net()
+    co = coefficients(CoolingSetup(), M, 3000.0, frozenset({"end_winding_model"}), None, fill=FILL)
+    rated = build_network(DOM, M, W, FILL, co, CoolingSetup())
+    caps = lambda n: [lump.capacity for lump in n.problem.lumps if lump.hot_spot]  # noqa: E731
+    assert caps(rated) == pytest.approx([c / (1 + END_WINDING_PEAK_RESIDUAL) for c in caps(nom)], rel=1e-12)
+    assert np.allclose(rated.problem.conductivity, nom.problem.conductivity)   # steady states do not change
+
+
+def test_end_winding_model_row_raises_the_short_end_rise_by_r():
+    from srmapp.cooling import END_WINDING_PEAK_RESIDUAL as R
+    setup = CoolingSetup()
+    out = {}
+    for rows in (frozenset(), frozenset({"end_winding_model"})):
+        co = coefficients(setup, M, 3000.0, rows, None, fill=FILL)
+        n = build_network(DOM, M, W, FILL, co, setup)
+        s = ThermalSolver(n.problem)
+        zero = np.zeros(len(DOM.triangles))
+        load = lambda _t, n=n: ThermalLoad(zero, {x: 100.0 for x in n.end_lumps.values()})  # noqa: E731
+        start = s.steady(lambda _t: ThermalLoad(zero))
+        tr = s.transient(start, load, 0.2, n_steps=400)
+        out[rows] = (s.hot_spot(s.steady(load)).temperature_c, max(tr.final.lumps[x] - start.lumps[x]
+                                                                   for x in n.end_lumps.values()))
+    (h0, r0), (h1, r1) = out[frozenset()], out[frozenset({"end_winding_model"})]
+    assert h1 == pytest.approx(h0, abs=1e-9)
+    assert (r1 / r0 - 1) == pytest.approx(R, rel=0.05)

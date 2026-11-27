@@ -49,7 +49,8 @@ def test_10jnex900_strength_from_ou_2021():
 def test_10jnex900_conductivity_grade_c():
     t = load_material("10JNEX900").thermal
     assert t.conductivity == 18.6 and t.confidence == "C"
-    assert t.specific_heat is None and t.expansion is None and t.conductivity_through_stack is None
+    assert t.specific_heat == 438.0  # carried over from Faiz 2009, owner decision 2026-11-27
+    assert t.expansion is None and t.conductivity_through_stack is None
 
 
 def test_copper_and_steel_1010_blocks():

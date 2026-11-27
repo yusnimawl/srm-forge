@@ -1,6 +1,6 @@
 # R5 thermal and rotor stress results
 
-This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0 is complete (docs/r5-sources.md section 9). V2 is recorded below: it does not pass. V4 and V5 are pending.
+This file holds the results of the R5a validation gates V1 to V6. V1 passed in tests/thermal. V6 is below and it passed on the revised model. V3 is recorded below (not reproduced exactly). V0 is complete (docs/r5-sources.md section 9). V2 is recorded below: it does not pass. V4 is recorded below: it passes. V5 has no separate gate (see the thermal mesh note).
 
 ## V1: solver against closed forms (tests/thermal)
 
@@ -283,7 +283,72 @@ V2 does not show our solver wrong. With their frame lump, the 119 min state and 
 
 If their early rise is the true one, our model of this case reads 3.4 to 5.0 K low from 2 to 29 min after a cold start. That case has a fixed loss and copper rho c over the whole coil. The rating differs in three ways. Its peak lasts 30 s by default (`Requirements.peak_duration_s`). It starts from a warm steady state. Its coil capacity is fill x copper rho c (`srmapp.thermal_network`), which heats faster early: the x 0.4 row above is 0.1, 1.6, 2.5 and 3.9 K low at 1, 5, 10 and 30 min. The rating's peak lies inside the first minute, where V2 cannot tell the curves apart. Load steps of several minutes are where the gap would matter (an inference).
 
-V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row still waits on V5 and the `end_winding_model` row on V4. The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
+V2 adds no row to the R5 budget. Spec section 7 names no V2 row, and the spec's V2 failure path is to record the input difference and state the gap. This follows the V3 record, where the gap is stated and not fitted away. The `thermal_mesh` row stays 0 (see the thermal mesh note). The `end_winding_model` row is set by V4 (below). The continuous rating still has no measured check. V2 is a code-to-code comparison and does not change that.
+
+## V4: our thermal network against the Kiyota 18/12 peak transient
+
+Verdict: V4 passes. The nominal coil-end peak rise is 39.22 K at `full` against the measured 39.5 +- 0.4 K, so the model reads 0.7 % cold (r = +0.00716). Against the printed 41 K it reads 4.5 % cold (r = +0.0454) and passes only through the resistance row. The band is 36.5 to 42.5 K. The result depends on an iron specific heat carried over from another lamination (see below).
+
+Run: `kiyota-v4b`, 2026-11-27, 57.5 min, LattePanda, commit 1348c0b, srmcore 0.8.0, srmapp 0.11.0, peak RSS 2778 MB. Iron capacity counts the stacking factor (0.90), which moved the peak by +0.02 K against the first run (39.20 K). Command: `$env:PYTHONPATH="src;tests"; python examples\kiyota_thermal_check.py --json docs/validation/r5_v4_kiyota.json`. Record: `docs/validation/r5_v4_kiyota.json`. Case: `tests/kiyota_thermal.py`.
+
+Inputs (sources and errors in `docs/r5-sources.md` 9.2): the Fig. 8 RMS current read off the figure (140.7 A hold, 14 s), uniform start at 51.1 degC, ambient 25 degC (assumed), 573 W mechanical loss (Fig. 7), iron loss 4400 W (Table III (b)) divided by `K_IRON_HI` at 1500 Hz for the nominal set and applied whole in the rated set, uniform over the stator iron. Phase resistance 92.5 mOhm at 20 degC, the winding alone. The paper prints 97.8 mOhm at the terminals and says that 5.3 mOhm of it is coil connections (0.78 m) and terminal wiring (1.68 m in all; 2014 pp. 5714-5715). Eq. (1) gives 4.9 mOhm for 1.68 m, so the winding is 92.5 to 92.9 mOhm. The tool's mean-turn value is 92.6 mOhm. Iron capacity is 438 J/(kg K) x 7490 kg/m3 x 0.90 from the library record (the heat load is per gross stack volume). The quantity compared is the maximum over 0 to 20 s of the hottest end-winding lump above the start temperature. The rating's hot spot (coil sides included) is reported beside it: 39.22 K nominal and 39.82 K rated at `full`, not judged. The rated set leaves the `end_winding_model` row out, because that row carries this gate's own residual.
+
+Results (rise above 51.1 degC, K):
+
+| Preset | Thermal-domain nodes | Nominal | Rated | Wall time (nominal, rated) |
+|---|---|---|---|---|
+| screening | 73 879 | 39.22 | 39.82 | 27 s, 27 s |
+| full | 135 396 | 39.22 | 39.82 | 89 s, 94 s |
+| reference | 951 237 | 39.22 | 39.82 | 259 s, 261 s |
+
+Mesh build: 28 s, 53 s and 719 s. The model reaches the peak earlier than the trace. At 10 s it reads 30.5 K against 22.7 K on the trace, and at 14 s 39.1 K against 35.5 K. The trace peaks after the current stops, and the model does not reproduce that lag. A sensor lag is not modelled and a time-matched comparison is out of scope, so the peak is compared and the shape is not.
+
+Numerical error (nominal, K): mesh |full - reference| 0.002, time step |0.05 s - 0.025 s| 0.011, total 0.014. For the rated set the total is 0.011 K.
+
+The 573 W mechanical loss may be counted twice: Table III (b) prints "iron and other losses" 4.4 kW and mechanical 0.7 kW as separate lines, so the 4.4 kW probably leaves it out (an inference: `docs/r5-sources.md` does not say so outright). Either way it moves the nominal peak by +0.007 K (39.210 K without it, 39.216 K with it, `screening`). The bike-gates plan (its D9) reconciles the loss split when that plan lands.
+
+The trace keeps rising about 4 s after the current stops. As an inference, the measured peak is then probably a lower bound of the coil-end peak, and r is most likely the smallest reading.
+
+Input rows (change of the end-lump peak in K, `full` nominal, signed):
+
+| Row | Low | High |
+|---|---|---|
+| Resistance 92.5 to 97.8 mOhm (94.9 mOhm is the inference with the connections at the coil end: +1.08) | 0 | +2.40 |
+| Cold-iron start (copper and end lumps at 51.1, the rest at the ambient) | -2.50 | 0 |
+| Iron 0.6 kW (Table III (c)) | -0.10 | 0 |
+| Mechanical loss at the end caps | 0 | +0.16 |
+| Stator pole arc +-0.3 mm | -0.07 | +0.07 |
+| Housing 4 and 16 mm, rotor pole arc, rotor yoke (0.00 each), ambient 40 degC (+0.02) | each at most 0.02 | |
+
+Band: the low end is the nominal 39.22 K at `full` minus the negative rows (-2.68 K), 36.53 K. The high end is the rated set (39.82 K, 0.60 K above the nominal) plus the positive rows (+2.65 K) plus the numerical error (0.01 K), 42.48 K.
+
+Pass rule: the band must reach the target within its reading error, that is low at most target + 0.4 K and high at least target - 0.4 K. For 39.5 K the nominal is 0.28 K below it, inside the 0.4 K reading error, so the trace pass needs no row. For the printed 41 K the high side must reach 40.6 K. The rated set (39.82 K) does not, and the resistance row (+2.40 K) does. The earlier plan risk that V4 passes only through the resistance row is reversed for the trace: the diagnosis had used the terminal resistance, which reads 41.6 K.
+
+Zero-capacity effect: without iron capacity the coil end read 49.2 K nominal (63.3 K rated) at the terminal resistance. With the library specific heat it reads 41.6 K at 97.8 mOhm and 39.2 K at 92.5 mOhm. The iron stores part of the heat in the first seconds. The 438 J/(kg K) is carried over from Faiz 2009 Table II (p. 2928), a lamination of unstated grade, not 10JNEX900 (grade C, owner decision 2026-11-27). The V4 pass depends on it. A measured 10JNEX900 value would move the result.
+
+What this means for the ratings: the peak transient of the end winding reads 0.7 % cold against the measured peak. Call 9 of the plan applies: r > 0, so the `end_winding_model` row is set to r. The rated set divides every end-winding lump capacity by 1 + `END_WINDING_PEAK_RESIDUAL` (0.007159, `srmapp.cooling`). The row moves the peak rating only. Its budget share is 0 K by construction, because shares are steady hot-spot rises. The rating's steady (continuous) side still has no measured check. V4 is one machine, one 14 s pulse, one coil-end sensor of unknown position, and an assumed ambient and housing. Against the owner's 10 to 15 % target: V4 checks copper heating in a 14 s copper-dominated pulse, with the iron loss held at a measured-over-model factor and not predicted (finding 1 of `docs/r3-loss-results.md`). The closed-form adiabatic copper rise alone is 40.60 K (`adiabatic_copper_rise_k` in the JSON), 2.8 % from 39.5 K, and the conduction and cooling rows (cross_wire, liner, contact, air gap, cooling h, lamination k) do not reach the 14 s peak. So V4 does not check the cooling paths, a 30 s peak from warm, or the continuous rating.
+
+## Thermal mesh (no separate gate, owner 2026-11-27)
+
+Verdict: the rating's thermal network changes by at most 0.26 K at `screening` and 0.16 K at `full` against `reference` on the 8/6, under the 0.5 K rating tolerance (`TOL_K`). The `thermal_mesh` row stays 0. A finer thermal mesh runs in the confirm step (roadmap section 0, Bike motor v1 part 7).
+
+Run: planning probe of 2026-11-26, LattePanda, a script in `/tmp` that is not in the repository. The 8/6 with 10JNEX900 laminations of 0.1 mm, 24 turns of one 1.0 mm strand, R from `series_resistance` at 20 degC, the machine's default fill. The network is `build_network` with the placeholder `CoolingSetup()` and coefficients at 2000 r/min. The loads are fixed on every mesh. DC copper is 10 A RMS for the steady state and 20 A RMS for the 30 s peak (`srmapp.thermal.peak_transient`, from that steady state). Iron is 30 W, 0.7 in the stator iron and 0.3 in the rotor iron, uniform per part, times `iron_factor` in the rated set. Two sets: nominal and rated (every row unfavourable). Hot spot in degC:
+
+| Preset | Thermal-domain nodes | Nominal steady | Nominal peak | Rated steady | Rated peak | Wall time |
+|---|---|---|---|---|---|---|
+| screening | 31 543 | 96.894 | 120.733 | 134.801 | 161.170 | 16 s |
+| full | 57 987 | 96.934 | 120.779 | 134.881 | 161.270 | 38 s |
+| reference | 405 997 | 96.999 | 120.853 | 135.016 | 161.429 | 313 s |
+| screening - reference | | -0.105 | -0.120 | -0.215 | -0.259 | |
+| full - reference | | -0.065 | -0.074 | -0.135 | -0.159 | |
+
+Wall times include the mesh. The rating's Illinois (regula falsi) search stops within `TOL_K` = 0.5 K below the limit, or at `BRACKET_REL`, so it stops anywhere in (-0.5, 0] K. A change of this size is inside the rating's stop tolerance. The `screening` preset is not the `full` knobs at a larger scale, so the three levels do not follow one h² line.
+
+Limits:
+
+- 8/6 only. The Kiyota case was not run: its planned steady load (60 A RMS, 1.5 kW iron) ran away above 1000 degC with the placeholder jacket. 30 A with 300 W stator iron gives 99.7 degC.
+- Iron capacity was zero at the time. Steady values do not depend on it. The peak values do.
+- The reference has an error of its own, so the differences read slightly low (an inference).
 
 ## First rating (8/6 screening, test fixture)
 
@@ -312,7 +377,41 @@ The lamination end faces are adiabatic (no cited through-stack conductivity); an
 | lamination_k | 2.69 | 2.88 |
 | thermal_mesh, end_winding_model | 0 | 0 |
 
-28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time: 550 s for the module on the bench host.
+Re-run 2026-11-27 (srmapp 0.10.1, 10JNEX900 iron capacity 438 J/(kg K) x density; same requirements and cooling, 29 strokes, 542 s rating wall time, 1128 s for the probe with the map):
+
+| Speed | Set | Continuous (Nm) | Peak (Nm) | Hot spot at continuous (degC) | Hot spot at peak end (degC) |
+|---|---|---|---|---|---|
+| 2000 rpm | nominal | 3.226 | 3.416 (envelope) | 158.5 | 121.3 |
+| 6000 rpm | nominal | 3.159 | 3.354 (envelope) | 158.5 | 116.6 |
+| 2000 rpm | rated | 2.309 | 3.105 (envelope) | 159.9 | 130.8 |
+| 6000 rpm | rated | 2.069 | 3.049 (envelope) | 158.3 | 123.5 |
+
+Budget shares of the re-run, in K of hot-spot rise at the rated continuous torque (the torque differs from the first run at 6000 rpm, so the shares do too):
+
+| Row | 2000 rpm | 6000 rpm |
+|---|---|---|
+| iron | 1.66 | 5.92 |
+| em_torque | 6.79 | 5.78 |
+| cross_wire | 0.05 | 0.04 |
+| liner | 16.9 | 14.4 |
+| contact | 5.62 | 5.82 |
+| air_gap | 0 | 0 |
+| cooling_h | 0.07 | 0.07 |
+| lamination_k | 2.69 | 2.69 |
+| thermal_mesh, end_winding_model | 0 | 0 |
+| mechanical_loss | 0.01 | 0.08 |
+
+(Source: the `Rating.shares` printed by the probe; the first-run table has no cross_wire value, no mechanical_loss row and shows 0 for cross_wire.) What moved and why:
+
+- Peak-end hot spots fall 2.6 (2000 rpm) and 2.9 K (6000 rpm) in the nominal set and 1.9 and 2.4 K in the rated set. Inference, not isolated: iron now stores heat during the peak transient, which lowers the peak-end hot spot. In the rated set this is the net of the capacity (down) and the higher iron factor (up, `K_IRON_HI` 3.2 and more). The peaks stay at the envelope.
+- Steady values do not depend on capacity (the steady solve does not use it). The nominal continuous torques equal the first run within 0.2 % (3.225 to 3.226, 3.164 to 3.159 Nm).
+- The first table was recorded 2026-11-09. Four changes to rating inputs landed after it and were not isolated from each other: `K_IRON_HI` as the Kiyota curve (2026-11-18), the continuous-conduction strokes (srmapp 0.10.0), friction and windage heat with the `mechanical_loss` row (2026-11-17, 4d754f1), and the `cross_wire` nominal as Milton with xi 0.324 instead of Hashin-Shtrikman at fill other than 0.37 (2026-11-17, 1cc953b; it moves the nominal set).
+- The rated continuous torque at 6000 rpm falls 7 % (2.230 to 2.069 Nm). The shares are taken at that torque, so they follow it at 6000 rpm: em_torque 6.58 to 5.78 K, liner 15.8 to 14.4, contact 6.20 to 5.82, lamination_k 2.88 to 2.69. The iron shares rise (0.75 to 1.66 and 2.67 to 5.92 K) with the iron factor. These changes come from the four input changes above, not from the capacity.
+- The 2000 rpm rated continuous torque moves 2.304 to 2.309 Nm (+0.2 %), within the 1 % bracket resolution; no cause is attributed.
+
+The probe's asserts (relations only) passed unchanged.
+
+In the first run 28 strokes were solved. The liner row dominates: the liner takes its plain conductivity over the full band and no coil-to-liner contact is assumed. The hot spot is within 1.5 K of the limit at every limit-bound speed (the bracket stops at 1 % of the torque). Run time of the first run: 550 s for the module on the bench host.
 
 ## R5b: the R5a open list, item by item
 
@@ -321,7 +420,7 @@ The lamination end faces are adiabatic (no cited through-stack conductivity); an
 - Backward Euler under-predicts a heating rise: done in R5b. `rate_speed` doubles the step count until the final hot spot changes by under 0.1 K (`STEP_TOL_K`) or the step cap is reached.
 - Temperature-dependent h needs a solver rebuild: decided against in R5b, to avoid a solver rebuild per iteration. Natural convection is evaluated at an assumed 80 degC surface and forced convection at the film temperature of the inlet; the small unsigned error is stated in the rating notes.
 - `gap_closure` non-optional `MechanicalData`: done in R5b. `rate` checks `mechanical is None` first and notes that there is no gap closure.
-- No iron specific heat, expansion or through-stack conductivity: iron capacity is zero (a note says so; steady results are unaffected) and the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Specific heat and expansion move to the owner list below (material data, tracker 10d).
+- Iron specific heat carried over 2026-11-27 (438 J/(kg K), Faiz 2009, owner decision; srmapp 0.11.0), so iron has capacity (before that it was zero, with a note). Expansion and through-stack conductivity stay open: the 10JNEX900 gap entries have centrifugal growth only. The cited lamination value (18.6 W/(m K), band in `K_LAMINATION`) has no stated direction and is used in-plane only; the lamination end faces are adiabatic (errs hot) until a through-stack value is cited (owner item, tracker 10d). Expansion and through-stack conductivity are on the owner list below (material data, tracker 10d).
 - Six FE-derived constants need the owner's yes: moved to the owner list below.
 - Search candidates read `no_fillet`: moved to the owner list below (before R5c).
 - Kiyota 18/12 V6: R5e.
@@ -336,8 +435,8 @@ R5d:
 - Web: route, job kind and Thermal tab for ratings; run report; options-graph axes. None exist yet.
 
 R5e:
-- V0, V2, V4 and V5 (no measured continuous case; the continuous rating has no measured check) and Kiyota 18/12 V6, on the LattePanda.
-- The 8/6 and bench-target demonstrations.
+- V0, V2 and V4 are recorded above and in docs/r5-sources.md section 9. V5 has no separate gate: the thermal mesh note stands, and a finer thermal mesh runs in the confirm step (roadmap section 0). The continuous rating has no measured check.
+- Moved out by roadmap section 0 (owner, 2026-11-26): V6 on the Kiyota rotor (Bike motor v1 part 8) and the 8/6 and bench-target demonstrations.
 
 R6:
 - A re-rate with new cooling needs new strokes. Spec section 10 promised cached strokes and thermal solves only; R5b does not meet that. R6 needs a loss-against-torque reuse design.
@@ -346,7 +445,7 @@ Owner:
 - Cooling concept: decided 2026-11-10 (core spec section 11): oil spray on the end windings plus the jacket at high load, the oil cooled into the water loop by a 3D-printed heat exchanger; jacket only at low load. The search default stays jacket only; end spray is an opt-in setup. The cooling placeholders stay as flagged defaults (owner, 2026-11-10; the UI labels them "placeholder cooling"): ambient 40 degC, housing 8 mm, jacket 4 x 20 mm, 4 passes, 9 L/min of 50/50 water-glycol at 65 degC.
 - The contact gap and resin conductivity (cited nominals 0.03 mm and 1.0 W/(m K), unfavourable 0.08 mm and 0.6) and any placeholder in docs/r5-sources.md section 7.
 - End spray runs with Shell Diala S4 ZX-I since 2026-11-10 (cp from Cragoe 1929, density from the Shell data sheet; docs/r5-sources.md 6.7). Shaft oil stays refused (no cited h). An oil slot channel stays refused: no viscosity curve and no laminar Nu are read. The oil's thermal expansion is not cited, so the spray oil rise reads a few percent low.
-- Iron specific heat and thermal expansion for 10JNEX900 (tracker 10d). Until sourced, the iron capacity and the stator thermal growth stay absent.
+- Iron specific heat for 10JNEX900 is carried over from Faiz 2009 (438 J/(kg K), 2026-11-27) until the jystator data arrive. Thermal expansion for 10JNEX900 (tracker 10d) stays open: the stator thermal growth stays absent.
 - Rotor stress, decided 2026-11-10 (core spec section 11): the six FE-derived constants are accepted, and search candidates carry a rotor root fillet of 0.05 x the pole width at the root (`generator.ROTOR_FILLET_SHARE`), inside the fit's 0.025 to 0.2 ratio.
 - Peak start state: decided 2026-11-10 (core spec section 11): the peak starts from the steady state at the required continuous torque (the current reading).
 - Oil choice and the heat exchanger's approach (oil inlet minus water temperature). The oil is Shell Diala S4 ZX-I (owner, 2026-11-10); its cp and k still need a cited source. The approach is a wide band until measured.
