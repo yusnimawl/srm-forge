@@ -16,7 +16,7 @@ from srmcore.model.design import RadialSRMParams
 from srmcore.post.bearing_friction import BEARING_MU, NOTE as FRICTION_NOTE, bearing_friction
 from srmcore.thermal.windage import windage_loss
 
-from .sizing.estimates import active_mass
+from .sizing.estimates import active_length, active_mass
 
 G = 9.81
 
@@ -37,11 +37,19 @@ class BearingSetup(BaseModel):
     count: int = Field(default=2, ge=1)                       # bearings; they share the load
     bore_diameter_m: float | None = Field(default=None, gt=0)    # None = the shaft diameter
     radial_load_n: float | None = Field(default=None, ge=0)      # total; None = the rotor weight
+    span_m: float | None = Field(default=None, gt=0)             # bearing centre to bearing centre; None = estimated
 
     @property
     def placeholder(self) -> bool:
-        """True while every field is its default (nothing about the bearing was chosen)."""
-        return self == BearingSetup()
+        """True while the friction inputs are their defaults (nothing about the bearing was chosen)."""
+        d = BearingSetup()
+        return (self.type, self.count, self.bore_diameter_m, self.radial_load_n) == \
+            (d.type, d.count, d.bore_diameter_m, d.radial_load_n)
+
+SPAN_ALLOWANCE = 0.015    # m per end, from the end winding to the bearing centre (a placeholder)
+SPAN_NOTE = (f"bearing span is estimated: stack plus both end windings plus {2 * SPAN_ALLOWANCE * 1e3:.0f} mm "
+             f"({SPAN_ALLOWANCE * 1e3:.0f} mm per end, half a bearing width plus a wall); this may be short for a "
+             "double-bearing set at each end (half width 9 to 13 mm); the end-cap drawing sets span_m")
 
 
 @dataclass(frozen=True)
@@ -93,3 +101,23 @@ def mechanical_loss(machine: RadialSRMParams, bearing: BearingSetup, rpm: float,
     if unfavourable:
         w, f = w * (1 + wr[1]), (fr.power_high_w if fr.power_w > 0 else 0.0)
     return MechanicalLoss(w, f, wr, fr_rel, tuple(dict.fromkeys(notes)))
+
+
+def bearing_span(machine: RadialSRMParams, bearing: BearingSetup) -> float:
+    """Bearing centre to bearing centre, m: `span_m`, or the stack with both end windings and the allowance."""
+    return bearing.span_m if bearing.span_m is not None else active_length(machine) + 2 * SPAN_ALLOWANCE
+
+
+def first_bending_rpm(machine: RadialSRMParams, bearing: BearingSetup) -> float | None:
+    """First bending speed of the shaft with the rotor laminations lumped at mid-span, r/min (docs/r5-sources.md
+    section 10). Dunkerley's sum, 1/w^2 = 1/w_r^2 + 1/w_s^2, is below the true value; the supports are rigid, which is
+    above it, and the stiffness of the stack is left out, which is below it. None without the shaft's Young's modulus."""
+    shaft = load_material(machine.materials.shaft)
+    if shaft.mechanical is None:
+        return None
+    length = bearing_span(machine, bearing)
+    d = machine.shaft_diameter
+    ei = shaft.mechanical.youngs_modulus * math.pi * d ** 4 / 64
+    w_r2 = 48 * ei / (active_mass(machine).rotor_iron * length ** 3)
+    w_s = (math.pi / length) ** 2 * math.sqrt(ei / (shaft.density * math.pi * d ** 2 / 4))
+    return math.sqrt(1 / (1 / w_r2 + 1 / w_s ** 2)) * 60 / (2 * math.pi)

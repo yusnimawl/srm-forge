@@ -9,10 +9,12 @@ from srmcore.model.design import RadialSRMParams
 from srmcore.post.rotor_stress import OVERSPEED, SAFETY_FACTOR, rotor_stress
 
 from .cooling import K_IRON_HI
+from .mechanical import SPAN_NOTE, first_bending_rpm
 from .requirements import Requirements
 
 # A search never shortlists a rotor whose stress was not checked (rotor bursting is not recoverable by a later step).
-SEARCH_REQUIRES_PASS = ("rotor_stress",)
+SEARCH_REQUIRES_PASS = ("rotor_stress", "bending")
+BENDING_MARGIN = 1.3    # first bending speed over the top speed
 
 
 @dataclass(frozen=True)
@@ -53,5 +55,18 @@ def frequency_limit(n_rotor_poles: int, req: Requirements) -> Limit:
                  f"stator electrical frequency {f:.0f} Hz at top speed, above {f_max:.0f} Hz (end of the iron-loss data)")
 
 
+def bending_limit(machine: RadialSRMParams, req: Requirements) -> Limit:
+    """First bending speed (`first_bending_rpm`) at least `BENDING_MARGIN` x the top speed; not run without shaft data."""
+    bearing = req.bearing
+    rpm = first_bending_rpm(machine, bearing)
+    need = BENDING_MARGIN * req.max_speed_rpm
+    if rpm is None:
+        return Limit("bending", "not_run", None, need, "bending not checked: the shaft material has no Young's modulus")
+    note = f"first bending speed {rpm:,.0f} r/min against {need:,.0f} r/min ({BENDING_MARGIN:g} x top speed)".replace(",", " ")
+    if bearing.span_m is None:
+        note += "; " + SPAN_NOTE
+    return Limit("bending", "pass" if rpm >= need else "fail", rpm, need, note)
+
+
 def hard_limits(req: Requirements, machine: RadialSRMParams) -> tuple[Limit, ...]:
-    return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req))
+    return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req), bending_limit(machine, req))

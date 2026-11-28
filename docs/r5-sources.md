@@ -518,3 +518,26 @@ Every changed reading, minute: old -> new (degC +- K; "none" is no reading):
   +- 0.78; 11: 35.23 +- 0.08 -> 35.05 +- 0.38; 36: 39.78 +- 0.12 -> 39.81 +- 0.29; 37: 39.81 +- 0.09 -> 39.87 +-
   0.29; 38: 39.83 +- 0.08 -> 39.93 +- 0.32; 41: 40.15 +- 0.06 -> 40.05 +- 0.31; 42: 40.15 +- 0.06 -> 40.05 +- 0.31;
   43: 40.20 +- 0.11 -> 40.10 +- 0.35; 44: 40.21 +- 0.12 -> 40.12 +- 0.36.
+
+## 10. First bending speed of the rotor and shaft
+
+Read on 2026-11-28 from open web pages (no local copy kept; both pages name no author). Page numbers do not exist; sections are named.
+
+**Beam formulas (item 10a).** "Problem 8.2. Additional mass - frequency of beam with hinged ends", *Mechanics of Civil Engineering Structures*, Section 8, solution manual of the Budapest University of Technology and Economics, https://solutionmanual.bme.hu/?p=3799. Read: the midspan stiffness of a simply supported beam k = P / u = 48 E I / L^3 (u = P L^3 / (48 E I)); the beam's own first frequency, f = (pi / 2) sqrt(E I / (m L^4)) with m the mass per length (the page's worked case, E I = 6000 kN m^2, m = 60 kg/m, L = 6 m, gives 13.8 Hz, which this file's arithmetic reproduces; in angular form w = pi^2 sqrt(E I / (m L^4)), the form the code uses); and the Dunkerley combination 1/f^2 = 1/f_m^2 + 1/f_M^2 of the beam's own mass and a concentrated mass. The page says this route is more accurate than a deflection estimate of the same problem. Grade C (a worked university solution, no stated error).
+
+**Bound (item 10b).** "Approximate Methods for Multiple Degree of Freedom Systems: Dunkerley's Formula", Engineering at Alberta Courses, University of Alberta, https://engcourses-uofa.ca/books/vibrations-and-sound/approximate-methods-for-multiple-degree-of-freedom-systems/dunkerleys-formula, Eq. (9.16). Read: the formula "provides a lower bound on the lowest natural frequency of the system" because terms were neglected. Grade C. The page has no 48 E I / L^3 and no uniform-beam frequency; those come from 10a.
+
+**Used in the code** (`srmapp.mechanical.first_bending_rpm`): 1/w^2 = 1/w_r^2 + 1/w_s^2, w_r^2 = 48 E I / (m_rotor L^3) with the rotor laminations lumped at mid-span, w_s = (pi / L)^2 sqrt(E I / (rho A)) for the shaft alone; E from the shaft material, rho its density, I and A of the solid shaft section.
+
+**Assumptions and their signs.**
+
+| Assumption | Sign on the computed speed |
+|---|---|
+| Dunkerley's sum | low (safe), 10b |
+| Rigid simple supports (no bearing compliance) | high (unsafe); to be bounded in R4 |
+| Stack stiffness left out (shaft section only) | low (safe) |
+| Laminations lumped at mid-span (a mid-span load is the worst position for the stiffness 48 E I / L^3) | low (safe) |
+| Shaft density and E from the library steel (grade C) | either |
+| Span = stack + both end windings + 2 x 15 mm (placeholder) | safe only if 15 mm is at least the real distance from the end winding to the bearing centre; one bearing per end (half width 4.5 to 6.5 mm) leaves 8.5 to 10.5 mm for clearance and end cap; a double-bearing set (half width 9 to 13 mm) leaves 2 to 6 mm and is likely short |
+
+Not found: a measured bending speed of a small SRM rotor to check the sum against; the figure is not validated.

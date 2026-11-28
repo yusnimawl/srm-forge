@@ -124,3 +124,45 @@ def test_hard_limits_include_the_frequency_and_a_case_above_it_is_infeasible():
     from test_app_evaluate import _evaluate
     e, _ = _evaluate(_req(max_speed_rpm=30000.0))
     assert not e.feasible and "Hz" in e.error
+
+
+def _bending_terms(machine, span):
+    from srmapp.sizing.estimates import active_mass
+    e, rho, d = 205e9, 7870.0, machine.shaft_diameter     # steel_1010 library values
+    ei = e * math.pi * d ** 4 / 64
+    w_r = math.sqrt(48 * ei / (active_mass(machine).rotor_iron * span ** 3))
+    w_s = (math.pi / span) ** 2 * math.sqrt(ei / (rho * math.pi * d ** 2 / 4))
+    return w_r * 30 / math.pi, w_s * 30 / math.pi
+
+
+def test_bending_speed_matches_the_hand_arithmetic_and_is_below_both_terms():
+    from srmapp.mechanical import BearingSetup, first_bending_rpm
+    m = make_8_6()
+    r_rpm, s_rpm = _bending_terms(m, 0.3)
+    expected = (1 / r_rpm ** 2 + 1 / s_rpm ** 2) ** -0.5
+    got = first_bending_rpm(m, BearingSetup(span_m=0.3))
+    assert got == pytest.approx(expected, rel=1e-9)
+    assert got < min(r_rpm, s_rpm)
+
+
+def test_longer_span_lowers_the_bending_speed():
+    from srmapp.mechanical import BearingSetup, first_bending_rpm
+    m = make_8_6()
+    assert first_bending_rpm(m, BearingSetup(span_m=0.4)) < first_bending_rpm(m, BearingSetup(span_m=0.3))
+
+
+def test_bending_limit_passes_at_6000_rpm_with_the_span_note_and_fails_when_too_fast():
+    from srmapp.limits import bending_limit
+    lim = bending_limit(make_8_6(), _req())
+    assert lim.status == "pass" and lim.value > 1.3 * 6000
+    assert "estimated" in lim.note and "double-bearing" in lim.note
+    assert bending_limit(make_8_6(), _req(max_speed_rpm=40000.0)).status == "fail"
+    assert "bending" in SEARCH_REQUIRES_PASS and "bending" in {x.name for x in hard_limits(_req(), make_8_6())}
+
+
+def test_given_span_drops_the_span_note_but_not_the_friction_placeholder():
+    from srmapp.limits import bending_limit
+    from srmapp.mechanical import BearingSetup
+    assert "estimated" not in bending_limit(make_8_6(), _req(bearing=BearingSetup(span_m=0.2))).note
+    assert BearingSetup(span_m=0.2).placeholder
+    assert not BearingSetup(count=4, span_m=0.2).placeholder
