@@ -233,10 +233,11 @@ def test_gap_limit_centrifugal_only_and_not_run():
     m = make_8_6(materials=RegionMaterials(stator="10JNEX900", rotor="10JNEX900"))
     half = 0.5 * m.air_gap
     cases = lambda c: {"continuous_overspeed": _gc(None, c), "peak_overspeed": _gc(None, c)}  # noqa: E731
-    assert gap_limit(m, _gap_rating(cases(0.5 * half))).status == "pass"
-    assert gap_limit(m, _gap_rating(cases(1.5 * half))).status == "fail"
-    assert gap_limit(m, _gap_rating(cases(0.5 * half), rotor_c=70.0)).status == "not_run"
+    assert gap_limit(m, _gap_rating(cases(0.5 * half), rotor_c=70.0)).status == "pass"
+    assert gap_limit(m, _gap_rating(cases(1.5 * half), rotor_c=80.0)).status == "fail"
+    assert "not hotter" in gap_limit(m, _gap_rating(cases(0.5 * half), rotor_c=70.0)).note
+    assert gap_limit(m, _gap_rating(cases(0.5 * half))).status == "not_run"     # rotor hotter than the bore
     other = make_8_6(materials=RegionMaterials(stator="M19", rotor="10JNEX900"))
-    assert gap_limit(other, _gap_rating(cases(0.5 * half))).status == "not_run"
+    assert gap_limit(other, _gap_rating(cases(0.5 * half), rotor_c=70.0)).status == "not_run"
     assert gap_limit(m, None).note.endswith("no rating")
     assert gap_limit(m, _gap_rating({})).status == "not_run"
