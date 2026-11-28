@@ -9,7 +9,7 @@ from srmcore.model.design import RadialSRMParams
 from srmcore.post.rotor_stress import OVERSPEED, SAFETY_FACTOR, rotor_stress
 
 from .cooling import K_IRON_HI
-from .mechanical import SPAN_NOTE, first_bending_rpm
+from .mechanical import BEARING_SPEED_RPM, DB_PRELOAD_A, SPAN_NOTE, first_bending_rpm
 from .requirements import Requirements
 
 # A search never shortlists a rotor whose stress was not checked (rotor bursting is not recoverable by a later step).
@@ -68,5 +68,22 @@ def bending_limit(machine: RadialSRMParams, req: Requirements) -> Limit:
     return Limit("bending", "pass" if rpm >= need else "fail", rpm, need, note)
 
 
+def bearing_limit(req: Requirements) -> Limit:
+    """Overspeed x top speed against the catalogue limiting speed of the bearing candidate x `DB_PRELOAD_A`. Without a
+    candidate the lowest of the three for the lubrication is used, so the check holds for whichever one is ordered."""
+    b = req.bearing
+    idx = 0 if b.lubrication == "grease" else 1
+    name = b.candidate or min(BEARING_SPEED_RPM, key=lambda n: BEARING_SPEED_RPM[n][idx])
+    cat = BEARING_SPEED_RPM[name][idx]
+    limit = cat * DB_PRELOAD_A
+    need = OVERSPEED * req.max_speed_rpm
+    lube = "grease" if idx == 0 else "oil-air"
+    note = (f"{name} on {lube}: catalogue {cat:,.0f} r/min x set factor {DB_PRELOAD_A:g} = {limit:,.0f} r/min, "
+            f"against {need:,.0f} r/min ({OVERSPEED:g} x top speed)").replace(",", " ")
+    if name.startswith("NSK"):
+        note += "; the set factor is assumed (not read for NSK)"
+    return Limit("bearing_speed", "pass" if need <= limit else "fail", need, limit, note)
+
+
 def hard_limits(req: Requirements, machine: RadialSRMParams) -> tuple[Limit, ...]:
-    return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req), bending_limit(machine, req))
+    return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req), bending_limit(machine, req), bearing_limit(req))

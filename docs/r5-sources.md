@@ -541,3 +541,15 @@ Read on 2026-11-28 from open web pages (no local copy kept; both pages name no a
 | Span = stack + both end windings + 2 x 15 mm (placeholder) | safe only if 15 mm is at least the real distance from the end winding to the bearing centre; one bearing per end (half width 4.5 to 6.5 mm) leaves 8.5 to 10.5 mm for clearance and end cap; a double-bearing set (half width 9 to 13 mm) leaves 2 to 6 mm and is likely short |
 
 Not found: a measured bending speed of a small SRM rotor to check the sum against; the figure is not validated.
+
+## 11. Bearing limiting speeds
+
+Full record: `docs/bearing-candidates.md` (web research of 2026-11-27). Speeds are for a single bearing, in r/min, grease and oil-air.
+
+| Bearing | d x D x B (mm) | Grease | Oil-air | Basis | Grade |
+|---|---|---|---|---|---|
+| SKF 7005 CD/HCP4A | 25 x 47 x 12 | 43 000 | 67 000 | SKF "attainable" | B (catalogue) |
+| NSK 30BNR19HTSUMP3 | 30 x 47 x 9 | 32 000 | 37 000 | NSK limiting speed; the page is the YN variant, not the exact designation | C |
+| SKF 7006 CD/HCP4A | 30 x 55 x 13 | 38 000 | 56 000 | SKF "attainable" | B (catalogue) |
+
+SKF Table 39 (SKF Super-precision bearings catalogue 13383_2): speed factors of a two-bearing DB set, preload A to D, 0.81 / 0.75 / 0.65 / 0.40 (grade B). The code uses 0.81 (`DB_PRELOAD_A`). The NSK set factor was not read, so 0.81 is assumed for it (grade C). SKF notes that the oil-air values drop for oil mist or jet lubrication. JTEKT's 80 % consult rule is not carried over: it belongs to JTEKT's own catalogue, and the 0.81 set factor takes its place.

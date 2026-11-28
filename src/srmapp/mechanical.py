@@ -25,6 +25,16 @@ BearingType = Literal["deep_groove_ball", "angular_contact_ball", "self_aligning
                       "spherical_thrust_roller"]
 assert set(BearingType.__args__) == set(BEARING_MU)
 
+BearingCandidate = Literal["SKF 7005 CD/HCP4A", "NSK 30BNR19HTSUMP3", "SKF 7006 CD/HCP4A"]
+# Catalogue limiting speeds in r/min, (grease, oil-air), single bearing (docs/bearing-candidates.md; SKF "attainable",
+# NSK the page of the YN variant).
+BEARING_SPEED_RPM: dict[str, tuple[float, float]] = {
+    "SKF 7005 CD/HCP4A": (43_000, 67_000),
+    "NSK 30BNR19HTSUMP3": (32_000, 37_000),
+    "SKF 7006 CD/HCP4A": (38_000, 56_000),
+}
+DB_PRELOAD_A = 0.81    # SKF Table 39: speed factor of a two-bearing DB set at preload A (docs/r5-sources.md section 11)
+
 PLACEHOLDER_NOTE = ("bearing type, size and load are placeholders (the bearing is not chosen): deep groove ball "
                     "bearings, bore equal to the shaft diameter, load equal to the rotor weight")
 
@@ -38,6 +48,8 @@ class BearingSetup(BaseModel):
     bore_diameter_m: float | None = Field(default=None, gt=0)    # None = the shaft diameter
     radial_load_n: float | None = Field(default=None, ge=0)      # total; None = the rotor weight
     span_m: float | None = Field(default=None, gt=0)             # bearing centre to bearing centre; None = estimated
+    candidate: BearingCandidate | None = None                    # the friction model does not read it
+    lubrication: Literal["grease", "oil_air"] = "grease"
 
     @property
     def placeholder(self) -> bool:

@@ -166,3 +166,34 @@ def test_given_span_drops_the_span_note_but_not_the_friction_placeholder():
     assert "estimated" not in bending_limit(make_8_6(), _req(bearing=BearingSetup(span_m=0.2))).note
     assert BearingSetup(span_m=0.2).placeholder
     assert not BearingSetup(count=4, span_m=0.2).placeholder
+
+
+def test_bearing_limit_edges_for_each_candidate_and_lubrication():
+    from srmapp.limits import bearing_limit
+    from srmapp.mechanical import BearingSetup
+    assert bearing_limit(_req(max_speed_rpm=21590.0)).status == "pass"
+    nsk = bearing_limit(_req(max_speed_rpm=21610.0))
+    assert nsk.status == "fail" and nsk.limit == pytest.approx(25920.0)
+    assert "NSK 30BNR19HTSUMP3" in nsk.note and "assumed" in nsk.note
+    skf = BearingSetup(candidate="SKF 7005 CD/HCP4A")
+    assert bearing_limit(_req(max_speed_rpm=29000.0, bearing=skf)).status == "pass"
+    lim = bearing_limit(_req(max_speed_rpm=29050.0, bearing=skf))
+    assert lim.status == "fail" and lim.limit == pytest.approx(34830.0) and "assumed" not in lim.note
+    oil = BearingSetup(candidate="SKF 7005 CD/HCP4A", lubrication="oil_air")
+    assert bearing_limit(_req(max_speed_rpm=45000.0, bearing=oil)).limit == pytest.approx(54270.0)
+    assert bearing_limit(_req(max_speed_rpm=6000.0)).status == "pass"
+    assert "bearing_speed" in {x.name for x in hard_limits(_req(), make_8_6())}
+    assert "bearing_speed" not in SEARCH_REQUIRES_PASS
+
+
+def test_candidate_and_lubrication_leave_the_friction_placeholder_alone():
+    from srmapp.mechanical import BearingSetup
+    assert BearingSetup(candidate="SKF 7006 CD/HCP4A", lubrication="oil_air").placeholder
+
+
+def test_search_above_the_bearing_speed_rejects_every_stage1_pass():
+    with mock.patch("srmapp.pipeline.evaluate_stage2") as ev:
+        res = run_search(_req(max_speed_rpm=24000.0),
+                         SearchSettings(n_candidates=8, shortlist=3, seed=1, materials=JNEX))
+    assert ev.call_count == 0 and res.evaluations == ()
+    assert res.limit_rejected["bearing_speed"] > 0 and res.stage1_rejected == res.sampled
