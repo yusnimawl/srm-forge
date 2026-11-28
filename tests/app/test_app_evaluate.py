@@ -274,11 +274,12 @@ def test_failed_evaluation_has_no_map():
 
 
 def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None,
-                 ratios=None, seen=None):
+                 ratios=None, seen=None, nominal=False):
     """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order (a failing check
     fails at 3000 rpm on the hot spot). `n_ranked` windings are EM-feasible (0: none is); `error_at` = (k, exc)
     raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call; `ratios` sets the
-    torque and power ratio of each ranked winding and `seen` receives the ranked points."""
+    torque and power ratio of each ranked winding and `seen` receives the ranked points; `nominal` is whether the
+    nominal-set check (rows=frozenset()) holds."""
     import srmapp.thermal as th
     from srmapp.turns import TurnsChoice, choose_turns
     req = _req()
@@ -299,7 +300,9 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     rated = mock.Mock(return_value="RATING", side_effect=rate_error)
     checks = []
 
-    def check(ctx, n):
+    def check(ctx, n, rows=None):
+        if rows is not None:   # the nominal-set check
+            return th.RequirementCheck(nominal, None if nominal else 3000.0, (), (), (), "" if nominal else th.HOT_SPOT_ABOVE)
         checks.append(ctx)
         if error_at is not None and len(checks) == error_at[0]:
             raise error_at[1]
@@ -391,6 +394,38 @@ def test_refusal_is_infeasible(monkeypatch):
     assert "no loss table" in e.error and "not thermally rated" in e.error
 
 
+def test_cooling_refusal_is_infeasible(monkeypatch):
+    from srmapp.cooling import MissingCoolingData
+    e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, MissingCoolingData("no oil data")))
+    assert e.status == "ok" and e.rating is None and not e.feasible and e.nominal_check is None
+    assert "no oil data" in e.error and "not thermally rated" in e.error
+
+
+@pytest.mark.parametrize("nominal", [True, False])
+def test_failing_winding_gets_a_nominal_check(monkeypatch, nominal):
+    e, _, _ = _ranked_eval(monkeypatch, [False, False, False], nominal=nominal)
+    assert e.nominal_check is not None and e.nominal_check.holds is nominal and not e.feasible
+
+
+def test_holding_winding_has_no_nominal_check(monkeypatch):
+    e, _, _ = _ranked_eval(monkeypatch, [True])
+    assert e.nominal_check is None
+
+
+def test_rated_kw_per_kg_reads_the_chosen_set():
+    from srmapp.evaluate import _rated_kw_per_kg
+    from srmapp.thermal import Rating, SpeedRating
+    from srmcore.thermal.solve import HotSpot
+    hs = HotSpot(100.0, "coil")
+
+    def at(cont):
+        return SpeedRating(3000.0, 2 * cont, cont, 2 * cont, hs, hs, 80.0, 90.0, 70.0, 75.0, 3, 10)
+    rating = Rating((at(2.0),), (at(1.0),), (), 180.0, "H", None, None, {}, 1.1, 5, (), "0")
+    w = 2 * math.pi / 60
+    assert _rated_kw_per_kg(rating, _req(), "continuous_nm", 1.0, "nominal") == pytest.approx(2.0 * 3000 * w / 1000)
+    assert _rated_kw_per_kg(rating, _req(), "continuous_nm", 1.0) == pytest.approx(1.0 * 3000 * w / 1000)
+
+
 def test_cancel_during_checks(monkeypatch):
     e, _, checks = _ranked_eval(monkeypatch, [False, False, False], cancel=lambda checks: len(checks) >= 1)
     assert e.status == "cancelled" and len(checks) == 1
@@ -455,7 +490,7 @@ def _failing_stage2(monkeypatch, rate_failed):
         return "RATING"
     monkeypatch.setattr(th, "thermal_context", lambda req_, ref, res, w, **kw: w)
     monkeypatch.setattr(th, "check_requirement",
-                        lambda ctx, n: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
+                        lambda ctx, n, rows=None: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
     monkeypatch.setattr(th, "rate_context", rated)
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), mock.patch("srmapp.evaluate.choose_turns", choose):
@@ -492,7 +527,7 @@ def test_input_error_from_the_context_is_a_failed_evaluation_and_is_logged(monke
     with caplog.at_level("ERROR", logger="srmapp.evaluate"):
         e, _, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, InputError([])))
     assert e.status == "InputError" and not e.feasible
-    assert any(r.exc_info for r in caplog.records)
+    assert any(r.exc_info for r in caplog.records) and _cand().id in caplog.text
 
 
 def test_choose_turns_error_is_a_failed_evaluation_and_is_logged(caplog):

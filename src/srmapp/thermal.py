@@ -315,7 +315,8 @@ class ThermalContext:
     def shaft_top(self, rpm, rows, em_top):
         """The shaft torque whose stroke ask stays within the EM envelope `em_top`: the loss torque of the stroke at
         `em_top` comes off em_top / factor. Iron loss rises with torque, so the plain steps `load_at` makes at this top
-        stay at or below `em_top`; a secant ask above it has no stroke and `load_at` retries at the plain step. Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
+        stay at or below `em_top`; a secant ask above it has no stroke and `load_at` retries at the plain step.
+        Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
         then em_top / factor."""
         coeffs, omega, mech = self._drag_terms(rpm, rows)
         s = self.stroke(rpm, em_top)
@@ -395,11 +396,12 @@ class RequirementCheck:
     hot_c: float = float("nan")            # hot spot at the failing torque; nan for a runaway or no stroke
 
 
-def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementCheck:
-    """Whether the rated set (every row of ROWS at its unfavourable end) holds the required continuous torque in
-    steady state and the required peak torque for `peak_duration_s` (from that steady state) under the hot-spot
-    limit at every rating speed. Stops at the first failing speed; a torque no stroke reaches fails."""
-    req, rows = ctx.req, frozenset(ROWS)
+def check_requirement(ctx: ThermalContext, n_speeds: int = 6, rows: frozenset = frozenset(ROWS)) -> RequirementCheck:
+    """Whether the set with `rows` at their unfavourable end (default: the rated set, every row of
+    ROWS) holds the required continuous torque in steady state and the required peak torque for `peak_duration_s`
+    (from that steady state) under the hot-spot limit at every rating
+    speed. Stops at the first failing speed; a torque no stroke reaches fails."""
+    req = ctx.req
     cont_hot, peak_hot, notes = [], [], []
     if req.continuous_power_w is None:
         notes.append("no continuous power required: continuous not checked")

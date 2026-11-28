@@ -53,6 +53,9 @@ class SearchSettings:
         return 1 + JS_STEP + GRADE_ALLOWANCE[worst]
 
 
+PEAK_BAND_NOTE = ("peak kW/kg is a band from rated to nominal: the peak-heat check (V4) measured one 14 s "
+                  "copper-dominated pulse, so the cooling paths and a 30 s peak from warm have no measured check "
+                  "(confirm step on the winner)")
 MAX_SAME_FAILURES = 3   # evaluations failing with one status before the search stops
 
 
@@ -67,6 +70,31 @@ class SearchResult:
     limit_rejected: dict[str, int] = field(default_factory=dict)   # candidates failing each hard limit
     dropped_pole_sets: dict[str, str] = field(default_factory=dict)   # "ns/nr" -> reason, removed before sampling
     stopped: str = ""   # why the search stopped early on repeated failures; empty when it did not
+
+    def recommended(self) -> tuple[Evaluation, ...]:
+        """Feasible designs with finite rated values, lightest first (ties: higher rated continuous kW/kg first)."""
+        ok = [e for e in self.evaluations if e.feasible and math.isfinite(e.rated_continuous_kw_per_kg)
+              and math.isfinite(e.rated_peak_kw_per_kg)]
+        return tuple(sorted(ok, key=lambda e: (e.mass_kg, -e.rated_continuous_kw_per_kg)))
+
+    def margin_sensitive(self) -> tuple[Evaluation, ...]:
+        """Evaluated designs lighter than the first recommended one that fail only the rated set: their nominal
+        check holds."""
+        rec = self.recommended()
+        if not rec:
+            return ()
+        return tuple(e for e in self.evaluations if e.mass_kg < rec[0].mass_kg and not e.feasible
+                     and e.nominal_check is not None and e.nominal_check.holds)
+
+    @property
+    def recommendation(self) -> Evaluation | None:
+        """The first recommended design, unless a lighter evaluated design holds the nominal check."""
+        rec = self.recommended()
+        return rec[0] if rec and not self.margin_sensitive() else None
+
+    @property
+    def notes(self) -> tuple[str, ...]:
+        return (PEAK_BAND_NOTE,) if self.recommended() else ()
 
     def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
         """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""
@@ -147,13 +175,13 @@ def run_search(req: Requirements, settings: SearchSettings = SearchSettings(), *
             evaluations.append(evaluation)
             if evaluation.feasible:
                 feasible_in[key] += 1
+            if progress is not None:
+                progress(done, budget)
             if evaluation.status not in ("ok", "no_winding"):
                 failures[evaluation.status] = failures.get(evaluation.status, 0) + 1
                 if failures[evaluation.status] == MAX_SAME_FAILURES:
                     stopped = (f"stopped after {MAX_SAME_FAILURES} evaluations failed with {evaluation.status}: "
                                f"{evaluation.error}")
                     break
-            if progress is not None:
-                progress(done, budget)
     return SearchResult(req, len(candidates), dropped, len(scored) - len(passing), tuple(evaluations), cancelled, limit_rejected,
                         dropped_sets, stopped)

@@ -18,7 +18,7 @@ from srmcore.maps.results import KeyNumbers, key_numbers
 from srmcore.model.design import Design
 
 from . import __version__
-from .cooling import MissingCoolingData
+from .cooling import MissingCoolingData, TORQUE_FLOOR
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .limits import Limit, hard_limits
@@ -89,6 +89,9 @@ class Evaluation:
     rated_continuous_kw_per_l: float = _NAN    # as rated_continuous_kw_per_kg, per litre
     rated_peak_kw_per_l: float = _NAN
     limits: tuple[Limit, ...] = ()             # the closed-form hard limits of the chosen design
+    nominal_continuous_kw_per_kg: float = _NAN   # as rated_*, from the nominal set (no row unfavourable)
+    nominal_peak_kw_per_kg: float = _NAN
+    nominal_check: "RequirementCheck | None" = None   # nominal-set check of the best winding when none holds the rated one
 
 
 def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limit: float) -> Evaluation:
@@ -96,11 +99,12 @@ def _failed(candidate: Candidate, stage: Stage1, status: str, error: str, j_limi
                       _NAN, _NAN, _NAN, _NAN, _NAN, False, None, None, j_limit=j_limit)
 
 
-def _rated_kw_per_kg(rating, req: Requirements, field: str, mass: float) -> float:
-    """Lowest rated power (kW per `mass` unit: kg, or litres) over the rating speeds from the base speed up."""
+def _rated_kw_per_kg(rating, req: Requirements, field: str, mass: float, which: str = "rated") -> float:
+    """Lowest power (kW per `mass` unit: kg, or litres) of the set `which` ("rated" or "nominal") over the rating
+    speeds from the base speed up."""
     if rating is None:
         return _NAN
-    return min(getattr(r, field) * r.rpm * 2 * math.pi / 60 for r in rating.rated if r.rpm >= req.base_speed_rpm) / 1000 / mass
+    return min(getattr(r, field) * r.rpm * 2 * math.pi / 60 for r in getattr(rating, which) if r.rpm >= req.base_speed_rpm) / 1000 / mass
 
 
 def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, grid: StageTwoGrid = StageTwoGrid(),
@@ -121,7 +125,9 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     are checked best-first against the rated hot-spot limit; the first that holds is chosen and rated in full
     (`thermal_progress(step, done, total)`: "windings", "strokes", "thermal"). None holding leaves the best EM winding,
     infeasible; with `rate_failed` that best winding is rated in full anyway. `fields_out` receives the temperature
-    fields of every rating made. A refusal (`MissingLossData`, `MissingCoolingData`) makes the design infeasible, unrated (note "not thermally rated"); any other error fails the evaluation and is logged."""
+    fields of every rating made. A refusal (`MissingLossData`, `MissingCoolingData`) makes the design infeasible, unrated (note
+    "not thermally rated"); any other error fails the evaluation and is logged. When no winding holds, the best
+    winding is also checked with every cooling row at its nominal value (`Evaluation.nominal_check`)."""
     design = candidate.design
     machine = design.machine
     try:
@@ -152,6 +158,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         return _failed(candidate, stage, "no_winding",
                        f"no turn count meets the wire, phase current and current-density limits{cap_text}", j_limit)
     point, env, feasible, rating, held = choice.point, choice.envelope, choice.feasible, None, None
+    nominal = None
     notes = []
     if not thermal:
         notes.append(NOT_RATED)
@@ -160,7 +167,6 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
         notes.append(f"no winding is EM-feasible; {NOT_RATED}")
     else:
         from . import thermal as th   # thermal imports this module
-        from .cooling import TORQUE_FLOOR
         # The rated set asks for (1 + TORQUE_FLOOR) x the required torque (no em_budget here), so a winding whose EM
         # ratio is below that can hardly hold; check those last (stable sort: best-first inside each group).
         checks = sorted(choice.ranked, key=lambda s: s.worst < 1.0 + TORQUE_FLOOR)[:MAX_THERMAL_CHECKS]
@@ -204,9 +210,10 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                             if len(choice.ranked) > len(checks) else "")
                     notes.append(f"no winding holds the rated hot-spot limit (best winding: {first.rpm:.0f} rpm, "
                                  f"{first.reason}{left})")
+                    if len(checks) > 1:
+                        ctx = context(checks[0])
+                    nominal = th.check_requirement(ctx, n_speeds, rows=frozenset())
                     if rate_failed:
-                        if len(checks) > 1:
-                            ctx = context(checks[0])
                         rating = th.rate_context(ctx, n_speeds=n_speeds, progress=thermal_progress, fields_out=fields_out)
             except InterruptedError:
                 return _failed(candidate, stage, "cancelled", "thermal check cancelled", j_limit)
@@ -255,4 +262,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
                       rated_peak_kw_per_kg=_rated_kw_per_kg(rating, req, "peak_nm", mass),
                       thermal_check=held, active_volume_l=litres,
                       rated_continuous_kw_per_l=_rated_kw_per_kg(rating, req, "continuous_nm", litres),
-                      rated_peak_kw_per_l=_rated_kw_per_kg(rating, req, "peak_nm", litres), limits=limits)
+                      rated_peak_kw_per_l=_rated_kw_per_kg(rating, req, "peak_nm", litres), limits=limits,
+                      nominal_continuous_kw_per_kg=_rated_kw_per_kg(rating, req, "continuous_nm", mass, "nominal"),
+                      nominal_peak_kw_per_kg=_rated_kw_per_kg(rating, req, "peak_nm", mass, "nominal"),
+                      nominal_check=nominal)

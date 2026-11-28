@@ -7,8 +7,9 @@ import numpy as np
 
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
-from srmapp.pipeline import SearchResult, SearchSettings, run_search
+from srmapp.pipeline import PEAK_BAND_NOTE, SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
+from srmapp.thermal import RequirementCheck
 from srmapp.sizing.estimates import J_PEAK_SCREEN, J_SCREEN
 from srmapp.sizing.generator import sample_candidates
 from srmcore.model.design import RegionMaterials
@@ -191,3 +192,50 @@ def test_third_failure_of_one_status_stops_the_search():
 def test_two_failures_of_each_of_two_statuses_do_not_stop_it():
     res = _run(["MapFailed", "ValueError", "MapFailed", "ValueError", "ok"])
     assert len(res.evaluations) == 5 and res.stopped == ""
+
+
+def test_no_winding_results_do_not_stop_the_search():
+    res = _run(["no_winding"] * 3 + ["ok"])
+    assert len(res.evaluations) == 4 and res.stopped == ""
+
+
+def test_progress_is_called_for_the_evaluation_that_stops_the_search():
+    seen = []
+    with mock.patch("srmapp.pipeline.evaluate_stage2", _failing(["MapFailed"] * 3 + ["ok"])):
+        res = run_search(_req(peak_torque_nm=2.0, peak_power_w=630.0),
+                         SearchSettings(n_candidates=60, shortlist=4, seed=1), progress=lambda d, t: seen.append(d))
+    assert res.stopped and seen == [1, 2, 3]
+
+
+def _evs(*rows):
+    """rows: (feasible, mass, rated continuous, nominal check holds or None)"""
+    cands, _ = sample_candidates(_req(), 6, seed=0)
+    out = []
+    for c, (feasible, mass, cont, nom) in zip(cands, rows):
+        check = None if nom is None else RequirementCheck(nom, None, (), (), ())
+        out.append(Evaluation(c.id, c.design, "ok", "", mass, None, 1.1, 1.1, 1000.0, 3.0, 0.9, feasible, None, None,
+                              rated_continuous_kw_per_kg=cont, rated_peak_kw_per_kg=cont, nominal_check=check))
+    return SearchResult(_req(), 6, {}, 0, tuple(out), False)
+
+
+def test_recommended_is_lightest_first_with_ties_by_rated_continuous():
+    res = _evs((True, 3.0, 1.0, None), (True, 2.0, 1.0, None), (True, 2.0, 2.0, None), (False, 1.0, 5.0, None),
+               (True, 0.5, float("nan"), None))
+    assert [(e.mass_kg, e.rated_continuous_kw_per_kg) for e in res.recommended()] == [(2.0, 2.0), (2.0, 1.0), (3.0, 1.0)]
+    assert res.recommendation is res.recommended()[0] and res.notes == (PEAK_BAND_NOTE,)
+
+
+def test_lighter_design_holding_the_nominal_check_withholds_the_recommendation():
+    res = _evs((True, 2.0, 1.0, None), (False, 1.0, float("nan"), True))
+    assert res.recommendation is None and res.margin_sensitive() == (res.evaluations[1],)
+    assert res.recommended() == (res.evaluations[0],)
+
+
+def test_lighter_design_failing_the_nominal_check_leaves_the_recommendation():
+    res = _evs((True, 2.0, 1.0, None), (False, 1.0, float("nan"), False), (False, 0.5, float("nan"), None))
+    assert res.recommendation is res.evaluations[0] and res.margin_sensitive() == ()
+
+
+def test_thermal_off_search_recommends_nothing():
+    res = _evs((True, 2.0, float("nan"), None))
+    assert res.recommended() == () and res.recommendation is None and res.notes == ()
