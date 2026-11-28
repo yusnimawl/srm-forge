@@ -20,7 +20,7 @@ DESIGN = Design(machine=make_8_6(materials=IRON, lamination_thickness=1.0e-4), m
 
 @pytest.mark.slow
 def test_rated_choice_8_6(tmp_path):
-    req = Requirements(peak_power_w=628.0, peak_torque_nm=3.0, base_speed_rpm=2000.0, max_speed_rpm=6000.0,
+    req = Requirements(peak_power_w=481.7, peak_torque_nm=2.3, base_speed_rpm=2000.0, max_speed_rpm=6000.0,
                         wires=[WIRE], phase_current_a=20.0, continuous_power_w=100.0)
     ref, i_map, stage = map_request(CaseInputs(requirements=req, design=DESIGN))
     t = time.time()
