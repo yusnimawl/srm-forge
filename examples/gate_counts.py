@@ -49,7 +49,7 @@ def count(ratio: float, n: int) -> dict:
 def table(r: dict) -> str:
     names = sorted({k for s in r["pole_sets"].values() for k in s["by_limit"]})
     lines = [f"Ratio {r['ratio']:g}. Dropped pole sets: "
-             + ("; ".join(f"{k} ({v})" for k, v in r["dropped_pole_sets"].items()) or "none") + ".", "",
+             + ("; ".join(f"{k}: {v}" for k, v in r["dropped_pole_sets"].items()) or "none") + ".", "",
              "| Pole set | Sampled | Stage 1 pass | " + " | ".join(names) + " | Limit-rejected |",
              "|---|---|---|" + "---|" * (len(names) + 1)]
     for k, s in sorted(r["pole_sets"].items()):

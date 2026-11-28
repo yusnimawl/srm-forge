@@ -314,8 +314,9 @@ class ThermalContext:
 
     def shaft_top(self, rpm, rows, em_top):
         """The shaft torque whose stroke ask stays within the EM envelope `em_top`: the loss torque of the stroke at
-        `em_top` comes off em_top / factor. Iron loss rises with torque, so the plain steps `load_at` makes at this top
-        stay at or below `em_top`; a secant ask above it has no stroke and `load_at` retries at the plain step.
+        `em_top` comes off em_top / factor. The stroke at the shaft top can carry more iron loss than the stroke at
+        `em_top`; it then needs more EM torque than the envelope gives, `load_at` finds no stroke there and returns
+        None, and `rate_speed` brackets down and stays on the feasible side, within its 1 % stop rule.
         Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
         then em_top / factor."""
         coeffs, omega, mech = self._drag_terms(rpm, rows)

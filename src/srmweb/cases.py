@@ -15,10 +15,10 @@ from srmweb.schemas import soft_magnetic
 from srmweb.store import Store
 
 BUDGET_S = {"screening": 228.0, "full": 1560.0}   # map time when no map of that preset has been timed
-# rating span (first thermal callback to return, winding checks included) when none has been timed: LattePanda x 1.25
-# (8/6, screening 850 s, full 1631 s; docs/validation/r5d_rating_*.json); reference = 4 x full
-# screening is measured (docs/validation/bike_gates_rating_screening.json, 5141 s x 1.25); full and reference are the
-# earlier values scaled by the screening ratio (5141 / 738.8) and are not measured
+# rating span (first thermal callback to return, winding checks included) when none has been timed: screening is
+# the LattePanda time x 1.25 of the rated 8/6 evaluation at shaft torque (docs/validation/bike_gates_rating_screening.json);
+# full and reference are the earlier budgets (2039 s, 8155 s) x 5141 / 738.8, the ratio of the shaft-torque to the
+# EM-torque screening time, and are not measured
 RATING_BUDGET_S = {"screening": 6426.0, "full": 14189.0, "reference": 56747.0}
 SCAN_BUDGET_S = {"auto": 454.1, "fixed": 8.0}    # winding-choice time when none has been timed: LattePanda x 1.25
 _WINDING_FIELD = re.compile(r"^(turns|strands|paths|wire)\b")
