@@ -19,7 +19,7 @@ Rated set (every row unfavourable, torque factor 1.10, iron factor 3.20). Every 
 
 The loss torque is taken from the branch stroke at the EM envelope. At all 6 speeds the branch envelope torque equals (main envelope torque - loss torque) x (1 - 0.001), the stroke tolerance. On main the continuous and peak torques equal the envelope torque at every speed. On the branch they equal it at 2000, 3000, 5000 and 6000 rpm, and sit 0.6 to 1.0 % below it at 1000 and 4000 rpm (rated), so the drop there is slightly larger than the loss torque.
 
-The rated drop is 10.1 to 11.8 %, over 10 % at all 6 speeds. The drop is large because the rated set multiplies the iron loss by 3.2 (the Kiyota measured-over-model factor).
+The rated drop is 10.1 to 11.8 %, over 10 % at all 6 speeds. The loss torque explains all of it, and the rated set's iron factor of 3.2 (the Kiyota measured-over-model factor) makes it large on this 2.4 N.m 8/6. The drop is accepted.
 
 Nominal set (no row unfavourable). Every change is a drop of 2.8 to 3.7 %.
 
@@ -39,7 +39,9 @@ Nominal set (no row unfavourable). Every change is a drop of 2.8 to 3.7 %.
 | Main (srmapp 0.11.0) | 738.8 s | 1043.3 s | 24 (second run) |
 | Branch | 5140.8 s | 5435.4 s | 214 |
 
-`RATING_BUDGET_S["screening"]` is 1063 s. The branch time x 1.25 is 6426 s. The budget is not changed in this commit.
+The branch takes 214 strokes and main 24. Main's 8/6 is EM-limited, so it needs 2 strokes per speed and set (the required torque and the top). On the branch, finding the shaft-torque top takes a secant search, and each step runs a drag loop of 2 to 3 strokes.
+
+`RATING_BUDGET_S` in `src/srmweb/cases.py` was 1063 s (screening), 2039 s (full) and 8155 s (reference). Screening is now 6426 s, the measured 5141 s x 1.25. Full is 14189 s and reference 56747 s: the old values x (5141 / 738.8), rounded to the second. Full and reference are scaled, not measured.
 
 ## Gate counts
 
