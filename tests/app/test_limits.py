@@ -191,9 +191,16 @@ def test_candidate_and_lubrication_leave_the_friction_placeholder_alone():
     assert BearingSetup(candidate="SKF 7006 CD/HCP4A", lubrication="oil_air").placeholder
 
 
-def test_search_above_the_bearing_speed_rejects_every_stage1_pass():
+def test_search_above_the_bearing_speed_rejects_every_stage1_pass(monkeypatch):
+    import srmapp.pipeline as pipeline
+    calls = []
+
+    def counting(req, machine):
+        calls.append(machine)
+        return hard_limits(req, machine)
+    monkeypatch.setattr(pipeline, "hard_limits", counting)
     with mock.patch("srmapp.pipeline.evaluate_stage2") as ev:
         res = run_search(_req(max_speed_rpm=24000.0),
                          SearchSettings(n_candidates=8, shortlist=3, seed=1, materials=JNEX))
     assert ev.call_count == 0 and res.evaluations == ()
-    assert res.limit_rejected["bearing_speed"] > 0 and res.stage1_rejected == res.sampled
+    assert calls and res.limit_rejected["bearing_speed"] == len(calls)

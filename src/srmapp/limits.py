@@ -78,10 +78,15 @@ def bearing_limit(req: Requirements) -> Limit:
     limit = cat * DB_PRELOAD_A
     need = OVERSPEED * req.max_speed_rpm
     lube = "grease" if idx == 0 else "oil-air"
-    note = (f"{name} on {lube}: catalogue {cat:,.0f} r/min x set factor {DB_PRELOAD_A:g} = {limit:,.0f} r/min, "
-            f"against {need:,.0f} r/min ({OVERSPEED:g} x top speed)").replace(",", " ")
+    def rpm(x: float) -> str:
+        return f"{x:,.0f}".replace(",", " ")
+    note = (f"{name} on {lube}: catalogue {rpm(cat)} r/min x set factor {DB_PRELOAD_A:g} = {rpm(limit)} r/min, "
+            f"against {rpm(need)} r/min ({OVERSPEED:g} x top speed)")
+    if not b.candidate:
+        note += "; no bearing is chosen, so this is the lowest of the three candidates"
     if name.startswith("NSK"):
-        note += "; the set factor is assumed (not read for NSK)"
+        note += ("; the set factor is assumed (not read for NSK) and is too high (unsafe) if the set has medium "
+                 "preload")
     return Limit("bearing_speed", "pass" if need <= limit else "fail", need, limit, note)
 
 

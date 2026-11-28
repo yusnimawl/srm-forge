@@ -553,3 +553,5 @@ Full record: `docs/bearing-candidates.md` (web research of 2026-11-27). Speeds a
 | SKF 7006 CD/HCP4A | 30 x 55 x 13 | 38 000 | 56 000 | SKF "attainable" | B (catalogue) |
 
 SKF Table 39 (SKF Super-precision bearings catalogue 13383_2): speed factors of a two-bearing DB set, preload A to D, 0.81 / 0.75 / 0.65 / 0.40 (grade B). The code uses 0.81 (`DB_PRELOAD_A`). The NSK set factor was not read, so 0.81 is assumed for it (grade C). SKF notes that the oil-air values drop for oil mist or jet lubrication. JTEKT's 80 % consult rule is not carried over: it belongs to JTEKT's own catalogue, and the 0.81 set factor takes its place.
+
+Direction of the NSK assumption. `docs/bearing-candidates.md` reads the "M" in 30BNR19HTSUMP3 as medium preload; that reading is inferred, no NSK legend was found. If it is right, 0.81 is on the unsafe side: the nearest SKF factor for a moderate (C) preload is 0.65, which gives an NSK grease limit of 32 000 x 0.65 = 20 800 r/min and a top speed of at most 17 333 r/min, against the 21 600 r/min the check now passes. Owner input: order the NSK at light preload, or confirm the preload and its NSK set factor.
