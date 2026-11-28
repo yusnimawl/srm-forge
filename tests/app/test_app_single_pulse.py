@@ -13,8 +13,10 @@ MACHINE = make_8_6()
 R = 0.1
 
 
-@pytest.mark.parametrize("rpm, volts", [(30.0, 400.0), (1500.0, 400.0), (9000.0, 400.0), (9000.0, 100.0)])
-def test_single_pulse_torque_is_the_torque_with_only_single_pulses(rpm, volts):
+@pytest.mark.parametrize("rpm, volts, rms", [(30.0, 400.0, None), (1500.0, 400.0, None), (9000.0, 400.0, None),
+                                             (9000.0, 100.0, None), (40000.0, 100.0, None), (1500.0, 400.0, 10.0),
+                                             (40000.0, 100.0, 10.0)])
+def test_single_pulse_torque_is_the_torque_with_only_single_pulses(rpm, volts, rms):
     result = synthetic_map(n_angles=24)
     real = drive._strokes
 
@@ -22,13 +24,15 @@ def test_single_pulse_torque_is_the_torque_with_only_single_pulses(rpm, volts):
         w_t, w_l, i2, valid, psi0 = real(*args)
         return w_t, w_l, i2, valid & (psi0 == 0), psi0
 
-    full = drive.envelope(result, MACHINE, volts, R, [rpm], waveforms=False)
+    full = drive.envelope(result, MACHINE, volts, R, [rpm], rms_limit=rms, waveforms=False)
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(drive, "_strokes", pulses_only)
-        pulse = drive.envelope(result, MACHINE, volts, R, [rpm], waveforms=False)
+        pulse = drive.envelope(result, MACHINE, volts, R, [rpm], rms_limit=rms, waveforms=False)
     np.testing.assert_array_equal(full.torque_single_pulse, pulse.torque)
     np.testing.assert_array_equal(pulse.torque_single_pulse, pulse.torque)
     assert full.torque_single_pulse[0] <= full.torque[0]
+    if (rpm, volts, rms) == (40000.0, 100.0, None):
+        assert full.torque_single_pulse[0] < full.torque[0]     # continuous conduction wins here
 
 
 def _equivalent(s):
