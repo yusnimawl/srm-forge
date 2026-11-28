@@ -8,7 +8,7 @@ The owner re-anchored the roadmap to their goal: first a motor for their own mot
 
 1. **Merged steps** (unchanged): R1, R2, R3, R3b, R3c, R4, R6d, R8a, R8b, and R5a to R5d.
 2. **Bike motor v1** (new step, the current milestone). Its parts, in order (revised 2026-11-27 after the stakeholder review, owner "yes"):
-   0. Gates and ranking: rotor stress as a stage-1 filter (status `ok` and safety factor at least 1.5, generator yoke floor 0.55); shortlist lightest first, top k per pole set; iron-loss frequency cap at the measured 2.78 kHz; thermal errors no longer hidden as "not rated"; pick the lightest design that passes, nominal beside rated; fix the windage double count; losses off the power check; current ripple within the 170 A device peak; density mode prefers single-pulse windings.
+   0. Gates and ranking: rotor stress as a stage-1 filter (status `ok` and safety factor at least 1.5, generator yoke floor 0.55); shortlist lightest first, top k per pole set; iron-loss frequency cap at the measured 2.78 kHz; thermal errors no longer hidden as "not rated"; pick the lightest design that passes, nominal beside rated; windage double count checked: none (Kiyota Table III); losses off the power check; current ripple within the 170 A device peak; density mode prefers single-pulse windings.
    1. Critical speed (first bending at least 1.3 x top speed), bearing speed (DN) and air-gap closure (at most 50 % of the gap) checks.
    2. Peak-heat check V4 against Kiyota 2014, with the 10JNEX900 specific heat 438 J/(kg K). The separate thermal mesh check V5 is dropped.
    3. Continuous current in the drive model: done, PR #44, 2026-11-27 (report `docs/reports/bike-v1-2.md`).

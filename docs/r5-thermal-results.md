@@ -305,7 +305,7 @@ Mesh build: 28 s, 53 s and 719 s. The model reaches the peak earlier than the tr
 
 Numerical error (nominal, K): mesh |full - reference| 0.002, time step |0.05 s - 0.025 s| 0.011, total 0.014. For the rated set the total is 0.011 K.
 
-The 573 W mechanical loss may be counted twice: Table III (b) prints "iron and other losses" 4.4 kW and mechanical 0.7 kW as separate lines, so the 4.4 kW probably leaves it out (an inference: `docs/r5-sources.md` does not say so outright). Either way it moves the nominal peak by +0.007 K (39.210 K without it, 39.216 K with it, `screening`). The bike-gates plan (its D9) reconciles the loss split when that plan lands.
+The 573 W mechanical loss is counted once: Table III (b) prints "iron and other losses" 4.4 kW and mechanical 0.7 kW as separate lines, and the paper says the iron and other losses are found by subtracting the output, the copper loss and the mechanical loss from the input (2014 p. 5719; Table III p. 5718). So the 4.4 kW leaves the mechanical loss out (`docs/r3-loss-results.md`, Kiyota finding 5). It moves the nominal peak by +0.007 K (39.210 K without it, 39.216 K with it, `screening`).
 
 The trace keeps rising about 4 s after the current stops. As an inference, the measured peak is then probably a lower bound of the coil-end peak, and r is most likely the smallest reading.
 
@@ -483,3 +483,11 @@ Browser check (headless Chromium, 1440 px and 375 px, srmweb with the built fron
 - Console: the 404 of the Losses lookup on every case view (existing) and the expected 410 after the cache clear. Not changed: the iron chip reads "Iron x3.2-3.2 band" for a zero-width band.
 
 Fast suite: 1767 passed. Engine digest matches its pin.
+
+## Shaft-torque ratings (Bike v1, part 0, srmapp 0.12.0)
+
+Machine: LattePanda, 2026-11-28. Numbers and records: `docs/bike-v1-gates-results.md`.
+
+The requirement checks and the rating now work at the motor shaft. A stroke must give the required shaft torque plus the loss torque, (iron loss x iron factor + windage and friction) / omega, times the torque factor. The iron loss is the stroke's own, and all of it counts as drag (the safe side). `ThermalContext.load_at` solves again at the new need until the stroke covers it within `DRAG_TOL` (1e-3), with secant steps, at most `DRAG_MAX_STROKES` (6) strokes. The top of the rating bracket is a shaft torque (`ThermalContext.shaft_top`) and `SpeedRating.envelope_nm` is that shaft top.
+
+On the 8/6 screening case the rated continuous and peak torques fall 10.1 to 11.8 % at the six speeds, and the nominal ones 2.8 to 3.7 %. Every change is a drop. The loss torque explains all of it: at each speed the branch envelope equals the main envelope less the loss torque, times 0.999. The rated set's iron factor of 3.2 makes the drop large on this small 8/6. The rating takes 5141 s against 739 s on main (214 against 24 stroke entries). Most of the added strokes are the points at the shaft top where the stroke has no solution and the bracket steps down. `RATING_BUDGET_S` (`srmweb.cases`) is screening 6426 s (measured x 1.25), full 14189 s and reference 56747 s (the earlier budgets scaled by 5141 / 738.8, not measured). A speed-up is an open Tracker item.

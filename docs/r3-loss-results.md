@@ -213,8 +213,9 @@ deep groove ball bearings, 20 mm bore, 23.6 N rotor weight), nominal values and 
 - Not validated against a motor measurement: no measured windage of an SRM was found. The smooth-cylinder value is a
   lower bound for a salient rotor (no cited factor), so efficiencies read high by an unknown amount at high speed.
 - Thermal: windage heats the rotor iron and friction the end caps; the rated set of the rating takes both at the
-  top of their bands (budget row `mechanical_loss`). The rating's torque is not reduced by friction and windage
-  (they take shaft torque, not winding heat).
+  top of their bands (budget row `mechanical_loss`). From the bike gates branch (srmapp 0.12.0) the rating is at
+  shaft torque: friction and windage, with the iron loss, come off the torque the stroke gives
+  (`docs/r5-thermal-results.md`, "Shaft-torque ratings").
 
 ## Kiyota 18/12, 10JNEX900 (tracker row 10a, LattePanda, 2026-11-18)
 
@@ -256,6 +257,7 @@ Findings:
 3. Stator yoke 16.3 or 15.5 mm changes the ratios by at most 5 % at the single-pulse points (the table below); at
    15.5 mm the 30 kW point at 13 900 r/min (f5) also has a stroke, now in continuous conduction.
 4. **How `K_IRON_HI` = 3.2 was chosen.** It is the largest measured-over-model ratio at or below 1.5 kHz, 3.170 (torque stroke at (a), yoke 16.3 mm), rounded up. The current-stroke rule would give 3.08. Above 1.5 kHz the curve is linear to 7.0 at 2.78 kHz.
+5. **The measurement leaves the mechanical loss out.** Table III prints "Mechanical loss" in its own row (0.2, 0.7 and 0.6 kW at (a), (b) and (c)), its efficiencies close only with that loss outside "iron and other", and the paper says the iron and other losses are the input less the output, the copper loss and the mechanical loss (2014 pp. 5718 to 5719). So `K_IRON_HI` holds no windage or friction, and the rated set counts them once.
 
 ### Continuous-conduction points (2026-11-27)
 
