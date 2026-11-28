@@ -5,7 +5,7 @@ from unittest import mock
 import numpy as np
 import pytest
 from conftest import make_8_6
-from map_fixtures import synthetic_map
+from map_fixtures import inductance, synthetic_map
 
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, rescale_turns, speed_grid, turns_scale
@@ -135,6 +135,20 @@ def test_single_pulse_evaluation_has_no_coupling_note():
     with _with_current(np.zeros_like):
         e, _ = _evaluate(_req())
     assert "continuous conduction" not in e.error
+
+
+@pytest.mark.parametrize("device_peak, binds", [(110.0, True), (1000.0, False)])
+def test_ripple_note_only_where_the_ripple_lowers_the_current(device_peak, binds):
+    req = _req(phase_current_a=device_peak, switching_frequency_hz=20e3)
+    stage = stage1(req, make_8_6())
+    r = _map(stage)
+    l_inc = np.full(r.l_inc.shape, np.nan)
+    l_inc[..., r.circuits.index(r.excited)] = inductance(r.angles)[:, None] + 0 * r.currents[None, :]
+    with mock.patch("srmapp.evaluate.build_map", return_value=dataclasses.replace(r, l_inc=l_inc)):
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30, thermal=False)
+    own = est.J_PEAK * e.winding.copper_area * e.winding.paths
+    assert (e.winding.current < own) == binds
+    assert (f"current limit {e.winding.current:.1f} A: the {device_peak:.0f} A device peak less half the" in e.error) == binds
 
 
 def test_density_mode_evaluation_fills_the_metrics():

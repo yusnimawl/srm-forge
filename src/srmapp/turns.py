@@ -153,13 +153,37 @@ def _ripple_inductance(result: MapResult, machine: RadialSRMParams, w: Winding):
     return scaled.currents[ok], low[ok]
 
 
+def _lower_inductance(cur: np.ndarray, low: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """L at the currents `x`: the lower of the two neighbouring nodes (a straight line reads high where L_inc levels
+    off); the first node below the map, the lowest L of the map above its top node."""
+    i = np.searchsorted(cur, x)
+    lower = np.minimum(low[np.clip(i - 1, 0, len(low) - 1)], low[np.clip(i, 0, len(low) - 1)])
+    return np.where(i >= len(cur), low.min(), lower)
+
+
 def ripple_half(result: MapResult, machine: RadialSRMParams, w: Winding, req: Requirements,
                 current: float) -> tuple[float, float]:
     """(half the peak-to-peak ripple in A, lowest L_inc in H) at winding current `current`."""
     cur, low = _ripple_inductance(result, machine, w)
-    inductance = float(np.interp(current, cur, low))
+    inductance = float(_lower_inductance(cur, low, np.asarray(current)))
     volts = req.max_bus_voltage_v or req.bus_voltage_v
     return RIPPLE_HALF_SHARE * volts / (inductance * req.switching_frequency_hz), inductance
+
+
+def ripple_note(result: MapResult, machine: RadialSRMParams, w: Winding, req: Requirements,
+                j_peak: float) -> str | None:
+    """The evaluation note for the ripple-limited winding `w`; None when no limit is set or it does not bind. It
+    binds when `ripple_limited` lowered the winding's own current (the device peak in wire mode, `j_peak` over the
+    copper in density mode, as the winding builders set it) or left it within one grid step of the device peak."""
+    if req.switching_frequency_hz is None or req.phase_current_a is None:
+        return None
+    own = req.phase_current_a if w.wire is not None else j_peak * w.copper_area * w.paths
+    half, low = ripple_half(result, machine, w, req, w.current)
+    if w.current > own * (1 - 0.5 / _RIPPLE_GRID) and w.current + half <= req.phase_current_a - own / _RIPPLE_GRID:
+        return None
+    return (f"current limit {w.current:.1f} A: the {req.phase_current_a:.0f} A device peak less half the "
+            f"{2 * half:.1f} A ripple ({req.switching_frequency_hz / 1e3:g} kHz, "
+            f"{req.max_bus_voltage_v or req.bus_voltage_v:g} V, hard chopping, lowest L_inc {low * 1e3:.3g} mH)")
 
 
 def ripple_limited(windings: list[Winding], result: MapResult, machine: RadialSRMParams,
@@ -173,8 +197,8 @@ def ripple_limited(windings: list[Winding], result: MapResult, machine: RadialSR
     out = []
     for w in windings:
         cur, low = _ripple_inductance(result, machine, w)
-        grid = w.current * np.arange(1, _RIPPLE_GRID + 1) / _RIPPLE_GRID
-        peak = grid + RIPPLE_HALF_SHARE * volts / (np.interp(grid, cur, low) * req.switching_frequency_hz)
+        grid = w.current * (np.arange(1, _RIPPLE_GRID + 1) / _RIPPLE_GRID)   # the top point is w.current exactly
+        peak = grid + RIPPLE_HALF_SHARE * volts / (_lower_inductance(cur, low, grid) * req.switching_frequency_hz)
         fits = np.flatnonzero(peak <= req.phase_current_a)
         if fits.size:
             out.append(dataclasses.replace(w, current=float(grid[fits[-1]])))

@@ -7,7 +7,7 @@ from map_fixtures import inductance, synthetic_map
 
 from srmapp.requirements import Requirements
 from srmapp.sizing.winding import Winding
-from srmapp.turns import ripple_half, ripple_limited
+from srmapp.turns import _lower_inductance, ripple_half, ripple_limited, ripple_note
 
 MACHINE = make_8_6()
 F = 20e3
@@ -76,3 +76,37 @@ def test_zero_inductance_map_raises():
 def test_max_bus_voltage_below_bus_is_refused():
     with pytest.raises(ValueError, match="max_bus_voltage_v"):
         _req(max_bus_voltage_v=300.0)
+
+
+@pytest.mark.parametrize("device_peak", [120.0, 250.0, 350.0])
+def test_saturated_tanh_map_true_peak_stays_under_the_device_peak(device_peak):
+    psi_sat = 0.2
+    cur = np.unique(400.0 * np.linspace(0, 1, 20) ** 2)
+    r = synthetic_map(n_angles=24, currents=cur, psi_sat=psi_sat)
+    col = r.circuits.index("A")
+    lam = inductance(r.angles)[:, None] * r.currents[None, :]
+    l_inc = np.full(r.l_inc.shape, np.nan)
+    l_inc[..., col] = inductance(r.angles)[:, None] / np.cosh(lam / psi_sat) ** 2
+    r, req = dataclasses.replace(r, l_inc=l_inc), _req(phase_current_a=device_peak)
+    (out,) = ripple_limited([_winding(MACHINE.turns_per_pole, 399.0)], r, MACHINE, req)
+    th = np.linspace(0, 2 * np.pi / 6, 2001)
+    true_l = (inductance(th) / np.cosh(inductance(th) * out.current / psi_sat) ** 2).min()
+    assert out.current + 0.25 * 400.0 / (true_l * F) <= device_peak * (1 + 1e-9)
+
+
+def test_inductance_step_never_reads_above_a_neighbour():
+    cur, low = np.array([0.0, 1.0, 2.0]), np.array([3.0, 1.0, 2.0])
+    assert list(_lower_inductance(cur, low, np.array([0.5, 1.0, 1.5, 2.0, 5.0]))) == [1.0, 1.0, 1.0, 1.0, 1.0]
+
+
+def test_note_present_when_the_ripple_binds_and_absent_when_it_does_not():
+    r, req = _map(), _req()
+    w = _winding(MACHINE.turns_per_pole, 100.0)
+    (bound,) = ripple_limited([w], r, MACHINE, req)
+    half, _ = ripple_half(r, MACHINE, bound, req, bound.current)
+    assert ripple_note(r, MACHINE, bound, req, j_peak=100.0 / w.copper_area) == (
+        f"current limit {bound.current:.1f} A: the 100 A device peak less half the {2 * half:.1f} A ripple "
+        "(20 kHz, 400 V, hard chopping, lowest L_inc 1 mH)")
+    low = _winding(MACHINE.turns_per_pole, 50.0)
+    assert ripple_limited([low], r, MACHINE, req) == [low]
+    assert ripple_note(r, MACHINE, low, req, j_peak=50.0 / low.copper_area) is None
