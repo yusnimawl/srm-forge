@@ -79,12 +79,13 @@ class SearchResult:
 
     def margin_sensitive(self) -> tuple[Evaluation, ...]:
         """Evaluated designs lighter than the first recommended one that fail only the rated set: their nominal
-        check holds."""
+        check holds and no hard limit fails."""
         rec = self.recommended()
         if not rec:
             return ()
         return tuple(e for e in self.evaluations if e.mass_kg < rec[0].mass_kg and not e.feasible
-                     and e.nominal_check is not None and e.nominal_check.holds)
+                     and e.nominal_check is not None and e.nominal_check.holds
+                     and not any(lim.status == "fail" for lim in e.limits))
 
     @property
     def recommendation(self) -> Evaluation | None:

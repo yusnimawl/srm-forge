@@ -1,3 +1,4 @@
+import dataclasses
 import math
 from unittest import mock
 
@@ -7,6 +8,7 @@ import numpy as np
 
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
+from srmapp.limits import Limit
 from srmapp.pipeline import PEAK_BAND_NOTE, SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
 from srmapp.thermal import RequirementCheck
@@ -234,6 +236,13 @@ def test_lighter_design_holding_the_nominal_check_withholds_the_recommendation()
 def test_lighter_design_failing_the_nominal_check_leaves_the_recommendation():
     res = _evs((True, 2.0, 1.0, None), (False, 1.0, float("nan"), False), (False, 0.5, float("nan"), None))
     assert res.recommendation is res.evaluations[0] and res.margin_sensitive() == ()
+
+
+def test_lighter_design_failing_a_hard_limit_is_not_margin_sensitive():
+    res = _evs((True, 2.0, 1.0, None), (False, 1.0, float("nan"), True))
+    lim = Limit("bearing_speed", "fail", 2.0, 1.0, "over the limit")
+    res = dataclasses.replace(res, evaluations=(res.evaluations[0], dataclasses.replace(res.evaluations[1], limits=(lim,))))
+    assert res.margin_sensitive() == () and res.recommendation is res.evaluations[0]
 
 
 def test_thermal_off_search_recommends_nothing():
