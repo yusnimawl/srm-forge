@@ -961,13 +961,23 @@ export interface components {
         BearingSetup: {
             /** Bore Diameter M */
             bore_diameter_m?: number | null;
+            /** Candidate */
+            candidate?: ("SKF 7005 CD/HCP4A" | "NSK 30BNR19HTSUMP3" | "SKF 7006 CD/HCP4A") | null;
             /**
              * Count
              * @default 2
              */
             count: number;
+            /**
+             * Lubrication
+             * @default grease
+             * @enum {string}
+             */
+            lubrication: "grease" | "oil_air";
             /** Radial Load N */
             radial_load_n?: number | null;
+            /** Span M */
+            span_m?: number | null;
             /**
              * Type
              * @default deep_groove_ball
@@ -1491,6 +1501,8 @@ export interface components {
             theta_on_el: (number | null)[];
             /** Torque */
             torque: (number | null)[];
+            /** Torque Single Pulse */
+            torque_single_pulse?: (number | null)[] | null;
             waveforms?: components["schemas"]["WaveformsOut"] | null;
             /** Work Loop */
             work_loop: (number | null)[];
@@ -1574,9 +1586,19 @@ export interface components {
             /** J Rms */
             j_rms?: number | null;
             key: components["schemas"]["KeyNumbersOut"] | null;
+            /**
+             * Limits
+             * @default []
+             */
+            limits: components["schemas"]["LimitOut"][];
             map?: components["schemas"]["MapArraysOut"] | null;
             /** Mass Kg */
             mass_kg: number | null;
+            nominal_check?: components["schemas"]["ThermalCheckOut"] | null;
+            /** Nominal Continuous Kw Per Kg */
+            nominal_continuous_kw_per_kg?: number | null;
+            /** Nominal Peak Kw Per Kg */
+            nominal_peak_kw_per_kg?: number | null;
             /** Peak Power W */
             peak_power_w: number | null;
             /** Power Density Kw Per Kg */
@@ -2104,6 +2126,22 @@ export interface components {
             /** Unaligned Angle */
             unaligned_angle: number | null;
         };
+        /** LimitOut */
+        LimitOut: {
+            /** Limit */
+            limit?: number | null;
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value?: number | null;
+        };
         /**
          * LitzWire
          * @description Litz or other multistrand conductor: `strands` round strands in a round bundle.
@@ -2537,6 +2575,7 @@ export interface components {
             /**
              * @default {
              *       "count": 2,
+             *       "lubrication": "grease",
              *       "type": "deep_groove_ball"
              *     }
              */
@@ -2575,6 +2614,10 @@ export interface components {
              * @enum {string}
              */
             insulation_class: "B" | "F" | "H";
+            /** Max Bus Voltage V */
+            max_bus_voltage_v?: number | null;
+            /** Max Length M */
+            max_length_m?: number | null;
             /** Max Mass Kg */
             max_mass_kg?: number | null;
             /** Max Outer Diameter M */
@@ -2597,6 +2640,8 @@ export interface components {
             peak_torque_nm: number;
             /** Phase Current A */
             phase_current_a?: number | null;
+            /** Switching Frequency Hz */
+            switching_frequency_hz?: number | null;
             /**
              * Winding Temperature C
              * @default 120
@@ -2628,6 +2673,11 @@ export interface components {
             i_rms: number | null;
             /** Power Ratio */
             power_ratio: number | null;
+            /**
+             * Single Pulse
+             * @default true
+             */
+            single_pulse: boolean;
             /** Torque Ratio */
             torque_ratio: number | null;
             winding: components["schemas"]["WindingOut"];
@@ -2810,15 +2860,46 @@ export interface components {
             dropped: {
                 [key: string]: number;
             };
+            /**
+             * Dropped Pole Sets
+             * @default {}
+             */
+            dropped_pole_sets: {
+                [key: string]: string;
+            };
             /** Evaluations */
             evaluations: components["schemas"]["EvaluationOut"][];
+            /**
+             * Limit Rejected
+             * @default {}
+             */
+            limit_rejected: {
+                [key: string]: number;
+            };
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
             /** Pareto Ids */
             pareto_ids: string[];
+            /** Recommendation Id */
+            recommendation_id?: string | null;
+            /**
+             * Recommended Ids
+             * @default []
+             */
+            recommended_ids: string[];
             requirements: components["schemas"]["Requirements"];
             /** Sampled */
             sampled: number;
             /** Stage1 Rejected */
             stage1_rejected: number;
+            /**
+             * Stopped
+             * @default
+             */
+            stopped: string;
         };
         /** SearchSettingsIn */
         SearchSettingsIn: {

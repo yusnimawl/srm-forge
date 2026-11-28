@@ -104,4 +104,10 @@ def search_result_json(r, fields_keys: dict[str, str] | None = None) -> dict:
         "evaluations": [evaluation_json(e, waveforms=False, fields_key=(fields_keys or {}).get(e.id),
                                         requirements=r.requirements) for e in r.evaluations],
         "pareto_ids": [e.id for e in r.pareto()],
+        "recommended_ids": [e.id for e in r.recommended()],
+        "recommendation_id": r.recommendation.id if r.recommendation is not None else None,
+        "notes": list(r.notes),
+        "stopped": r.stopped,
+        "limit_rejected": dict(r.limit_rejected),
+        "dropped_pole_sets": dict(r.dropped_pole_sets),
     }
