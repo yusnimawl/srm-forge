@@ -204,3 +204,39 @@ def test_search_above_the_bearing_speed_rejects_every_stage1_pass(monkeypatch):
                          SearchSettings(n_candidates=8, shortlist=3, seed=1, materials=JNEX))
     assert ev.call_count == 0 and res.evaluations == ()
     assert calls and res.limit_rejected["bearing_speed"] == len(calls)
+
+
+def _gap_rating(cases, rotor_c=100.0, bore_c=80.0):
+    from srmapp.thermal import Rating, SpeedRating
+    sr = SpeedRating(3000.0, 1.0, 1.0, 1.0, None, None, rotor_c, rotor_c, bore_c, bore_c, 3, 10)
+    return Rating((), (sr,), (), 180.0, "H", None, None, cases, 1.1, 5, (), "0")
+
+
+def _gc(closure, centrifugal):
+    from srmcore.post.rotor_stress import GapClosure
+    return GapClosure(centrifugal, None, None, closure, "")
+
+
+def test_gap_limit_full_closure_pass_and_fail():
+    from srmapp.limits import GAP_SHARE, gap_limit
+    m = make_8_6()
+    half = GAP_SHARE * m.air_gap
+    ok = {"continuous_overspeed": _gc(0.9 * half, 0.0), "peak_overspeed": _gc(0.5 * half, 0.0)}
+    assert gap_limit(m, _gap_rating(ok)).status == "pass"
+    bad = {"continuous_overspeed": _gc(0.5 * half, 0.0), "peak_overspeed": _gc(1.1 * half, 0.0)}
+    lim = gap_limit(m, _gap_rating(bad))
+    assert lim.status == "fail" and lim.value == pytest.approx(1.1 * half)
+
+
+def test_gap_limit_centrifugal_only_and_not_run():
+    from srmapp.limits import gap_limit
+    m = make_8_6(materials=RegionMaterials(stator="10JNEX900", rotor="10JNEX900"))
+    half = 0.5 * m.air_gap
+    cases = lambda c: {"continuous_overspeed": _gc(None, c), "peak_overspeed": _gc(None, c)}  # noqa: E731
+    assert gap_limit(m, _gap_rating(cases(0.5 * half))).status == "pass"
+    assert gap_limit(m, _gap_rating(cases(1.5 * half))).status == "fail"
+    assert gap_limit(m, _gap_rating(cases(0.5 * half), rotor_c=70.0)).status == "not_run"
+    other = make_8_6(materials=RegionMaterials(stator="M19", rotor="10JNEX900"))
+    assert gap_limit(other, _gap_rating(cases(0.5 * half))).status == "not_run"
+    assert gap_limit(m, None).note.endswith("no rating")
+    assert gap_limit(m, _gap_rating({})).status == "not_run"

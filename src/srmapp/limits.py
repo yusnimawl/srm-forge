@@ -15,6 +15,7 @@ from .requirements import Requirements
 # A search never shortlists a rotor whose stress was not checked (rotor bursting is not recoverable by a later step).
 SEARCH_REQUIRES_PASS = ("rotor_stress", "bending")
 BENDING_MARGIN = 1.3    # first bending speed over the top speed
+GAP_SHARE = 0.5         # largest air-gap closure at overspeed, as a share of the air gap
 
 
 @dataclass(frozen=True)
@@ -92,3 +93,29 @@ def bearing_limit(req: Requirements) -> Limit:
 
 def hard_limits(req: Requirements, machine: RadialSRMParams) -> tuple[Limit, ...]:
     return (rotor_limit(machine, req), frequency_limit(machine.n_rotor_poles, req), bending_limit(machine, req), bearing_limit(req))
+
+
+def gap_limit(machine: RadialSRMParams, rating) -> Limit:
+    """Larger gap closure of the continuous and peak overspeed cases (`Rating.gap`) against `GAP_SHARE` x the air gap.
+    Without expansion data the closure is None: with one material for stator and rotor and the rotor at or above the
+    bore temperature in both cases, the centrifugal part alone is checked (the thermal part, which only adds, is not
+    run); otherwise the check is not run."""
+    limit = GAP_SHARE * machine.air_gap
+    cases = [] if rating is None else [rating.gap.get(k) for k in ("continuous_overspeed", "peak_overspeed")]
+    if not cases or None in cases:
+        return Limit("gap_closure", "not_run", None, limit, "gap closure not checked: no rating" if rating is None
+                     else "gap closure not checked: the rating has no gap closure")
+    what = "gap closure"
+    if any(c.closure is None for c in cases):
+        last = rating.rated[-1] if rating.rated else None
+        same = machine.materials.stator == machine.materials.rotor
+        if not (same and last and last.rotor_c >= last.bore_c and last.rotor_peak_c >= last.bore_peak_c):
+            return Limit("gap_closure", "not_run", None, limit,
+                         "gap closure not checked: no thermal expansion data for the stator and rotor materials")
+        values = [c.centrifugal for c in cases]
+        what = "centrifugal gap closure (thermal part not run)"
+    else:
+        values = [c.closure for c in cases]
+    worst = max(values)
+    note = f"{what} {worst * 1e3:.3f} mm at overspeed against {limit * 1e3:.3f} mm ({GAP_SHARE:g} x air gap)"
+    return Limit("gap_closure", "pass" if worst <= limit else "fail", worst, limit, note)

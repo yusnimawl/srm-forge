@@ -7,6 +7,7 @@ import pytest
 from conftest import make_8_6
 from map_fixtures import inductance, synthetic_map
 
+from srmapp.limits import Limit
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, rescale_turns, speed_grid, turns_scale
 from srmapp.requirements import Requirements
@@ -321,6 +322,7 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     monkeypatch.setattr(th, "rate_context", rated)
     # a rating the evaluation can read
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", "pass", 0.0, 1.0, ""))
     with mock.patch("srmapp.evaluate.build_map", return_value=result), mock.patch("srmapp.evaluate.choose_turns", choose):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30, cancel=None if cancel is None else (lambda: cancel(checks)))
     return e, rated, checks
@@ -493,6 +495,7 @@ def _failing_stage2(monkeypatch, rate_failed):
                         lambda ctx, n, rows=None: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
     monkeypatch.setattr(th, "rate_context", rated)
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", "pass", 0.0, 1.0, ""))
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), mock.patch("srmapp.evaluate.choose_turns", choose):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30, rate_failed=rate_failed, fields_out=fields.append)
     return e, fields

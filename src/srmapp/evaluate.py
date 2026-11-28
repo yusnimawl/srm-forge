@@ -21,7 +21,7 @@ from . import __version__
 from .cooling import MissingCoolingData, TORQUE_FLOOR
 from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
-from .limits import Limit, hard_limits
+from .limits import Limit, gap_limit, hard_limits
 from .requirements import Requirements
 from .sizing.estimates import active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
 from .sizing.generator import Candidate
@@ -250,7 +250,7 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     over_mass = req.max_mass_kg is not None and mass > req.max_mass_kg
     if over_mass:
         notes.append(f"mass {mass:.2f} kg above the {req.max_mass_kg:.2f} kg limit")
-    limits = hard_limits(req, chosen)
+    limits = (*hard_limits(req, chosen), gap_limit(chosen, rating))
     notes += [lim.note for lim in limits if lim.status != "pass"]
     failed_limit = any(lim.status == "fail" for lim in limits)
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
