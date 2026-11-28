@@ -3,6 +3,7 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
 from srmapp.case import LIMIT_FIELDS, CaseInputs
+from srmapp.requirements import Requirements
 from srmweb.setup import SetupFile, case_inputs_from_setup, setup_from_case
 from web_support import REQ, make_client
 
@@ -179,3 +180,23 @@ def test_setup_without_cut_process_imports_unspecified(client):
     imported = client.post("/api/cases", json={"origin": "import", "setup": body})
     assert imported.status_code == 201, imported.text
     assert imported.json()["inputs"]["requirements"]["cut_process"] == "unspecified"
+
+
+def test_setup_without_bike_gate_fields_imports_defaults(client):
+    case = _reference(client)
+    body = client.get(f"/api/cases/{case['id']}/setup").json()
+    req = body["requirements"]
+    for k in ("switching_frequency_hz", "max_bus_voltage_v", "max_length_m"):
+        req.pop(k, None)
+    bearing = dict(req.get("bearing") or {})
+    for k in ("span_m", "candidate", "lubrication"):
+        bearing.pop(k, None)
+    req["bearing"] = bearing
+    imported = client.post("/api/cases", json={"origin": "import", "setup": body})
+    assert imported.status_code == 201, imported.text
+    got = imported.json()["inputs"]["requirements"]
+    defaults = Requirements(**REQ)
+    for k in ("switching_frequency_hz", "max_bus_voltage_v", "max_length_m"):
+        assert got.get(k) == getattr(defaults, k)
+    assert got["bearing"].get("span_m") is None and got["bearing"].get("candidate") is None
+    assert got["bearing"].get("lubrication", "grease") == "grease"
