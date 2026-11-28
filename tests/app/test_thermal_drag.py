@@ -56,8 +56,8 @@ def test_rated_set_takes_iron_factor_and_high_mechanical_band(monkeypatch):
     assert heats[0][8] == IRON_FACTOR and heats[0][-1].total_w == MECH[True]
 
 
-def test_raises_after_four_strokes(monkeypatch):
-    ctx, asked, _ = make(monkeypatch, iron_w=lambda n: 100.0 * n, torque_avg=lambda ask: 0.0)
+def test_raises_after_the_stroke_cap(monkeypatch):
+    ctx, asked, _ = make(monkeypatch, iron_w=lambda n: 100.0 * n, torque_avg=lambda ask: 0.0)   # DRAG_MAX_STROKES strokes
     with pytest.raises(RuntimeError):
         ctx.load_at(RPM, frozenset())(2.0)
     assert len(asked) == th.DRAG_MAX_STROKES
@@ -109,19 +109,45 @@ def test_shaft_top_is_reached_and_stays_within_the_em_top(monkeypatch):
     assert max(asked) <= em_top
 
 
-def test_em_bound_speed_takes_the_shaft_top_branch(monkeypatch):
-    ctx, _, _ = make(monkeypatch)
-    top, _ = ctx.shaft_top(RPM, frozenset(), 5.0)
-    probes = []
+def test_rate_context_passes_the_shaft_top(monkeypatch):
+    ctx, asked, _ = make(monkeypatch)
+    em_top = 5.0
+    ctx.setup = types.SimpleNamespace(placeholder=False)
+    ctx.machine = ctx.limit = None
+    ctx.envelope_at = lambda speeds: {rpm: em_top for rpm in speeds}
+    ctx.strokes, ctx.check, ctx.solver_for = {}, lambda: None, lambda rpm, rows: None
+    monkeypatch.setattr(th, "mechanical_loss", lambda *a, **kw: types.SimpleNamespace(
+        total_w=MECH[kw.get("unfavourable", False)], notes=[]))
+    ctx.limit = 120.0
+    seen = []
 
-    class Solver:
-        def steady(self, load):
-            return load
+    def stop(rpm, envelope, *a, **kw):
+        seen.append(envelope)
+        raise KeyboardInterrupt
 
-        def hot_spot(self, t):
-            return types.SimpleNamespace(temperature_c=50.0, location="x")
+    monkeypatch.setattr(th, "rate_speed", stop)
+    with pytest.raises(KeyboardInterrupt):
+        th.rate_context(ctx)
+    expected, _ = ctx.shaft_top(th.rating_speeds(ctx.req, 6)[0], frozenset(), em_top)
+    assert seen[0] == pytest.approx(expected) and seen[0] < em_top / FACTOR - 1e-6
 
-    load_at = ctx.load_at(RPM, frozenset())
-    monkeypatch.setattr(th, "_kind_mean", lambda *a: 0.0)
-    r = th.rate_speed(RPM, top, 200.0, 30.0, lambda: Solver(), lambda t: probes.append(t) or load_at(t))
-    assert probes[:2] == [0.0, top] and r.continuous_nm == top and r.envelope_nm == top
+
+def test_secant_ask_above_the_em_top_falls_back_to_the_plain_step(monkeypatch):
+    em_top, share, jump_at = 5.0, 0.1, 0.95 * 5.0
+    ctx, asked, _ = make(monkeypatch)
+    solved = []
+
+    def stroke(rpm, a):
+        if a > em_top:
+            return None
+        solved.append(a)
+        jump = 1.1 if a > jump_at else 1.0     # single pulse to continuous conduction
+        return (types.SimpleNamespace(torque_avg=a),
+                types.SimpleNamespace(iron_w=share * a * jump * OMEGA / FACTOR))
+
+    ctx.stroke = stroke
+    monkeypatch.setattr(th, "mechanical_loss", lambda *a, **kw: types.SimpleNamespace(total_w=0.0))
+    top, fell = ctx.shaft_top(RPM, frozenset(), em_top)
+    solved.clear()
+    assert not fell and ctx.load_at(RPM, frozenset())(top) is not None
+    assert max(solved) <= em_top and len(solved) >= 3

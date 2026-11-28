@@ -314,8 +314,8 @@ class ThermalContext:
 
     def shaft_top(self, rpm, rows, em_top):
         """The shaft torque whose stroke ask stays within the EM envelope `em_top`: the loss torque of the stroke at
-        `em_top` comes off em_top / factor. Iron loss rises with torque, so every ask `load_at` makes at this top is at
-        or below `em_top`. Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
+        `em_top` comes off em_top / factor. Iron loss rises with torque, so the plain steps `load_at` makes at this top
+        stay at or below `em_top`; a secant ask above it has no stroke and `load_at` retries at the plain step. Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
         then em_top / factor."""
         coeffs, omega, mech = self._drag_terms(rpm, rows)
         s = self.stroke(rpm, em_top)
@@ -337,21 +337,28 @@ class ThermalContext:
             # loss counts as drag torque (safe side: part of the core loss is supplied electrically, so this
             # understates the shaft torque).
             ask, need, hist = torque * coeffs.torque_factor, float("nan"), []
-            for _ in range(DRAG_MAX_STROKES):
+            n, secant = 0, False
+            while n < DRAG_MAX_STROKES:
                 s = self.stroke(rpm, ask)
                 if s is None:
-                    return None
+                    if not secant:
+                        return None
+                    ask, secant = need, False   # a secant ask can pass the EM envelope; the plain step does not
+                    continue
+                n += 1
                 trace, sl = s
                 need = (torque + (sl.iron_w * coeffs.iron_factor + mech.total_w) / omega) * coeffs.torque_factor
                 if trace.torque_avg >= need * (1.0 - DRAG_TOL):
                     break
                 hist.append((ask, need))
                 nxt = need
+                secant = False
                 if len(hist) >= 2:   # secant step on the fixed point a = need(a)
                     (a0, n0), (a1, n1) = hist[-2:]
                     den = 1.0 - (n1 - n0) / (a1 - a0) if a1 != a0 else 0.0
                     if den > 0:
                         nxt = a1 + (n1 - a1) / den
+                        secant = math.isfinite(nxt) and nxt > 0 and nxt != need
                 ask = nxt if math.isfinite(nxt) and nxt > 0 else need
             else:
                 raise RuntimeError(f"no stroke covers the shaft torque {torque:g} N.m plus the loss torque within "
