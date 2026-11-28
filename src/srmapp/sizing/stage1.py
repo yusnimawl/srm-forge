@@ -13,6 +13,9 @@ from .winding import max_mmf
 
 # Allowance on the saturation flux for mu0*H beyond Js and fringing.
 FLUX_ALLOWANCE = 1.1
+# Largest measured share (drive torque at 50 r/min at the map top over `torque_upper`) 0.636 x 1.1, bike requirement
+# at ratio 12, 9 designs of 3 pole sets (docs/validation/bike_gates_bound_share.json); orders the shortlist only.
+BOUND_SHARE = 0.699
 
 
 def torque_upper_bound(p: RadialSRMParams, mmf: float) -> float:
