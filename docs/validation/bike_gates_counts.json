@@ -1,0 +1,101 @@
+[
+  {
+    "ratio": 8.0,
+    "n": 250,
+    "dropped_pole_sets": {
+      "24/16": "stator electrical frequency 2829 Hz at top speed, above 2780 Hz (end of the iron-loss data)"
+    },
+    "pole_sets": {
+      "6/4": {
+        "sampled": 63,
+        "stage1_pass": 4,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "8/6": {
+        "sampled": 63,
+        "stage1_pass": 8,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "12/8": {
+        "sampled": 62,
+        "stage1_pass": 7,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "16/12": {
+        "sampled": 62,
+        "stage1_pass": 13,
+        "limit_rejected": 4,
+        "by_limit": {
+          "rotor_stress": 4
+        }
+      }
+    }
+  },
+  {
+    "ratio": 12.0,
+    "n": 250,
+    "dropped_pole_sets": {
+      "16/12": "stator electrical frequency 3182 Hz at top speed, above 2780 Hz (end of the iron-loss data)",
+      "24/16": "stator electrical frequency 4243 Hz at top speed, above 2780 Hz (end of the iron-loss data)"
+    },
+    "pole_sets": {
+      "6/4": {
+        "sampled": 84,
+        "stage1_pass": 5,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "8/6": {
+        "sampled": 83,
+        "stage1_pass": 28,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "12/8": {
+        "sampled": 83,
+        "stage1_pass": 32,
+        "limit_rejected": 5,
+        "by_limit": {
+          "bending": 2,
+          "rotor_stress": 3
+        }
+      }
+    }
+  },
+  {
+    "ratio": 15.0,
+    "n": 250,
+    "dropped_pole_sets": {
+      "16/12": "stator electrical frequency 3978 Hz at top speed, above 2780 Hz (end of the iron-loss data)",
+      "24/16": "stator electrical frequency 5304 Hz at top speed, above 2780 Hz (end of the iron-loss data)"
+    },
+    "pole_sets": {
+      "6/4": {
+        "sampled": 84,
+        "stage1_pass": 12,
+        "limit_rejected": 0,
+        "by_limit": {}
+      },
+      "8/6": {
+        "sampled": 83,
+        "stage1_pass": 39,
+        "limit_rejected": 1,
+        "by_limit": {
+          "rotor_stress": 1
+        }
+      },
+      "12/8": {
+        "sampled": 83,
+        "stage1_pass": 39,
+        "limit_rejected": 11,
+        "by_limit": {
+          "bending": 6,
+          "rotor_stress": 5
+        }
+      }
+    }
+  }
+]
