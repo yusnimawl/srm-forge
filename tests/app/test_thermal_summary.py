@@ -42,6 +42,11 @@ def test_binds_em_at_envelope():
     assert ts.binds(sr(2000.0, 50.0, 10.0), "continuous") == ts.BINDS_EM
 
 
+def test_binds_em_within_the_bracket_stop_rule_of_the_envelope():
+    assert ts.binds(sr(2000.0, 50.0 * 0.994, 10.0), "continuous") == ts.BINDS_EM
+    assert ts.binds(sr(2000.0, 50.0 * 0.98, 10.0), "continuous") == ts.BINDS_HEAT
+
+
 def test_binds_heat_below_envelope():
     s = sr(2000.0, 30.0, 50.0)
     assert ts.binds(s, "continuous") == ts.BINDS_HEAT and ts.binds(s, "peak") == ts.BINDS_EM

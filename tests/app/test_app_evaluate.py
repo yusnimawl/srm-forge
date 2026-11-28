@@ -205,6 +205,30 @@ def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
     assert "not thermally rated" in free.error and "rotor stress not checked" in free.error
 
 
+def test_length_over_the_limit_after_the_winding_is_chosen_is_infeasible():
+    from srmapp.sizing.estimates import active_length
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    length = active_length(make_8_6())
+    stage = stage1(req, make_8_6())
+    limited = _req(wires=[THICK], phase_current_a=100.0, max_length_m=length * 0.9)
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
+        e = evaluate_stage2(_cand(), limited, stage, max_turns=30, thermal=False)
+    assert e.status == "ok" and not e.feasible
+    assert f"total length {length * 1e3:.0f} mm above the {length * 0.9e3:.0f} mm limit" in e.error
+
+
+def test_ripple_inputs_without_their_partners_are_noted_as_ignored():
+    e, _ = _evaluate(_req(switching_frequency_hz=20e3, max_bus_voltage_v=450.0))
+    assert "switching_frequency_hz is ignored" in e.error and "max_bus_voltage_v is ignored" in e.error
+
+
+def test_passing_limit_caveats_are_in_the_notes():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    e, _ = _evaluate(req)
+    assert all(lim.status != "fail" for lim in e.limits if lim.name in ("bending", "bearing_speed"))
+    assert "bearing span is estimated" in e.error and "unsafe if the set has medium preload" in e.error
+
+
 @pytest.mark.slow
 def test_real_8_6_evaluation():
     pytest.importorskip("ngsolve")

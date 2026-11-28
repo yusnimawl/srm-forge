@@ -1,4 +1,4 @@
-"""Measure how much of the stage-1 torque bound a drive reaches, for the bike requirement (D4 of the bike gates plan).
+"""Measure how much of the stage-1 torque bound a drive reaches, for the bike requirement.
 
 Usage: python examples/bound_share.py [--ratio 12] [--per-set 3] [--workers N] [--cache-dir DIR] [--json PATH]
 

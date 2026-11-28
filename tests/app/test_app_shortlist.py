@@ -1,4 +1,4 @@
-"""Shortlist order of `run_search` (D4): likely designs first, lightest first, round-robin over the pole sets."""
+"""Shortlist order of `run_search`: likely designs first, lightest first, round-robin over the pole sets."""
 from dataclasses import replace
 from unittest import mock
 

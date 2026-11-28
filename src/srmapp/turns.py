@@ -8,7 +8,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from srmcore.maps import MapResult
+from srmcore.maps.end_winding import end_winding_inductance
 from srmcore.maps.pool import default_workers, map_ordered
+from srmcore.maps.validation import MEASURED_LU_GAP
 from srmcore.model.design import RadialSRMParams
 
 from .drive.envelope import Envelope, envelope
@@ -139,16 +141,22 @@ def _scan_job(key: tuple[float, float, float, float]):
     return _drive_summary(_SCAN["result"], _SCAN["machine"], _SCAN["bus_voltage"], _SCAN["band"], key)
 
 
-RIPPLE_HALF_SHARE = 0.25   # dI/2 = V / (4 L f): hard chopping at zero back-EMF, twice the soft-chopping ripple
+END_IMAGE_FACTOR = 1.5     # midpoint of the free-air (1) and iron-image (2) end-winding bounds; the maps carry it
+RIPPLE_IMAGE_FACTOR = 1.0  # the ripple uses the free-air bound: a higher L would lower the ripple (unsafe)
+RIPPLE_HALF_SHARE = 0.25   # dI/2 = V / (4 L f): hard chopping at zero back-EMF (the worst case), twice the soft-chopping ripple
 _RIPPLE_GRID = 1000        # current steps over [0, w.current]: 0.1 %
 
 
 def _ripple_inductance(result: MapResult, machine: RadialSRMParams, w: Winding):
-    """(currents, lowest L_inc over the angles) of the excited column on the map rescaled to `w`, valid nodes only."""
-    scaled = rescale_turns(result, turns_scale(machine, w))
+    """(currents, lowest L_inc over the angles) of the excited column on the map rescaled to `w`, valid nodes only.
+    The map carries the end winding at `END_IMAGE_FACTOR`; the ripple takes it at `RIPPLE_IMAGE_FACTOR` and divides
+    L by 1 + `MEASURED_LU_GAP` (the model's unaligned L reads 45 % high against the Krishnan 6/4 measurement)."""
+    k = turns_scale(machine, w)
+    scaled = rescale_turns(result, k)
     column = scaled.circuits.index(scaled.excited)
+    excess = (end_winding_inductance(machine, END_IMAGE_FACTOR) - end_winding_inductance(machine, RIPPLE_IMAGE_FACTOR)) * k * k
     with np.errstate(all="ignore"):
-        low = np.fmin.reduce(scaled.l_inc[..., column], axis=0)
+        low = (np.fmin.reduce(scaled.l_inc[..., column], axis=0) - excess) / (1.0 + MEASURED_LU_GAP)
     ok = np.isfinite(low)
     if not ok.any() or np.any(low[ok] <= 0):
         raise ValueError("no positive incremental inductance on the map: the current ripple cannot be computed")

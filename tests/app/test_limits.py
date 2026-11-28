@@ -241,3 +241,20 @@ def test_gap_limit_centrifugal_only_and_not_run():
     assert gap_limit(other, _gap_rating(cases(0.5 * half), rotor_c=70.0)).status == "not_run"
     assert gap_limit(m, None).note.endswith("no rating")
     assert gap_limit(m, _gap_rating({})).status == "not_run"
+
+
+def test_nsk_and_estimated_span_caveats_are_set_on_a_passing_design():
+    from srmapp.limits import bearing_limit, bending_limit
+    m = make_8_6(materials=JNEX)
+    b = bearing_limit(_req(max_speed_rpm=6000.0))
+    assert b.status == "pass" and "0.65 gives a top speed of 17 333 r/min" in b.caveat
+    g = bending_limit(m, _req(max_speed_rpm=3000.0))
+    assert g.status == "pass" and "bearing span is estimated" in g.caveat
+
+
+def test_span_shorter_than_the_active_length_fails_bending():
+    from srmapp.limits import bending_limit
+    from srmapp.mechanical import BearingSetup
+    m = make_8_6(materials=JNEX)
+    lim = bending_limit(m, _req(max_speed_rpm=3000.0, bearing=BearingSetup(span_m=0.01)))
+    assert lim.status == "fail" and "shorter than" in lim.note and lim.caveat == ""

@@ -23,11 +23,11 @@ from .curves import MapCurves, map_curves
 from .drive.envelope import Envelope
 from .limits import Limit, gap_limit, hard_limits
 from .requirements import Requirements
-from .sizing.estimates import active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
+from .sizing.estimates import active_length, active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coil_side_area, peak_cap_text
 from .sizing.generator import Candidate
 from .sizing.stage1 import Stage1
 from .sizing.winding import DENSITY_MAX_TURNS, Winding
-from .turns import _envelope, ripple_note, ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
+from .turns import END_IMAGE_FACTOR, _envelope, ripple_note, ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
 
 if TYPE_CHECKING:
     from .thermal import Rating, RequirementCheck
@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 _NAN = float("nan")
 _log = logging.getLogger(__name__)
 NOT_RATED = "not thermally rated"
-END_IMAGE_FACTOR = 1.5    # midpoint of the free-air (1) and iron-image (2) end-winding bounds
 MAX_THERMAL_CHECKS = 4    # ranked windings checked against the rated hot-spot limit per design, best first
 
 
@@ -234,6 +233,11 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     i_rms = float(np.max(env.i_rms))
     if not req.wire_mode and w.turns / w.paths >= max_turns:
         notes.append(f"turn scan reached its limit of {max_turns}; more turns may also be feasible")
+    if req.switching_frequency_hz is not None and req.phase_current_a is None:
+        notes.append("switching_frequency_hz is ignored: the ripple limit needs phase_current_a (the device peak)")
+    if req.max_bus_voltage_v is not None and (req.switching_frequency_hz is None or req.phase_current_a is None):
+        notes.append("max_bus_voltage_v is ignored: it only sets the current ripple, which needs "
+                     "switching_frequency_hz and phase_current_a")
     ripple = ripple_note(result, machine, w, req, j_peak)
     if ripple:
         notes.append(ripple)
@@ -250,12 +254,19 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     over_mass = req.max_mass_kg is not None and mass > req.max_mass_kg
     if over_mass:
         notes.append(f"mass {mass:.2f} kg above the {req.max_mass_kg:.2f} kg limit")
+    length = active_length(chosen)
+    over_length = req.max_length_m is not None and length > req.max_length_m
+    if over_length:
+        notes.append(f"total length {length * 1e3:.0f} mm above the {req.max_length_m * 1e3:.0f} mm limit")
     limits = (*hard_limits(req, chosen), gap_limit(chosen, rating))
-    notes += [lim.note for lim in limits if lim.status != "pass"]
+    for lim in limits:
+        for text in (lim.note if lim.status != "pass" else "", lim.caveat):
+            if text and not any(text in n for n in notes):
+                notes.append(text)
     failed_limit = any(lim.status == "fail" for lim in limits)
     return Evaluation(candidate.id, design.model_copy(update={"machine": chosen}), "ok", "; ".join(notes), mass, w,
                       point.torque_ratio, point.power_ratio, peak_power, peak_power / 1000 / mass,
-                      float(env.efficiency[at_base]), feasible and not over_mass and not failed_limit, env, key, choice.scan,
+                      float(env.efficiency[at_base]), feasible and not over_mass and not over_length and not failed_limit, env, key, choice.scan,
                       i_rms, i_rms / (w.paths * w.copper_area), arrays,
                       map_curves(arrays, chosen, w, key, l_end * k * k), j_limit, rating=rating,
                       rated_continuous_kw_per_kg=_rated_kw_per_kg(rating, req, "continuous_nm", mass),

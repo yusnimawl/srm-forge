@@ -56,6 +56,8 @@ class SearchSettings:
 PEAK_BAND_NOTE = ("peak kW/kg is a band from rated to nominal: the peak-heat check (V4) measured one 14 s "
                   "copper-dominated pulse, so the cooling paths and a 30 s peak from warm have no measured check "
                   "(confirm step on the winner)")
+NOT_RATED_NOTE = ("no design is recommended: the feasible designs are not thermally rated (thermal is off, or no rating "
+                  "could be made), and the recommendation ranks rated designs")
 MAX_SAME_FAILURES = 3   # evaluations failing with one status before the search stops
 
 
@@ -95,7 +97,11 @@ class SearchResult:
 
     @property
     def notes(self) -> tuple[str, ...]:
-        return (PEAK_BAND_NOTE,) if self.recommended() else ()
+        if self.recommended():
+            return (PEAK_BAND_NOTE,)
+        if any(e.feasible and not math.isfinite(e.rated_continuous_kw_per_kg) for e in self.evaluations):
+            return (NOT_RATED_NOTE,)
+        return ()
 
     def pareto(self, maximize=(True, True)) -> tuple[Evaluation, ...]:
         """Non-dominated feasible designs over (rated continuous, rated peak) kW/kg; unrated designs are left out."""

@@ -9,10 +9,12 @@ from srmcore.model.design import RadialSRMParams
 from srmcore.post.rotor_stress import OVERSPEED, SAFETY_FACTOR, rotor_stress
 
 from .cooling import K_IRON_HI
-from .mechanical import BEARING_SPEED_RPM, DB_PRELOAD_A, SPAN_NOTE, first_bending_rpm
+from .mechanical import BEARING_SPEED_RPM, DB_PRELOAD_A, SPAN_NOTE, bearing_span, first_bending_rpm
+from .sizing.estimates import active_length
 from .requirements import Requirements
 
-# A search never shortlists a rotor whose stress was not checked (rotor bursting is not recoverable by a later step).
+# A search never shortlists a design whose rotor stress or bending speed was not checked (neither is recoverable by a
+# later step).
 SEARCH_REQUIRES_PASS = ("rotor_stress", "bending")
 BENDING_MARGIN = 1.3    # first bending speed over the top speed
 GAP_SHARE = 0.5         # largest air-gap closure at overspeed, as a share of the air gap
@@ -25,6 +27,7 @@ class Limit:
     value: float | None     # the computed quantity (None when not run)
     limit: float | None     # what it is compared with
     note: str
+    caveat: str = ""        # an assumption or placeholder behind the value; an evaluation notes it whatever the status
 
 
 def rotor_limit(machine: RadialSRMParams, req: Requirements) -> Limit:
@@ -63,10 +66,15 @@ def bending_limit(machine: RadialSRMParams, req: Requirements) -> Limit:
     need = BENDING_MARGIN * req.max_speed_rpm
     if rpm is None:
         return Limit("bending", "not_run", None, need, "bending not checked: the shaft material has no Young's modulus")
+    caveat = SPAN_NOTE if bearing.span_m is None else ""
     note = f"first bending speed {rpm:,.0f} r/min against {need:,.0f} r/min ({BENDING_MARGIN:g} x top speed)".replace(",", " ")
-    if bearing.span_m is None:
-        note += "; " + SPAN_NOTE
-    return Limit("bending", "pass" if rpm >= need else "fail", rpm, need, note)
+    if caveat:
+        note += "; " + caveat
+    span = bearing_span(machine, bearing)
+    if span < active_length(machine):
+        return Limit("bending", "fail", rpm, need, f"{note}; the bearing span {span * 1e3:.0f} mm is shorter than the "
+                     f"stack with both end windings ({active_length(machine) * 1e3:.0f} mm)", caveat)
+    return Limit("bending", "pass" if rpm >= need else "fail", rpm, need, note, caveat)
 
 
 def bearing_limit(req: Requirements) -> Limit:
@@ -85,10 +93,12 @@ def bearing_limit(req: Requirements) -> Limit:
             f"against {rpm(need)} r/min ({OVERSPEED:g} x top speed)")
     if not b.candidate:
         note += "; no bearing is chosen, so this is the lowest of the three candidates"
+    caveat = ""
     if name.startswith("NSK"):
-        note += ("; the set factor is assumed (not read for NSK) and is too high (unsafe) if the set has medium "
-                 "preload")
-    return Limit("bearing_speed", "pass" if need <= limit else "fail", need, limit, note)
+        caveat = (f"the NSK set factor {DB_PRELOAD_A:g} is assumed (not read for NSK) and is unsafe if the set has "
+                  f"medium preload: 0.65 gives a top speed of {cat * 0.65 / OVERSPEED:,.0f} r/min".replace(",", " "))
+        note += "; " + caveat
+    return Limit("bearing_speed", "pass" if need <= limit else "fail", need, limit, note, caveat)
 
 
 def hard_limits(req: Requirements, machine: RadialSRMParams) -> tuple[Limit, ...]:

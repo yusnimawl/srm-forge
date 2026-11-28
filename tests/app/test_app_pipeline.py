@@ -9,7 +9,7 @@ import numpy as np
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation
 from srmapp.limits import Limit
-from srmapp.pipeline import PEAK_BAND_NOTE, SearchResult, SearchSettings, run_search
+from srmapp.pipeline import NOT_RATED_NOTE, PEAK_BAND_NOTE, SearchResult, SearchSettings, run_search
 from srmapp.requirements import Requirements
 from srmapp.thermal import RequirementCheck
 from srmapp.sizing.estimates import J_PEAK_SCREEN, J_SCREEN
@@ -247,4 +247,4 @@ def test_lighter_design_failing_a_hard_limit_is_not_margin_sensitive():
 
 def test_thermal_off_search_recommends_nothing():
     res = _evs((True, 2.0, float("nan"), None))
-    assert res.recommended() == () and res.recommendation is None and res.notes == ()
+    assert res.recommended() == () and res.recommendation is None and res.notes == (NOT_RATED_NOTE,)

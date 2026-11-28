@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 
 from srmapp.cooling import k_iron_hi
 from srmapp.requirements import Requirements
-from srmapp.thermal import (_TORQUE_TOL, BIG_K, HOT_SPOT_ABOVE, Rating, RequirementCheck, SpeedRating,
+from srmapp.thermal import (_TORQUE_TOL, BIG_K, BRACKET_REL, HOT_SPOT_ABOVE, Rating, RequirementCheck, SpeedRating,
                             required_torques)
 
 BINDS_HEAT = "heat"
@@ -47,7 +47,8 @@ def hint(row: str) -> str | None:
 
 def binds(s: SpeedRating, which: str) -> str:
     torque = s.continuous_nm if which == "continuous" else s.peak_nm
-    return BINDS_EM if torque >= s.envelope_nm - _TORQUE_TOL else BINDS_HEAT
+    # The rating's bracket stops within BRACKET_REL of the envelope, so closer than that the two cannot be told apart.
+    return BINDS_EM if torque >= s.envelope_nm * (1 - BRACKET_REL) - _TORQUE_TOL else BINDS_HEAT
 
 
 def location_text(location: str) -> str:
