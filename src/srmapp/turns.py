@@ -137,6 +137,50 @@ def _scan_job(key: tuple[float, float, float, float]):
     return _drive_summary(_SCAN["result"], _SCAN["machine"], _SCAN["bus_voltage"], _SCAN["band"], key)
 
 
+RIPPLE_HALF_SHARE = 0.25   # dI/2 = V / (4 L f): hard chopping at zero back-EMF, twice the soft-chopping ripple
+_RIPPLE_GRID = 1000        # current steps over [0, w.current]: 0.1 %
+
+
+def _ripple_inductance(result: MapResult, machine: RadialSRMParams, w: Winding):
+    """(currents, lowest L_inc over the angles) of the excited column on the map rescaled to `w`, valid nodes only."""
+    scaled = rescale_turns(result, turns_scale(machine, w))
+    column = scaled.circuits.index(scaled.excited)
+    with np.errstate(all="ignore"):
+        low = np.fmin.reduce(scaled.l_inc[..., column], axis=0)
+    ok = np.isfinite(low)
+    if not ok.any() or np.any(low[ok] <= 0):
+        raise ValueError("no positive incremental inductance on the map: the current ripple cannot be computed")
+    return scaled.currents[ok], low[ok]
+
+
+def ripple_half(result: MapResult, machine: RadialSRMParams, w: Winding, req: Requirements,
+                current: float) -> tuple[float, float]:
+    """(half the peak-to-peak ripple in A, lowest L_inc in H) at winding current `current`."""
+    cur, low = _ripple_inductance(result, machine, w)
+    inductance = float(np.interp(current, cur, low))
+    volts = req.max_bus_voltage_v or req.bus_voltage_v
+    return RIPPLE_HALF_SHARE * volts / (inductance * req.switching_frequency_hz), inductance
+
+
+def ripple_limited(windings: list[Winding], result: MapResult, machine: RadialSRMParams,
+                   req: Requirements) -> list[Winding]:
+    """Each winding with its current lowered to the largest I <= w.current whose peak I + dI(I)/2 stays within
+    `req.phase_current_a`; a winding with no such I is dropped. Unchanged without a switching frequency and a device
+    peak. A map with no incremental inductance raises ValueError."""
+    if req.switching_frequency_hz is None or req.phase_current_a is None:
+        return list(windings)
+    volts = req.max_bus_voltage_v or req.bus_voltage_v
+    out = []
+    for w in windings:
+        cur, low = _ripple_inductance(result, machine, w)
+        grid = w.current * np.arange(1, _RIPPLE_GRID + 1) / _RIPPLE_GRID
+        peak = grid + RIPPLE_HALF_SHARE * volts / (np.interp(grid, cur, low) * req.switching_frequency_hz)
+        fits = np.flatnonzero(peak <= req.phase_current_a)
+        if fits.size:
+            out.append(dataclasses.replace(w, current=float(grid[fits[-1]])))
+    return out
+
+
 def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements, *, j_peak: float = J_PEAK,
                  j_limit: float = J_SCREEN, j_peak_max: float | None = None, margin: float = 1.0,
                  max_turns: int = DENSITY_MAX_TURNS, only: Winding | None = None, workers: int | None = 1,
@@ -162,6 +206,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
         capped = len(windings) < sum(len(wire_windings(machine, req, i, math.inf)) for i in range(len(req.wires)))
     else:
         windings = density_windings(machine, req, j_peak, max_turns)
+    windings = ripple_limited(windings, result, machine, req)
     grid = speed_grid(req)
     band = grid[grid >= req.base_speed_rpm]
 

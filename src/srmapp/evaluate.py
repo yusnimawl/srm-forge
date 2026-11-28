@@ -27,7 +27,7 @@ from .sizing.estimates import active_volume, J_LIMIT, J_PEAK, J_PEAK_SCREEN, coi
 from .sizing.generator import Candidate
 from .sizing.stage1 import Stage1
 from .sizing.winding import DENSITY_MAX_TURNS, Winding
-from .turns import _envelope, ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
+from .turns import _envelope, ripple_half, ScanCancelled, ScanPoint, choose_turns, requirement_ratios, rescale_turns, speed_grid, turns_scale  # noqa: F401
 
 if TYPE_CHECKING:
     from .thermal import Rating, RequirementCheck
@@ -227,6 +227,11 @@ def evaluate_stage2(candidate: Candidate, req: Requirements, stage: Stage1, *, g
     i_rms = float(np.max(env.i_rms))
     if not req.wire_mode and w.turns / w.paths >= max_turns:
         notes.append(f"turn scan reached its limit of {max_turns}; more turns may also be feasible")
+    if req.switching_frequency_hz is not None and req.phase_current_a is not None:
+        half, low = ripple_half(result, machine, w, req, w.current)
+        notes.append(f"current limit {w.current:.1f} A: the {req.phase_current_a:.0f} A device peak less half the "
+                     f"{2 * half:.1f} A ripple ({req.switching_frequency_hz / 1e3:g} kHz, "
+                     f"{req.max_bus_voltage_v or req.bus_voltage_v:g} V, hard chopping, lowest L_inc {low * 1e3:.3g} mH)")
     if env.waveforms is not None:
         cont = env.speeds_rpm[np.all(env.waveforms.current > 0, axis=1)]
         if cont.size:
