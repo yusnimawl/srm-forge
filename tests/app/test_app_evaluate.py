@@ -275,12 +275,12 @@ def test_failed_evaluation_has_no_map():
 
 
 def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None,
-                 ratios=None, seen=None, nominal=False):
+                 ratios=None, seen=None, nominal=False, gap="pass"):
     """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order (a failing check
     fails at 3000 rpm on the hot spot). `n_ranked` windings are EM-feasible (0: none is); `error_at` = (k, exc)
     raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call; `ratios` sets the
     torque and power ratio of each ranked winding and `seen` receives the ranked points; `nominal` is whether the
-    nominal-set check (rows=frozenset()) holds."""
+    nominal-set check (rows=frozenset()) holds; `gap` is the status the gap limit returns."""
     import srmapp.thermal as th
     from srmapp.turns import TurnsChoice, choose_turns
     req = _req()
@@ -322,7 +322,7 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     monkeypatch.setattr(th, "rate_context", rated)
     # a rating the evaluation can read
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
-    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", "pass", 0.0, 1.0, ""))
+    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", gap, 0.0, 1.0, "gap note"))
     with mock.patch("srmapp.evaluate.build_map", return_value=result), mock.patch("srmapp.evaluate.choose_turns", choose):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30, cancel=None if cancel is None else (lambda: cancel(checks)))
     return e, rated, checks
@@ -339,6 +339,13 @@ def test_first_holding_winding_is_chosen(monkeypatch):
     e, rated, checks = _ranked_eval(monkeypatch, [False, True])
     assert e.status == "ok" and e.rating == "RATING" and e.winding is checks[1]
     assert rated.call_count == 1 and len(checks) == 2
+
+
+@pytest.mark.parametrize("gap, feasible", [("pass", True), ("not_run", True), ("fail", False)])
+def test_gap_limit_status_decides_feasibility(monkeypatch, gap, feasible):
+    e, _, _ = _ranked_eval(monkeypatch, [True], gap=gap)
+    assert [(l.name, l.status) for l in e.limits if l.name == "gap_closure"] == [("gap_closure", gap)]
+    assert e.feasible is feasible
 
 
 def test_no_winding_holds(monkeypatch):
