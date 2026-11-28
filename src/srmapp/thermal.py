@@ -44,7 +44,7 @@ BIG_K = 1000.0           # excess assigned to an infeasible torque (no stroke, o
 @dataclass(frozen=True)
 class SpeedRating:
     rpm: float
-    envelope_nm: float
+    envelope_nm: float      # shaft torque: the EM envelope less the loss torque of the stroke at it (`ThermalContext.shaft_top`)
     continuous_nm: float
     peak_nm: float
     continuous_hot_spot: HotSpot
@@ -196,6 +196,8 @@ def rate_speed(rpm: float, envelope_nm: float, limit_c: float, peak_duration_s: 
 # The FE showed the centrifugal growth up to 9.4 % low (docs/r5-thermal-results.md); the gap uses the unsafe-side correction.
 GROWTH_LOW = 0.094
 _TORQUE_TOL = 1e-9
+DRAG_TOL = 1e-3          # a stroke is enough when its torque is within this of the torque plus loss torque it must cover
+DRAG_MAX_STROKES = 6     # secant steps converge in a few solves; hitting the cap means slow convergence or a shaft torque no stroke reaches
 
 
 @dataclass(frozen=True)
@@ -304,19 +306,65 @@ class ThermalContext:
     def solver_for(self, rpm, rows):
         return lambda: ThermalSolver(self.at(rpm, rows)[1].problem)
 
+    def _drag_terms(self, rpm, rows):
+        """Torque factor, iron factor, speed (rad/s) and the set's mechanical loss (W; the same for every torque)."""
+        coeffs = self.at(rpm, rows)[0]
+        mech = mechanical_loss(self.machine, self.req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+        return coeffs, rpm * 2 * math.pi / 60, mech
+
+    def shaft_top(self, rpm, rows, em_top):
+        """The shaft torque whose stroke ask stays within the EM envelope `em_top`: the loss torque of the stroke at
+        `em_top` comes off em_top / factor. The stroke at the shaft top can carry more iron loss than the stroke at
+        `em_top`; it then needs more EM torque than the envelope gives, `load_at` finds no stroke there and returns
+        None, and `rate_speed` brackets down and stays on the feasible side, within its 1 % stop rule.
+        Returns (torque, fell_back); fell_back is true when no stroke reaches `em_top`, and the top is
+        then em_top / factor."""
+        coeffs, omega, mech = self._drag_terms(rpm, rows)
+        s = self.stroke(rpm, em_top)
+        if s is None:
+            return em_top / coeffs.torque_factor, True
+        loss = (s[1].iron_w * coeffs.iron_factor + mech.total_w) / omega
+        return max(em_top / coeffs.torque_factor - loss, 0.0) * (1.0 - DRAG_TOL), False
+
     def load_at(self, rpm, rows):
         coeffs, net = self.at(rpm, rows)
-        domain, req = self.domain, self.req
+        domain = self.domain
+        _, omega, mech = self._drag_terms(rpm, rows)
 
         def load(torque: float):
             if torque <= 0:
                 zero = ThermalLoad(np.zeros(len(domain.triangles)), {})
                 return lambda t: zero
-            s = self.stroke(rpm, torque * coeffs.torque_factor)
-            if s is None:
-                return None
-            trace, sl = s
-            mech = mechanical_loss(self.machine, req.bearing, rpm, unfavourable="mechanical_loss" in rows)
+            # `torque` is at the shaft: the stroke must also cover the iron, windage and friction torque. All the iron
+            # loss counts as drag torque (safe side: part of the core loss is supplied electrically, so this
+            # understates the shaft torque).
+            ask, need, hist = torque * coeffs.torque_factor, float("nan"), []
+            n, secant = 0, False
+            while n < DRAG_MAX_STROKES:
+                s = self.stroke(rpm, ask)
+                if s is None:
+                    if not secant:
+                        return None
+                    ask, secant = need, False   # a secant ask can pass the EM envelope; the plain step does not
+                    continue
+                n += 1
+                trace, sl = s
+                need = (torque + (sl.iron_w * coeffs.iron_factor + mech.total_w) / omega) * coeffs.torque_factor
+                if trace.torque_avg >= need * (1.0 - DRAG_TOL):
+                    break
+                hist.append((ask, need))
+                nxt = need
+                secant = False
+                if len(hist) >= 2:   # secant step on the fixed point a = need(a)
+                    (a0, n0), (a1, n1) = hist[-2:]
+                    den = 1.0 - (n1 - n0) / (a1 - a0) if a1 != a0 else 0.0
+                    if den > 0:
+                        nxt = a1 + (n1 - a1) / den
+                        secant = math.isfinite(nxt) and nxt > 0 and nxt != need
+                ask = nxt if math.isfinite(nxt) and nxt > 0 else need
+            else:
+                raise RuntimeError(f"no stroke covers the shaft torque {torque:g} N.m plus the loss torque within "
+                                   f"{DRAG_MAX_STROKES} strokes at {rpm:g} rpm (last need {need:g} N.m)")
             heat = point_heat(sl, trace, domain, self.static, self.hot, self.wire, self.machine, self.limit,
                               coeffs.iron_factor, rpm, mech)
             return load_fn(heat, net, self.machine, self.hot)
@@ -349,11 +397,12 @@ class RequirementCheck:
     hot_c: float = float("nan")            # hot spot at the failing torque; nan for a runaway or no stroke
 
 
-def check_requirement(ctx: ThermalContext, n_speeds: int = 6) -> RequirementCheck:
-    """Whether the rated set (every row of ROWS at its unfavourable end) holds the required continuous torque in
-    steady state and the required peak torque for `peak_duration_s` (from that steady state) under the hot-spot
-    limit at every rating speed. Stops at the first failing speed; a torque no stroke reaches fails."""
-    req, rows = ctx.req, frozenset(ROWS)
+def check_requirement(ctx: ThermalContext, n_speeds: int = 6, rows: frozenset = frozenset(ROWS)) -> RequirementCheck:
+    """Whether the set with `rows` at their unfavourable end (default: the rated set, every row of
+    ROWS) holds the required continuous torque in steady state and the required peak torque for `peak_duration_s`
+    (from that steady state) under the hot-spot limit at every rating
+    speed. Stops at the first failing speed; a torque no stroke reaches fails."""
+    req = ctx.req
     cont_hot, peak_hot, notes = [], [], []
     if req.continuous_power_w is None:
         notes.append("no continuous power required: continuous not checked")
@@ -464,9 +513,14 @@ def rate_context(ctx: ThermalContext, *, em_budget: UncertaintyBudget | None = N
         omega = max(rpm, req.base_speed_rpm) * 2 * math.pi / 60
         start = None if req.continuous_power_w is None else req.continuous_power_w / omega
         top = env[rpm]
-        ratings = [rate_speed(rpm, top / at(rpm, rows)[0].torque_factor, limit, req.peak_duration_s,
-                              solver_for(rpm, rows), load_at(rpm, rows), start, keep=kept if rows else None)
-                   for rows in (frozenset(), frozenset(ROWS))]   # the rated set's deliverable envelope is top / torque factor
+        ratings = []
+        for rows in (frozenset(), frozenset(ROWS)):
+            # SpeedRating.envelope_nm is the shaft envelope: the EM top less the loss torque of the stroke at it
+            shaft, fell_back = ctx.shaft_top(rpm, rows, top)
+            if fell_back and "no stroke reaches the EM top" not in " ".join(notes):
+                notes.append("no stroke reaches the EM top at some speed: the shaft envelope there ignores the loss torque")
+            ratings.append(rate_speed(rpm, shaft, limit, req.peak_duration_s, solver_for(rpm, rows), load_at(rpm, rows),
+                                      start, keep=kept if rows else None))
         nominal.append(ratings[0])
         rated.append(ratings[1])
         t_rated = ratings[1].continuous_nm

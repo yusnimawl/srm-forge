@@ -8,7 +8,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from srmcore.maps import MapResult
+from srmcore.maps.end_winding import end_winding_inductance
 from srmcore.maps.pool import default_workers, map_ordered
+from srmcore.maps.validation import MEASURED_LU_GAP
 from srmcore.model.design import RadialSRMParams
 
 from .drive.envelope import Envelope, envelope
@@ -71,6 +73,7 @@ class ScanPoint:
     power_ratio: float      # achieved / required, worst over base..max speed
     i_rms: float            # A, phase RMS current, worst over base..max speed
     feasible: bool          # worst ratio at least the margin
+    single_pulse: bool = True   # the single-pulse strokes alone meet the margin at base speed and over the band
 
     @property
     def worst(self) -> float:
@@ -126,15 +129,90 @@ def _scan_init(result: MapResult, machine: RadialSRMParams, bus_voltage: float, 
 
 def _drive_summary(result: MapResult, machine: RadialSRMParams, bus_voltage: float, band: np.ndarray,
                    key: tuple[float, float, float, float]):
-    """(speeds, torque, power, i_rms) of the drive envelope of one `_drive_key` over `band`; no waveforms."""
+    """(speeds, torque, power, i_rms, single-pulse torque) of the drive envelope of one `_drive_key` over `band`; no
+    waveforms."""
     k, resistance, current, rms_limit = key
     env = envelope(rescale_turns(result, k), machine, bus_voltage, resistance, band, current_limit=current,
                    rms_limit=rms_limit, waveforms=False)
-    return env.speeds_rpm, env.torque, env.power, env.i_rms
+    return env.speeds_rpm, env.torque, env.power, env.i_rms, env.torque_single_pulse
 
 
 def _scan_job(key: tuple[float, float, float, float]):
     return _drive_summary(_SCAN["result"], _SCAN["machine"], _SCAN["bus_voltage"], _SCAN["band"], key)
+
+
+END_IMAGE_FACTOR = 1.5     # midpoint of the free-air (1) and iron-image (2) end-winding bounds; the maps carry it
+RIPPLE_IMAGE_FACTOR = 1.0  # the ripple uses the free-air bound: a higher L would lower the ripple (unsafe)
+RIPPLE_HALF_SHARE = 0.25   # dI/2 = V / (4 L f): hard chopping at zero back-EMF (the worst case), twice the soft-chopping ripple
+_RIPPLE_GRID = 1000        # current steps over [0, w.current]: 0.1 %
+
+
+def _ripple_inductance(result: MapResult, machine: RadialSRMParams, w: Winding):
+    """(currents, lowest L_inc over the angles) of the excited column on the map rescaled to `w`, valid nodes only.
+    The map carries the end winding at `END_IMAGE_FACTOR`; the ripple takes it at `RIPPLE_IMAGE_FACTOR` and divides
+    L by 1 + `MEASURED_LU_GAP` (the model's unaligned L reads 45 % high against the Krishnan 6/4 measurement)."""
+    k = turns_scale(machine, w)
+    scaled = rescale_turns(result, k)
+    column = scaled.circuits.index(scaled.excited)
+    excess = (end_winding_inductance(machine, END_IMAGE_FACTOR) - end_winding_inductance(machine, RIPPLE_IMAGE_FACTOR)) * k * k
+    with np.errstate(all="ignore"):
+        low = (np.fmin.reduce(scaled.l_inc[..., column], axis=0) - excess) / (1.0 + MEASURED_LU_GAP)
+    ok = np.isfinite(low)
+    if not ok.any() or np.any(low[ok] <= 0):
+        raise ValueError("no positive incremental inductance on the map: the current ripple cannot be computed")
+    return scaled.currents[ok], low[ok]
+
+
+def _lower_inductance(cur: np.ndarray, low: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """L at the currents `x`: the lower of the two neighbouring nodes (a straight line reads high where L_inc levels
+    off); the first node below the map, the lowest L of the map above its top node."""
+    i = np.searchsorted(cur, x)
+    lower = np.minimum(low[np.clip(i - 1, 0, len(low) - 1)], low[np.clip(i, 0, len(low) - 1)])
+    return np.where(i >= len(cur), low.min(), lower)
+
+
+def ripple_half(result: MapResult, machine: RadialSRMParams, w: Winding, req: Requirements,
+                current: float) -> tuple[float, float]:
+    """(half the peak-to-peak ripple in A, lowest L_inc in H) at winding current `current`."""
+    cur, low = _ripple_inductance(result, machine, w)
+    inductance = float(_lower_inductance(cur, low, np.asarray(current)))
+    volts = req.max_bus_voltage_v or req.bus_voltage_v
+    return RIPPLE_HALF_SHARE * volts / (inductance * req.switching_frequency_hz), inductance
+
+
+def ripple_note(result: MapResult, machine: RadialSRMParams, w: Winding, req: Requirements,
+                j_peak: float) -> str | None:
+    """The evaluation note for the ripple-limited winding `w`; None when no limit is set or it does not bind. It
+    binds when `ripple_limited` lowered the winding's own current (the device peak in wire mode, `j_peak` over the
+    copper in density mode, as the winding builders set it) or left it within one grid step of the device peak."""
+    if req.switching_frequency_hz is None or req.phase_current_a is None:
+        return None
+    own = req.phase_current_a if w.wire is not None else j_peak * w.copper_area * w.paths
+    half, low = ripple_half(result, machine, w, req, w.current)
+    if w.current > own * (1 - 0.5 / _RIPPLE_GRID) and w.current + half <= req.phase_current_a - own / _RIPPLE_GRID:
+        return None
+    return (f"current limit {w.current:.1f} A: the {req.phase_current_a:.0f} A device peak less half the "
+            f"{2 * half:.1f} A ripple ({req.switching_frequency_hz / 1e3:g} kHz, "
+            f"{req.max_bus_voltage_v or req.bus_voltage_v:g} V, hard chopping, lowest L_inc {low * 1e3:.3g} mH)")
+
+
+def ripple_limited(windings: list[Winding], result: MapResult, machine: RadialSRMParams,
+                   req: Requirements) -> list[Winding]:
+    """Each winding with its current lowered to the largest I <= w.current whose peak I + dI(I)/2 stays within
+    `req.phase_current_a`; a winding with no such I is dropped. Unchanged without a switching frequency and a device
+    peak. A map with no incremental inductance raises ValueError."""
+    if req.switching_frequency_hz is None or req.phase_current_a is None:
+        return list(windings)
+    volts = req.max_bus_voltage_v or req.bus_voltage_v
+    out = []
+    for w in windings:
+        cur, low = _ripple_inductance(result, machine, w)
+        grid = w.current * (np.arange(1, _RIPPLE_GRID + 1) / _RIPPLE_GRID)   # the top point is w.current exactly
+        peak = grid + RIPPLE_HALF_SHARE * volts / (_lower_inductance(cur, low, grid) * req.switching_frequency_hz)
+        fits = np.flatnonzero(peak <= req.phase_current_a)
+        if fits.size:
+            out.append(dataclasses.replace(w, current=float(grid[fits[-1]])))
+    return out
 
 
 def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements, *, j_peak: float = J_PEAK,
@@ -145,7 +223,9 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
     conductor RMS current density, `j_peak_max` (default None: `J_PEAK_SCREEN`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
-    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
+    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths, among
+    the windings whose single-pulse strokes alone meet the margin (`ScanPoint.single_pulse`) while any exists: mutual
+    coupling under continuous conduction is not measured yet (owner, 2026-11-27). With no
     feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding.
 
     The scan runs one drive envelope per distinct (turn ratio, resistance, current limit, RMS limit), so windings
@@ -162,6 +242,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
         capped = len(windings) < sum(len(wire_windings(machine, req, i, math.inf)) for i in range(len(req.wires)))
     else:
         windings = density_windings(machine, req, j_peak, max_turns)
+    windings = ripple_limited(windings, result, machine, req)
     grid = speed_grid(req)
     band = grid[grid >= req.base_speed_rpm]
 
@@ -185,10 +266,11 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     by_key = dict(zip(distinct, summaries))
 
     def scan_point(w: Winding, key) -> ScanPoint:
-        speeds, torque, power, i_rms = by_key[key]
+        speeds, torque, power, i_rms, pulse = by_key[key]
         torque_ratio, power_ratio = _ratios(speeds, torque, power, req)
+        pulse_t, pulse_p = _ratios(speeds, pulse, pulse * speeds * 2 * math.pi / 60, req)
         return ScanPoint(w, torque_ratio, power_ratio, float(np.max(i_rms)),
-                         min(torque_ratio, power_ratio) >= margin)
+                         min(torque_ratio, power_ratio) >= margin, min(pulse_t, pulse_p) >= margin)
 
     scan = tuple(scan_point(w, key) for w, key in zip(windings, keys))
     if not scan:
@@ -200,7 +282,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     elif req.wire_mode:
         ranked = sorted(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
     else:
-        ranked = sorted(feasible, key=lambda s: (-s.winding.turns / s.winding.paths, s.winding.paths))
+        ranked = sorted(feasible, key=lambda s: (not s.single_pulse, -s.winding.turns / s.winding.paths, s.winding.paths))
     if feasible:
         point = ranked[0]
     return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid, j_limit), scan,

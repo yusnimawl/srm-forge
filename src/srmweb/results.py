@@ -69,6 +69,7 @@ class EnvelopeOut(_Out):
     line_rms: Vec | None = None
     power_factor: Vec | None = None
     waveforms: WaveformsOut | None = None
+    torque_single_pulse: Vec | None = None
 
 
 class MapArraysOut(_Out):
@@ -96,6 +97,7 @@ class ScanPointOut(_Out):
     power_ratio: F
     i_rms: F
     feasible: bool
+    single_pulse: bool = True
 
 
 class SpeedDetailOut(_Out):
@@ -236,6 +238,14 @@ class ThermalSummaryOut(_Out):
     iron_band: Vec | None = None
 
 
+class LimitOut(_Out):
+    name: str
+    status: str
+    value: F = None
+    limit: F = None
+    note: str = ""
+
+
 class EvaluationOut(_Out):
     id: str
     design: Design
@@ -262,6 +272,10 @@ class EvaluationOut(_Out):
     srmcore_version: str | None = None
     thermal_check: ThermalCheckOut | None = None
     thermal_summary: ThermalSummaryOut | None = None
+    limits: list[LimitOut] = []
+    nominal_continuous_kw_per_kg: F = None
+    nominal_peak_kw_per_kg: F = None
+    nominal_check: ThermalCheckOut | None = None
     thermal_fields: str | None = None   # key of the temperature-field file; null when not rated and before R5d
     active_volume_l: F = None
     rated_continuous_kw_per_l: F = None
@@ -278,6 +292,12 @@ class SearchResultOut(_Out):
     cancelled: bool
     evaluations: list[EvaluationOut]
     pareto_ids: list[str]
+    recommended_ids: list[str] = []   # stored results made before the recommendation lack these keys
+    recommendation_id: str | None = None
+    notes: list[str] = []
+    stopped: str = ""
+    limit_rejected: dict[str, int] = {}
+    dropped_pole_sets: dict[str, str] = {}
 
 
 class CheckOut(_Out):

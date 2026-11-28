@@ -22,7 +22,7 @@ def test_deterministic_for_a_seed():
 def test_every_candidate_is_valid_and_fits():
     cands, dropped = sample_candidates(_req(), 12, seed=1)
     assert len(cands) > 0
-    assert set(dropped) == {"validator", "fit"}
+    assert set(dropped) == {"validator", "fit", "length"}
     for c in cands:
         require_valid(c.design)
         build_outline(c.design.machine)
@@ -60,7 +60,7 @@ def test_very_restrictive_limit_returns_nothing_and_counts_drops():
 def test_split_is_even_over_pole_sets():
     cands, _ = sample_candidates(_req(), 8, seed=0)
     counts = [sum(c.design.machine.n_stator_poles == s for c in cands) for s, _, _ in POLE_SETS]
-    assert counts == [2, 2, 2, 2]
+    assert counts == [2, 2, 2, 1, 1]
 
 
 def test_small_n_uses_first_pole_sets():
@@ -78,3 +78,25 @@ def test_materials_and_their_lamination_thickness_are_set():
 def test_sample_candidates_preset():
     kept, _ = sample_candidates(_req(), 4, seed=0, preset="screening")
     assert kept and all(c.design.mesh.preset == "screening" for c in kept)
+
+
+def test_16_12_samples_pass_the_validator_and_the_fit_check():
+    cands, _ = sample_candidates(_req(), 4, seed=0, pole_sets=[(16, 12, 4)])
+    assert len(cands) == 4 and all(c.design.machine.n_rotor_poles == 12 for c in cands)
+
+
+def test_unset_length_limit_keeps_the_old_stack_mapping():
+    import numpy as np
+    from conftest import make_8_6
+    from srmapp.sizing.generator import _DIMS, _machine
+    for u in np.random.default_rng(0).random((5, _DIMS)):
+        m = _machine(u, 8, 6, 4, 0.08, 0.12, 6000.0, RegionMaterials(), 1e-4)
+        assert m.stack_length == m.stator_outer_diameter * (0.25 + 0.95 * u[1])
+
+
+def test_length_limit_caps_the_total_and_still_fills_n():
+    from srmapp.sizing.estimates import active_length
+    limit = 0.07
+    cands, dropped = sample_candidates(_req(max_length_m=limit), 12, seed=0)
+    assert len(cands) == 12 and dropped["length"] > 0
+    assert all(active_length(c.design.machine) <= limit for c in cands)

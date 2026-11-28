@@ -178,11 +178,36 @@
             ],
             "title": "Bore Diameter M"
           },
+          "candidate": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SKF 7005 CD/HCP4A",
+                  "NSK 30BNR19HTSUMP3",
+                  "SKF 7006 CD/HCP4A"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate"
+          },
           "count": {
             "default": 2,
             "minimum": 1.0,
             "title": "Count",
             "type": "integer"
+          },
+          "lubrication": {
+            "default": "grease",
+            "enum": [
+              "grease",
+              "oil_air"
+            ],
+            "title": "Lubrication",
+            "type": "string"
           },
           "radial_load_n": {
             "anyOf": [
@@ -195,6 +220,18 @@
               }
             ],
             "title": "Radial Load N"
+          },
+          "span_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span M"
           },
           "type": {
             "default": "deep_groove_ball",
@@ -1968,6 +2005,27 @@
             "title": "Torque",
             "type": "array"
           },
+          "torque_single_pulse": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torque Single Pulse"
+          },
           "waveforms": {
             "anyOf": [
               {
@@ -2262,6 +2320,14 @@
               }
             ]
           },
+          "limits": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LimitOut"
+            },
+            "title": "Limits",
+            "type": "array"
+          },
           "map": {
             "anyOf": [
               {
@@ -2282,6 +2348,38 @@
               }
             ],
             "title": "Mass Kg"
+          },
+          "nominal_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThermalCheckOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nominal_continuous_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nominal Continuous Kw Per Kg"
+          },
+          "nominal_peak_kw_per_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nominal Peak Kw Per Kg"
           },
           "peak_power_w": {
             "anyOf": [
@@ -3684,6 +3782,51 @@
         "title": "KeyNumbersOut",
         "type": "object"
       },
+      "LimitOut": {
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "LimitOut",
+        "type": "object"
+      },
       "LitzWire": {
         "additionalProperties": false,
         "description": "Litz or other multistrand conductor: `strands` round strands in a round bundle.",
@@ -5051,6 +5194,7 @@
             "$ref": "#/components/schemas/BearingSetup",
             "default": {
               "count": 2,
+              "lubrication": "grease",
               "type": "deep_groove_ball"
             }
           },
@@ -5107,6 +5251,30 @@
             ],
             "title": "Insulation Class",
             "type": "string"
+          },
+          "max_bus_voltage_v": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Bus Voltage V"
+          },
+          "max_length_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length M"
           },
           "max_mass_kg": {
             "anyOf": [
@@ -5171,6 +5339,18 @@
               }
             ],
             "title": "Phase Current A"
+          },
+          "switching_frequency_hz": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Switching Frequency Hz"
           },
           "winding_temperature_c": {
             "default": 120.0,
@@ -5269,6 +5449,11 @@
               }
             ],
             "title": "Power Ratio"
+          },
+          "single_pulse": {
+            "default": true,
+            "title": "Single Pulse",
+            "type": "boolean"
           },
           "torque_ratio": {
             "anyOf": [
@@ -5571,6 +5756,14 @@
             "title": "Dropped",
             "type": "object"
           },
+          "dropped_pole_sets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Dropped Pole Sets",
+            "type": "object"
+          },
           "evaluations": {
             "items": {
               "$ref": "#/components/schemas/EvaluationOut"
@@ -5578,11 +5771,46 @@
             "title": "Evaluations",
             "type": "array"
           },
+          "limit_rejected": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Limit Rejected",
+            "type": "object"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
           "pareto_ids": {
             "items": {
               "type": "string"
             },
             "title": "Pareto Ids",
+            "type": "array"
+          },
+          "recommendation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Id"
+          },
+          "recommended_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Recommended Ids",
             "type": "array"
           },
           "requirements": {
@@ -5595,6 +5823,11 @@
           "stage1_rejected": {
             "title": "Stage1 Rejected",
             "type": "integer"
+          },
+          "stopped": {
+            "default": "",
+            "title": "Stopped",
+            "type": "string"
           }
         },
         "required": [
@@ -7088,7 +7321,7 @@
   },
   "info": {
     "title": "srmweb",
-    "version": "0.12.1"
+    "version": "0.12.2"
   },
   "openapi": "3.1.0",
   "paths": {

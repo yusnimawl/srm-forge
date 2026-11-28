@@ -102,3 +102,15 @@ def test_narrow_rotor_pole_does_not_lower_the_bound():
     p = make_8_6()
     narrow = p.model_copy(update={"rotor_pole_arc": p.rotor_pole_arc / 2})
     assert torque_upper_bound(narrow, 1200.0) == pytest.approx(torque_upper_bound(p, 1200.0))
+
+
+def test_total_length_limit_rejects_after_mass_and_before_torque():
+    p = make_8_6()
+    total = est.active_length(p)
+    assert stage1(_req(peak_power_w=1000.0, peak_torque_nm=3.2, max_length_m=total * 1.01), p).passes
+    s = stage1(_req(peak_power_w=1000.0, peak_torque_nm=3.2, max_length_m=total * 0.99), p)
+    assert not s.passes and f"total length {total * 1e3:.0f} mm above the {total * 0.99e3:.0f} mm limit" in s.reason
+    s = stage1(_req(max_length_m=total * 0.99, max_mass_kg=0.5), p)
+    assert "mass" in s.reason and "length" not in s.reason
+    s = stage1(_req(max_length_m=total * 0.99), p)   # torque requirement fails too; length comes first
+    assert "total length" in s.reason

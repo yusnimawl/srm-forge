@@ -89,7 +89,7 @@ def test_choose_turns_only_scans_the_given_winding(monkeypatch):
     w = fixed_winding(P, req, 10, 1, 1, None, 8e6)
     monkeypatch.setattr(t, "_envelope", lambda *a, **k: SimpleNamespace(i_rms=np.array([1.0])))
     ones = np.array([1.0])
-    monkeypatch.setattr(t, "_drive_summary", lambda *a: (ones, ones, ones, ones))
+    monkeypatch.setattr(t, "_drive_summary", lambda *a: (ones, ones, ones, ones, ones))
     monkeypatch.setattr(t, "_ratios", lambda *a: (1.5, 1.5))
     choice = choose_turns(None, P, req, only=w, margin=1.0)
     assert len(choice.scan) == 1 and choice.scan[0].winding is w and choice.point.winding is w

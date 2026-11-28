@@ -99,9 +99,14 @@ def active_mass(p: RadialSRMParams) -> Mass:
                 copper=copper_mass(p, p.turns_per_pole, conductor_area(p)))
 
 
+def active_length(p: RadialSRMParams) -> float:
+    """m: the stack plus both end windings (coil build and slot liner each end)."""
+    return p.stack_length + 2 * (coil_geometry(p).build + p.slot_liner_thickness)
+
+
 def active_volume(p: RadialSRMParams) -> float:
-    """m3: the stator outer cylinder over the stack plus both end windings (coil build and slot liner each end)."""
-    return math.pi / 4 * p.stator_outer_diameter**2 * (p.stack_length + 2 * (coil_geometry(p).build + p.slot_liner_thickness))
+    """m3: the stator outer cylinder over `active_length`."""
+    return math.pi / 4 * p.stator_outer_diameter**2 * active_length(p)
 
 
 def phase_resistance(p: RadialSRMParams, temperature_c: float = 100.0) -> float:

@@ -97,3 +97,54 @@ def test_evaluation_out_parses_waveforms():
     nan_pf = dataclasses.replace(ev.envelope, power_factor=np.array([0.5, NAN]))
     out = EvaluationOut.model_validate(evaluation_json(dataclasses.replace(ev, envelope=nan_pf)))
     assert out.envelope.power_factor[1] is None
+
+
+def _rec_result(evals=(), **kw):
+    req = Requirements(peak_power_w=1000, peak_torque_nm=10, base_speed_rpm=955, max_speed_rpm=2000)
+    return SearchResult(req, len(evals), {}, 0, tuple(evals), False, **kw)
+
+
+def test_search_result_json_recommendation_keys():
+    from srmapp.pipeline import PEAK_BAND_NOTE
+    r = _rec_result((_eval(True), _eval(False)), limit_rejected={"rotor_stress": 3},
+                    dropped_pole_sets={"6/4": "not self-starting"}, stopped="three failures")
+    out = search_result_json(r)
+    json.dumps(out, allow_nan=False)
+    assert out["recommended_ids"] == ["good"] and out["recommendation_id"] == "good"
+    assert out["notes"] == [PEAK_BAND_NOTE]
+    assert out["limit_rejected"] == {"rotor_stress": 3}
+    assert out["dropped_pole_sets"] == {"6/4": "not self-starting"} and out["stopped"] == "three failures"
+
+
+def test_search_result_json_without_recommendation():
+    out = search_result_json(_rec_result((_eval(False),)))
+    assert out["recommendation_id"] is None and out["recommended_ids"] == [] and out["notes"] == []
+    assert out["limit_rejected"] == {} and out["dropped_pole_sets"] == {} and out["stopped"] == ""
+
+
+def test_older_stored_results_load():
+    from srmweb.results import EvaluationOut, SearchResultOut
+    out = search_result_json(_rec_result((_eval(True),)))
+    new_ev = ("limits", "nominal_continuous_kw_per_kg", "nominal_peak_kw_per_kg", "nominal_check")
+    for e in out["evaluations"]:
+        for k in new_ev:
+            e.pop(k)
+    for k in ("recommended_ids", "recommendation_id", "notes", "stopped", "limit_rejected", "dropped_pole_sets"):
+        out.pop(k)
+    got = SearchResultOut.model_validate(out)
+    assert got.recommendation_id is None and got.recommended_ids == [] and got.evaluations[0].limits == []
+    assert EvaluationOut.model_validate(out["evaluations"][0]).nominal_check is None
+
+
+def test_new_evaluation_fields_nan_become_null():
+    from srmapp.limits import Limit
+    from srmweb.results import EvaluationOut
+    ev = dataclasses.replace(_eval(True), limits=(Limit("rotor", "not_run", NAN, None, "n"),),
+                             nominal_continuous_kw_per_kg=NAN, nominal_peak_kw_per_kg=NAN)
+    ev = dataclasses.replace(ev, envelope=dataclasses.replace(ev.envelope, torque_single_pulse=np.array([1.0, NAN])))
+    body = evaluation_json(ev)
+    assert body["envelope"]["torque_single_pulse"] == [1.0, None]
+    assert body["limits"][0]["value"] is None and body["nominal_peak_kw_per_kg"] is None
+    out = EvaluationOut.model_validate(body)
+    dumped = json.loads(out.model_dump_json())
+    assert dumped["envelope"]["torque_single_pulse"] == [1.0, None] and dumped["nominal_continuous_kw_per_kg"] is None

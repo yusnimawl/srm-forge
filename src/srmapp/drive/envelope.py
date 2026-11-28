@@ -53,7 +53,11 @@ class Envelope:
 
     `waveforms` holds the chosen stroke of phase A and the dc-link current over one rotor pole pitch (zeros where no
     stroke is valid). `line_mean` and `line_rms` are the mean and RMS of the dc-link current. `power_factor` is the
-    output power over q·V_rms·I_rms of one phase (copper loss only; NaN where there is no stroke)."""
+    output power over q·V_rms·I_rms of one phase (copper loss only; NaN where there is no stroke).
+
+    `torque_single_pulse` is the best torque per speed over the strokes that start from zero flux (single pulses),
+    after the same RMS filter, from the same stroke pass; it is 0 where no single pulse is valid and equals `torque`
+    where the chosen stroke is one."""
     speeds_rpm: np.ndarray
     torque: np.ndarray
     power: np.ndarray
@@ -67,6 +71,7 @@ class Envelope:
     line_mean: np.ndarray
     line_rms: np.ndarray
     power_factor: np.ndarray
+    torque_single_pulse: np.ndarray | None = None
 
     @property
     def efficiency(self) -> np.ndarray:
@@ -299,12 +304,16 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     q = machine.n_phases
     zero = np.zeros(n)
     traces = []
+    single = []
     for rpm in speeds:
         omega = rpm * 2 * math.pi / 60
         w_t, w_l, i2, valid, psi0 = _strokes(t, omega, bus_voltage, resistance, on, off)
         if rms_limit is not None:
             valid &= i2 / period <= rms_limit**2 * (1 + _EPS)
         best = int(np.argmax(np.where(valid, w_t, -np.inf))) if valid.any() else -1
+        pulse = valid & (psi0 == 0)
+        pbest = int(np.argmax(np.where(pulse, w_t, -np.inf))) if pulse.any() else -1
+        single.append(q * machine.n_rotor_poles * w_t[pbest] / (2 * math.pi) if pbest >= 0 and w_t[pbest] > 0 else 0.0)
         if best < 0 or w_t[best] <= 0:
             rows.append((0.0, 0.0, _theta(t, on[0]), _theta(t, off[0]), 0.0, 0.0, 0.0))
             traces.append((zero,) * 5)
@@ -321,12 +330,13 @@ def envelope(result: MapResult, machine: RadialSRMParams, bus_voltage: float, re
     power = torque * speeds * 2 * math.pi / 60
     if not waveforms:
         nan = np.full(speeds.size, np.nan)
-        return Envelope(speeds, torque, power, copper, th_on, th_off, work_t, work_l, i_rms, None, nan, nan, nan)
+        return Envelope(speeds, torque, power, copper, th_on, th_off, work_t, work_l, i_rms, None, nan, nan, nan,
+                        np.array(single))
     cur, psi_w, volt, tq_w, bus = (np.array(c) for c in zip(*traces))
     wave = Waveforms(t.theta[:n], cur, psi_w, volt, tq_w, line_current(bus, q))
     return Envelope(speeds, torque, power, copper, th_on, th_off, work_t, work_l, i_rms, wave,
                     wave.line.mean(axis=1), np.sqrt((wave.line**2).mean(axis=1)),
-                    power_factor(power, volt, cur, q))
+                    power_factor(power, volt, cur, q), np.array(single))
 
 
 @dataclass(frozen=True)

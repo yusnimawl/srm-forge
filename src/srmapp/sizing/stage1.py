@@ -8,11 +8,14 @@ from srmcore.materials.library import load_material
 from srmcore.model.design import RadialSRMParams
 
 from ..requirements import Requirements
-from .estimates import J_PEAK, J_PEAK_SCREEN, Mass, active_mass, pole_chord, peak_cap_text
+from .estimates import J_PEAK, J_PEAK_SCREEN, Mass, active_length, active_mass, pole_chord, peak_cap_text
 from .winding import max_mmf
 
 # Allowance on the saturation flux for mu0*H beyond Js and fringing.
 FLUX_ALLOWANCE = 1.1
+# Largest measured share (drive torque at 50 r/min at the map top over `torque_upper`) 0.636 x 1.1, bike requirement
+# at ratio 12, 9 designs of 3 pole sets (docs/validation/bike_gates_bound_share.json); orders the shortlist only.
+BOUND_SHARE = 0.699
 
 
 def torque_upper_bound(p: RadialSRMParams, mmf: float) -> float:
@@ -46,6 +49,8 @@ def stage1(req: Requirements, p: RadialSRMParams, margin: float = 1.0, j_peak: f
     reason = ""
     if req.max_mass_kg is not None and mass.iron > req.max_mass_kg:
         reason = f"iron mass {mass.iron:.2f} kg above the {req.max_mass_kg:.2f} kg limit"
+    elif req.max_length_m is not None and (length := active_length(p)) > req.max_length_m:   # owner limit, core spec §11, 2026-11-26 item 11
+        reason = f"total length {length * 1e3:.0f} mm above the {req.max_length_m * 1e3:.0f} mm limit"
     elif mmf == 0.0:
         reason = ("no winding meets the wire, phase current and peak current-density "
                   f"({peak_cap_text(j_peak_max)}) limits" if req.wire_mode and math.isfinite(j_peak_max) else

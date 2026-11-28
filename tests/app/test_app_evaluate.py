@@ -5,8 +5,9 @@ from unittest import mock
 import numpy as np
 import pytest
 from conftest import make_8_6
-from map_fixtures import synthetic_map
+from map_fixtures import inductance, synthetic_map
 
+from srmapp.limits import Limit
 from srmapp.drive.envelope import Envelope
 from srmapp.evaluate import Evaluation, StageTwoGrid, evaluate_stage2, requirement_ratios, rescale_turns, speed_grid, turns_scale
 from srmapp.requirements import Requirements
@@ -137,6 +138,20 @@ def test_single_pulse_evaluation_has_no_coupling_note():
     assert "continuous conduction" not in e.error
 
 
+@pytest.mark.parametrize("device_peak, binds", [(110.0, True), (1000.0, False)])
+def test_ripple_note_only_where_the_ripple_lowers_the_current(device_peak, binds):
+    req = _req(phase_current_a=device_peak, switching_frequency_hz=20e3)
+    stage = stage1(req, make_8_6())
+    r = _map(stage)
+    l_inc = np.full(r.l_inc.shape, np.nan)
+    l_inc[..., r.circuits.index(r.excited)] = inductance(r.angles)[:, None] + 0 * r.currents[None, :]
+    with mock.patch("srmapp.evaluate.build_map", return_value=dataclasses.replace(r, l_inc=l_inc)):
+        e = evaluate_stage2(_cand(), req, stage, max_turns=30, thermal=False)
+    own = est.J_PEAK * e.winding.copper_area * e.winding.paths
+    assert (e.winding.current < own) == binds
+    assert (f"current limit {e.winding.current:.1f} A: the {device_peak:.0f} A device peak less half the" in e.error) == binds
+
+
 def test_density_mode_evaluation_fills_the_metrics():
     e, stage = _evaluate(_req())
     assert e.status == "ok" and e.winding is not None and e.winding.wire is None
@@ -187,7 +202,31 @@ def test_mass_over_the_limit_after_the_winding_is_chosen_is_infeasible():
     e, stage = _evaluate(_req(wires=[THICK], phase_current_a=100.0, max_mass_kg=limit))
     assert stage.passes and e.status == "ok" and not e.feasible
     assert "mass" in e.error and f"{limit:.2f} kg limit" in e.error
-    assert free.error == "not thermally rated"
+    assert "not thermally rated" in free.error and "rotor stress not checked" in free.error
+
+
+def test_length_over_the_limit_after_the_winding_is_chosen_is_infeasible():
+    from srmapp.sizing.estimates import active_length
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    length = active_length(make_8_6())
+    stage = stage1(req, make_8_6())
+    limited = _req(wires=[THICK], phase_current_a=100.0, max_length_m=length * 0.9)
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)):
+        e = evaluate_stage2(_cand(), limited, stage, max_turns=30, thermal=False)
+    assert e.status == "ok" and not e.feasible
+    assert f"total length {length * 1e3:.0f} mm above the {length * 0.9e3:.0f} mm limit" in e.error
+
+
+def test_ripple_inputs_without_their_partners_are_noted_as_ignored():
+    e, _ = _evaluate(_req(switching_frequency_hz=20e3, max_bus_voltage_v=450.0))
+    assert "switching_frequency_hz is ignored" in e.error and "max_bus_voltage_v is ignored" in e.error
+
+
+def test_passing_limit_caveats_are_in_the_notes():
+    req = _req(wires=[THICK], phase_current_a=100.0)
+    e, _ = _evaluate(req)
+    assert all(lim.status != "fail" for lim in e.limits if lim.name in ("bending", "bearing_speed"))
+    assert "bearing span is estimated" in e.error and "unsafe if the set has medium preload" in e.error
 
 
 @pytest.mark.slow
@@ -260,11 +299,12 @@ def test_failed_evaluation_has_no_map():
 
 
 def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, error_at=None, rate_error=None,
-                 ratios=None, seen=None):
+                 ratios=None, seen=None, nominal=False, gap="pass"):
     """Stage 2 with thermal mocked: `holds` gives check_requirement's answer per winding in order (a failing check
     fails at 3000 rpm on the hot spot). `n_ranked` windings are EM-feasible (0: none is); `error_at` = (k, exc)
     raises exc from the k-th check, `ctx_error` = (k, exc) from the k-th thermal_context call; `ratios` sets the
-    torque and power ratio of each ranked winding and `seen` receives the ranked points."""
+    torque and power ratio of each ranked winding and `seen` receives the ranked points; `nominal` is whether the
+    nominal-set check (rows=frozenset()) holds; `gap` is the status the gap limit returns."""
     import srmapp.thermal as th
     from srmapp.turns import TurnsChoice, choose_turns
     req = _req()
@@ -285,7 +325,9 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     rated = mock.Mock(return_value="RATING", side_effect=rate_error)
     checks = []
 
-    def check(ctx, n):
+    def check(ctx, n, rows=None):
+        if rows is not None:   # the nominal-set check
+            return th.RequirementCheck(nominal, None if nominal else 3000.0, (), (), (), "" if nominal else th.HOT_SPOT_ABOVE)
         checks.append(ctx)
         if error_at is not None and len(checks) == error_at[0]:
             raise error_at[1]
@@ -304,6 +346,7 @@ def _ranked_eval(monkeypatch, holds, ctx_error=None, cancel=None, n_ranked=3, er
     monkeypatch.setattr(th, "rate_context", rated)
     # a rating the evaluation can read
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", gap, 0.0, 1.0, "gap note"))
     with mock.patch("srmapp.evaluate.build_map", return_value=result), mock.patch("srmapp.evaluate.choose_turns", choose):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30, cancel=None if cancel is None else (lambda: cancel(checks)))
     return e, rated, checks
@@ -322,11 +365,18 @@ def test_first_holding_winding_is_chosen(monkeypatch):
     assert rated.call_count == 1 and len(checks) == 2
 
 
+@pytest.mark.parametrize("gap, feasible", [("pass", True), ("not_run", True), ("fail", False)])
+def test_gap_limit_status_decides_feasibility(monkeypatch, gap, feasible):
+    e, _, _ = _ranked_eval(monkeypatch, [True], gap=gap)
+    assert [(l.name, l.status) for l in e.limits if l.name == "gap_closure"] == [("gap_closure", gap)]
+    assert e.feasible is feasible
+
+
 def test_no_winding_holds(monkeypatch):
     e, rated, checks = _ranked_eval(monkeypatch, [False, False, False])
     assert e.rating is None and not e.feasible and e.winding is checks[0]
     assert "no winding holds the rated hot-spot limit" in e.error and not rated.called
-    assert "3000 rpm" in e.error and "hot spot above the limit" in e.error and "checked" not in e.error
+    assert "3000 rpm" in e.error and "hot spot above the limit" in e.error and "EM-feasible windings" not in e.error
 
 
 def test_thermal_checks_stop_at_the_cap(monkeypatch):
@@ -370,11 +420,43 @@ def test_no_em_feasible_winding_is_not_rated(monkeypatch):
     assert "no winding is EM-feasible" in e.error and "not thermally rated" in e.error
 
 
-def test_refusal_keeps_em_choice(monkeypatch):
+def test_refusal_is_infeasible(monkeypatch):
     from srmcore.materials.loss import MissingLossData
     e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, MissingLossData("no loss table")))
-    assert e.status == "ok" and e.rating is None and e.feasible
+    assert e.status == "ok" and e.rating is None and not e.feasible
     assert "no loss table" in e.error and "not thermally rated" in e.error
+
+
+def test_cooling_refusal_is_infeasible(monkeypatch):
+    from srmapp.cooling import MissingCoolingData
+    e, rated, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, MissingCoolingData("no oil data")))
+    assert e.status == "ok" and e.rating is None and not e.feasible and e.nominal_check is None
+    assert "no oil data" in e.error and "not thermally rated" in e.error
+
+
+@pytest.mark.parametrize("nominal", [True, False])
+def test_failing_winding_gets_a_nominal_check(monkeypatch, nominal):
+    e, _, _ = _ranked_eval(monkeypatch, [False, False, False], nominal=nominal)
+    assert e.nominal_check is not None and e.nominal_check.holds is nominal and not e.feasible
+
+
+def test_holding_winding_has_no_nominal_check(monkeypatch):
+    e, _, _ = _ranked_eval(monkeypatch, [True])
+    assert e.nominal_check is None
+
+
+def test_rated_kw_per_kg_reads_the_chosen_set():
+    from srmapp.evaluate import _rated_kw_per_kg
+    from srmapp.thermal import Rating, SpeedRating
+    from srmcore.thermal.solve import HotSpot
+    hs = HotSpot(100.0, "coil")
+
+    def at(cont):
+        return SpeedRating(3000.0, 2 * cont, cont, 2 * cont, hs, hs, 80.0, 90.0, 70.0, 75.0, 3, 10)
+    rating = Rating((at(2.0),), (at(1.0),), (), 180.0, "H", None, None, {}, 1.1, 5, (), "0")
+    w = 2 * math.pi / 60
+    assert _rated_kw_per_kg(rating, _req(), "continuous_nm", 1.0, "nominal") == pytest.approx(2.0 * 3000 * w / 1000)
+    assert _rated_kw_per_kg(rating, _req(), "continuous_nm", 1.0) == pytest.approx(1.0 * 3000 * w / 1000)
 
 
 def test_cancel_during_checks(monkeypatch):
@@ -441,9 +523,10 @@ def _failing_stage2(monkeypatch, rate_failed):
         return "RATING"
     monkeypatch.setattr(th, "thermal_context", lambda req_, ref, res, w, **kw: w)
     monkeypatch.setattr(th, "check_requirement",
-                        lambda ctx, n: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
+                        lambda ctx, n, rows=None: th.RequirementCheck(False, 6000.0, (), (), ("6000 rpm: HOT_SPOT_ABOVE",), "HOT_SPOT_ABOVE"))
     monkeypatch.setattr(th, "rate_context", rated)
     monkeypatch.setattr("srmapp.evaluate._rated_kw_per_kg", lambda *a: 1.0)
+    monkeypatch.setattr("srmapp.evaluate.gap_limit", lambda *a: Limit("gap_closure", "pass", 0.0, 1.0, ""))
     with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), mock.patch("srmapp.evaluate.choose_turns", choose):
         e = evaluate_stage2(_cand(), req, stage, max_turns=30, rate_failed=rate_failed, fields_out=fields.append)
     return e, fields
@@ -471,3 +554,21 @@ def test_rated_infeasible_stays_off_the_front():
                           rated_continuous_kw_per_kg=v, rated_peak_kw_per_kg=v)
     res = SearchResult(_req(), 2, {}, 0, (ev(False, 9.0), ev(True, 1.0)), False)
     assert [e.feasible for e in res.pareto()] == [True]
+
+
+def test_input_error_from_the_context_is_a_failed_evaluation_and_is_logged(monkeypatch, caplog):
+    from srmcore.model.errors import InputError
+    with caplog.at_level("ERROR", logger="srmapp.evaluate"):
+        e, _, _ = _ranked_eval(monkeypatch, [], ctx_error=(1, InputError([])))
+    assert e.status == "InputError" and not e.feasible
+    assert any(r.exc_info for r in caplog.records) and _cand().id in caplog.text
+
+
+def test_choose_turns_error_is_a_failed_evaluation_and_is_logged(caplog):
+    stage = stage1(_req(), make_8_6())
+    with mock.patch("srmapp.evaluate.build_map", return_value=_map(stage)), \
+            mock.patch("srmapp.evaluate.choose_turns", side_effect=ValueError("scan broke")), \
+            caplog.at_level("ERROR", logger="srmapp.evaluate"):
+        e = evaluate_stage2(_cand(), _req(), stage, max_turns=30)
+    assert e.status == "ValueError" and "scan broke" in e.error and not e.feasible
+    assert any(r.exc_info for r in caplog.records) and _cand().id in caplog.text

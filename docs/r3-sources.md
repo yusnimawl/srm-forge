@@ -238,3 +238,26 @@ Yan et al., IET Electr. Power Appl. 14(11), 2020, Table 3 (4-phase 8/6, 50W470, 
 **Grade B**, a manufacturer's reference values with no stated accuracy. The SKF frictional-moment model (rolling, sliding, seal and drag terms) was seen in a search result and not read; it would need bearing catalogue constants that are not chosen yet.
 
 **Placeholders (owner row: the bearing is not chosen).** `srmapp.mechanical.BearingSetup` takes the type, the number of bearings, the bore and the load; with nothing set (`placeholder` true) it uses deep groove ball bearings, a bore equal to the shaft diameter and a load equal to the rotor weight (rotor laminations plus the shaft over the stack length, times 9.81 m/s2). Results then say so, in the notes and in the Losses chip. Magnetic pull, unbalance and drive loads are not in the load.
+
+## 8. Current ripple of the winding current limit (bike gates, 2026-11-28)
+
+No outside source was read. The constant `RIPPLE_HALF_SHARE` (0.25, `srmapp.turns`) comes from the relation L di/dt = V alone. It is a derived value, grade D.
+
+**Derivation.** Take hard chopping at zero back-EMF at a 50 % duty cycle. The voltage across the phase is +V for half a period and -V for the other half. The current ramps up by V (1 / (2 f)) / L = V / (2 L f) in the first half and down by the same in the second. So the peak-to-peak ripple is V / (2 L f) and half of it is V / (4 L f), which is 0.25 x V / (L f). With soft chopping (+V, then zero) the same ramp is half as large. So hard chopping is the safe side by a factor of 2. With back-EMF e the hard-chopping peak-to-peak ripple is (V^2 - e^2) / (2 V L f), so zero back-EMF is the worst case. Hysteresis control can chop hard (`soft = 0` in `hysteresis.c`), so the ripple is sized for hard chopping.
+
+**Used in the code.** `turns.ripple_limited` lowers a winding's current to the largest I at most `w.current` with I + 0.25 V / (L f) at most `phase_current_a`. V is `max_bus_voltage_v` (else `bus_voltage_v`) and f is `switching_frequency_hz`. L is the lowest incremental inductance over the map angles at I, with the end winding at the free-air bound (image factor 1.0) instead of the map's 1.5, divided by 1 + `MEASURED_LU_GAP` (0.452). For a current between two map nodes, L is the lower of the two nodes.
+
+**Assumptions and their signs.**
+
+| Assumption | Sign on the allowed current |
+|---|---|
+| Hard chopping (the hysteresis controller can chop hard; the others chop soft) | low (safe) |
+| Zero back-EMF (hard chopping: ripple (V^2 - e^2) / (2 V L f), so e = 0 is the worst case) | low (safe) |
+| Model L: the 2D map plus end winding reads Lu 45 % high against the Krishnan 6/4 measurement (`MEASURED_LU_GAP`), divided out | low (safe) |
+| End winding at image factor 1.0, the free-air lower bound (the map carries 1.5; a higher L lowers the ripple, unsafe) | low (safe) |
+| Highest bus voltage, not the design voltage | low (safe) |
+| Lowest L_inc over the angles | low (safe) |
+| Lower neighbour node for L between nodes | low (safe) |
+| 50 % duty cycle (the largest ripple of a single leg) | low (safe) |
+
+The 0.25 is not measured. No measured ripple of an SRM phase at a bus voltage and switching frequency was compared with it.
