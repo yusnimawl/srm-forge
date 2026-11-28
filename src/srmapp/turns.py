@@ -71,6 +71,7 @@ class ScanPoint:
     power_ratio: float      # achieved / required, worst over base..max speed
     i_rms: float            # A, phase RMS current, worst over base..max speed
     feasible: bool          # worst ratio at least the margin
+    single_pulse: bool = True   # the single-pulse strokes alone meet the margin at base speed and over the band
 
     @property
     def worst(self) -> float:
@@ -126,11 +127,12 @@ def _scan_init(result: MapResult, machine: RadialSRMParams, bus_voltage: float, 
 
 def _drive_summary(result: MapResult, machine: RadialSRMParams, bus_voltage: float, band: np.ndarray,
                    key: tuple[float, float, float, float]):
-    """(speeds, torque, power, i_rms) of the drive envelope of one `_drive_key` over `band`; no waveforms."""
+    """(speeds, torque, power, i_rms, single-pulse torque) of the drive envelope of one `_drive_key` over `band`; no
+    waveforms."""
     k, resistance, current, rms_limit = key
     env = envelope(rescale_turns(result, k), machine, bus_voltage, resistance, band, current_limit=current,
                    rms_limit=rms_limit, waveforms=False)
-    return env.speeds_rpm, env.torque, env.power, env.i_rms
+    return env.speeds_rpm, env.torque, env.power, env.i_rms, env.torque_single_pulse
 
 
 def _scan_job(key: tuple[float, float, float, float]):
@@ -213,7 +215,9 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     """Scan every allowed winding on the map of `machine` (built at `machine.turns_per_pole`). `j_limit` caps the
     conductor RMS current density, `j_peak_max` (default None: `J_PEAK_SCREEN`) the peak density in wire mode. A winding is
     feasible when its worst ratio is at least `margin`. Wire mode keeps the feasible winding with the lowest
-    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths. With no
+    resistance; density mode keeps the feasible winding with the most equivalent turns (turns / paths), then the fewest paths, among
+    the windings whose single-pulse strokes alone meet the margin (`ScanPoint.single_pulse`) while any exists: mutual
+    coupling under continuous conduction is not measured yet (owner, 2026-11-27). With no
     feasible winding, the one with the largest worst ratio is reported. `only` replaces the scan with that one winding.
 
     The scan runs one drive envelope per distinct (turn ratio, resistance, current limit, RMS limit), so windings
@@ -254,10 +258,11 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     by_key = dict(zip(distinct, summaries))
 
     def scan_point(w: Winding, key) -> ScanPoint:
-        speeds, torque, power, i_rms = by_key[key]
+        speeds, torque, power, i_rms, pulse = by_key[key]
         torque_ratio, power_ratio = _ratios(speeds, torque, power, req)
+        pulse_t, pulse_p = _ratios(speeds, pulse, pulse * speeds * 2 * math.pi / 60, req)
         return ScanPoint(w, torque_ratio, power_ratio, float(np.max(i_rms)),
-                         min(torque_ratio, power_ratio) >= margin)
+                         min(torque_ratio, power_ratio) >= margin, min(pulse_t, pulse_p) >= margin)
 
     scan = tuple(scan_point(w, key) for w, key in zip(windings, keys))
     if not scan:
@@ -269,7 +274,7 @@ def choose_turns(result: MapResult, machine: RadialSRMParams, req: Requirements,
     elif req.wire_mode:
         ranked = sorted(feasible, key=lambda s: (s.winding.resistance, s.winding.turns, s.winding.paths))
     else:
-        ranked = sorted(feasible, key=lambda s: (-s.winding.turns / s.winding.paths, s.winding.paths))
+        ranked = sorted(feasible, key=lambda s: (not s.single_pulse, -s.winding.turns / s.winding.paths, s.winding.paths))
     if feasible:
         point = ranked[0]
     return TurnsChoice(point, bool(feasible), _envelope(result, machine, req, point.winding, grid, j_limit), scan,
